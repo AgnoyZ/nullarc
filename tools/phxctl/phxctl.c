@@ -18,6 +18,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "../../src/phxbringup/PhxNativeABI.h"
+#include "../../src/phxbringup/PhxPspLayout.h"
+static_assert(sizeof(struct PhxPspLayout) == 64, "PSP layout wire size");
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,13 +81,20 @@ static kern_return_t checked_method(io_connect_t connection, uint32_t selector,
    return kr;
 }
 
-static uint32_t checked_u32(const char *text)
+static uint64_t checked_u64(const char *text)
 {
    char *end = NULL;
    if (!text || text[0] < '0' || text[0] > '9') control_failure(64, "invalid unsigned argument");
    errno = 0;
    unsigned long long value = strtoull(text, &end, 0);
-   if (errno || end == text || *end || value > UINT32_MAX) control_failure(64, "invalid unsigned argument");
+   if (errno || end == text || *end || value > UINT64_MAX) control_failure(64, "invalid unsigned argument");
+   return (uint64_t)value;
+}
+
+static uint32_t checked_u32(const char *text)
+{
+   uint64_t value = checked_u64(text);
+   if (value > UINT32_MAX) control_failure(64, "invalid unsigned argument");
    return (uint32_t)value;
 }
 
@@ -235,6 +244,8 @@ static const struct named_reg gc_regs[] = {
 
 int main(int argc, char **argv)
 {
+   if (argc >= 2 && !strcmp(argv[1], "psp-layout") && argc != 7)
+      control_failure(64, "psp-layout requires ring offset, TMR offset/capacity and staging offset/capacity");
    if (argc >= 2 && !strcmp(argv[1], "verify-file")) {
       if (argc != 4) control_failure(64, "verify-file requires a file and reviewed SHA-256");
       uint32_t size = 0;
@@ -253,7 +264,14 @@ int main(int argc, char **argv)
    if (open_kext())
       return 1;
 
-   if (!strcmp(argv[1], "regs")) {
+   if (!strcmp(argv[1], "psp-layout")) {
+      struct PhxPspLayout layout = {PHX_PSP_LAYOUT_VERSION, checked_u64(argv[2]), checked_u64(argv[3]),
+         checked_u64(argv[4]), checked_u64(argv[5]), checked_u64(argv[6]), {0, 0}};
+      uint64_t out[4] = {0};
+      uint32_t n = 4;
+      checked_method(conn, PHX_PSP_LAYOUT_SELECTOR, NULL, 0, &layout, sizeof(layout), out, &n, NULL, NULL);
+      printf("psp layout configured; numeric checks only, memory ownership unverified\n");
+   } else if (!strcmp(argv[1], "regs")) {
       for (int i = 2; i < argc; i++) {
          uint32_t reg = (uint32_t)strtoul(argv[i], NULL, 0), v = 0;
          int kr = read_reg(reg, &v);

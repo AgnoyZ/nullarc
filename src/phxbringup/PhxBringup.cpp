@@ -21,6 +21,9 @@
 #include <sys/sysctl.h>
 
 #include "PhxNativeABI.h"
+#include "PhxPspLayout.h"
+static_assert(sizeof(PhxPspLayout) == 64, "PSP layout wire size");
+static_assert(PHX_PSP_LAYOUT_RING_BYTES == PHX_PSP_FENCE_REL + 0x1000, "PSP layout ring span");
 #include <libkern/version.h>
 #include "PhxHardwarePolicy.hpp"
 
@@ -85,6 +88,7 @@ public:
     IOReturn sysMem(uint64_t op, uint64_t a, uint64_t b, uint64_t *out0, uint64_t *out1);
     IOReturn smuMessage(uint32_t msg, uint32_t arg, uint32_t *resp, uint32_t *argAfter);
     IOReturn pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4]);
+    IOReturn configurePspLayout(const PhxPspLayout &layout, uint64_t out[4]);
     IOReturn pspSubmit(uint32_t cmdId, uint64_t out[4]);
     IOReturn fwStage(uint32_t dstOffset, const void *bytes, uint32_t len);
     IOReturn loadIpFw(uint32_t fwType, uint32_t fwBufOffset, uint32_t size, uint64_t out[4]);
@@ -134,6 +138,8 @@ private:
     uint64_t cmdOff{0}, cmdMc{0}, fenceOff{0}, fenceMc{0};
     uint32_t fenceCounter{0};
     bool pspSubmissionFaulted{false}; // sticky for this driver instance; no automatic recovery
+    PhxPspLayout pspLayout{};
+    bool pspLayoutConfigured{false};
     // Firmware bring-up regions (set when the ring is created): TMR the PSP copies firmware into, and fw_buf
     // where the CPU stages ucode for LOAD_IP_FW. Offsets are VRAM byte offsets, Mc the matching MC addresses.
     uint64_t tmrOff{0}, tmrMc{0}, tmrSize{0};
@@ -231,6 +237,7 @@ private:
     IOReturn doWaitSeq(IOExternalMethodArguments *a);
     IOReturn doDbgSmu(IOExternalMethodArguments *a);
     IOReturn doDbgPspRing(IOExternalMethodArguments *a);
+    IOReturn doDbgPspLayout(IOExternalMethodArguments *a);
     IOReturn doDbgVramRead(IOExternalMethodArguments *a);
     IOReturn doDbgPspSubmit(IOExternalMethodArguments *a);
     IOReturn doDbgFwStage(IOExternalMethodArguments *a);
@@ -879,12 +886,36 @@ bool PhxBringup::pspWaitTos(uint32_t timeoutMs) const {
     return false;
 }
 
-// Debug selector 101: create / destroy the PSP 13.0.4 KM ring the way Linux psp_v13_0_ring_create / _stop and
-// Cobalt64 psp_v14_0.cpp do. The ring lives in VRAM at carveOffset; the CPU writes it through the BAR0
-// framebuffer aperture, which is MMIO above system RAM — so the PSP sees the bytes and the macOS heap is never
-// touched. The MC address handed to the PSP is fbMcBase + carveOffset.
+// Debug selector 114: validate/store numeric offsets only. This does not reserve memory or prove ownership.
+IOReturn PhxBringup::configurePspLayout(const PhxPspLayout &layout, uint64_t out[4]) {
+    if (!out) return kIOReturnBadArgument;
+    for (unsigned i = 0; i < 4; ++i) out[i] = 0;
+    if (!mmio || !fbAper || !smuLock || !gpuLock) return kIOReturnNotReady;
+    IOLockLock(gpuLock);
+    IOLockLock(smuLock);
+    IOReturn r = kIOReturnSuccess;
+    if (pspSubmissionFaulted) {
+        r = kIOReturnNotReady;
+    } else if (ringMc || tmrSetUp || fwBufSize || gpuReady()) {
+        r = kIOReturnExclusiveAccess;
+    } else if (!phxPspLayoutValid(&layout, fbMcBase, fbPhys, fbSize, fbAperLen)) {
+        r = kIOReturnBadArgument;
+    } else {
+        pspLayout = layout;
+        pspLayoutConfigured = true;
+        out[0] = fbMcBase; out[1] = fbPhys; out[2] = fbSize; out[3] = fbAperLen;
+    }
+    IOLockUnlock(smuLock);
+    IOLockUnlock(gpuLock);
+    return r;
+}
+
+// Debug selector 101: ring creation uses the explicitly configured relative regions.
+// BAR0 writes still require independently established target memory ownership.
 IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4]) {
-    if (!mmio || !fbAper || !fbMcBase)
+    if (!out) return kIOReturnBadArgument;
+    for (unsigned i = 0; i < 4; ++i) out[i] = 0;
+    if (!mmio || !fbAper || !fbMcBase || !smuLock)
         return kIOReturnNotReady;
     IOReturn r = kIOReturnSuccess;
     IOLockLock(smuLock);
@@ -893,13 +924,16 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
         return kIOReturnNotReady;
     }
     if (op == 1) {
-        if (ringMc) {
-            r = kIOReturnExclusiveAccess;   // a ring is already live; destroy it first
-        } else if ((carveOffset & 0xFFF) ||
-                   !phx780m::rangeWithin(carveOffset, PHX_PSP_FENCE_REL + 0x1000, PHX_VRAM_TMR_OFF) ||
-                   !phx780m::rangeWithin(carveOffset, PHX_PSP_FENCE_REL + 0x1000, fbAperLen) ||
-                   !phx780m::rangeWithin(PHX_VRAM_FWBUF_OFF, PHX_VRAM_FWBUF_SIZE, fbAperLen)) {
-            r = kIOReturnBadArgument;        // ring+cmd+fence must sit below the TMR; fw_buf must fit the aperture
+        if (!pspLayoutConfigured) {
+            IOLockUnlock(smuLock);
+            return kIOReturnNotReady;
+        } else if (ringMc) {
+            IOLockUnlock(smuLock);
+            return kIOReturnExclusiveAccess;
+        } else if (carveOffset != pspLayout.ringOffset ||
+                   !phxPspLayoutValid(&pspLayout, fbMcBase, fbPhys, fbSize, fbAperLen)) {
+            IOLockUnlock(smuLock);
+            return kIOReturnBadArgument;
         } else {
             volatile uint32_t *ring = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + carveOffset);
             uint32_t nonzero = 0;
@@ -930,13 +964,13 @@ IOReturn PhxBringup::pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4])
                     cmdMc = fbMcBase + cmdOff;
                     fenceMc = fbMcBase + fenceOff;
                     fenceCounter = 0;
-                    tmrOff = PHX_VRAM_TMR_OFF;
+                    tmrOff = pspLayout.tmrOffset;
                     tmrMc = fbMcBase + tmrOff;
                     tmrSize = 0;
                     tmrSetUp = false;
-                    fwBufOff = PHX_VRAM_FWBUF_OFF;
+                    fwBufOff = pspLayout.stagingOffset;
                     fwBufMc = fbMcBase + fwBufOff;
-                    fwBufSize = PHX_VRAM_FWBUF_SIZE;
+                    fwBufSize = pspLayout.stagingCapacity;
                     volatile uint32_t *cmd = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + cmdOff);
                     volatile uint32_t *fen = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + fenceOff);
                     for (uint32_t i = 0; i < 0x1000 / 4; i++) {
@@ -1125,8 +1159,8 @@ IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
     if (!ringMc || pspSubmissionFaulted) {
         r = kIOReturnNotReady;
     } else if (op == 1) {
-        uint32_t size = arg ? arg : 0x400000u;
-        if (size > PHX_VRAM_TMR_CAP) {
+        uint32_t size = arg;
+        if (!pspLayoutConfigured || !size || size > pspLayout.tmrCapacity) {
             IOLockUnlock(smuLock);
             return kIOReturnBadArgument;
         }
@@ -1346,6 +1380,7 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         case PHXN_SEL_SUBMIT:    r = doSubmit(a); break;
         case PHXN_SEL_DBG_SMU:   r = doDbgSmu(a); break;
         case PHXN_SEL_DBG_PSP_RING: r = doDbgPspRing(a); break;
+        case PHX_PSP_LAYOUT_SELECTOR: r = doDbgPspLayout(a); break;
         case PHXN_SEL_DBG_VRAM_READ: r = doDbgVramRead(a); break;
         case PHXN_SEL_DBG_PSP_SUBMIT: r = doDbgPspSubmit(a); break;
         case PHXN_SEL_DBG_FW_STAGE: r = doDbgFwStage(a); break;
@@ -1794,6 +1829,20 @@ IOReturn IOAccelPhxNativeClient::doDbgSmu(IOExternalMethodArguments *a) {
                                    &resp, &after);
     a->scalarOutput[0] = resp;
     a->scalarOutput[1] = after;
+    return r;
+}
+
+IOReturn IOAccelPhxNativeClient::doDbgPspLayout(IOExternalMethodArguments *a) {
+    if (!owner->debugEnabled()) return kIOReturnUnsupported;
+    if (!privileged) return kIOReturnNotPrivileged;
+    if (!shape(a, 0, 4, sizeof(PhxPspLayout), 0) || !a->structureInput)
+        return kIOReturnBadArgument;
+    PhxPspLayout layout;
+    memcpy(&layout, a->structureInput, sizeof(layout));
+    uint64_t out[4]{};
+    IOReturn r = owner->configurePspLayout(layout, out);
+    if (r == kIOReturnSuccess)
+        for (unsigned i = 0; i < 4; ++i) a->scalarOutput[i] = out[i];
     return r;
 }
 
