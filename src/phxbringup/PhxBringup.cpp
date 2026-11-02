@@ -81,7 +81,7 @@ struct PhxClientBo {
     uint64_t size;
     uint32_t domain, bits;
     uint8_t *kva;
-    bool host;
+    bool host, pendingFree;
 };
 struct PhxRetiredBuffers {
     PhxClientBo entries[PHXN_MAX_BOS];
@@ -134,7 +134,8 @@ public:
     uint32_t vmidAlloc();
     void deferClient(uint32_t handle, uint64_t lastSeq, PhxRetiredBuffers *buffers);
     void reapContexts();
-    IOReturn vmMap(uint32_t vmid, uint64_t va, IOMemoryDescriptor *md, uint64_t off, uint64_t size);
+    IOReturn vmMap(uint32_t vmid, uint64_t va, IOMemoryDescriptor *md, uint64_t off, uint64_t size, bool *cleanupRequired);
+    IOReturn vmCanReclaim(uint32_t handle);
     IOReturn vmUnmap(uint32_t vmid, uint64_t va, uint64_t size);
     IOReturn gpuSubmit(uint32_t vmid, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seq);
     uint64_t gpuRetired() const;
@@ -228,6 +229,8 @@ private:
     uint64_t *vmPte(VmCtx &c, uint64_t va, bool alloc);
     bool vmFlushTlb(uint32_t vmid) const;
     bool vmBindingValid(uint32_t vmid, uint64_t physical) const;
+    bool vmOwnershipKnown(uint32_t repairing) const;
+    IOReturn vmIdleLocked(uint32_t handle, bool repair);
     void ringPut(GpuQueue &q, uint32_t idx, uint32_t value);
     bool debug{false};
     bool smuUsed{false};
@@ -254,6 +257,7 @@ private:
         uint32_t handle;
         uint64_t va, size, off;
         uint32_t flags;
+        bool pending;
     };
 
     IOReturn doHello(IOExternalMethodArguments *a);
@@ -289,6 +293,8 @@ private:
     bool ibCovered(uint64_t vaCanon, uint64_t bytes);
     void freeAll();
     void closeResources();
+    void reapPending();
+    bool hasPending() const;
 
     PhxBringup *owner{nullptr};
     IOLock *lock{nullptr};
@@ -788,16 +794,7 @@ void PhxBringup::reapContextsLocked() {
         c.hw = 0;
     }
     // Failed replacement may have left hardware pointing at either old or new tables.
-    for (uint32_t i = 0; i < kNumUserVmids; ++i) {
-        const HwVmid &h = hwv[i];
-        if (h.faulted || (h.ctx && (h.ctx > kMaxCtx || !vm[h.ctx - 1].busy ||
-                                   vm[h.ctx - 1].hw != kFirstUserVmid + i))) return;
-    }
-    for (uint32_t i = 0; i < kMaxCtx; ++i) {
-        const VmCtx &c = vm[i];
-        if (c.busy && c.hw && (c.hw < kFirstUserVmid || c.hw >= kFirstUserVmid + kNumUserVmids ||
-                              hwv[c.hw - kFirstUserVmid].ctx != i + 1)) return;
-    }
+    if (!vmOwnershipKnown(0)) return;
     for (VmCtx &c : vm) {
         if (!c.busy || !c.closing || c.hw || c.retireSeq > done || (c.retireSeq && !observable) ||
             !c.used || c.used > c.pages || c.pages > kPtChunks * kPtChunkPages) continue;
@@ -905,43 +902,108 @@ IOReturn PhxBringup::claimAccel() {
     return kIOReturnSuccess;
 }
 
-IOReturn PhxBringup::vmMap(uint32_t handle, uint64_t va, IOMemoryDescriptor *md, uint64_t off, uint64_t size) {
-    if (!vmCtx(handle))
+bool PhxBringup::vmOwnershipKnown(uint32_t repairing) const {
+    if (repairing && (repairing < kFirstUserVmid || repairing >= kFirstUserVmid + kNumUserVmids)) return false;
+    for (uint32_t i = 0; i < kNumUserVmids; ++i) {
+        const HwVmid &h = hwv[i];
+        if ((h.faulted && repairing != kFirstUserVmid + i) ||
+            (h.ctx && (h.ctx > kMaxCtx || !vm[h.ctx - 1].busy || vm[h.ctx - 1].hw != kFirstUserVmid + i))) return false;
+    }
+    for (uint32_t i = 0; i < kMaxCtx; ++i) {
+        const VmCtx &c = vm[i];
+        if (c.busy && c.hw && (c.hw < kFirstUserVmid || c.hw >= kFirstUserVmid + kNumUserVmids ||
+                              hwv[c.hw - kFirstUserVmid].ctx != i + 1)) return false;
+    }
+    return true;
+}
+
+// gpuLock held. A retry may repair this slot's failed invalidation, but not an unrelated uncertain slot.
+IOReturn PhxBringup::vmIdleLocked(uint32_t handle, bool repair) {
+    VmCtx *c = vmCtx(handle);
+    if (!c || !gpuReady() || !mmio || !fbAper || !vmOwnershipKnown(repair ? c->hw : 0))
         return kIOReturnNotReady;
-    VmCtx &c = vm[handle - 1];
-    IOReturn r = kIOReturnSuccess;
+    if (c->lastSeq && gpuRetired() < c->lastSeq) return kIOReturnBusy;
+    if (c->hw && !vmBindingValid(c->hw, c->phys)) {
+        hwv[c->hw - kFirstUserVmid].faulted = true;
+        return kIOReturnNotReady;
+    }
+    return kIOReturnSuccess;
+}
+
+IOReturn PhxBringup::vmCanReclaim(uint32_t handle) {
+    if (!gpuLock) return kIOReturnNotReady;
     IOLockLock(gpuLock);
+    const IOReturn result = vmIdleLocked(handle, false);
+    IOLockUnlock(gpuLock);
+    return result;
+}
+
+IOReturn PhxBringup::vmMap(uint32_t handle, uint64_t va, IOMemoryDescriptor *md, uint64_t off, uint64_t size, bool *cleanupRequired) {
+    if (!cleanupRequired) return kIOReturnBadArgument;
+    *cleanupRequired = false;
+    if (!md || !size || ((va | off | size) & 4095) || va < 0x10000 ||
+        !phx780m::rangeWithin(va, size, 1ull << 48) || !phx780m::rangeWithin(off, size, md->getLength()))
+        return kIOReturnBadArgument;
+    if (!gpuLock) return kIOReturnNotReady;
+    IOLockLock(gpuLock);
+    const IOReturn idle = vmIdleLocked(handle, true);
+    if (idle != kIOReturnSuccess) { IOLockUnlock(gpuLock); return idle; }
+    VmCtx &c = vm[handle - 1];
+    // Reject existing mappings and invalid physical spans before exposing any new leaf.
     for (uint64_t p = 0; p < size; p += 4096) {
         IOByteCount segLen = 0;
         const addr64_t pa = md->getPhysicalSegment(off + p, &segLen, kIOMemoryMapperNone);
-        uint64_t *pte = pa ? vmPte(c, va + p, true) : nullptr;
-        if (!pte) {
-            r = pa ? kIOReturnNoMemory : kIOReturnVMError;
-            break;
+        uint64_t *pte = vmPte(c, va + p, false);
+        if (!pa || (pa & ~kPtAddrMask) || segLen < 4096 || (pte && (*pte & 1))) {
+            IOLockUnlock(gpuLock);
+            return pte && (*pte & 1) ? kIOReturnExclusiveAccess : kIOReturnVMError;
         }
-        *pte = (pa & kPtAddrMask) | kPteSysFlags;
+    }
+    IOReturn result = kIOReturnSuccess;
+    uint64_t written = 0;
+    for (; written < size; written += 4096) {
+        IOByteCount segLen = 0;
+        const addr64_t pa = md->getPhysicalSegment(off + written, &segLen, kIOMemoryMapperNone);
+        if (!pa || (pa & ~kPtAddrMask) || segLen < 4096) { result = kIOReturnVMError; break; }
+        uint64_t *pte = vmPte(c, va + written, true);
+        if (!pte) { result = kIOReturnNoMemory; break; }
+        *cleanupRequired = true;
+        *pte = pa | kPteSysFlags;
         flushLine(pte);
     }
-    if (c.hw)   // an unbound context is flushed when it is next bound
-        vmFlushTlb(c.hw);
+    if (result != kIOReturnSuccess) {
+        for (uint64_t p = 0; p < written; p += 4096) {
+            uint64_t *pte = vmPte(c, va + p, false);
+            if (pte) { *pte = 0; flushLine(pte); }
+        }
+    }
+    if (c.hw && *cleanupRequired) {
+        HwVmid &h = hwv[c.hw - kFirstUserVmid];
+        h.faulted = !vmFlushTlb(c.hw);
+        if (h.faulted) { IOLockUnlock(gpuLock); return kIOReturnTimeout; }
+    }
+    *cleanupRequired = false;
     IOLockUnlock(gpuLock);
-    return r;
+    return result;
 }
 
 IOReturn PhxBringup::vmUnmap(uint32_t handle, uint64_t va, uint64_t size) {
-    if (!vmCtx(handle))
-        return kIOReturnNotReady;
-    VmCtx &c = vm[handle - 1];
+    if (!size || ((va | size) & 4095) || va < 0x10000 || !phx780m::rangeWithin(va, size, 1ull << 48))
+        return kIOReturnBadArgument;
+    if (!gpuLock) return kIOReturnNotReady;
     IOLockLock(gpuLock);
+    const IOReturn idle = vmIdleLocked(handle, true);
+    if (idle != kIOReturnSuccess) { IOLockUnlock(gpuLock); return idle; }
+    VmCtx &c = vm[handle - 1];
     for (uint64_t p = 0; p < size; p += 4096) {
         uint64_t *pte = vmPte(c, va + p, false);
-        if (pte) {
-            *pte = 0;
-            flushLine(pte);
-        }
+        if (pte) { *pte = 0; flushLine(pte); }
     }
-    if (c.hw)
-        vmFlushTlb(c.hw);
+    if (c.hw) {
+        HwVmid &h = hwv[c.hw - kFirstUserVmid];
+        h.faulted = !vmFlushTlb(c.hw);
+        if (h.faulted) { IOLockUnlock(gpuLock); return kIOReturnTimeout; }
+    }
     IOLockUnlock(gpuLock);
     return kIOReturnSuccess;
 }
@@ -1611,7 +1673,7 @@ void IOAccelPhxNativeClient::free() {
 }
 
 IOAccelPhxNativeClient::Bo *IOAccelPhxNativeClient::findBo(uint32_t h) {
-    if (!bos || h == 0 || h >= PHXN_MAX_BOS || !bos[h].md)
+    if (!bos || h == 0 || h >= PHXN_MAX_BOS || !bos[h].md || bos[h].pendingFree)
         return nullptr;
     return &bos[h];
 }
@@ -1647,6 +1709,7 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
     if (closed || (selector != PHXN_SEL_HELLO && !hello)) {
         r = kIOReturnNotReady;
     } else {
+        reapPending();
         switch (selector) {
         case PHXN_SEL_HELLO:     r = doHello(a); break;
         case PHXN_SEL_QUERYINFO: r = doQueryInfo(a); break;
@@ -1807,7 +1870,7 @@ IOReturn IOAccelPhxNativeClient::doBoCreate(IOExternalMethodArguments *a) {
         return kIOReturnNoMemory;
     bzero(md->getBytesNoCopy(), size);
     *pool += size;
-    bos[h] = Bo{md, size, domain, bits, static_cast<uint8_t *>(md->getBytesNoCopy()), false};
+    bos[h] = Bo{md, size, domain, bits, static_cast<uint8_t *>(md->getBytesNoCopy()), false, false};
     a->scalarOutput[0] = h;
     a->scalarOutput[1] = size;
     a->scalarOutput[2] = domain;
@@ -1815,25 +1878,52 @@ IOReturn IOAccelPhxNativeClient::doBoCreate(IOExternalMethodArguments *a) {
     return kIOReturnSuccess;
 }
 
+// Client lock held. A logical free keeps its handle slot, budgets, descriptor and pins until cleanup succeeds.
+bool IOAccelPhxNativeClient::hasPending() const {
+    if (!bos || !maps) return false;
+    for (uint32_t h = 1; h < PHXN_MAX_BOS; ++h) if (bos[h].md && bos[h].pendingFree) return true;
+    for (int i = 0; i < kMaxMaps; ++i) if (maps[i].used && maps[i].pending) return true;
+    return false;
+}
+
+void IOAccelPhxNativeClient::reapPending() {
+    if (closed || !bos || !maps) return;
+    for (int i = 0; i < kMaxMaps; ++i) {
+        Map &m = maps[i];
+        if (!m.used || !m.pending) continue;
+        if (!m.handle || m.handle >= PHXN_MAX_BOS || !bos[m.handle].md) return;
+        if (vmid && owner && owner->vmUnmap(vmid, m.va, m.size) == kIOReturnSuccess) m = Map{};
+    }
+    uint64_t mapped[(PHXN_MAX_BOS + 63) / 64]{};
+    for (int i = 0; i < kMaxMaps; ++i) {
+        const Map &m = maps[i];
+        if (!m.used) continue;
+        if (!m.handle || m.handle >= PHXN_MAX_BOS) return;
+        mapped[m.handle / 64] |= 1ull << (m.handle & 63);
+    }
+    for (uint32_t h = 1; h < PHXN_MAX_BOS; ++h) {
+        Bo &b = bos[h];
+        if (!b.md || !b.pendingFree) continue;
+        if ((mapped[h / 64] & (1ull << (h & 63))) ||
+            (vmid && (!owner || owner->vmCanReclaim(vmid) != kIOReturnSuccess))) continue;
+        uint64_t *pool = b.host ? &hostUsed : b.domain == 2 ? &gttUsed :
+            (b.bits & PHXN_PLACED_HI_POOL) ? &hiUsed : &visUsed;
+        if (*pool < b.size) continue;
+        *pool -= b.size;
+        boRelease(b);
+    }
+}
+
 IOReturn IOAccelPhxNativeClient::doBoFree(IOExternalMethodArguments *a) {
-    if (!shape(a, 1, 0, 0, 0))
-        return kIOReturnBadArgument;
-    uint32_t h = static_cast<uint32_t>(a->scalarInput[0]);
+    if (!shape(a, 1, 0, 0, 0) || a->scalarInput[0] > UINT32_MAX) return kIOReturnBadArgument;
+    const uint32_t h = static_cast<uint32_t>(a->scalarInput[0]);
     Bo *b = findBo(h);
-    if (!b)
-        return kIOReturnNotFound;
-    for (int i = 0; i < kMaxMaps; i++)
-        if (maps[i].used && maps[i].handle == h)
-            maps[i].used = false;
-    if (b->host)
-        hostUsed -= b->size;
-    else if (b->domain == 2)
-        gttUsed -= b->size;
-    else if (b->bits & PHXN_PLACED_HI_POOL)
-        hiUsed -= b->size;
-    else
-        visUsed -= b->size;
-    boRelease(*b);
+    if (!b) return kIOReturnNotFound;
+    b->pendingFree = true;
+    for (int i = 0; i < kMaxMaps; ++i)
+        if (maps[i].used && maps[i].handle == h) maps[i].pending = true;
+    if (pendFenceHandle == h) { pendFenceHandle = pendFenceOffset = 0; pendFenceSeq = 0; }
+    reapPending();
     return kIOReturnSuccess;
 }
 
@@ -1871,7 +1961,7 @@ IOReturn IOAccelPhxNativeClient::doBoImportHost(IOExternalMethodArguments *a) {
         return r;
     }
     hostUsed += size;
-    bos[h] = Bo{md, size, 2, 0, nullptr, true};
+    bos[h] = Bo{md, size, 2, 0, nullptr, true, false};
     a->scalarOutput[0] = h;
     a->scalarOutput[1] = size;
     a->scalarOutput[2] = 0;
@@ -1900,9 +1990,9 @@ IOReturn IOAccelPhxNativeClient::doGemVa(IOExternalMethodArguments *a) {
     const uint64_t va = v->va_address & kVaMask;
     if (((v->va_address | v->offset_in_bo | v->map_size) & 4095) || v->map_size == 0)
         return kIOReturnBadArgument;
-    if (va < 0x10000 || va + v->map_size > (1ull << 48))
+    if (va < 0x10000 || !phx780m::rangeWithin(va, v->map_size, 1ull << 48))
         return kIOReturnBadArgument;
-    if (v->offset_in_bo + v->map_size > b->size)
+    if (!phx780m::rangeWithin(v->offset_in_bo, v->map_size, b->size))
         return kIOReturnBadArgument;
 
     if (v->operation == PHX_AMDGPU_VA_OP_MAP) {
@@ -1914,29 +2004,33 @@ IOReturn IOAccelPhxNativeClient::doGemVa(IOExternalMethodArguments *a) {
                 continue;
             }
             if (va < maps[i].va + maps[i].size && maps[i].va < va + v->map_size)
-                return kIOReturnBadArgument;
+                return maps[i].pending ? kIOReturnBusy : kIOReturnBadArgument;
         }
         if (freei < 0)
             return kIOReturnNoMemory;
-        maps[freei] = Map{true, v->handle, va, v->map_size, v->offset_in_bo, v->flags};
-        if (owner->gpuReady()) {
-            const IOReturn r = ensureVmid() ? owner->vmMap(vmid, va, b->md, v->offset_in_bo, v->map_size) : kIOReturnNoResources;
-            if (r != kIOReturnSuccess) {
-                maps[freei].used = false;
-                return r;
-            }
-        }
-        return kIOReturnSuccess;
+        if (!owner || !owner->gpuReady()) return kIOReturnNotReady;
+        if (!ensureVmid()) return kIOReturnNoResources;
+        maps[freei] = Map{true, v->handle, va, v->map_size, v->offset_in_bo, v->flags, true};
+        bool cleanupRequired = false;
+        const IOReturn r = owner->vmMap(vmid, va, b->md, v->offset_in_bo, v->map_size, &cleanupRequired);
+        if (r == kIOReturnSuccess) maps[freei].pending = false;
+        else if (!cleanupRequired) maps[freei] = Map{};
+        return r;
     }
     for (int i = 0; i < kMaxMaps; i++) {
         if (maps[i].used && maps[i].handle == v->handle && maps[i].va == va && maps[i].size == v->map_size) {
-            maps[i].used = false;
-            if (vmid)
-                owner->vmUnmap(vmid, va, v->map_size);
-            return kIOReturnSuccess;
+            if (!vmid || !owner) return kIOReturnNotReady;
+            const IOReturn r = owner->vmUnmap(vmid, va, v->map_size);
+            if (r == kIOReturnSuccess) maps[i] = Map{};
+            else if (r == kIOReturnTimeout) maps[i].pending = true;
+            return r;
         }
     }
-    return kIOReturnBadArgument;
+    // Retrying a completed cleanup is idempotent; never accept a partial overlap as an unmap.
+    for (int i = 0; i < kMaxMaps; ++i)
+        if (maps[i].used && va < maps[i].va + maps[i].size && maps[i].va < va + v->map_size)
+            return kIOReturnBadArgument;
+    return kIOReturnSuccess;
 }
 
 IOReturn IOAccelPhxNativeClient::doCtx(IOExternalMethodArguments *a) {
@@ -1971,7 +2065,7 @@ bool IOAccelPhxNativeClient::ibCovered(uint64_t vaCanon, uint64_t bytes) {
         bool ok = false;
         for (int i = 0; i < kMaxMaps; i++) {
             const Map &mp = maps[i];
-            if (mp.used && (mp.flags & PHX_AMDGPU_VM_PAGE_EXECUTABLE) && cur >= mp.va && cur < mp.va + mp.size) {
+            if (mp.used && !mp.pending && findBo(mp.handle) && (mp.flags & PHX_AMDGPU_VM_PAGE_EXECUTABLE) && cur >= mp.va && cur < mp.va + mp.size) {
                 cur = mp.va + mp.size < end ? mp.va + mp.size : end;
                 ok = true;
                 break;
@@ -1997,6 +2091,8 @@ IOReturn IOAccelPhxNativeClient::doSubmit(IOExternalMethodArguments *a) {
         return kIOReturnBadArgument;
     if (h.ctx_id == 0 || h.ctx_id > PHXN_MAX_CTX || !ctx[h.ctx_id])
         return kIOReturnNotFound;
+    reapPending();
+    if (hasPending()) return kIOReturnBusy;
 
     phxn_cs_ib firstIb;
     bcopy(in + sizeof(h), &firstIb, sizeof(firstIb));
@@ -2366,6 +2462,7 @@ IOReturn IOAccelPhxNativeClient::doWaitSeq(IOExternalMethodArguments *a) {
             IOLockLock(lock);
             if (closed) { IOLockUnlock(lock); return kIOReturnNotReady; }
             owner->reapContexts();
+            reapPending();
             flushBos();
             if (pendFenceSeq && pendFenceSeq <= retired) {
                 Bo *fb = findBo(pendFenceHandle);
