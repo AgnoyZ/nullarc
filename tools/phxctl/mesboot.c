@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <errno.h>
+#include "../../src/phxbringup/PhxGartLayout.h"
 #include "mes_v11_api_def.h"
 
 #define UC_TYPE 0x4E34384Eu
@@ -136,23 +138,73 @@ static int use_mc;
 #define VA(off) ((use_mc ? VRAM_MC : GART_VA) + (off))
 #define MC(off) (VRAM_MC + (off))
 
-static void gart(void)
+static _Noreturn void gart_failure(int code, const char *message)
 {
-   for (uint64_t i = 0; i < GART_N; i++) {
-      uint64_t pte = (FB_PA + i * 4096) | ((getenv("PTE_SYS") && *getenv("PTE_SYS")) ? 0x77 : 0x71);      // VALID | EXEC | READ | WRITE, local FB
-      vw(GART_PT + i * 8, (uint32_t)pte);
-      vw(GART_PT + i * 8 + 4, (uint32_t)(pte >> 32));
+   fprintf(stderr, "mesboot GART: %s; stopping (no rollback)\n", message);
+   exit(code);
+}
+static uint64_t gart_argument(const char *text)
+{
+   char *end = NULL;
+   if (!text || *text < '0' || *text > '9') gart_failure(64, "invalid unsigned argument");
+   errno = 0;
+   unsigned long long value = strtoull(text, &end, 0);
+   if (errno || end == text || *end || value > UINT64_MAX) gart_failure(64, "invalid unsigned argument");
+   return (uint64_t)value;
+}
+static uint64_t gart_read64(uint64_t offset)
+{
+   uint64_t input[2] = {offset, 2};
+   uint32_t words[2] = {0, 0};
+   size_t size = sizeof(words);
+   checked_method(conn, SEL_DBG_VRAM_READ, input, 2, NULL, 0, NULL, NULL, words, &size);
+   return words[0] | ((uint64_t)words[1] << 32);
+}
+static int gart(int argc, char **argv)
+{
+   if (argc != 6) gart_failure(64, "requires virtual base, mapped bytes, table offset and default-page offset");
+   struct PhxGartLayout layout = {PHX_GART_LAYOUT_VERSION, gart_argument(argv[2]), gart_argument(argv[3]),
+                                 gart_argument(argv[4]), gart_argument(argv[5])};
+   if (!phxGartInputsValid(&layout) || env_on("PTE_SYS") || env_on("FAULT_DEFAULT"))
+      gart_failure(64, "invalid GART arguments or incompatible legacy environment override");
+   if (open_kext()) return 1;
+   struct PhxBootMemory memory = {0};
+   size_t snapshot_size = sizeof(memory);
+   checked_method(conn, PHX_BOOT_MEMORY_SELECTOR, NULL, 0, NULL, 0, NULL, NULL, &memory, &snapshot_size);
+   if (!phxGartLayoutValid(&layout, &memory))
+      gart_failure(75, "reported bootstrap state or GART ranges are unusable");
+   uint32_t cp = rd(0x21a0), rlc = rd(0xee7e);
+   if (cp || rlc == UINT32_MAX || !(rlc & 0x80000000u))
+      gart_failure(75, "GFX boot readiness not observed");
+   for (unsigned context = 0; context < 16; ++context)
+      if (rd(0x28e8 + context) & 1) gart_failure(75, "refusing to replace an enabled GPUVM context");
+   const uint64_t pages = layout.mappedBytes >> 12;
+   const uint64_t table_bytes = phxGartTableBytes(&layout);
+   const uint64_t table_pa = memory.physicalBase + layout.tableOffset;
+   const uint64_t default_pa = memory.physicalBase + layout.defaultPageOffset;
+   const uint64_t virtual_end = layout.virtualBase + layout.mappedBytes - 1;
+   for (uint64_t i = 0; i < table_bytes / 8; ++i) {
+      const uint64_t pte = i < pages ? (memory.physicalBase + i * 4096) | 0x71ull : 0;
+      vw(layout.tableOffset + i * 8, (uint32_t)pte);
+      vw(layout.tableOffset + i * 8 + 4, (uint32_t)(pte >> 32));
    }
-   wr(SEG0(0x1713), (uint32_t)(GART_VA >> 12)); wr(SEG0(0x1714), (uint32_t)(GART_VA >> 44));
-   wr(SEG0(0x1733), (uint32_t)((GART_VA + (uint64_t)GART_N * 4096 - 1) >> 12)); wr(SEG0(0x1734), (uint32_t)((GART_VA + (uint64_t)GART_N * 4096 - 1) >> 44));
-   wr(SEG0(0x16f3), (uint32_t)((FB_PA + GART_PT) | 1)); wr(SEG0(0x16f4), (uint32_t)((FB_PA + GART_PT) >> 32));   // PDB base = physical (FB_PA + vram offset), as the Linux trace
+   for (unsigned i = 0; i < 4096; i += 4) vw(layout.defaultPageOffset + i, 0);
+   if (gart_read64(layout.tableOffset) != (memory.physicalBase | 0x71ull) ||
+       gart_read64(layout.tableOffset + (pages - 1) * 8) != ((memory.physicalBase + (pages - 1) * 4096) | 0x71ull) ||
+       (pages * 8 < table_bytes && gart_read64(layout.tableOffset + pages * 8) != 0) ||
+       gart_read64(layout.defaultPageOffset) != 0)
+      gart_failure(75, "page-table/default-page readback mismatch");
+   wr(SEG0(0x1713), (uint32_t)(layout.virtualBase >> 12)); wr(SEG0(0x1714), (uint32_t)(layout.virtualBase >> 44));
+   wr(SEG0(0x1733), (uint32_t)(virtual_end >> 12)); wr(SEG0(0x1734), (uint32_t)(virtual_end >> 44));
+   wr(SEG0(0x16f3), (uint32_t)(table_pa | 1)); wr(SEG0(0x16f4), (uint32_t)(table_pa >> 32));
    // system aperture / AGP / defaults exactly as the Linux trace (gfxhub_v3_0_init_system_aperture_regs)
    wr(SEG0(0x167c), 0); wr(SEG0(0x167b), 0x00ffffff); wr(SEG0(0x167a), 0);      // AGP_BASE/BOT/TOP (AGP off)
-   wr(SEG0(0x167d), 0x00200000); wr(SEG0(0x167e), 0x00205fff);                  // SYSTEM_APERTURE LOW/HIGH = VRAM MC range
-   wr(SEG0(0x15a8), 0x006a0f9f); wr(SEG0(0x15a9), 0);                           // SYSTEM_APERTURE_DEFAULT_ADDR LSB/MSB
-   wr(SEG0(0x15cb), 0x0000a23c); wr(SEG0(0x15cc), 0);                           // L2 protection fault default addr
+   wr(SEG0(0x167d), (uint32_t)(memory.mcBase >> 18));
+   wr(SEG0(0x167e), (uint32_t)((memory.mcBase + memory.vramBytes - 1) >> 18));
+   wr(SEG0(0x15a8), (uint32_t)(default_pa >> 12)); wr(SEG0(0x15a9), (uint32_t)(default_pa >> 44));
+   wr(SEG0(0x15cb), (uint32_t)(default_pa >> 12)); wr(SEG0(0x15cc), (uint32_t)(default_pa >> 44));
    wr(SEG0(0x15c5), 0x00060000);                                                // L2_PROTECTION_FAULT_CNTL2
-   wr(SEG0(0x15c4), env_on("FAULT_DEFAULT") ? 0x3ffffffc : 0x00000002);   // debug: no default-page redirect so faults are recorded                                                // L2_PROTECTION_FAULT_CNTL (fault handling on; was missing -> silent drops)
+   wr(SEG0(0x15c4), 0x00000002);   // keep fault recording enabled; no legacy redirect override
    wr(SEG0(0x15ce), 0xffffffff); wr(SEG0(0x15cf), 0x0000000f); wr(SEG0(0x15d0), 0);  // identity aperture LOW/HIGH (disabled)
    wr(SEG0(0x167f), 0x1859);                 // GCMC_VM_MX_L1_TLB_CNTL
    // GCVM L2 exactly as the working Linux driver programs it (regtrace, 1.558983..)
@@ -178,9 +230,30 @@ static void gart(void)
    }
    wr(SEG1(0x900), 0);
    wr(SEG0(0x1e1f), rd(SEG0(0x1e1f)) | 0x8000);   // CP_DEBUG.CPG_UTCL1_ERROR_HALT_DISABLE (linux sets it with the gfxhub)
+   const uint32_t verify[][2] = {
+      {SEG0(0x16f3), (uint32_t)(table_pa | 1)}, {SEG0(0x16f4), (uint32_t)(table_pa >> 32)},
+      {SEG0(0x1713), (uint32_t)(layout.virtualBase >> 12)}, {SEG0(0x1714), (uint32_t)(layout.virtualBase >> 44)},
+      {SEG0(0x1733), (uint32_t)(virtual_end >> 12)}, {SEG0(0x1734), (uint32_t)(virtual_end >> 44)},
+      {SEG0(0x167d), (uint32_t)(memory.mcBase >> 18)}, {SEG0(0x167e), (uint32_t)((memory.mcBase + memory.vramBytes - 1) >> 18)},
+      {SEG0(0x15a8), (uint32_t)(default_pa >> 12)}, {SEG0(0x15a9), (uint32_t)(default_pa >> 44)},
+      {SEG0(0x15cb), (uint32_t)(default_pa >> 12)}, {SEG0(0x15cc), (uint32_t)(default_pa >> 44)}
+   };
+   for (unsigned i = 0; i < sizeof(verify) / sizeof(verify[0]); ++i)
+      if (rd(verify[i][0]) != verify[i][1]) gart_failure(75, "GART address register readback mismatch");
+   if ((rd(SEG0(0x1688)) & 7) != 1) gart_failure(75, "context zero did not enter enabled flat-page-table mode");
    wr(SEG0(0x16ab + 17), 0x00F80001);          // GCVM_INVALIDATE_ENG17_REQ (the engine amdgpu uses for gmc flushes)
-   usleep(2000);
-   printf("gart: ack17=0x%x ctx0=0x%x\n", rd(SEG0(0x16bd + 17)), rd(SEG0(0x1688)));
+   unsigned sample;
+   for (sample = 0; sample < 1000; ++sample) {
+      uint32_t ack = rd(SEG0(0x16bd + 17));
+      if (ack == UINT32_MAX) gart_failure(75, "invalid all-ones GART invalidation response");
+      if (ack & 1) break;
+      if (usleep(1000) && errno != EINTR) gart_failure(74, "GART invalidation polling delay failed");
+   }
+   if (sample == 1000) gart_failure(75, "GART invalidation acknowledgement timed out");
+   if (IOServiceClose(conn) != KERN_SUCCESS) gart_failure(74, "service close failed");
+   printf("gart complete: %llu pages, address readbacks and invalidation acknowledged; GPU execution unverified\n",
+          (unsigned long long)pages);
+   return 0;
 }
 static void grbm_select(uint32_t me, uint32_t pipe, uint32_t queue, uint32_t vmid)
 {
@@ -808,13 +881,14 @@ static void sdma_sys_test(void)
 
 int main(int argc, char **argv)
 {
+   if (argc >= 2 && !strcmp(argv[1], "gart")) return gart(argc, argv);
+   if (argc >= 2 && !strcmp(argv[1], "all")) gart_failure(64, "legacy all cannot supply an explicit GART layout");
    if (open_kext()) return 1;
    if (argc < 2) { fprintf(stderr, "mesboot gart|mes|kiq|all\n"); return 2; }
    int all = !strcmp(argv[1], "all");
    if (getenv("MESBOOT_MC") && *getenv("MESBOOT_MC") == '1') use_mc = 1;
    if (!strcmp(argv[1], "db") && argc >= 4) { printf("db +0x%llx <- %llu kr=0x%x\n", strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0), db(strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0))); return 0; }
    if (!strcmp(argv[1], "dump")) mesdump();
-   if (all || !strcmp(argv[1], "gart")) gart();
    if (all || !strcmp(argv[1], "mes")) mes_start();
    if (!strcmp(argv[1], "kiqdb")) { use_db = 1; kiq_test(); }
    if (!strcmp(argv[1], "kiqsched")) { kiq_init_only(); sched_test(); }

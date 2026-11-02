@@ -22,6 +22,7 @@
 
 #include "PhxNativeABI.h"
 #include "PhxPspLayout.h"
+#include "PhxBootMemory.h"
 static_assert(sizeof(PhxPspLayout) == 64, "PSP layout wire size");
 static_assert(PHX_PSP_LAYOUT_RING_BYTES == PHX_PSP_FENCE_REL + 0x1000, "PSP layout ring span");
 static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX_PSP_CMD_BUF_SIZE,
@@ -91,6 +92,7 @@ public:
     IOReturn smuMessage(uint32_t msg, uint32_t arg, uint32_t *resp, uint32_t *argAfter);
     IOReturn pspRing(uint32_t op, uint64_t carveOffset, uint64_t out[4]);
     IOReturn configurePspLayout(const PhxPspLayout &layout, uint64_t out[4]);
+    IOReturn bootMemory(PhxBootMemory *out);
     IOReturn pspSubmit(uint32_t cmdId, uint64_t out[4]);
     IOReturn fwStage(uint32_t dstOffset, const void *bytes, uint32_t len);
     IOReturn loadIpFw(uint32_t fwType, uint32_t fwBufOffset, uint32_t size, uint64_t out[4]);
@@ -242,6 +244,7 @@ private:
     IOReturn doDbgSmu(IOExternalMethodArguments *a);
     IOReturn doDbgPspRing(IOExternalMethodArguments *a);
     IOReturn doDbgPspLayout(IOExternalMethodArguments *a);
+    IOReturn doDbgBootMemory(IOExternalMethodArguments *a);
     IOReturn doDbgLoadToc(IOExternalMethodArguments *a);
     IOReturn doDbgVramRead(IOExternalMethodArguments *a);
     IOReturn doDbgPspSubmit(IOExternalMethodArguments *a);
@@ -892,6 +895,29 @@ bool PhxBringup::pspWaitTos(uint32_t timeoutMs) const {
     return false;
 }
 
+// A locked software snapshot only; it does not reserve ranges or certify ownership.
+IOReturn PhxBringup::bootMemory(PhxBootMemory *out) {
+    if (!out) return kIOReturnBadArgument;
+    *out = PhxBootMemory{};
+    if (!smuLock || !gpuLock) return kIOReturnNotReady;
+    IOLockLock(gpuLock);
+    IOLockLock(smuLock);
+    IOReturn result = kIOReturnNotReady;
+    if (pspLayoutConfigured) {
+        out->version = PHX_BOOT_MEMORY_VERSION;
+        out->flags = PHX_BOOT_LAYOUT_CONFIGURED | (ringMc ? PHX_BOOT_RING_ACTIVE : 0) |
+                     (tmrSetUp ? PHX_BOOT_TMR_ACTIVE : 0) | (gpuReady() ? PHX_BOOT_GPU_ACTIVE : 0) |
+                     (pspSubmissionFaulted ? PHX_BOOT_PSP_FAULTED : 0);
+        out->mcBase = fbMcBase; out->physicalBase = fbPhys;
+        out->vramBytes = fbSize; out->apertureBytes = fbAperLen;
+        out->tmrBytes = tmrSize; out->psp = pspLayout;
+        result = kIOReturnSuccess;
+    }
+    IOLockUnlock(smuLock);
+    IOLockUnlock(gpuLock);
+    return result;
+}
+
 // Debug selector 114: validate/store numeric offsets only. This does not reserve memory or prove ownership.
 IOReturn PhxBringup::configurePspLayout(const PhxPspLayout &layout, uint64_t out[4]) {
     if (!out) return kIOReturnBadArgument;
@@ -1439,6 +1465,7 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         case PHXN_SEL_DBG_SMU:   r = doDbgSmu(a); break;
         case PHXN_SEL_DBG_PSP_RING: r = doDbgPspRing(a); break;
         case PHX_PSP_LAYOUT_SELECTOR: r = doDbgPspLayout(a); break;
+        case PHX_BOOT_MEMORY_SELECTOR: r = doDbgBootMemory(a); break;
         case PHX_PSP_LOAD_TOC_SELECTOR: r = doDbgLoadToc(a); break;
         case PHXN_SEL_DBG_VRAM_READ: r = doDbgVramRead(a); break;
         case PHXN_SEL_DBG_PSP_SUBMIT: r = doDbgPspSubmit(a); break;
@@ -1901,6 +1928,16 @@ IOReturn IOAccelPhxNativeClient::doDbgLoadToc(IOExternalMethodArguments *a) {
     if (r == kIOReturnSuccess)
         for (unsigned i = 0; i < 4; ++i) a->scalarOutput[i] = out[i];
     return r;
+}
+
+IOReturn IOAccelPhxNativeClient::doDbgBootMemory(IOExternalMethodArguments *a) {
+    if (!owner->debugEnabled()) return kIOReturnUnsupported;
+    if (!privileged) return kIOReturnNotPrivileged;
+    if (!shape(a, 0, 0, 0, sizeof(PhxBootMemory)) || !a->structureOutput) return kIOReturnBadArgument;
+    PhxBootMemory memory{};
+    IOReturn result = owner->bootMemory(&memory);
+    memcpy(a->structureOutput, &memory, sizeof(memory));
+    return result;
 }
 
 IOReturn IOAccelPhxNativeClient::doDbgPspLayout(IOExternalMethodArguments *a) {
