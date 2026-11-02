@@ -24,7 +24,7 @@ def prepare_radv(mesa, cobalt, destination, root=ROOT):
     for path, component in ((mesa, "Mesa"), (cobalt, "Cobalt64")):
         verify_checkout(path, lock[component]["commit"])
         if destination.is_relative_to(path):
-            raise RuntimeError("Staging must be outside the Mesa and Cobalt64 checkouts")
+            raise RuntimeError("Staging must be outside all upstream source checkouts")
     try:
         git(nullarc, "cat-file", "-e", lock["nullarc"]["commit"] + "^{commit}")
     except subprocess.CalledProcessError:
