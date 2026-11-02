@@ -64,7 +64,9 @@ class PhxAMDFB : public IOFramebuffer {
     // whole desktop lagged, 2026-10-20). This view comes out write-back although it asks for write-combined (frames
     // copied with plain stores stayed in the CPU cache: stripes), so the display pipe writes it with non-temporal stores.
     IOMemoryMap *fAliasMap = nullptr;
-    unsigned fAliasTries = 0;
+    unsigned fAliasTries = 0;    // pixel checks made against the carve-out; a mismatch is not retried forever
+    unsigned fAliasWaits = 0;    // presents made before the carve-out was published: not verification failures
+    static constexpr unsigned kAliasVerifyLimit = 3, kAliasWaitLimit = 3600;
     volatile UInt32 fAliasBusy = 0;
     struct Irq { IOFBInterruptProc proc = nullptr; OSObject *target = nullptr; void *ref = nullptr; };
     Irq fVbl[4], fConnect;   // IOFramebuffer itself and, when it asks, IOAccelDisplayPipe each register a VBL handler
@@ -106,7 +108,7 @@ class PhxAMDFB : public IOFramebuffer {
             if (b && b->prepare() != kIOReturnSuccess) OSSafeReleaseNULL(b);
             if (!b) continue;
             fPoolRange = IORangeAllocator::withRange(bytes, PAGE_SIZE, 0, IORangeAllocator::kLocking);
-            if (!fPoolRange) { b->complete(); b->release(); return; }
+            if (!fPoolRange) { b->complete(); b->release(); continue; }   // a smaller pool may still be usable
             fPool = b; fPoolKva = (uint8_t *)b->getBytesNoCopy(); fPoolBytes = bytes;
             fPoolPhys = b->getPhysicalSegment(0, nullptr, kIOMemoryMapperNone);
             PFBLOG("VRAM pool: %llu MB at phys 0x%llx", bytes >> 20, fPoolPhys);
@@ -161,8 +163,16 @@ class PhxAMDFB : public IOFramebuffer {
     IOReturn vramFree(NVRMVramRequest *r) {
         if (!r || r->version != NVRM_VRAM_ABI_VERSION) return kIOReturnBadArgument;
         if (IOSubMemoryDescriptor *s = OSDynamicCast(IOSubMemoryDescriptor, (OSObject *)r->handle)) {
-            const uint64_t off = (uint64_t)((uint8_t *)r->kva - fPoolKva), len = s->getLength();
-            if (!fPoolRange || (uint8_t *)r->kva < fPoolKva || off + len > fPoolBytes) return kIOReturnBadArgument;
+            // Validate the handle as integers before the range allocator sees it: subtracting a pointer that need not
+            // point into the pool is undefined, and the old `off + len` check could wrap. Either one could hand the
+            // allocator a partial or foreign extent to release. Pool allocations are page-granular and never zero.
+            const uint64_t kva = (uint64_t)(uintptr_t)r->kva, base = (uint64_t)(uintptr_t)fPoolKva;
+            const uint64_t len = s->getLength();
+            if (!fPoolRange || !fPoolKva || kva < base || !phx780m::poolReleaseValid(kva - base, len, fPoolBytes)) {
+                PFBLOG("VRAM: release refused: kva 0x%llx len 0x%llx outside the %llu-byte pool", kva, len, fPoolBytes);
+                return kIOReturnBadArgument;
+            }
+            const uint64_t off = kva - base;
             OSAddAtomic64(-(SInt64)len, &fVramBytes);
             fPoolRange->deallocate(off, len);
             s->release();
@@ -371,12 +381,12 @@ public:
     // marks a display pipe active only once one exists (init_framebuffer_resource sets +0x298): every WindowServer
     // transaction ended kIOReturnNotReady and no frame reached the panel (2026-10-20).
     // The scan-out through the carve-out, once PhxBringup has published where the carve-out sits (phx-fb-phys) and only
-    // if that view holds the pixels the BAR shows. NULL (copy through the BAR) until then.
+    // if that view holds the pixels the BAR shows. NULL (copy through the BAR) until then; an unpublished carve-out is
+    // retried on later presents (see fAliasWaits), a mismatched view is dropped after kAliasVerifyLimit checks.
     IOMemoryMap *aliasMap() {
-        if (fAliasMap || fAliasTries >= 3) return fAliasMap;
+        if (fAliasMap || fAliasTries >= kAliasVerifyLimit || fAliasWaits >= kAliasWaitLimit) return fAliasMap;
         if (!OSCompareAndSwap(0, 1, &fAliasBusy)) return nullptr;
-        if (!fAliasMap && fAliasTries < 3) {
-            fAliasTries++;
+        if (!fAliasMap) {
             uint64_t fbPhys = 0, barOff = ~0ull;
             if (OSIterator *it = fPCI->getChildIterator(gIOServicePlane)) {
                 while (OSObject *o = it->getNextObject()) {
@@ -393,10 +403,18 @@ public:
                     break;
                 }
             }
+            // PhxBringup can publish the carve-out after this framebuffer's first presents. That is a wait, not a
+            // failed check: counting three early presents as verification failures pinned the session to the BAR copy
+            // path (~110 ms a frame at 2560x1600) for its whole life. Only a real pixel mismatch uses the budget.
+            if (!fbPhys || barOff == ~0ull || fbPhys > UINT64_MAX - barOff) {
+                if (!fAliasWaits++) PFBLOG("alias: carve-out not published yet (ram 0x%llx, BAR offset 0x%llx): retrying", fbPhys, barOff);
+                fAliasBusy = 0;
+                return fAliasMap;
+            }
+            fAliasTries++;
             const uint64_t phys = fbPhys + barOff, bytes = (uint64_t)fRowBytes * fHeight;
             IOMemoryMap *m = nullptr;
-            if (fbPhys && barOff != ~0ull)
-                if (IODeviceMemory *dm = IODeviceMemory::withRange(phys, bytes)) { m = dm->map(kIOMapWriteCombineCache); dm->release(); }
+            if (IODeviceMemory *dm = IODeviceMemory::withRange(phys, bytes)) { m = dm->map(kIOMapWriteCombineCache); dm->release(); }
             if (m) {
                 const volatile uint32_t *a = (const volatile uint32_t *)m->getVirtualAddress();
                 const volatile uint32_t *b = (const volatile uint32_t *)fSurfMap->getVirtualAddress();
