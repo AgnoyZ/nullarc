@@ -1,0 +1,177 @@
+"""Check real Apple Metal tooling and compile native probes before dependency builds."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import platform
+import plistlib
+import subprocess
+
+from build_radv import runtime_destination, runtime_metadata_destination, write_runtime_metadata, seal_runtime_bundle
+from test_bringup_transport import compile_native
+from target_inventory import capture as capture_inventory, import_capture
+from verify_artifacts import inspect_macho
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def native_capture_preflight(out):
+    if platform.system() != 'Darwin' or platform.machine() != 'x86_64':
+        raise RuntimeError('Native capture preflight requires Intel macOS')
+    out = Path(out).resolve()
+    if out.exists(): raise RuntimeError('Native capture output exists; choose a fresh directory')
+    script = ROOT / 'tools/recovery_inventory.sh'
+    environment = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LC_ALL': 'C', 'SYSTEM_VERSION_COMPAT': '0'}
+    try:
+        result = subprocess.run(['/bin/sh', str(script), str(out)], capture_output=True, env=environment, timeout=130)
+    except (OSError, subprocess.TimeoutExpired):
+        raise RuntimeError('Native metadata capture did not complete; no target evidence is claimed') from None
+    if result.returncode:
+        raise RuntimeError('Native metadata capture failed; raw details remain private')
+    parsed = import_capture(out, out.parent / (out.name + '-import'))
+    return {'capture_completed': True, 'native_collector_sha256': hashlib.sha256(script.read_bytes()).hexdigest(),
+            'importer_sha256': parsed['collector_sha256'], 'system': parsed['system'],
+            'pci_root_count': parsed['pci']['pci_root_count'],
+            'target_candidate_count': parsed['pci']['target_candidate_count'],
+            'raw_capture_logged': False, 'safe_to_initialize': False, 'gpu_work_submitted': False}
+
+
+def metal_command(fixture, output, value):
+    return ["xcrun", "-sdk", "macosx", "metal", "-std=metal3.1", "-c",
+            str(Path(fixture).resolve()), f"-DADD_VALUE={value}", "-o", str(output)]
+
+
+def probe_command(kind, output):
+    if kind not in ("metal-smoke", "plugin-compile-probe"):
+        raise ValueError("Unknown native probe")
+    smoke = kind == "metal-smoke"
+    command = ["xcrun", "clang", "-arch", "x86_64", "-mmacosx-version-min=" + ("13.0" if smoke else "15.0"),
+               "-fobjc-arc", "-Wall", "-Wextra", "-Werror"]
+    if smoke:
+        command += ["-fblocks", "-I" + str(ROOT / "src")]
+    for framework in ("Foundation", "Metal", "IOKit", "CoreFoundation"):
+        command += ["-framework", framework]
+    source = "metal_smoke.m" if smoke else "plugin_compile_probe.m"
+    return command + [str(ROOT / "tools" / source), "-o", str(output)]
+
+
+def native_shader_command(stage, output):
+    stage = Path(stage).resolve()
+    return ['xcrun', 'clang++', '-std=c++17', '-arch', 'x86_64', '-mmacosx-version-min=15.0',
+            '-O2', '-Wall', '-Wextra', '-Werror', '-I' + str(stage / 'src/phxbringup'),
+            '-I' + str(stage / 'tools/phxctl'), str(ROOT / 'tools/native_shader_probe.cpp'),
+            '-framework', 'IOKit', '-framework', 'CoreFoundation', '-o', str(output)]
+
+
+def compile_native_shader(stage, output):
+    if platform.system() != 'Darwin' or platform.machine() != 'x86_64':
+        raise RuntimeError('Native GPUVM probe compilation requires Intel macOS')
+    output = Path(output).resolve()
+    if output.exists(): raise RuntimeError('Native GPUVM probe output exists; choose a fresh path')
+    subprocess.run(native_shader_command(stage, output), check=True, timeout=60)
+    binary = inspect_macho(output, 2)
+    result = subprocess.run([str(output), '--check'], capture_output=True, text=True, timeout=15)
+    if result.returncode != 4 or result.stdout or not result.stderr.startswith('REFUSED:'):
+        raise RuntimeError('Native GPUVM probe did not refuse the non-target CI host')
+    return {'binary': binary, 'source_sha256': hashlib.sha256((ROOT / 'tools/native_shader_probe.cpp').read_bytes()).hexdigest(),
+            'native_iokit_linked': True, 'non_target_check_exit': 4, 'check_only_executed': True,
+            'gpu_work_submitted': False, 'target_hardware_tested': False, 'deployable': False}
+
+
+def packaging_preflight(out):
+    """Exercise code/resource sealing with synthetic binaries, never real drivers."""
+    if platform.system() != "Darwin" or platform.machine() != "x86_64":
+        raise RuntimeError("Bundle packaging preflight requires Intel macOS")
+    out = Path(out).resolve()
+    if out.exists():
+        raise RuntimeError("Packaging output exists; choose a fresh directory")
+    code = out / "NVMTLDriver.bundle/Contents/MacOS"
+    code.mkdir(parents=True)
+    source = ROOT / "tests/fixtures/packaging_only.c"
+    command = ["xcrun", "clang", "-arch", "x86_64", "-mmacosx-version-min=15.0", "-Wall", "-Wextra", "-Werror"]
+    subprocess.run(command + ["-bundle", str(source), "-o", str(code / "NVMTLDriver")], check=True, timeout=60)
+    info = {"CFBundleIdentifier": "org.agnoyz.radeon780m.PackagingFixture", "CFBundleExecutable": "NVMTLDriver",
+            "CFBundlePackageType": "BNDL", "CFBundleVersion": "1", "CFBundleInfoDictionaryVersion": "6.0"}
+    (code.parent / "Info.plist").write_bytes(plistlib.dumps(info))
+    destination = runtime_destination(out, True)
+    binaries = {}
+    for name in ("libvulkan_radeon.dylib", "libnvmtl_translate.dylib", "air-runtime/libLLVM.dylib"):
+        library = destination / name
+        library.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(command + ["-dynamiclib", str(source), "-o", str(library)], check=True, timeout=60)
+        subprocess.run(["codesign", "--force", "--sign", "-", str(library)], check=True, timeout=30)
+        subprocess.run(["codesign", "--verify", "--strict", str(library)], check=True, timeout=30)
+        binaries[name] = inspect_macho(library, 6)
+    write_runtime_metadata(out, True, {"file_format_version": "1.0.0", "ICD": {"api_version": "1.0.0"}},
+                           {"synthetic_packaging_fixture": True, "driver_runtime_tested": False})
+    seal_runtime_bundle(out)
+    resources = runtime_metadata_destination(out, True)
+    sealed_resources = []
+    for name in ("radeon_icd.json", "radv-build-report.json"):
+        resource = resources / name
+        original = resource.read_bytes()
+        try:
+            resource.write_bytes(original + b"\n")
+            result = subprocess.run(["codesign", "--verify", "--strict", str(code.parent.parent)],
+                                    capture_output=True, text=True, timeout=30)
+            if result.returncode <= 0:
+                raise RuntimeError("Signature verification did not reject altered resource: " + name)
+        finally:
+            resource.write_bytes(original)
+        subprocess.run(["codesign", "--verify", "--strict", str(code.parent.parent)], check=True, timeout=30)
+        sealed_resources.append(name)
+    return {"synthetic_packaging_fixture": True, "nested_binaries": binaries,
+            "sealed_resources_verified": sealed_resources, "bundle_signing_verified": True,
+            "driver_runtime_tested": False, "hardware_executed": False}
+
+
+def preflight(out):
+    if platform.system() != "Darwin" or platform.machine() != "x86_64":
+        raise RuntimeError("Native toolchain preflight requires Intel macOS")
+    out = Path(out).resolve()
+    if out.exists():
+        raise RuntimeError("Preflight output exists; choose a fresh directory")
+    out.mkdir(parents=True)
+    compiler = subprocess.check_output(["xcrun", "-sdk", "macosx", "metal", "--version"], text=True, timeout=30).strip()
+    reports = []
+    for value in (17, 29):
+        air, library = out / f"increment{value}.air", out / f"increment{value}.metallib"
+        subprocess.run(metal_command(ROOT / "tests/fixtures/compute_increment.metal", air, value), check=True, timeout=60)
+        subprocess.run(["xcrun", "-sdk", "macosx", "metallib", str(air), "-o", str(library)], check=True, timeout=60)
+        data = library.read_bytes()
+        if not data.startswith(b"MTLB") or len(data) < 32:
+            raise RuntimeError("Apple linker did not produce a metallib container")
+        reports.append({"value": value, "metallib_bytes": len(data), "metallib_sha256": hashlib.sha256(data).hexdigest()})
+    probes = {}
+    for kind in ("metal-smoke", "plugin-compile-probe"):
+        executable = out / kind
+        subprocess.run(probe_command(kind, executable), check=True, timeout=60)
+        probes[kind] = inspect_macho(executable, 2)
+    packaging = packaging_preflight(out / "packaging")
+    bringup_transport = compile_native(out / "bringup-transport-native")
+    native_shader = compile_native_shader(out / 'bringup-transport-native/stage', out / 'native-shader-probe')
+    inventory = capture_inventory(out / "inventory")
+    inventory_summary = {"capture_completed": True, "system": inventory["system"],
+                         "pci_root_count": inventory["pci"]["pci_root_count"],
+                         "target_candidate_count": inventory["pci"]["target_candidate_count"],
+                         "safe_to_initialize": inventory["safe_to_initialize"],
+                         "gpu_work_submitted": inventory["gpu_work_submitted"]}
+    native_inventory = native_capture_preflight(out / 'native-capture')
+    if native_inventory['system'] != inventory_summary['system']:
+        raise RuntimeError('Direct and imported native system metadata disagree')
+    report = {"metal_compiler": compiler, "cases": reports, "compiled_probes": probes, "packaging": packaging,
+              "bringup_transport_compile_only": bringup_transport,
+              "native_shader_check_only": native_shader,
+              "read_only_host_inventory": inventory_summary,
+              "read_only_native_capture": native_inventory,
+              "native_probes_executed": True, "native_probe_execution": "native-shader-probe --check only; non-target refusal",
+              "driver_runtime_tested": False, "hardware_executed": False}
+    (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2), flush=True)
+    return report
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--out", type=Path, required=True)
+    preflight(parser.parse_args().out)

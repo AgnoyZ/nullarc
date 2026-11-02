@@ -7,6 +7,10 @@ it can be re-synced; all downstream commits live only on this branch.
 It is a hardening/precision pass over the upstream bring-up and display paths, not a new driver and not a
 hardware-validated release. Nothing here has been executed on the target laptop.
 
+Since 2026-11-02 this fork is the only working repository: the staging/build/test tooling, CI workflow,
+validation evidence and research documents that used to live in `AgnoyZ/radeon-780m-tahoe` moved here
+(see `docs/MIGRATION.md`).
+
 ## What the branch adds
 
 - Shared, testable policy and layout headers used by the patched sources:
@@ -65,17 +69,28 @@ hardware-validated release. Nothing here has been executed on the target laptop.
 - The downstream `mesboot`/`phxctl` paths are stricter than upstream's scripts and will refuse layouts or
   replies upstream accepted.
 
-## What is not in this branch
+## Repository layout
 
-The research scaffolding lives in the separate `AgnoyZ/radeon-780m-tahoe` repository: target inventory and
-preflight gates, the sanitizer/fake-IOKit harnesses, validation evidence, the firmware lock and manifest
-tool, and the build recipe that stages and hashes these sources. Keeping it out keeps this fork close to
-upstream's own build (`src/phxbringup/build.sh`, `src/phxaccel/build.sh`, `make test`).
+| Path | Contents |
+| --- | --- |
+| `src/` | Driver sources plus the canonical downstream headers and `src/README.md` |
+| `tools/` | Staging, build, firmware manifest, target inventory/preflight and boot-gate tooling |
+| `tests/` | Python suite, C++ sanitizer harnesses, fake-IOKit runners and shell fixtures |
+| `docs/` | Design notes, audit records, migration notes and `docs/validation/` evidence |
+| `patches/` | Historical record of the 28-commit series; hashed by staging, never applied |
+| `.github/workflows/build.yml` | Source tests on Linux and the macOS kext/plugin/RADV/LLVM build |
 
-## Building and using
+## Building and testing
 
-Same prerequisites as upstream: an Intel Mac with Command Line Tools and MacKernelSDK. The sources keep
-upstream's build scripts and identifiers.
+Same prerequisites as upstream for the kexts: an Intel Mac with Command Line Tools and MacKernelSDK. The
+sources keep upstream's build scripts and identifiers. The full pipeline (including Mesa RADV, LLVM and the
+translator) is described in `docs/BUILD.md` and runs in CI.
+
+```sh
+python tools/prepare_source.py build/review-source     # exports HEAD, records provenance
+python -m unittest discover -s tests -v                # source/staging/runner tests
+clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Isrc tests/test_hardware_policy.cpp -o build/test-policy
+```
 
 ```sh
 sh src/phxbringup/build.sh /path/to/MacKernelSDK

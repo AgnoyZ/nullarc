@@ -1,0 +1,146 @@
+name: Build and test experimental 780M sources
+on:
+  push:
+    branches: [main, downstream/780m-tahoe]
+    paths: ['src/**', 'tools/**', 'tests/**', 'patches/**', 'docs/**', 'upstream.lock.json', 'firmware.lock.json', '.github/workflows/**', 'AGENTS.md']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      retain_artifacts:
+        description: 'Upload private build artifacts (requires available Actions storage)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  source-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Patch integration and artifact rejection tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Execute the policy used by the kernel patch
+        run: |
+          mkdir -p build
+          clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Isrc tests/test_hardware_policy.cpp -o build/test-policy
+          build/test-policy
+      - name: Fault-inject actual bring-up transport without hardware
+        run: python3 tools/test_bringup_transport.py --out build/transport-tests
+      - name: Exercise actual PSP kernel methods without hardware
+        run: python3 tools/test_psp_submission.py --out build/psp-tests
+      - name: Exercise actual kernel queue adoption without hardware
+        run: python3 tools/test_queue_adoption.py --out build/queue-adoption-tests
+      - name: Exercise actual VMID binding and submission without hardware
+        run: python3 tools/test_vm_binding.py --out build/vm-binding-tests
+      - name: Exercise deferred client ownership and context reclamation without hardware
+        run: python3 tools/test_context_retirement.py --out build/context-retirement-tests
+      - name: Exercise deferred BO release and checked mapping without hardware
+        run: python3 tools/test_bo_retirement.py --out build/bo-retirement-tests
+      - name: Reproduce and bound actual native-submit debug reads without hardware
+        run: python3 tools/test_ib_debug.py --out build/ib-debug-tests
+      - name: Exercise serialized queue retirement and submission without hardware
+        run: python3 tools/test_queue_retirement.py --out build/queue-retirement-tests
+      - name: Exercise actual page-table allocation and walks without hardware
+        run: python3 tools/test_page_tables.py --out build/page-table-tests
+      - name: Exercise actual page walks with map cleanup and BO lifetime without hardware
+        run: python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup-tests
+      - name: Fault-inject authenticated firmware control without hardware
+        run: python3 tools/test_firmware_control.py --out build/firmware-control-tests
+      - name: Exercise complete firmware sequence with synthetic inputs
+        run: python3 tools/test_firmware_sequence.py --out build/firmware-sequence-tests
+      - name: Exercise GFX power and readiness with synthetic inputs
+        run: python3 tools/test_firmware_sequence.py --power --out build/gfx-power-tests
+      - name: Exercise explicit GART bootstrap with synthetic registers
+        run: python3 tools/test_gart_bootstrap.py --out build/gart-tests
+      - name: Exercise firmware-profile MES start with synthetic registers
+        run: python3 tools/test_mes_start.py --out build/mes-start-tests
+      - name: Exercise relocated scheduler queues with synthetic completions
+        run: python3 tools/test_mes_queue.py --out build/mes-queue-tests
+      - name: Exercise explicit compute-ring probe with synthetic completions
+        run: python3 tools/test_compute_probe.py --out build/compute-probe-tests
+      - name: Exercise actual GFX11 shader-probe packets with synthetic GPU writes
+        run: python3 tools/test_shader_probe.py --out build/shader-probe-tests
+      - name: Exercise native GPUVM shader acceptance with fake IOKit and GPU writes
+        run: python3 tools/test_native_shader_probe.py --out build/native-shader-probe-tests
+  macos-kexts:
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    needs: source-tests
+    steps:
+      - name: Refuse public binary publishing before license audit
+        if: ${{ inputs.retain_artifacts && !github.event.repository.private }}
+        run: |
+          echo '::error::Public binary artifacts are blocked pending the upstream license/provenance audit and explicit publication approval.'
+          exit 1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Preflight Apple Metal tooling and native probe compilation
+        run: python3 tools/macos_toolchain.py --out build/toolchain-preflight
+      - name: Checkout pinned MacKernelSDK
+        run: |
+          git clone https://github.com/acidanthera/MacKernelSDK.git build-sdk
+          git -C build-sdk checkout --detach 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+      - name: Checkout pinned Vulkan headers
+        run: |
+          git clone --depth 1 --branch v1.4.363 https://github.com/KhronosGroup/Vulkan-Headers.git build-vulkan-headers
+          test "$(git -C build-vulkan-headers rev-parse HEAD)" = '6802bb4733b63ed5efd3adb308a6c885ef180ea1'
+      - name: Prepare pinned translator source and Rust toolchain
+        run: |
+          python3 tools/translator_source.py build/inputs/nvmtl-translator-source.tar.gz
+          rustup toolchain install 1.90.0 --profile minimal --target x86_64-apple-darwin
+      - name: Prepare pinned Mesa RADV sources and build dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          python3 tools/fetch_radv.py build/inputs/radv
+          python3 -m venv build/radv-venv
+          build/radv-venv/bin/python -m pip install -r tools/radv-build-requirements.txt
+          command -v glslangValidator >/dev/null || brew install glslang
+          command -v pkg-config >/dev/null || brew install pkgconf
+          echo "$PWD/build/radv-venv/bin" >> "$GITHUB_PATH"
+      - name: Prepare pinned LLVM AIR runtime source
+        run: |
+          python3 tools/fetch_air_runtime.py build/inputs/llvm
+          cmake --version
+      - name: Compile, link, sign and test kernel, Metal, translator and RADV
+        run: python3 tools/build_macos.py --sdk build-sdk --vulkan-headers build-vulkan-headers --translator-source build/inputs/nvmtl-translator-source.tar.gz --mesa build/inputs/radv/mesa --cobalt build/inputs/radv/cobalt --llvm build/inputs/llvm --out build/ci
+      - name: Validate real translator ABI and generated SPIR-V without a GPU
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          command -v spirv-val >/dev/null || brew install spirv-tools
+          python3 tools/test_translator_runtime.py --library build/ci/artifacts/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib --plugin-source build/ci/stage/src/nmplugin/NVMTLLibraryLoad.m --fixture tests/fixtures/compute_increment.ll --validator "$(command -v spirv-val)" --out build/ci/artifacts/translator-tests
+      - name: Validate actual Metal compiler AIR through LLVM and the translator
+        run: python3 tools/test_air_runtime.py --llvm build/ci/artifacts/NVMTLDriver.bundle/Contents/MacOS/air-runtime/libLLVM.dylib --translator build/ci/artifacts/NVMTLDriver.bundle/Contents/MacOS/libnvmtl_translate.dylib --plugin-source build/ci/stage/src/nmplugin/NVMTLLibraryLoad.m --ir-fixture tests/fixtures/compute_increment.ll --metal-fixture tests/fixtures/compute_increment.metal --validator "$(command -v spirv-val)" --out build/ci/artifacts/air-runtime-tests
+      - name: Exercise real plugin metallib compilation without creating a device
+        run: python3 tools/plugin_runtime.py --bundle build/ci/artifacts/NVMTLDriver.bundle --fixture tests/fixtures/compute_increment.metal --validator "$(command -v spirv-val)" --out build/ci/plugin-runtime-tests
+      - name: Verify the Metal probe refuses this non-780M build host
+        shell: bash
+        run: |
+          build/ci/artifacts/metal-smoke --list
+          python3 - <<'PY'
+          import subprocess
+          probe = 'build/ci/artifacts/metal-smoke'
+          listing = subprocess.run([probe, '--list'], capture_output=True, text=True, check=True)
+          if 'target=yes' in listing.stdout:
+              raise SystemExit('Unexpected target GPU on hosted CI; do not auto-submit work')
+          result = subprocess.run([probe], capture_output=True, text=True, timeout=10)
+          print(result.stdout, result.stderr)
+          if result.returncode != 4:
+              raise SystemExit(f'Expected no-device refusal (4), got {result.returncode}')
+          PY
+      - name: Report compile-only artifact retention policy
+        if: ${{ !inputs.retain_artifacts }}
+        run: echo '::notice::Compile/test-only run. Binaries are not retained; storage quota was exhausted on 2026-10-30. Build report and checksums remain in this job log. No hardware test has run.'
+      - name: Preserve private experimental artifacts and upstream license notices
+        if: ${{ inputs.retain_artifacts && github.event.repository.private }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: experimental-780m-${{ github.sha }}
+          path: build/ci/artifacts
+          retention-days: 7
+          if-no-files-found: error

@@ -1,3 +1,5 @@
+> **Downstream work repository.** This fork is the working repository for the Radeon 780M research on the ThinkBook 16 G6+ AHP. Downstream commits, tests and build recipes live on branch `downstream/780m-tahoe`; see [DOWNSTREAM.md](DOWNSTREAM.md). `main` mirrors upstream `luuumi-dev/nullarc`.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/nullarc-logo-dark.svg">

@@ -1,0 +1,83 @@
+{
+  "nullarc": {
+    "url": "https://github.com/luuumi-dev/nullarc.git",
+    "commit": "b02ba29f5a3d98f56f25846545a3239c85fdc18c",
+    "path": "."
+  },
+  "MacKernelSDK": {
+    "url": "https://github.com/acidanthera/MacKernelSDK.git",
+    "commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164"
+  },
+  "Vulkan-Headers": {
+    "url": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+    "commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+    "tag": "v1.4.363"
+  },
+  "nvmtl-translator": {
+    "url": "https://github.com/luuumi-dev/nullarc/releases/download/v0.3.0-alpha/nvmtl-translator-source.tar.gz",
+    "sha256": "1252d982578b19e18144266aab994bb354a757c7491dcb33c15518b6791c3f3c",
+    "archive_root": "nvmtl-translator-2.4.1",
+    "rust_toolchain": "1.90.0",
+    "target": "x86_64-apple-darwin",
+    "license": "LGPL-3.0-or-later"
+  },
+  "Mesa": {
+    "url": "https://gitlab.freedesktop.org/mesa/mesa.git",
+    "commit": "f5cb8ee032adabef599ae892ec4e42d796b84da9"
+  },
+  "Cobalt64": {
+    "url": "https://github.com/Almosst-DEV/Cobalt64.git",
+    "commit": "d6c9aedf8e6526a39e349b5886cbc8c7ddf77f65",
+    "patch_directory": "mesa-patches",
+    "patch_count": 9
+  },
+  "radv-phoenix": {
+    "patch_directory": "mesa-patches-phoenix",
+    "patch_count": 6
+  },
+  "LLVM": {
+    "url": "https://github.com/llvm/llvm-project.git",
+    "commit": "2078da43e25a4623cab2d0d60decddf709aaea28",
+    "tag": "llvmorg-21.1.8",
+    "license": "Apache-2.0 WITH LLVM-exception"
+  },
+  "patches": [
+    "patches/0001-strict-hardware-execution.patch",
+    "patches/0002-plugin-relative-radv.patch",
+    "patches/0003-bringup-aperture-bounds.patch",
+    "patches/0004-checked-bringup-transport.patch",
+    "patches/0005-checked-gpu-completion.patch",
+    "patches/0006-bounded-mes-submission.patch",
+    "patches/0007-checked-psp-completion.patch",
+    "patches/0008-checked-firmware-control.patch",
+    "patches/0009-explicit-psp-layout.patch",
+    "patches/0010-checked-toc-initialization.patch",
+    "patches/0011-profile-firmware-sequence.patch",
+    "patches/0012-checked-gfx-power-sequence.patch",
+    "patches/0013-explicit-gart-bootstrap.patch",
+    "patches/0014-profile-mes-start.patch",
+    "patches/0015-explicit-scheduler-queue.patch",
+    "patches/0016-explicit-compute-ring-probe.patch",
+    "patches/0017-checked-queue-adoption.patch",
+    "patches/0018-checked-vmid-binding.patch",
+    "patches/0019-deferred-client-context-retirement.patch",
+    "patches/0020-deferred-bo-release-and-checked-unmap.patch",
+    "patches/0021-serialized-queue-retirement.patch",
+    "patches/0022-checked-page-table-backing.patch",
+    "patches/0023-checked-walk-cleanup.patch",
+    "patches/0024-checked-context-table-clear.patch",
+    "patches/0025-gfx11-shader-dispatch-probe.patch",
+    "patches/0026-share-gfx11-dispatch-packets.patch",
+    "patches/0027-bounded-ib-debug-reads.patch",
+    "patches/0028-checked-framebuffer-pool-and-alias-retry.patch"
+  ],
+  "target": {
+    "darwin_major": 25,
+    "vendor_id": "1002",
+    "device_id": "1900",
+    "architecture": "x86_64"
+  },
+  "radv-patches": [
+    "patches/radv/0001-native-phoenix-only.patch"
+  ]
+}
