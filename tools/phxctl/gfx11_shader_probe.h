@@ -29,6 +29,7 @@
 #define PHX_SHADER_PROBE_ARENA_BYTES 0x6000ull
 #define PHX_SHADER_PROBE_OUTPUT_BYTES 1024u
 #define PHX_SHADER_PROBE_PACKET_DWORDS 86u
+#define PHX_SHADER_DISPATCH_DWORDS 78u
 static const uint32_t phxGfx11ClearShader[] = {
 	0xB0802006, 0xBF840003, 0x360000FF, 0x000003FF,
 	0x7E020205, 0x7E040206, 0x7E060207, 0xBF870004,
@@ -59,13 +60,12 @@ static inline int phxShaderProbeLayoutValid(const struct PhxMesQueueLayout *sche
         phxPspDisjoint(scheduler->arenaOffset, PHX_MES_QUEUE_ARENA_BYTES,
                       work->arenaOffset, PHX_SHADER_PROBE_ARENA_BYTES);
 }
-static inline unsigned phxGfx11ClearCommands(uint32_t *out, size_t capacity, uint64_t shader,
-    uint64_t target, uint64_t fence, uint64_t completion, const uint32_t pattern[4]) {
+static inline unsigned phxGfx11DispatchCommands(uint32_t *out, size_t capacity, uint64_t shader,
+    uint64_t target, const uint32_t pattern[4]) {
     const uint64_t limit = 1ull << 48;
-    if (!out || !pattern || capacity < PHX_SHADER_PROBE_PACKET_DWORDS || !completion ||
+    if (!out || !pattern || capacity < PHX_SHADER_DISPATCH_DWORDS ||
         !shader || (shader & 255) || !phxPspSpanFits(shader, 4096, limit) ||
         !target || (target & 15) || !phxPspSpanFits(target, PHX_SHADER_PROBE_OUTPUT_BYTES, limit) ||
-        !fence || (fence & 7) || !phxPspSpanFits(fence, 8, limit) ||
         !phxPspDisjoint(shader, 4096, target, PHX_SHADER_PROBE_OUTPUT_BYTES)) return 0;
     const uint32_t packet[] = {
         /* MEC ACQUIRE_MEM: invalidate instruction/scalar/vector/L1/L2 caches, write back L2. */
@@ -87,12 +87,20 @@ static inline unsigned phxGfx11ClearCommands(uint32_t *out, size_t capacity, uin
         0xc0047602u, 0x240, (uint32_t)target, (uint32_t)(target >> 32) | 0x100000u, 64, 0x1003dfac,
         0xc0047602u, 0x244, pattern[0], pattern[1], pattern[2], pattern[3],
         0xc0017602u, 0x215, 0,
-        0xc0031502u, 1, 1, 1, 1,
-        0xc0064900u, 0x06603514u, 0x40000000u, (uint32_t)fence, (uint32_t)(fence >> 32),
-        (uint32_t)completion, (uint32_t)(completion >> 32), 0
+        0xc0031502u, 1, 1, 1, 1
     };
-    if (sizeof(packet) / sizeof(packet[0]) != PHX_SHADER_PROBE_PACKET_DWORDS) return 0;
+    if (sizeof(packet) / sizeof(packet[0]) != PHX_SHADER_DISPATCH_DWORDS) return 0;
     memcpy(out, packet, sizeof(packet));
+    return PHX_SHADER_DISPATCH_DWORDS;
+}
+static inline unsigned phxGfx11ClearCommands(uint32_t *out, size_t capacity, uint64_t shader,
+    uint64_t target, uint64_t fence, uint64_t completion, const uint32_t pattern[4]) {
+    if (!out || capacity < PHX_SHADER_PROBE_PACKET_DWORDS || !completion || !fence ||
+        (fence & 7) || !phxPspSpanFits(fence, 8, 1ull << 48)) return 0;
+    if (phxGfx11DispatchCommands(out, capacity, shader, target, pattern) != PHX_SHADER_DISPATCH_DWORDS) return 0;
+    const uint32_t release[] = {0xc0064900u, 0x06603514u, 0x40000000u,
+        (uint32_t)fence, (uint32_t)(fence >> 32), (uint32_t)completion, (uint32_t)(completion >> 32), 0};
+    memcpy(out + PHX_SHADER_DISPATCH_DWORDS, release, sizeof(release));
     return PHX_SHADER_PROBE_PACKET_DWORDS;
 }
 #endif
