@@ -20,6 +20,8 @@
 #include <sys/sysctl.h>
 #include "nvrm_vram_abi.h"
 #include "nvrm_gpuva_abi.h"
+#include <libkern/version.h>
+#include "PhxHardwarePolicy.hpp"
 
 void phxAgdcInstall();   // phxagdc.cpp: the AppleGraphicsDeviceControl that reports this panel (debug.phxagdc)
 void phxAgdcRemove();
@@ -461,6 +463,15 @@ bool PhxAMDFB::start(IOService *provider)
 {
     char arg[8];
     if (PE_parse_boot_argn("-phxfboff", arg, sizeof arg)) { PFBLOG("-phxfboff: leaving the firmware framebuffer"); return false; }
+    int optIn = 0;
+    const bool optedIn = PE_parse_boot_argn("phx780m", &optIn, sizeof(optIn)) && optIn == 1;
+    IOPCIDevice *candidate = OSDynamicCast(IOPCIDevice, provider);
+    if (!candidate || !phx780m::allowDevice(version_major,
+            candidate->configRead16(kIOPCIConfigVendorID),
+            candidate->configRead16(kIOPCIConfigDeviceID), optedIn)) {
+        PFBLOG("780M research gate declined; not consuming display boot arming");
+        return false;
+    }
     if (!takeBootArming()) { PFBLOG("NVRAM phxfb-boot not set: leaving the firmware framebuffer this boot"); return false; }
     fPCI = OSDynamicCast(IOPCIDevice, provider);
     if (!fPCI) return false;
