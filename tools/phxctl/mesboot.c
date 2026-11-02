@@ -12,6 +12,7 @@
 #include "../../src/phxbringup/PhxMesQueueLayout.h"
 #include "../../src/phxbringup/PhxFirmwareProfile.h"
 #include "mes_v11_api_def.h"
+#include "gfx11_shader_probe.h"
 
 #define UC_TYPE 0x4E34384Eu
 #define SEL_HELLO 0
@@ -802,13 +803,10 @@ static void sched_test(void)
    if (env_on("MESBOOT_GFX")) gfx_via_mes();
 }
 
-static void compute_ring_probe(const struct PhxMesQueueLayout *queue, const struct PhxBootMemory *memory)
+static void compute_queue_start(const struct PhxMesQueueLayout *queue, uint64_t arena_bytes)
 {
    const uint64_t ring = queue->arenaOffset, wb = ring + 4096, mqd = ring + 8192, eop = ring + 12288;
-   const uint64_t result = ring + 16384, fence = result + 256;
-   const uint32_t pattern = 0x7800c0deu;
-   const uint64_t completion_value = ((uint64_t)pattern << 32) | 1u, guard = 0xa55aa55a5aa55aa5ull;
-   for (uint64_t i = 0; i < PHX_COMPUTE_PROBE_ARENA_BYTES; i += 4) vw(ring + i, 0);
+   for (uint64_t i = 0; i < arena_bytes; i += 4) vw(ring + i, 0);
    mqd_build(mqd, ring, wb, eop, 1, (uint32_t)queue->doorbellIndex);
    union MESAPI__ADD_QUEUE a;
    memset(&a, 0, sizeof(a));
@@ -819,6 +817,15 @@ static void compute_ring_probe(const struct PhxMesQueueLayout *queue, const stru
    a.queue_type = MES_QUEUE_TYPE_COMPUTE; a.map_legacy_kq = 1;
    mes_submit(&a, sizeof(a), offsetof(union MESAPI__ADD_QUEUE, api_status), "ADD_QUEUE(explicit compute probe)");
    hqd_verify(1, 0, mqd, ring, wb, (uint32_t)queue->doorbellIndex);
+}
+
+static void compute_ring_probe(const struct PhxMesQueueLayout *queue, const struct PhxBootMemory *memory)
+{
+   const uint64_t ring = queue->arenaOffset, wb = ring + 4096;
+   const uint64_t result = ring + 16384, fence = result + 256;
+   const uint32_t pattern = 0x7800c0deu;
+   const uint64_t completion_value = ((uint64_t)pattern << 32) | 1u, guard = 0xa55aa55a5aa55aa5ull;
+   compute_queue_start(queue, PHX_COMPUTE_PROBE_ARENA_BYTES);
    vw(result, (uint32_t)guard); vw(result + 4, (uint32_t)(guard >> 32));
    vw(result + 8, ~pattern); vw(result + 12, (uint32_t)(guard >> 32));
    vw(result + 16, (uint32_t)guard); vw(result + 20, (uint32_t)(guard >> 32));
@@ -843,9 +850,57 @@ static void compute_ring_probe(const struct PhxMesQueueLayout *queue, const stru
       gpu_failure("compute-ring memory result or guards");
 }
 
+static void compute_shader_probe(const struct PhxMesQueueLayout *queue, const struct PhxBootMemory *memory)
+{
+   const uint64_t ring = queue->arenaOffset, wb = ring + 4096, result = ring + 16384;
+   const uint64_t code = ring + 20480, fence = result + 2048;
+   const uint64_t completion_value = 0x7800a11c00000001ull, guard = 0xa55aa55a5aa55aa5ull;
+   const uint32_t pattern[4] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
+   uint32_t packet[PHX_SHADER_PROBE_PACKET_DWORDS];
+   const unsigned dwords = phxGfx11ClearCommands(packet, PHX_SHADER_PROBE_PACKET_DWORDS,
+       VA(code), VA(result + 16), memory->mcBase + fence, completion_value, pattern);
+   if (!dwords) mes_start_failure(75, "invalid GFX11 shader packet addresses");
+   compute_queue_start(queue, PHX_SHADER_PROBE_ARENA_BYTES);
+   for (unsigned i = 0; i < sizeof(phxGfx11ClearShader) / sizeof(phxGfx11ClearShader[0]); ++i)
+      vw(code + (uint64_t)i * 4, phxGfx11ClearShader[i]);
+   for (unsigned i = 0; i < (sizeof(phxGfx11ClearShader) + 7) / 8; ++i) {
+      uint64_t expected = phxGfx11ClearShader[2 * i];
+      if (2 * i + 1 < sizeof(phxGfx11ClearShader) / sizeof(phxGfx11ClearShader[0]))
+         expected |= (uint64_t)phxGfx11ClearShader[2 * i + 1] << 32;
+      if (vr64(code + (uint64_t)i * 8) != expected) gpu_failure("GFX11 shader staging readback");
+   }
+   for (unsigned i = 0; i < 4; ++i) {
+      uint32_t value = i & 1 ? (uint32_t)(guard >> 32) : (uint32_t)guard;
+      vw(result + (uint64_t)i * 4, value);
+      vw(result + 16 + PHX_SHADER_PROBE_OUTPUT_BYTES + (uint64_t)i * 4, value);
+   }
+   for (unsigned i = 0; i < PHX_SHADER_PROBE_OUTPUT_BYTES / 4; ++i)
+      vw(result + 16 + (uint64_t)i * 4, ~pattern[i & 3]);
+   vw(fence, (uint32_t)~completion_value); vw(fence + 4, (uint32_t)(~completion_value >> 32));
+   for (unsigned i = 0; i < dwords; ++i) vw(ring + (uint64_t)i * 4, packet[i]);
+   vw(wb + 16, dwords); vw(wb + 20, 0);
+   db(queue->doorbellIndex * 4, dwords);
+   unsigned sample;
+   for (sample = 0; sample < 400; ++sample) {
+      if (usleep(5000) && errno != EINTR) mes_start_failure(74, "shader completion delay failed");
+      if (vr64(fence) == completion_value) break;
+   }
+   if (sample == 400) gpu_failure("GFX11 shader full-width release fence");
+   if (vr64(fence) != completion_value) gpu_failure("GFX11 shader release changed");
+   for (unsigned i = 0; i < PHX_SHADER_PROBE_OUTPUT_BYTES / 8; ++i) {
+      uint64_t expected = pattern[(2 * i) & 3] | (uint64_t)pattern[(2 * i + 1) & 3] << 32;
+      if (vr64(result + 16 + (uint64_t)i * 8) != expected) gpu_failure("GFX11 shader output mismatch");
+   }
+   if (vr64(result) != guard || vr64(result + 8) != guard ||
+       vr64(result + 16 + PHX_SHADER_PROBE_OUTPUT_BYTES) != guard ||
+       vr64(result + 24 + PHX_SHADER_PROBE_OUTPUT_BYTES) != guard)
+      gpu_failure("GFX11 shader output guards");
+}
+
 static int scheduler_query(int argc, char **argv)
 {
-   const int compute = !strcmp(argv[1], "compute-probe");
+   const int shader = !strcmp(argv[1], "shader-probe");
+   const int compute = shader || !strcmp(argv[1], "compute-probe");
    if (argc != (compute ? 10 : 8)) mes_start_failure(64, "requires explicit GART and scheduler layout; compute-probe also requires compute arena and doorbell");
    struct PhxGartLayout layout = {PHX_GART_LAYOUT_VERSION, gart_argument(argv[2]), gart_argument(argv[3]),
                                  gart_argument(argv[4]), gart_argument(argv[5])};
@@ -862,7 +917,8 @@ static int scheduler_query(int argc, char **argv)
    size_t size = sizeof(memory);
    checked_method(conn, PHX_BOOT_MEMORY_SELECTOR, NULL, 0, NULL, 0, NULL, NULL, &memory, &size);
    if (!phxMesQueueLayoutValid(&queue, &layout, &memory)) mes_start_failure(75, "scheduler arena overlaps or exceeds bootstrap regions");
-   if (compute && !phxComputeProbeLayoutValid(&queue, &work, &layout, &memory))
+   if (compute && !(shader ? phxShaderProbeLayoutValid(&queue, &work, &layout, &memory) :
+       phxComputeProbeLayoutValid(&queue, &work, &layout, &memory)))
       mes_start_failure(75, "compute arena or doorbell overlaps or exceeds bootstrap resources");
    uint32_t cp = rd(0x21a0), rlc = rd(0xee7e);
    if (cp || rlc == UINT32_MAX || !(rlc & 0x80000000u)) mes_start_failure(75, "GFX boot readiness not observed");
@@ -873,7 +929,7 @@ static int scheduler_query(int argc, char **argv)
       if (gart_read64(layout.tableOffset + (offset >> 12) * 8) != ((memory.physicalBase + offset) | 0x71ull))
          mes_start_failure(75, "scheduler arena PTE does not match bootstrap backing memory");
    }
-   if (compute) for (unsigned page = 0; page < 5; ++page) {
+   if (compute) for (unsigned page = 0; page < (shader ? 6u : 5u); ++page) {
       uint64_t offset = work.arenaOffset + (uint64_t)page * 4096;
       if (gart_read64(layout.tableOffset + (offset >> 12) * 8) != ((memory.physicalBase + offset) | 0x71ull))
          mes_start_failure(75, "compute arena PTE does not match bootstrap backing memory");
@@ -904,9 +960,11 @@ static int scheduler_query(int argc, char **argv)
    sched_init();
    hqd_verify(3, 0, SCH_MQD, SCH_RING, SCH_WB, scheduler_doorbell);
    sched_resources();
-   if (compute) compute_ring_probe(&work, &memory);
+   if (shader) compute_shader_probe(&work, &memory);
+   else if (compute) compute_ring_probe(&work, &memory);
    if (IOServiceClose(conn) != KERN_SUCCESS) mes_start_failure(74, "service close failed");
-   if (compute) puts("compute-ring probe: memory write and full-width release fence observed; shader execution unverified");
+   if (shader) puts("GFX11 shader probe: 1024-byte buffer-clear output and full-width release fence observed; Metal and display unverified");
+   else if (compute) puts("compute-ring probe: memory write and full-width release fence observed; shader execution unverified");
    else puts("scheduler query: resource and query completions observed; GPU compute and graphics unverified");
    return 0;
 }
@@ -1075,7 +1133,7 @@ static void sdma_sys_test(void)
 
 int main(int argc, char **argv)
 {
-   if (argc >= 2 && (!strcmp(argv[1], "sched-query") || !strcmp(argv[1], "compute-probe"))) return scheduler_query(argc, argv);
+   if (argc >= 2 && (!strcmp(argv[1], "sched-query") || !strcmp(argv[1], "compute-probe") || !strcmp(argv[1], "shader-probe"))) return scheduler_query(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "mes")) return mes_start(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "gart")) return gart(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "all")) gart_failure(64, "legacy all cannot supply an explicit GART layout");
