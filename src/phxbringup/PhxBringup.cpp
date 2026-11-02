@@ -194,7 +194,8 @@ private:
     uint64_t *ptTable(const VmCtx &c, uint64_t phys) const;
     uint64_t ptTablePhys(VmCtx &c, uint32_t i);
     uint64_t *vmPte(VmCtx &c, uint64_t va, bool alloc);
-    void vmFlushTlb(uint32_t vmid) const;
+    bool vmFlushTlb(uint32_t vmid) const;
+    bool vmBindingValid(uint32_t vmid, uint64_t physical) const;
     void ringPut(GpuQueue &q, uint32_t idx, uint32_t value);
     bool debug{false};
     bool smuUsed{false};
@@ -572,11 +573,34 @@ uint64_t *PhxBringup::vmPte(VmCtx &c, uint64_t va, bool alloc) {
     return t ? t + ((va >> 12) & 511) : nullptr;
 }
 
-void PhxBringup::vmFlushTlb(uint32_t vmid) const {
+bool PhxBringup::vmFlushTlb(uint32_t vmid) const {
+    if (!mmio || vmid < kFirstUserVmid || vmid >= kFirstUserVmid + kNumUserVmids)
+        return false;
+    const uint32_t mask = 1u << vmid;
     __asm__ __volatile__("mfence" ::: "memory");
-    wreg(kRegInvEng17Req, 0x00F80000u | (1u << vmid) | 1u);
-    for (int i = 0; i < 1000 && !(rreg(kRegInvEng17Ack) & (1u << vmid)); i++)
-        IODelay(1);
+    // GFXHUB legacy invalidation: flush only this user VMID, not VMID 0 as well.
+    wreg(kRegInvEng17Req, 0x00F80000u | mask);
+    for (unsigned sample = 0; sample < 1000; ++sample) {
+        const uint32_t ack = rreg(kRegInvEng17Ack);
+        if (ack == UINT32_MAX) return false;
+        if (ack & mask) return true;
+        if (sample + 1 < 1000) IODelay(1);
+    }
+    return false;
+}
+
+bool PhxBringup::vmBindingValid(uint32_t vmid, uint64_t physical) const {
+    if (!mmio || vmid < kFirstUserVmid || vmid >= kFirstUserVmid + kNumUserVmids ||
+        !physical || (physical & ~kPtAddrMask))
+        return false;
+    const uint32_t regs[] = {kRegCtx0BaseLo + 2 * vmid, kRegCtx0BaseLo + 2 * vmid + 1,
+        kRegCtx0Cntl + vmid, kRegCtx0StartLo + 2 * vmid, kRegCtx0StartLo + 2 * vmid + 1,
+        kRegCtx0EndLo + 2 * vmid, kRegCtx0EndLo + 2 * vmid + 1};
+    const uint32_t values[] = {static_cast<uint32_t>(physical | 3), static_cast<uint32_t>(physical >> 32),
+        0x01fffe07, 0, 0, 0xffffffff, 0xf};
+    for (unsigned i = 0; i < 7; ++i)
+        if (rreg(regs[i]) != values[i]) return false;
+    return true;
 }
 
 // Takes a free context: empty tables (root only), no hardware VMID until its first submission. Returns its handle,
@@ -608,9 +632,17 @@ uint32_t PhxBringup::vmidAlloc() {
 // Points a hardware VMID at the context's tables for a submission (gpuLock held): the one it already has, a free one,
 // or the least recently used one whose submissions the GPU has all finished (waits for one, bounded ~2 s). 0 on timeout.
 uint32_t PhxBringup::vmBind(uint32_t handle) {
-    VmCtx &c = vm[handle - 1];
+    VmCtx *context = vmCtx(handle);
+    if (!context || !mmio || !context->phys || (context->phys & ~kPtAddrMask) || hwTick == UINT64_MAX)
+        return 0;
+    VmCtx &c = *context;
     const uint64_t now = ++hwTick;
     if (c.hw) {
+        if (c.hw < kFirstUserVmid || c.hw >= kFirstUserVmid + kNumUserVmids ||
+            hwv[c.hw - kFirstUserVmid].ctx != handle)
+            return 0;
+        // Recheck cached assignments too: a prior invalidation may have failed.
+        if (!vmBindingValid(c.hw, c.phys) || !vmFlushTlb(c.hw)) return 0;
         hwv[c.hw - kFirstUserVmid].lastUse = now;
         return c.hw;
     }
@@ -619,6 +651,9 @@ uint32_t PhxBringup::vmBind(uint32_t handle) {
         const uint64_t done = gpuRetired();
         uint64_t oldest = ~0ull;
         for (uint32_t i = 0; i < kNumUserVmids; i++) {
+            if (hwv[i].ctx && (hwv[i].ctx > kMaxCtx || !vm[hwv[i].ctx - 1].busy ||
+                              vm[hwv[i].ctx - 1].hw != kFirstUserVmid + i))
+                return 0;
             if (!hwv[i].ctx) {
                 pick = static_cast<int>(i);
                 break;
@@ -649,7 +684,9 @@ uint32_t PhxBringup::vmBind(uint32_t handle) {
     wreg(kRegCtx0StartLo + 2 * vmid + 1, 0);
     wreg(kRegCtx0EndLo + 2 * vmid, 0xffffffff);
     wreg(kRegCtx0EndLo + 2 * vmid + 1, 0xf);
-    vmFlushTlb(vmid);
+    // Keep the software reservation on failure, but never return a submission-ready VMID.
+    // A later call must revalidate these registers and obtain its own invalidation ACK.
+    if (!vmBindingValid(vmid, c.phys) || !vmFlushTlb(vmid)) return 0;
     return vmid;
 }
 
