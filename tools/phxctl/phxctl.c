@@ -60,7 +60,8 @@ static kern_return_t checked_scalar(io_connect_t connection, uint32_t selector,
    if (selector == SEL_HELLO && output[0] != input[0])
       control_failure(75, "incompatible kernel ABI");
    if ((selector == SEL_DBG_PSP_SUBMIT || selector == SEL_DBG_PSP_CTL ||
-        selector == SEL_DBG_PSP_LOADIPFW || selector == SEL_DBG_PSP_RAW) && output[0] != 0)
+        selector == SEL_DBG_PSP_LOADIPFW || selector == SEL_DBG_PSP_RAW ||
+        selector == PHX_PSP_LOAD_TOC_SELECTOR) && output[0] != 0)
       control_failure(75, "PSP completion/status not confirmed");
    if (selector == SEL_DBG_SMU && output[0] != 1)
       control_failure(75, "SMU response not successful");
@@ -244,6 +245,8 @@ static const struct named_reg gc_regs[] = {
 
 int main(int argc, char **argv)
 {
+   if (argc >= 2 && !strcmp(argv[1], "loadtoc") && argc != 7)
+      control_failure(64, "loadtoc requires file, offset, size, staging offset and reviewed SHA-256");
    if (argc >= 2 && !strcmp(argv[1], "psp-layout") && argc != 7)
       control_failure(64, "psp-layout requires ring offset, TMR offset/capacity and staging offset/capacity");
    if (argc >= 2 && !strcmp(argv[1], "verify-file")) {
@@ -264,7 +267,20 @@ int main(int argc, char **argv)
    if (open_kext())
       return 1;
 
-   if (!strcmp(argv[1], "psp-layout")) {
+   if (!strcmp(argv[1], "loadtoc")) {
+      uint32_t offset = checked_u32(argv[3]), size = checked_u32(argv[4]), destination = checked_u32(argv[5]);
+      if (destination & 0xfff) control_failure(64, "TOC staging destination must be page aligned");
+      stage_firmware(argv[2], offset, size, destination, argv[6]);
+      uint64_t input[2] = {destination, size}, out[4] = {0};
+      uint32_t n = 4;
+      checked_scalar(conn, PHX_PSP_LOAD_TOC_SELECTOR, input, 2, out, &n);
+      if (!out[2] || out[2] > UINT32_MAX || out[3] != 1) {
+         fprintf(stderr, "TOC reported %llu TMR bytes; configured region fit=%llu\n",
+                 (unsigned long long)out[2], (unsigned long long)out[3]);
+         control_failure(75, "TOC size or configured TMR capacity/alignment not usable");
+      }
+      printf("loadtoc complete; required TMR bytes %llu; TMR not set up\n", (unsigned long long)out[2]);
+   } else if (!strcmp(argv[1], "psp-layout")) {
       struct PhxPspLayout layout = {PHX_PSP_LAYOUT_VERSION, checked_u64(argv[2]), checked_u64(argv[3]),
          checked_u64(argv[4]), checked_u64(argv[5]), checked_u64(argv[6]), {0, 0}};
       uint64_t out[4] = {0};
