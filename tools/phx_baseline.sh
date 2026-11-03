@@ -9,8 +9,9 @@
 #   sh tools/phx_baseline.sh --out /Users/Shared/phx-baseline-$(date +%Y%m%d-%H%M) --window 60
 #
 # Two samples are taken --window seconds apart; the delta is the measurement (frames on the panel,
-# present rate, the cost of one copied frame as a share of one refresh, VBL tick lateness). Without
-# --window the counters are captured once: a state snapshot, not a measurement.
+# present rate, the cost of one copied frame as a share of one refresh, VBL tick lateness, and the present
+# cadence against the tick). Without --window the counters are captured once: a state snapshot, not a
+# measurement. The capture is then decided by tools/phx_baseline_report.py (thresholds: docs/analysis.md §9).
 #
 # Exit codes: 0 captured, 2 usage, 3 not Darwin/x86_64, 4 output directory exists, 5 a counter is
 # missing (kexts not loaded, or a name changed -- the code is authoritative, not the docs).
@@ -22,8 +23,10 @@ UNAME_BIN=${PHX_UNAME:-uname}
 
 # Read-only knobs: they say which code path was measured, so a baseline is not comparable without them.
 KNOBS='debug.phxfb_alias debug.phxfb_vbl_staged debug.nvaccel_iop debug.nvaccel_iop_sse debug.nvaccel_iop_vsync debug.nvaccel_vm_sticky debug.phxbos_flush'
-# Monotonic counters (src/phxaccel/accel/phxfb.cpp, src/phxaccel/accel/nvrm-accel.cpp).
-COUNTERS='debug.phxfb_vbl_n debug.phxfb_vbl_late_us_sum debug.phxfb_vbl_late_us_max debug.nvaccel_iop_ok debug.nvaccel_iop_ok_h0 debug.nvaccel_iop_src_res debug.nvaccel_iop_src_surf debug.nvaccel_iop_copy_skip debug.nvaccel_iop_blank debug.nvaccel_iop_fail debug.nvaccel_iop_copy_us debug.nvaccel_iop_copy_us_max debug.nvaccel_iop_copy_us_sum debug.nvaccel_vm_parked debug.nvaccel_vm_unparked'
+# Monotonic counters (src/phxaccel/accel/phxfb.cpp, src/phxaccel/accel/nvrm-accel.cpp). The last six are the
+# present cadence H3 is decided from: frames one, two, three and four-or-more refreshes after the previous
+# one, completion checks answered "not yet", and frames completed past two refreshes without a tick.
+COUNTERS='debug.phxfb_vbl_n debug.phxfb_vbl_late_us_sum debug.phxfb_vbl_late_us_max debug.nvaccel_iop_ok debug.nvaccel_iop_ok_h0 debug.nvaccel_iop_src_res debug.nvaccel_iop_src_surf debug.nvaccel_iop_copy_skip debug.nvaccel_iop_blank debug.nvaccel_iop_fail debug.nvaccel_iop_copy_us debug.nvaccel_iop_copy_us_max debug.nvaccel_iop_copy_us_sum debug.nvaccel_vm_parked debug.nvaccel_vm_unparked debug.nvaccel_iop_gap1 debug.nvaccel_iop_gap2 debug.nvaccel_iop_gap3 debug.nvaccel_iop_gap4 debug.nvaccel_iop_vsync_waits debug.nvaccel_iop_vsync_late'
 
 usage() {
     cat <<'EOF'
@@ -125,13 +128,19 @@ BEGIN {
             skip = B["debug.nvaccel_iop_copy_skip"] - A["debug.nvaccel_iop_copy_skip"]
             blank = B["debug.nvaccel_iop_blank"] - A["debug.nvaccel_iop_blank"]
             fail = B["debug.nvaccel_iop_fail"] - A["debug.nvaccel_iop_fail"]
+            g1 = B["debug.nvaccel_iop_gap1"] - A["debug.nvaccel_iop_gap1"]
+            g2 = B["debug.nvaccel_iop_gap2"] - A["debug.nvaccel_iop_gap2"]
+            g3 = B["debug.nvaccel_iop_gap3"] - A["debug.nvaccel_iop_gap3"]
+            g4 = B["debug.nvaccel_iop_gap4"] - A["debug.nvaccel_iop_gap4"]
+            vw = B["debug.nvaccel_iop_vsync_waits"] - A["debug.nvaccel_iop_vsync_waits"]
+            vl = B["debug.nvaccel_iop_vsync_late"] - A["debug.nvaccel_iop_vsync_late"]
             hz = vbl / window
             frame_us = (hz > 0 ? 1000000.0 / hz : 0)
             avg = (ok > 0 ? cost / ok : 0)
             share = (frame_us > 0 ? 100.0 * avg / frame_us : 0)
             lateavg = (vbl > 0 ? late / vbl : 0)
-            printf "    {\"index\": %d, \"vbl_ticks\": %d, \"vbl_hz\": %.1f, \"frames_on_panel\": %d, \"presents_per_s\": %.1f, \"avg_copy_us\": %.1f, \"copy_share_of_refresh_pct\": %.1f, \"copy_skip\": %d, \"blank_frames\": %d, \"iop_fail\": %d, \"vbl_late_avg_us\": %.1f, \"vbl_late_max_us\": %d}%s\n", s, vbl, hz, ok, ok / window, avg, share, skip, blank, fail, lateavg, B["debug.phxfb_vbl_late_us_max"], (s < samples ? "," : "") > json
-            printf "%d\t%.1f\t%.1f\t%.1f\t%.1f\t%d\t%d\t%d\t%.1f\n", s, hz, ok / window, avg, share, skip, blank, fail, lateavg > tsv
+            printf "    {\"index\": %d, \"vbl_ticks\": %d, \"vbl_hz\": %.1f, \"frames_on_panel\": %d, \"presents_per_s\": %.1f, \"avg_copy_us\": %.1f, \"copy_share_of_refresh_pct\": %.1f, \"copy_skip\": %d, \"blank_frames\": %d, \"iop_fail\": %d, \"vbl_late_avg_us\": %.1f, \"vbl_late_max_us\": %d, \"iop_gap1\": %d, \"iop_gap2\": %d, \"iop_gap3\": %d, \"iop_gap4\": %d, \"iop_vsync_waits\": %d, \"iop_vsync_late\": %d}%s\n", s, vbl, hz, ok, ok / window, avg, share, skip, blank, fail, lateavg, B["debug.phxfb_vbl_late_us_max"], g1, g2, g3, g4, vw, vl, (s < samples ? "," : "") > json
+            printf "%d\t%.1f\t%.1f\t%.1f\t%.1f\t%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\n", s, hz, ok / window, avg, share, skip, blank, fail, lateavg, g1, g2, g3, g4, vw, vl > tsv
         } else {
             printf "    {\"index\": %d, \"snapshot_only\": true, \"frames_on_panel\": %d, \"last_copy_us\": %d, \"slowest_copy_us\": %d}%s\n", s, A["debug.nvaccel_iop_ok"], A["debug.nvaccel_iop_copy_us"], A["debug.nvaccel_iop_copy_us_max"], (s < samples ? "," : "") > json
         }
@@ -152,7 +161,13 @@ BEGIN {
             printf "%-8s %-7s %-10s %-11s %-8s %-5s %-6s %-5s %s\n", f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9] > sum
         }
         close(tsv)
-        printf "\ncopy_pct is one copied frame as a share of one refresh. docs/analysis.md decides the hypotheses:\nH1 holds when copy_pct is large AND presents_s follows the copy rate rather than vbl_hz.\n" > sum
+        printf "\ncadence (copied frames by the gap since the previous one):\nwindow   gap1  gap2  gap3  gap4  vsync_waits vsync_late\n" > sum
+        while ((getline line < tsv) > 0) {
+            split(line, f, "\t")
+            printf "%-8s %-5s %-5s %-5s %-5s %-11s %s\n", f[1], f[10], f[11], f[12], f[13], f[14], f[15] > sum
+        }
+        close(tsv)
+        printf "\ncopy_pct is one copied frame as a share of one refresh; gap1..4 count copied frames about one, two,\nthree and four-or-more refreshes after the previous one. tools/phx_baseline_report.py applies the\nthresholds in docs/analysis.md §9 to this file and prints which hypothesis the capture supports.\n" > sum
     } else {
         printf "snapshot only (--window 0): the counters were read once, so there is no rate and no delta.\n" > sum
     }

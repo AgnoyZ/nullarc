@@ -25,6 +25,8 @@ COUNTERS = {
     "debug.nvaccel_iop_src_surf": 120, "debug.nvaccel_iop_copy_skip": 0, "debug.nvaccel_iop_blank": 0,
     "debug.nvaccel_iop_fail": 0, "debug.nvaccel_iop_copy_us": 2000, "debug.nvaccel_iop_copy_us_max": 2600,
     "debug.nvaccel_iop_copy_us_sum": 240000, "debug.nvaccel_vm_parked": 0, "debug.nvaccel_vm_unparked": 0,
+    "debug.nvaccel_iop_gap1": 100, "debug.nvaccel_iop_gap2": 15, "debug.nvaccel_iop_gap3": 4,
+    "debug.nvaccel_iop_gap4": 1, "debug.nvaccel_iop_vsync_waits": 8, "debug.nvaccel_iop_vsync_late": 1,
 }
 
 FAKE_SYSCTL = '''#!{python}
@@ -114,10 +116,21 @@ class BaselineTests(unittest.TestCase):
             self.assertAlmostEqual(window["copy_share_of_refresh_pct"], 24.0, places=1)
             self.assertAlmostEqual(window["vbl_late_avg_us"], 100.0, places=1)
             self.assertEqual(window["vbl_late_max_us"], 350)
+            # The present cadence H3 is decided from (docs/analysis.md §5): the deltas reach the record...
+            self.assertEqual(window["iop_gap1"], 100)
+            self.assertEqual(window["iop_gap2"], 15)
+            self.assertEqual(window["iop_gap3"], 4)
+            self.assertEqual(window["iop_gap4"], 1)
+            self.assertEqual(window["iop_vsync_waits"], 8)
+            self.assertEqual(window["iop_vsync_late"], 1)
             self.assertEqual(record["knobs"]["debug.nvaccel_iop_sse"], 1)
             self.assertEqual(record["claims"], {"display_path_counters_read": True, "gpu_work_submitted": False,
                                                 "hardware_execution_established": False})
-            self.assertTrue((out / "summary.txt").read_text().strip())
+            # ...and the summary shows them, so a session can be read without opening the JSON.
+            summary = (out / "summary.txt").read_text()
+            self.assertTrue(summary.strip())
+            self.assertIn("cadence", summary)
+            self.assertIn("vsync_late", summary)
             calls = [json.loads(line) for line in (state / "calls.jsonl").read_text().splitlines()]
             self.assertTrue(calls)
             self.assertFalse([c for c in calls if "-w" in c], "the baseline tool must never write a sysctl")

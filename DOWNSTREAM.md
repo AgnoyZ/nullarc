@@ -58,6 +58,12 @@ validation evidence and research documents that used to live in `AgnoyZ/radeon-7
   after taking the lock, keeps a crash marker (a killed attempt makes the next run refuse), and never
   reboots, writes NVRAM, writes sysctl, kills by process name, installs anything, or embeds an address.
   It ships no stages and no installer.
+- Phase-1 display measurement that CI can keep honest while the target laptop is unavailable:
+  `tools/phx_baseline.sh` (read-only capture of the display counters, including the present cadence),
+  `tools/phx_baseline_report.py` (turns that capture into the H1–H4 verdict against the thresholds in
+  `docs/analysis.md` §9) and `tools/phx_counter_contract.py` (fails when the capture, the kernel sources
+  and the analysis stop naming the same OIDs or a knob default moves). `docs/CI-WITHOUT-HARDWARE.md`
+  states what this establishes and what it explicitly does not.
 
 ## Behaviour changes to be aware of
 

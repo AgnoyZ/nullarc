@@ -27,6 +27,14 @@ jobs:
           mkdir -p build
           clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Isrc tests/test_hardware_policy.cpp -o build/test-policy
           build/test-policy
+      # The target laptop is not always available, so the parts of the phase-1 plan that can be checked
+      # without it are checked here: the capture, the sources and docs/analysis.md must name the same OIDs
+      # with the same defaults, and the verdict pipeline must run end to end on a capture (--demo is marked
+      # synthetic, so it cannot be mistaken for evidence).
+      - name: Prove the phase-1 instrumentation contract without hardware
+        run: python3 tools/phx_counter_contract.py --out build/counter-contract
+      - name: Render the phase-1 verdict pipeline from a synthetic capture
+        run: python3 tools/phx_baseline_report.py --demo --out build/baseline-report-demo
       - name: Fault-inject actual bring-up transport without hardware
         run: python3 tools/test_bringup_transport.py --out build/transport-tests
       - name: Exercise actual PSP kernel methods without hardware

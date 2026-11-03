@@ -132,20 +132,32 @@ stall. The per-frame cost they produce is measured only through the counters in 
 
 ## 4. The counters that already exist (nothing new is needed to measure phase 1)
 
+Every name below is written in full, because `tools/phx_counter_contract.py` reads this table and fails CI if
+the capture script reads a `debug.*` OID this file does not name (or names one the kernel does not declare).
+
 | sysctl | meaning | where |
 | --- | --- | --- |
 | `debug.phxfb_alias` (rw) | 1 = copy through the carve-out, 0 = through the BAR | `phxfb.cpp:32-35` |
 | `debug.phxfb_vbl_staged` (rw) | 1 = staged VBL arming, 0 = one plain deadline | `phxfb.cpp:47-48` |
-| `debug.phxfb_vbl_n`, `_late_us_sum`, `_late_us_max` | ticks fired; lateness summed / worst | `phxfb.cpp:49-51` |
+| `debug.phxfb_vbl_n` | VBL ticks fired | `phxfb.cpp:49` |
+| `debug.phxfb_vbl_late_us_sum`, `debug.phxfb_vbl_late_us_max` | tick lateness summed / worst (both rw: writing 0 restarts) | `phxfb.cpp:50-51` |
 | `debug.nvaccel_iop` (rw) | 1 = publish display-pipe capabilities and run transactions | `nvrm-accel.cpp:1291-1293` |
 | `debug.nvaccel_iop_sse` (rw) | 1 = 64-byte SSE row copy, 0 = 8-byte loads | `nvrm-accel.cpp:1342` |
 | `debug.nvaccel_iop_vsync` (rw) | 1 = complete a copied frame on the next tick | `nvrm-accel.cpp:1087-1103` |
-| `debug.nvaccel_iop_ok`, `_ok_h0..h4` | frames copied to a panel, per head | `nvrm-accel.cpp:1321-1326` |
-| `debug.nvaccel_iop_src_res` / `_src_surf` | frames sourced from our VRAM / the IOSurface | `nvrm-accel.cpp:1336-1337` |
-| `debug.nvaccel_iop_copy_skip`, `_blank` | frames held back / copied frames that were one colour | `nvrm-accel.cpp:1338-1340` |
-| `debug.nvaccel_iop_copy_us`, `_max`, `_sum` | cost of the last / slowest / all copied frames | `nvrm-accel.cpp:1344-1346` |
-| `debug.nvaccel_iop_bench`, `_read_us` | one timed read-only pass over the next source | `nvrm-accel.cpp:1341`, `1185-1193` |
+| `debug.nvaccel_iop_ok`, `debug.nvaccel_iop_ok_h0` … `debug.nvaccel_iop_ok_h4` | frames copied to a panel, per head | `nvrm-accel.cpp:1321-1326` |
+| `debug.nvaccel_iop_src_res`, `debug.nvaccel_iop_src_surf` | frames sourced from our VRAM / from the IOSurface | `nvrm-accel.cpp:1336-1337` |
+| `debug.nvaccel_iop_copy_skip`, `debug.nvaccel_iop_blank` | frames held back / copied frames that were one colour | `nvrm-accel.cpp:1338-1340` |
+| `debug.nvaccel_iop_fail` | copy transactions that failed | `nvrm-accel.cpp:1321-1326` |
+| `debug.nvaccel_iop_copy_us`, `debug.nvaccel_iop_copy_us_max`, `debug.nvaccel_iop_copy_us_sum` | cost of the last / slowest / all copied frames | `nvrm-accel.cpp:1344-1346` |
+| `debug.nvaccel_iop_gap1`, `debug.nvaccel_iop_gap2`, `debug.nvaccel_iop_gap3`, `debug.nvaccel_iop_gap4` | copied frames about one, two, three and four-or-more refreshes after the previous one | `nvrm-accel.cpp:1195-1204`, `1347-1350` |
+| `debug.nvaccel_iop_vsync_waits`, `debug.nvaccel_iop_vsync_late` | completion checks answered "not yet" / frames completed past two refreshes without a tick | `nvrm-accel.cpp:1353-1354` |
+| `debug.nvaccel_vm_parked`, `debug.nvaccel_vm_unparked` | surfaces that kept their VRAM across a dealloc/alloc | `nvrm-accel.cpp:1312-1315` |
+| `debug.nvaccel_iop_bench`, `debug.nvaccel_iop_read_us` | one timed read-only pass over the next source | `nvrm-accel.cpp:1341`, `1185-1193` |
 | `debug.phxbos_flush` (rw) | BO cache maintenance per submit/wait: 0 none, 1 clflushopt, 2 clflush | `src/phxbringup/PhxBringup.cpp:35-43` |
+
+The gap counters are what make H3 decidable: without them a capture can show that frames reach the panel
+slowly, but not whether they arrive evenly. They were readable in the code from the start and
+`tools/phx_baseline.sh` now records them, so one capture decides H1 through H4 together.
 
 `debug.phxbos_flush` matters to compositing too: with `clflush`, "WindowServer spent ~73% of its CPU here
 and composited ~13 fps; with none, 41 fps" (`PhxBringup.cpp:35-38`) — the default is 0, and
@@ -179,8 +191,9 @@ commit. If none of them holds, the honest next step is to measure application-si
 - Inventing a before/after table without a measurement would be exactly the fabricated evidence this
   project forbids.
 
-What this change *does* add: this analysis, and `tools/phx_baseline.sh` — the read-only capture that makes
-phase 1 a command instead of a discussion.
+What this change *does* add: this analysis, `tools/phx_baseline.sh` — the read-only capture that makes
+phase 1 a command instead of a discussion — and `tools/phx_baseline_report.py`, which computes the verdict
+below from that capture (§7, §9).
 
 ## 7. Phase 1, exactly
 
@@ -188,12 +201,20 @@ phase 1 a command instead of a discussion.
 # on the target laptop, from a normal session, with the accelerated panel up
 sh tools/phx_baseline.sh --out /Users/Shared/phx-baseline-$(date +%Y%m%d-%H%M) --window 60 --samples 3
 sh tools/phx_baseline.sh --out /Users/Shared/phx-baseline-snapshot   # counters once, no window
+
+# anywhere, on the capture (no hardware needed to compute the verdict)
+python3 tools/phx_baseline_report.py baseline=/Users/Shared/phx-baseline-20261103-1010 --out build/verdict
+python3 tools/phx_baseline_report.py baseline=BASE b1-sse-off=B1 b2-plain-tick=B2 b3-immediate=B3 b4-bar=B4
 ```
 
-Record, in one place, for each of the three windows: which destination was live (`debug.phxfb_alias`, and
-`alias:` lines in the kernel log), `vbl_hz`, `presents_per_s`, `avg_copy_us`,
-`copy_share_of_refresh_pct`, `copy_skip`, `blank_frames`, `vbl_late_avg_us`/`_max`. Then repeat the
-60 s window three times with the A/B switches, one at a time, changing nothing else:
+The capture writes `vbl_hz`, `presents_per_s`, `avg_copy_us`, `copy_share_of_refresh_pct`, `copy_skip`,
+`blank_frames`, `iop_fail`, `vbl_late_avg_us`/`_max`, the present cadence (`iop_gap1`–`iop_gap4`,
+`iop_vsync_waits`, `iop_vsync_late`) and the knob values that say which path was measured; `summary.txt`
+prints the same numbers by hand. `tools/phx_baseline_report.py` applies §9 to them and prints which
+hypothesis the capture supports, which it refutes, and which it cannot decide — a capture without the
+cadence counters leaves H3 undecidable instead of guessed. Also record the `alias:` lines from the kernel
+log: they say whether the carve-out view was ever verified. Then repeat the 60 s window three times with
+the A/B switches, one at a time, changing nothing else:
 
 | run | change | question |
 | --- | --- | --- |
@@ -201,6 +222,9 @@ Record, in one place, for each of the three windows: which destination was live 
 | B2 | `debug.phxfb_vbl_staged=0` | is the staged tick worth it, and how late is a plain deadline |
 | B3 | `debug.nvaccel_iop_vsync=0` | does the next-tick completion actually change the cadence |
 | B4 | `debug.phxfb_alias=0` | the BAR copy baseline (expected to be much worse; it is the control, not a candidate) |
+
+Each A/B capture goes in as `label=PATH` after the baseline capture, and the report prints the change per
+metric with a noise caveat: one window per side is a single sample.
 
 Acceptance for phase 1 is a filled table, not a verdict: it decides H1–H4 and nothing else.
 
@@ -218,3 +242,20 @@ Acceptance for phase 1 is a filled table, not a verdict: it decides H1–H4 and 
 - Constraints from the work order: no BIOS or firmware change, no video decode, no external-display work,
   and no change to how the GPU is brought up. Files derived from NullMoth (`src/phxaccel/**`,
   `src/nmplugin/**`) keep `LICENSE.PolyForm-NC`, their headers and `THIRD_PARTY_NOTICES.md` untouched.
+
+## 9. Thresholds the verdict uses
+
+`tools/phx_baseline_report.py` applies these numbers (its `THRESHOLDS` table is the same set) and prints
+them next to every decision, so a reader can disagree with the verdict by disagreeing with one number
+instead of re-deriving it. Median over the capture's windows; a capture with one window is provisional.
+
+| hypothesis | supported when | refuted when | undecidable when |
+| --- | --- | --- | --- |
+| H1 (the copy limits the present rate) | `copy_share_of_refresh_pct` ≥ 40 and `presents_per_s` ≤ 0.85 × `vbl_hz` | either condition fails | never (both are always captured) |
+| H2 (the software tick's jitter causes judder) | `vbl_late_avg_us` ≥ 300 or `vbl_late_max_us` ≥ 2000 — reported as a **candidate**, since the B2 A/B is what shows it costs frames | both below | never |
+| H3 (the cadence is uneven rather than slow) | `presents_per_s` > 1.05 × `vbl_hz` (more presents than refreshes: the duplicate-present bug) or the share of copies landing two or more refreshes after the previous one ≥ 5 % | both below | the capture has no `iop_gap*`/`iop_vsync_*` fields |
+| H4 (surface readiness stalls show up as repeated frames) | `copy_skip` ÷ (`on-panel` + `copy_skip`) ≥ 3 %, or the blank-frame share ≥ 3 % | both below | never |
+
+40 % of a refresh, 5 % of copies and 3 % of frames are order-of-magnitude lines, not physics: they separate
+"the copy owns the refresh" from "the copy is an eighth of it". If a capture lands next to one of them, say
+so in the record instead of reading the tool's word as a result.
