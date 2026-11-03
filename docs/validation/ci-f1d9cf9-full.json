@@ -1,0 +1,87 @@
+{
+  "repository": "https://github.com/AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "workflow": ".github/workflows/build.yml",
+  "ci_run_id": 41637929244,
+  "ci_run_url": "https://github.com/AgnoyZ/nullarc/actions/runs/41637929244",
+  "project_commit": "f1d9cf9",
+  "ci_started_at": "2026-11-03T12:42:08Z",
+  "ci_completed_at": "2026-11-03T13:29:53Z",
+  "ci_overall_conclusion": "success",
+  "jobs": {
+    "source-tests": {
+      "job_id": 125923744588,
+      "runner": "ubuntu-24.04",
+      "conclusion": "success",
+      "python_suite": {
+        "command": "python3 -m unittest discover -s tests -v",
+        "result": "OK",
+        "note": "count not extracted from the log; the job reports success and no step was skipped"
+      },
+      "policy_assertions": [
+        "clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_hardware_policy.cpp: passed (policy only, not GPU execution)",
+        "clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Isrc/phxaccel tests/test_present_pacing.cpp: passed, including the value-by-value comparison of phx780m::iopGapBucket against the inline expression it replaced"
+      ],
+      "headless_checks": [
+        "tools/phx_counter_contract.py: the capture script, the SYSCTL declarations under src/ and docs/analysis.md name the same debug.* OIDs, and the knobs the phase-1 A/B plan relies on still start at the planned values",
+        "tools/phx_baseline_report.py --demo: the H1-H4 verdict pipeline ran end to end on a synthetic capture, which the report stamps as not evidence"
+      ],
+      "runner_steps_passed": [
+        "bringup transport fault injection",
+        "PSP submission",
+        "queue adoption",
+        "VMID binding",
+        "context retirement",
+        "BO retirement",
+        "IB debug reads",
+        "queue retirement",
+        "page tables",
+        "VM walk cleanup",
+        "firmware control",
+        "firmware sequence",
+        "GFX power",
+        "GART bootstrap",
+        "MES start",
+        "MES queue",
+        "compute-ring probe",
+        "GFX11 shader probe",
+        "native GPUVM shader acceptance"
+      ]
+    },
+    "macos-kexts": {
+      "job_id": 125925335305,
+      "runner": "macos-15-intel",
+      "conclusion": "success",
+      "compile_scope": "The commit under test changed src/phxaccel/accel/nvrm-accel.cpp to call src/phxaccel/PhxPresentPacing.hpp, so this job is the compile gate for that change: PhxAccel (nvrm-accel.cpp, phxfb.cpp, phxagdc.cpp), PhxBringup, the Metal plugin bundle, the AIR-to-SPIR-V translator, Mesa RADV and the LLVM AIR runtime",
+      "steps_passed": [
+        "Apple Metal tooling and native probe preflight",
+        "pinned MacKernelSDK and Vulkan-Headers checkout",
+        "pinned translator source and Rust toolchain",
+        "pinned Mesa RADV sources and build dependencies",
+        "pinned LLVM AIR runtime source",
+        "compile, link, sign and test kernel, Metal translator and RADV",
+        "translator ABI and SPIR-V validation without a GPU",
+        "Metal compiler AIR through LLVM and the translator",
+        "plugin metallib compilation without creating a device",
+        "metal-smoke refuses this non-780M host (exit 4)"
+      ]
+    }
+  },
+  "claims": {
+    "kernel_sources_compiled": true,
+    "kernel_sources_linked_and_signed": true,
+    "present_pacing_policy_asserted": true,
+    "instrumentation_contract_checked": true,
+    "verdict_pipeline_exercised_on_a_fixture": true,
+    "gpu_work_submitted": false,
+    "metal_device_created": false,
+    "hardware_execution_established": false,
+    "frames_on_panel_measured": false
+  },
+  "limitations": [
+    "Host build and offline-logic evidence only. No kext was loaded, no GPU work was submitted and no frame reached a panel.",
+    "The macOS runner has no Radeon 780M; metal-smoke refusing that host is the expected result and is asserted, not a failure.",
+    "The phase-1 verdict pipeline was exercised on a synthetic capture; it establishes that the pipeline runs, not any frame rate.",
+    "Binaries were not retained (retention step skipped by policy pending the upstream license/provenance audit)."
+  ]
+}
