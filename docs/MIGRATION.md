@@ -38,6 +38,24 @@ fork; its history keeps the earlier patch-based workflow. `docs/validation/*.jso
 records of runs made before the migration (they name the old repository and patch revisions) and are not
 current CI evidence.
 
+## Files the first import missed (fixed)
+
+The first import left out three test-only inputs, which made the fork's own CI fail at
+`tools/test_bringup_transport.py` with `'IOKit/IOKitLib.h' file not found`:
+
+- `tests/fake_iokit/{IOKit/IOKitLib.h,CommonCrypto/CommonDigest.h}` — the stub headers every
+  `tools/test_*.py` supplies with `-I tests/fake_iokit` to compile the real `mesboot.c`/`phxctl.c`
+  against a fake transport.
+- `tests/fake_native_iokit/{IOKit/IOKitLib.h,CoreFoundation/CoreFoundation.h}` — the same idea for the
+  native-shader-probe harness.
+- `tests/fixtures/{compute_increment.ll,compute_increment.metal,packaging_only.c}` — synthetic IR/Metal
+  sources used by the translator, AIR-runtime and plugin steps of the macOS job. They are not firmware,
+  so `.gitignore` now ignores `tests/fixtures/*` but keeps these three tracked; `make fixtures` still
+  downloads into the ignored `tests/fixtures/phoenix/`.
+
+No other path in the old repository is absent here: its whole tree was compared against this branch, and
+the only remaining difference is its `.gitmodules`, which no longer applies.
+
 ## Verification after migration
 
 `python -m unittest discover -s tests -v` and the C++ policy assertions run in this repository; the macOS

@@ -22,8 +22,13 @@ __pycache__/
 memory/
 .current_notepad
 
-# Firmware test fixtures (downloaded by `make fixtures`, not committed)
-tests/fixtures/
+# Firmware test fixtures (downloaded by `make fixtures`, not committed).
+# The three synthetic shader/IR sources listed below are not firmware: the tests and the
+# macOS CI job read them, so they stay tracked.
+tests/fixtures/*
+!tests/fixtures/compute_increment.ll
+!tests/fixtures/compute_increment.metal
+!tests/fixtures/packaging_only.c
 
 # Reference dumps and vendor assets if downloaded locally
 reference/
