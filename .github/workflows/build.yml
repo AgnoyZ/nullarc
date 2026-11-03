@@ -27,6 +27,13 @@ jobs:
           mkdir -p build
           clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Isrc tests/test_hardware_policy.cpp -o build/test-policy
           build/test-policy
+      # The display path's present pacing decisions (complete on the next tick, gaps bucketed in refreshes,
+      # four held frames then copy anyway) are policy, not hardware: this asserts them, including that the
+      # gap buckets still match the inline expression the driver used before the extraction.
+      - name: Execute the present-pacing policy used by the display path
+        run: |
+          clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Isrc -Isrc/phxaccel tests/test_present_pacing.cpp -o build/test-present-pacing
+          build/test-present-pacing
       # The target laptop is not always available, so the parts of the phase-1 plan that can be checked
       # without it are checked here: the capture, the sources and docs/analysis.md must name the same OIDs
       # with the same defaults, and the verdict pipeline must run end to end on a capture (--demo is marked

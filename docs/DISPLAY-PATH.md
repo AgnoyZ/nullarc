@@ -103,3 +103,22 @@ pageAligned(len) && (offset & 0xFFF) == 0 && rangeWithin(offset, len, poolBytes)
 5. 睡眠/唤醒后重新合成，确认面板内容会更新（对应上游“池碎片导致唤醒后画面不刷新”的场景）。
 
 以上五条都需要真实 GPU 执行证据；在完成之前，本条目不构成加速成功的声明。
+
+## 显示节拍策略：从内联表达式抽成可断言的头文件
+
+`src/phxaccel/accel/nvrm-accel.cpp` 里三条“决定一帧怎么算画完、怎么计节奏、什么时候不再等
+surface”的判断，原来散在函数体里，只能靠实机观察：
+
+| 规则 | 原位置 | 现在的实现 |
+| --- | --- | --- |
+| 拷贝的帧在**下一个 VBL tick** 才完成；超过两个刷新仍无 tick 就强制完成（避免画面冻结） | `isTransactionComplete` | `phx780m::presentCompletion()` |
+| 相邻两次拷贝的间隔按刷新数分桶（约 1 / 2 / 3 / ≥4 个刷新，即 `debug.nvaccel_iop_gap1..gap4`） | `performTransaction` | `phx780m::iopGapBucket()` |
+| 同一个 head 最多连续压 4 帧，之后照旧拷贝（surface 永不同步也不能冻住面板） | `nvAccelSurfCopyReady` | `phx780m::nextCopyHold()` |
+
+三条规则现在都在 `src/phxaccel/PhxPresentPacing.hpp`（纯函数，无 IOKit、无寄存器、无副作用），
+由 `tests/test_present_pacing.cpp` 在 Linux CI 上断言，并**逐值对比**分桶规则与原始内联表达式
+（含刷新周期为奇数时 `floor(3 * refresh / 2) != 1.5 * refresh` 的边界），所以节奏计数器与旧采集
+仍然可比。
+
+这仍然只是策略断言：它能证明“规则按预期工作”，不能证明“帧真的按时到了面板”。上表五条实机
+验收一条都没变——尤其第 3 条帧率，只能靠真机的 `debug.nvaccel_iop_gap*` 与 `copy_us` 说话。

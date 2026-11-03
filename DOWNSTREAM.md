@@ -15,10 +15,11 @@ validation evidence and research documents that used to live in `AgnoyZ/radeon-7
 
 - Shared, testable policy and layout headers used by the patched sources:
   `src/phxbringup/{PhxHardwarePolicy.hpp, PhxPspLayout.h, PhxBootMemory.h, PhxGartLayout.h,
-  PhxMesQueueLayout.h, PhxFirmwareProfile.h}`, `src/phxaccel/PhxHardwarePolicy.hpp`,
+  PhxMesQueueLayout.h, PhxFirmwareProfile.h}`, `src/phxaccel/{PhxHardwarePolicy.hpp, PhxPresentPacing.hpp}`,
   `src/nmplugin/PhxRuntimePath.h`.
   `PhxFirmwareProfile.h` is metadata only, generated from a separately reviewed firmware lock; it
-  contains no firmware bytes.
+  contains no firmware bytes. `PhxPresentPacing.hpp` holds the display path's present-completion, gap-bucket
+  and copy-hold rules as pure functions, asserted by `tests/test_present_pacing.cpp`.
 - 28 downstream commits, in order:
 
 | # | Commit subject | Area |

@@ -26,12 +26,13 @@ verdict re-derived by hand from a JSON file, a renamed counter discovered after 
 | --- | --- | --- |
 | Do the two kexts, the Metal plugin, the AIR translator and Mesa RADV still build, link and sign against the pinned MacKernelSDK/Vulkan-Headers/LLVM? | `macos-kexts` job | that anything loads, runs or draws |
 | Does the display-path policy behave (patch 0028: alias retry budget, VRAM pool release validation, pool shrink)? | `tests/test_hardware_policy.cpp` under ASan/UBSan on Linux | that the policy fixes a real frame rate |
+| Do the present-pacing rules behave (complete on the next tick, complete anyway past two refreshes, four held frames then copy, gap buckets unchanged)? | `tests/test_present_pacing.cpp` under ASan/UBSan on Linux | that frames reach the panel, or when |
 | Do the real kernel source paths behave under fault injection? | the `tools/test_*.py` fake-IOKit runners | any behaviour of the actual GPU |
 | Does the translator/plugin ABI still match, and is the generated SPIR-V valid? | `translator`, `air-runtime`, `plugin-runtime` steps | that Metal renders correctly |
 | Can the phase-1 capture read what the analysis needs, under the names the kernel actually declares? | `tests/test_phase1_baseline_shell.py`, `tools/phx_counter_contract.py` | any counter value |
 | Is the H1–H4 verdict a computation instead of an opinion? | `tools/phx_baseline_report.py`, `tests/test_baseline_report.py` | the measurement itself |
 
-The last two are the ones this change adds; §4 explains why they are worth CI time.
+The last four rows are what the two headless changes added; §4 explains why they are worth CI time.
 
 ## 3. What only the laptop can answer
 
@@ -52,14 +53,16 @@ The last two are the ones this change adds; §4 explains why they are worth CI t
 3. **Mechanical verdict** (`tools/phx_baseline_report.py`, in CI). Thresholds written down in
    `docs/analysis.md` §9, refused inputs (snapshot, missing counter, a record claiming hardware execution),
    undecidable hypotheses named as undecidable, and A/B comparisons printed with their noise caveat.
-4. **Make the present-pacing state machine host-testable.** `isTransactionComplete` (complete a copied
-   frame on the next tick, complete anyway past two refreshes) and the gap bucketing are pure logic trapped
-   inside IOKit calls. Extracting them into a shared header with a policy test table — the shape patch 0028
-   already uses for `phx780m::poolReleaseValid()` — turns "a broken VBL cannot freeze the desktop" into an
-   assertion that runs on every push. Next candidate; not done here.
+4. **Host-testable present pacing** (`src/phxaccel/PhxPresentPacing.hpp`, `tests/test_present_pacing.cpp`, in
+   CI). `isTransactionComplete` (complete a copied frame on the next tick, complete anyway past two
+   refreshes), the gap bucketing and the four-held-frames limit were inline expressions inside IOKit calls.
+   They are now pure functions the driver calls, asserted on every push — including a value-by-value
+   comparison of the bucket rule with the expression it replaced, odd refresh periods included, so the
+   cadence counters stay comparable with earlier captures. `docs/DISPLAY-PATH.md` records the three rules
+   and what still needs the laptop.
 5. **Status honesty, per card.** A `CARD-SUPPORT`-style table (target hardware, what is verified, what is
    not, how it was verified) written the way the nullmoth reference does it. Cheap, and it stops
-   "compiles in CI" from reading as "works".
+   "compiles in CI" from reading as "works". Next candidate.
 6. **Anything that needs a frame on the panel.** Hardware only, by definition.
 
 ## 5. The one hardware session, when the laptop is back
@@ -85,7 +88,7 @@ computed from those files, so a single session produces a decision instead of a 
 | verification class | state |
 | --- | --- |
 | kexts, plugin, translator, RADV compile/link/sign (macOS runner) | green in CI |
-| offline logic: patch 0028 policy, fake-IOKit kernel runners, translator/plugin ABI | green in CI |
+| offline logic: patch 0028 policy, present-pacing policy, fake-IOKit kernel runners, translator/plugin ABI | green in CI |
 | capture ↔ source ↔ analysis contract | green in CI |
 | verdict pipeline (fixture only) | green in CI |
 | driver loaded and executing GPU work on the 780M | **not established** |

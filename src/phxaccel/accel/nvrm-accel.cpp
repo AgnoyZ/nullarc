@@ -49,6 +49,7 @@ static void               nvAccelWriteStamp(int index, unsigned int value);
 #endif
 #include <sys/sysctl.h>
 #include <libkern/OSAtomic.h>
+#include "PhxPresentPacing.hpp"   // present completion, gap buckets and copy-hold policy: pure, host-testable
 extern "C" {   // kern/thread_call.h and kern/clock.h clash with the family headers here, so the KPIs are declared by hand
 struct thread_call *thread_call_allocate(void (*func)(void *, void *), void *param0);
 int thread_call_enter_delayed(struct thread_call *call, uint64_t deadline);
@@ -1095,9 +1096,22 @@ static SInt64 gCntIopVsyncWaits, gCntIopVsyncLate;
 bool NVDisplayPipe::isTransactionComplete(IOAccelDisplayPipeTransaction2 *)
 {
     if (gNvIop == 0 || nvAccelIopAsyncBusy(this)) return false;
-    if (!gIopVsync || !gPhxFrameAbs || !fIopVblSeq) return true;
-    if (__atomic_load_n(&gPhxVblSeq, __ATOMIC_ACQUIRE) != fIopVblSeq) { fIopVblSeq = 0; return true; }
-    if (mach_absolute_time() - gIopLastAbs > 2 * gPhxFrameAbs) { OSAddAtomic64(1, &gCntIopVsyncLate); fIopVblSeq = 0; return true; }
+    // The decision lives in PhxPresentPacing.hpp, so "a copied frame completes on the tick after it, and past
+    // two refreshes without one it completes anyway" is asserted by tests/test_present_pacing.cpp, not only
+    // here.
+    const uint64_t tick = __atomic_load_n(&gPhxVblSeq, __ATOMIC_ACQUIRE);
+    switch (phx780m::presentCompletion(gIopVsync != 0, gPhxFrameAbs != 0, fIopVblSeq != 0, tick != fIopVblSeq,
+                                       mach_absolute_time() - gIopLastAbs, gPhxFrameAbs)) {
+    case phx780m::PresentCompletion::Complete:
+        fIopVblSeq = 0;
+        return true;
+    case phx780m::PresentCompletion::CompleteLate:
+        OSAddAtomic64(1, &gCntIopVsyncLate);
+        fIopVblSeq = 0;
+        return true;
+    case phx780m::PresentCompletion::WaitForTick:
+        break;
+    }
     OSAddAtomic64(1, &gCntIopVsyncWaits);
     return false;
 }
@@ -1197,7 +1211,7 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
         gIopLastAbs = t0;
         if (prev && t0 > prev) {
             const uint64_t g = t0 - prev;
-            OSAddAtomic64(1, &gCntIopGap[g < fr * 3 / 2 ? 0 : g < fr * 5 / 2 ? 1 : g < fr * 7 / 2 ? 2 : 3]);
+            OSAddAtomic64(1, &gCntIopGap[phx780m::iopGapBucket(g, fr)]);
         }
         const uint64_t v = gPhxVblLastAbs;
         if (v && t0 > v) { uint64_t ns; absolutetime_to_nanoseconds(t0 - v, &ns); OSAddAtomic64((SInt64)(ns / 1000), &gIopPhaseUsSum); }
@@ -2246,8 +2260,11 @@ static bool nvAccelSurfCopyReady(IOSurface *s, unsigned head)
         }
     }
     if (head >= kNvMaxFB) return true;
-    if (ready) { gIopCopyHeld[head] = 0; return true; }
-    if (++gIopCopyHeld[head] > 4) { gIopCopyHeld[head] = 0; return true; }
+    // The hold limit (four frames in a row per head, then copy anyway) is policy: tests/test_present_pacing.cpp
+    // asserts that a surface which never syncs is copied rather than freezing the panel.
+    const phx780m::CopyHold hold = phx780m::nextCopyHold(gIopCopyHeld[head], ready);
+    gIopCopyHeld[head] = hold.held;
+    if (hold.copy) return true;
     OSAddAtomic64(1, &gCntIopCopySkip);
     return false;
 }
