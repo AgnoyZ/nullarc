@@ -156,7 +156,7 @@ BEGIN {
     } else {
         printf "snapshot only (--window 0): the counters were read once, so there is no rate and no delta.\n" > sum
     }
-    printf "\nfull record: %s/baseline.json\n" > sum
+    printf "\nfull record: %s/baseline.json\n", dir > sum
     close(sum)
 }' || die "could not derive the baseline from the samples" 1
 
