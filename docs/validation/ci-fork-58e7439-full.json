@@ -1,0 +1,68 @@
+{
+  "repository": "https://github.com/AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "workflow": ".github/workflows/build.yml",
+  "ci_run_id": 41595639780,
+  "ci_run_url": "https://github.com/AgnoyZ/nullarc/actions/runs/41595639780",
+  "project_commit": "58e7439",
+  "ci_started_at": "2026-11-03T07:20:15Z",
+  "ci_completed_at": "2026-11-03T08:13:11Z",
+  "ci_overall_conclusion": "success",
+  "jobs": {
+    "source-tests": {
+      "job_id": 125782230739,
+      "runner": "ubuntu-24.04",
+      "conclusion": "success",
+      "python_suite": {"command": "python3 -m unittest discover -s tests -v", "tests_run": 256, "result": "OK"},
+      "policy_assertions": "clang++ -fsanitize=address,undefined tests/test_hardware_policy.cpp: passed (not a GPU execution test)",
+      "runner_steps_passed": [
+        "bringup transport fault injection",
+        "PSP submission",
+        "queue adoption",
+        "VMID binding",
+        "context retirement",
+        "BO retirement",
+        "IB debug reads",
+        "queue retirement",
+        "page tables",
+        "VM walk cleanup",
+        "firmware control",
+        "firmware sequence",
+        "GFX power",
+        "GART bootstrap",
+        "MES start",
+        "MES queue",
+        "compute-ring probe",
+        "GFX11 shader probe",
+        "native GPUVM shader acceptance"
+      ]
+    },
+    "macos-kexts": {
+      "job_id": 125783406493,
+      "runner": "macos-15-intel",
+      "conclusion": "success",
+      "checkout": "fetch-depth: 0 (tools/prepare_radv.py reads the patch series out of the pinned upstream.lock.json commit)",
+      "steps_passed": [
+        "Apple Metal tooling and native probe preflight",
+        "pinned MacKernelSDK and Vulkan-Headers checkout",
+        "pinned translator source and Rust toolchain",
+        "pinned Mesa RADV sources and build dependencies",
+        "pinned LLVM AIR runtime source",
+        "compile, link, sign and test kernel, Metal translator and RADV",
+        "translator ABI and SPIR-V validation without a GPU",
+        "Metal compiler AIR through LLVM and the translator",
+        "plugin metallib compilation without creating a device",
+        "metal-smoke refuses this non-780M host (exit 4)"
+      ]
+    }
+  },
+  "skipped_steps": [
+    "Refuse public binary publishing before license audit (only runs when retain_artifacts is requested on a public repository)",
+    "Preserve private experimental artifacts (artifact upload disabled; storage quota exhausted on 2026-10-30)"
+  ],
+  "hardware_executed": false,
+  "driver_runtime_tested": false,
+  "target_gpu_present": false,
+  "limitation": "Compile- and integration-only evidence from hosted CI hosts without a Radeon 780M. It proves the branch builds and that the offline runners exercise the patched sources; it says nothing about GPU initialisation, scan-out, frame rate or WindowServer acceleration on the target laptop, which still requires on-device evidence.",
+  "supersedes": "The pre-migration records in this directory name AgnoyZ/radeon-780m-tahoe and patch revisions; this is the first run recorded from inside the fork."
+}

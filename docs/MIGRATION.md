@@ -73,4 +73,7 @@ The first two pushes after the migration each showed a defect the old workflow h
   and the error message names the cause.
 - CI evidence only counts inside this repository. `docs/validation/*.json` are historical records of runs
   made in the old repository (they name it and its patch revisions); do not cite them as a build pass for
-  this branch.
+  this branch. The first run recorded here is `docs/validation/ci-fork-58e7439-full.json`
+  (run `41595639780`, commit `58e7439`): both jobs succeeded, 256 Python tests `OK`, every offline runner
+  and the macOS kext/plugin/translator/RADV/LLVM build passed. It is compile-only — no host in that run has
+  a 780M, so it is not GPU-init or acceleration evidence.
