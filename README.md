@@ -41,6 +41,10 @@ in October 2026:
 
 Other Radeon 780M / 760M machines (Phoenix, Hawk Point) are untested.
 
+That table is upstream's measurement of its own reference machine. This fork has not been run on any hardware
+yet: [docs/SUPPORT-STATUS.md](docs/SUPPORT-STATUS.md) lists area by area what this branch can claim (compiled,
+policy-asserted, or nothing) and what only the target laptop can establish.
+
 ## How it works
 
 ```mermaid

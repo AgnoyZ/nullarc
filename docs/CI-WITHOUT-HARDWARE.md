@@ -95,4 +95,5 @@ computed from those files, so a single session produces a decision instead of a 
 | frames on the panel, present rate, judder, wake | **not measured** |
 
 The bottom two rows are the project's actual acceptance criteria (`docs/DOWNSTREAM-ROADMAP.md`). CI has made
-the path to them short and checkable; it has not walked it.
+the path to them short and checkable; it has not walked it. `docs/SUPPORT-STATUS.md` is the maintained,
+per-area version of this table: it gives every area an evidence class and names what would move it up.

@@ -84,6 +84,7 @@ validation evidence and research documents that used to live in `AgnoyZ/radeon-7
 | `tools/` | Staging, build, firmware manifest, target inventory/preflight and boot-gate tooling |
 | `tests/` | Python suite, C++ sanitizer harnesses, fake-IOKit runners and shell fixtures |
 | `docs/` | Design notes, audit records, migration notes and `docs/validation/` evidence |
+| `docs/SUPPORT-STATUS.md` | Per-area table of what this branch can claim today and what needs the target laptop |
 | `patches/` | Historical record of the 28-commit series; hashed by staging, never applied |
 | `.github/workflows/build.yml` | Source tests on Linux and the macOS kext/plugin/RADV/LLVM build |
 
