@@ -5,6 +5,11 @@
 nullarc is alpha software that runs in the kernel and inside WindowServer. Keep a way back before you start: a second
 bootable macOS or a USB installer, and a copy of your EFI folder.
 
+> **This fork does not install anything for you.** `tools/phx_install_plan.py` writes the OpenCore part of these
+> instructions as a reviewed, revertible plan for a human — and stops exactly where the AMFI/CSR security changes
+> begin, which the repository will not make on your behalf. See [INSTALL-PLAN.md](INSTALL-PLAN.md). The
+> instructions below are upstream's and are the full picture, including the parts this fork refuses to automate.
+
 ## What you need
 
 | | |

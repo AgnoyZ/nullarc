@@ -41,7 +41,8 @@ there, every claim in this repository is host-side.
 | Display sleep / wake repaint | Not verified; the upstream comment describes a fragmenting-pool failure | `unknown` | `docs/analysis.md` §3, patch 0028 rationale | a wake on the target with the panel repainting |
 | External displays (HDMI, USB-C) | Not attempted | `not implemented` | `docs/DOWNSTREAM-ROADMAP.md` | — |
 | Hardware video decode/encode | Not attempted | `not implemented` | `docs/DOWNSTREAM-ROADMAP.md` | — |
-| Installer, uninstaller, rollback package | None shipped; `tools/phx_boot_gate.sh` runs stages but ships none and installs nothing | `not implemented` | `docs/BOOT-GATE.md` | an installer with a rollback path that does not touch the internal disk's EFI |
+| Install plan (what to add to an EFI, and how to revert it) | `tools/phx_install_plan.py` reads an existing `config.plist` and writes numbered operator steps plus the rollback; no apply mode, and it refuses system locations, foreign kexts and unmatched digests | `host-verified` (synthetic layouts) | `tests/test_install_plan.py`, `docs/INSTALL-PLAN.md` | one reviewed install on the target, then the driver attaching |
+| Installer, uninstaller, rollback package | None shipped and none planned: `tools/phx_boot_gate.sh` runs stages but ships none, and the plan tool writes steps instead of performing them. The security changes upstream's install needs stay the owner's decision, not the repository's action | `not implemented` | `docs/BOOT-GATE.md`, `docs/INSTALL-PLAN.md` | an installer that stays step-revertible and touches no system location |
 | Other 780M / 760M machines (Hawk Point, other panels) | Nothing is claimed for them | `unknown` | — | a report from one of those machines |
 
 ## How to keep this table honest
@@ -53,4 +54,5 @@ there, every claim in this repository is host-side.
 - `README.md`'s status table stays as upstream wrote it, because it is upstream's measurement; this file is
   the one that answers for this branch.
 
-Corresponds to `downstream/780m-tahoe` at `f1d9cf9`.
+Corresponds to `downstream/780m-tahoe` as of the commit that last changed this file; the rows above name the
+test, CI job or record behind each one, and those are what to check, not this date.

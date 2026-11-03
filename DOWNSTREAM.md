@@ -65,6 +65,11 @@ validation evidence and research documents that used to live in `AgnoyZ/radeon-7
   `docs/analysis.md` §9) and `tools/phx_counter_contract.py` (fails when the capture, the kernel sources
   and the analysis stop naming the same OIDs or a knob default moves). `docs/CI-WITHOUT-HARDWARE.md`
   states what this establishes and what it explicitly does not.
+- `tools/phx_install_plan.py`: the OpenCore part of an install, written as numbered operator steps plus the
+  rollback, with no apply mode. It reads an existing `config.plist`, checks the bundles and their digests, and
+  refuses a system location, a foreign kext or a mismatched build. It stops where upstream's AMFI/CSR changes
+  begin and lists them as the owner's decision, because this repository does not weaken OS security or write
+  system locations (`docs/INSTALL-PLAN.md`).
 
 ## Behaviour changes to be aware of
 

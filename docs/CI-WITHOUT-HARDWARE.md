@@ -60,10 +60,16 @@ The last four rows are what the two headless changes added; §4 explains why the
    comparison of the bucket rule with the expression it replaced, odd refresh periods included, so the
    cadence counters stay comparable with earlier captures. `docs/DISPLAY-PATH.md` records the three rules
    and what still needs the laptop.
-5. **Status honesty, per card.** A `CARD-SUPPORT`-style table (target hardware, what is verified, what is
-   not, how it was verified) written the way the nullmoth reference does it. Cheap, and it stops
-   "compiles in CI" from reading as "works". Next candidate.
-6. **Anything that needs a frame on the panel.** Hardware only, by definition.
+5. **Status honesty, per area** (`docs/SUPPORT-STATUS.md`, in CI as a document only). One table with the
+   evidence class of every area — `target-verified` (none yet), `host-verified`, `policy-asserted`,
+   `not implemented`, `unknown` — the test or run behind each row, and what would move it up. It stops
+   "compiles in CI" from reading as "works".
+6. **A revertible install plan** (`tools/phx_install_plan.py`, `tests/test_install_plan.py`, in CI). The kexts
+   have to be installed before any capture can run, and installing is what this repository must not do: the
+   planner reads an existing `config.plist` and writes numbered operator steps plus the rollback, with no apply
+   mode, refusing system locations, foreign kexts and unmatched digests. It ends where upstream's AMFI/CSR
+   changes begin and names them as the owner's decision (`docs/INSTALL-PLAN.md`).
+7. **Anything that needs a frame on the panel.** Hardware only, by definition.
 
 ## 5. The one hardware session, when the laptop is back
 
