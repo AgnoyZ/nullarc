@@ -78,6 +78,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          # tools/prepare_radv.py reads the reviewed Phoenix patch series from the commit pinned in
+          # upstream.lock.json, which is an ancestor of HEAD; a depth-1 clone has no such object.
+          fetch-depth: 0
       - name: Preflight Apple Metal tooling and native probe compilation
         run: python3 tools/macos_toolchain.py --out build/toolchain-preflight
       - name: Checkout pinned MacKernelSDK

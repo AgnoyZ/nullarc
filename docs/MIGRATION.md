@@ -59,5 +59,18 @@ the only remaining difference is its `.gitmodules`, which no longer applies.
 ## Verification after migration
 
 `python -m unittest discover -s tests -v` and the C++ policy assertions run in this repository; the macOS
-job compiles and signs the patched kexts, plugin, translator, RADV and LLVM. The first push of this branch
-produces that evidence; until it is recorded, no run in this repository should be cited as a build pass.
+job compiles and signs the patched kexts, plugin, translator, RADV and LLVM.
+
+The first two pushes after the migration each showed a defect the old workflow had hidden, both fixed now:
+
+- `41395590380` — source tests failed because the fake-IOKit headers and the three synthetic fixtures
+  were missing (see above). Fixed in `19c4a73`: that run's `source-tests` job then passed all 21 steps,
+  including every "without hardware" runner.
+- `41593751055` — with source tests green, the macOS job reached the RADV stage and stopped with
+  "Pinned RADV patch-series commit is missing from this repository": `tools/prepare_radv.py` reads the
+  reviewed Phoenix series with `git show <pinned commit>:patches/...`, but CI checked out with the default
+  depth of 1, so that ancestor object did not exist. The macOS job now checks out with `fetch-depth: 0`,
+  and the error message names the cause.
+- CI evidence only counts inside this repository. `docs/validation/*.json` are historical records of runs
+  made in the old repository (they name it and its patch revisions); do not cite them as a build pass for
+  this branch.

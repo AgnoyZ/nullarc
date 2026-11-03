@@ -28,7 +28,10 @@ def prepare_radv(mesa, cobalt, destination, root=ROOT):
     try:
         git(nullarc, "cat-file", "-e", lock["nullarc"]["commit"] + "^{commit}")
     except subprocess.CalledProcessError:
-        raise RuntimeError("Pinned RADV patch-series commit is missing from this repository")
+        raise RuntimeError(
+            "Pinned RADV patch-series commit is missing from this repository "
+            f"({lock['nullarc']['commit']}); a shallow clone must fetch the full history "
+            "(actions/checkout with fetch-depth: 0)")
     if destination == nullarc:
         raise RuntimeError("Staging must not overwrite the repository root")
     if destination.exists():
