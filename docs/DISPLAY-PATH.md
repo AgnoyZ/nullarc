@@ -144,3 +144,23 @@ ARGB2101010 窄化成 XRGB8888 的位运算**。两者同样抽进 `src/phxaccel
 
 这仍然只是策略断言：它证明位运算与选择规则按文档工作，**不证明面板上的颜色正确**——颜色要看真机
 截图与 `debug.nvaccel_crc`，帧率要看 `copy_us`。
+
+## 别名重试预算：把 0028 修的那个 bug 变成断言
+
+补丁 0028 修的是"carve-out 还没发布时的 present 被当成校验失败"——三次早期 present 就把整个会话
+钉在 BAR 拷贝（约 7 fps）。当时只有一段 staged-source 测试按**文本顺序**断言行号；现在这条语义
+本身进了 `src/phxaccel/PhxHardwarePolicy.hpp`，由 `tests/test_hardware_policy.cpp` 断言：
+
+| 规则 | 实现 | 断言里最重要的一条 |
+| --- | --- | --- |
+| 预算耗尽判定：3 次像素校验失败，或 3600 次等待 | `phx780m::aliasExhausted()` + `kAliasVerifyLimit` / `kAliasWaitLimit` | `aliasExhausted(0, 3599)` 为假——**3599 次等待一个校验预算都不花** |
+| 能否映射并校验：必须同时拿到已发布的 carve-out 地址与 BAR 内偏移，且相加不回绕 | `phx780m::aliasCarveOutReady()` | 两者缺一即为"等待"，相加溢出也拒绝 |
+| 采样步长：整屏约 4096 个采样点，至少 1 字 | `phx780m::aliasSampleStep()` | 2560×1600 字 → 每 1000 字一个采样 |
+| 接受条件：全部采样一致，且至少一个非零 | `phx780m::aliasSamplesMatch()` | 全零视图（"看起来一致"）被拒绝，那是过期画面不是同一帧 |
+
+驱动侧（`phxfb.cpp`）只保留三件事：计数顺序（先 `fAliasWaits++`，再 `fAliasTries++`，最后才
+`IODeviceMemory::withRange`）、日志与状态；`tests/test_framebuffer_path.py` 现在断言它**调用**这些
+策略函数并保持该顺序，不再断言魔法数字的字面文本。
+
+依旧只是策略断言：它证明"等待不会吃掉预算"这类规则成立，不证明别名在真机上建立成功——那要看内核
+日志里的 `alias: ... samples match the BAR` 行。

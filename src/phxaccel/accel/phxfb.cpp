@@ -66,7 +66,10 @@ class PhxAMDFB : public IOFramebuffer {
     IOMemoryMap *fAliasMap = nullptr;
     unsigned fAliasTries = 0;    // pixel checks made against the carve-out; a mismatch is not retried forever
     unsigned fAliasWaits = 0;    // presents made before the carve-out was published: not verification failures
-    static constexpr unsigned kAliasVerifyLimit = 3, kAliasWaitLimit = 3600;
+    // The retry budget and both acceptance rules live in PhxHardwarePolicy.hpp, so tests/test_hardware_policy.cpp
+    // can assert that a wait never spends a verification check (the 0028 regression).
+    static constexpr unsigned kAliasVerifyLimit = phx780m::kAliasVerifyLimit;
+    static constexpr unsigned kAliasWaitLimit = phx780m::kAliasWaitLimit;
     volatile UInt32 fAliasBusy = 0;
     struct Irq { IOFBInterruptProc proc = nullptr; OSObject *target = nullptr; void *ref = nullptr; };
     Irq fVbl[4], fConnect;   // IOFramebuffer itself and, when it asks, IOAccelDisplayPipe each register a VBL handler
@@ -384,7 +387,7 @@ public:
     // if that view holds the pixels the BAR shows. NULL (copy through the BAR) until then; an unpublished carve-out is
     // retried on later presents (see fAliasWaits), a mismatched view is dropped after kAliasVerifyLimit checks.
     IOMemoryMap *aliasMap() {
-        if (fAliasMap || fAliasTries >= kAliasVerifyLimit || fAliasWaits >= kAliasWaitLimit) return fAliasMap;
+        if (fAliasMap || phx780m::aliasExhausted(fAliasTries, fAliasWaits)) return fAliasMap;
         if (!OSCompareAndSwap(0, 1, &fAliasBusy)) return nullptr;
         if (!fAliasMap) {
             uint64_t fbPhys = 0, barOff = ~0ull;
@@ -406,7 +409,7 @@ public:
             // PhxBringup can publish the carve-out after this framebuffer's first presents. That is a wait, not a
             // failed check: counting three early presents as verification failures pinned the session to the BAR copy
             // path (~110 ms a frame at 2560x1600) for its whole life. Only a real pixel mismatch uses the budget.
-            if (!fbPhys || barOff == ~0ull || fbPhys > UINT64_MAX - barOff) {
+            if (!phx780m::aliasCarveOutReady(fbPhys, barOff)) {
                 if (!fAliasWaits++) PFBLOG("alias: carve-out not published yet (ram 0x%llx, BAR offset 0x%llx): retrying", fbPhys, barOff);
                 fAliasBusy = 0;
                 return fAliasMap;
@@ -418,12 +421,12 @@ public:
             if (m) {
                 const volatile uint32_t *a = (const volatile uint32_t *)m->getVirtualAddress();
                 const volatile uint32_t *b = (const volatile uint32_t *)fSurfMap->getVirtualAddress();
-                const uint64_t words = bytes / 4, step = words / 4096 ? words / 4096 : 1;
+                const uint64_t words = bytes / 4, step = phx780m::aliasSampleStep(words);
                 unsigned same = 0, nz = 0, n = 0;
                 for (uint64_t w = 0; w < words; w += step, n++) { const uint32_t x = a[w], y = b[w]; same += x == y; nz += y != 0; }
                 PFBLOG("alias: scan-out at BAR offset 0x%llx = system RAM 0x%llx: %u of %u samples match the BAR (%u non-zero)",
                        barOff, phys, same, n, nz);
-                if (same == n && nz) fAliasMap = m; else m->release();
+                if (phx780m::aliasSamplesMatch(same, n, nz)) fAliasMap = m; else m->release();
             } else {
                 PFBLOG("alias: carve-out 0x%llx, scan-out BAR offset 0x%llx: no system-RAM view, copying through the BAR", fbPhys, barOff);
             }

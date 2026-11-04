@@ -47,20 +47,27 @@ class FramebufferPathTests(unittest.TestCase):
 
     def test_unpublished_carve_out_is_retried_instead_of_spending_the_budget(self):
         alias = self.fb.split("IOMemoryMap *aliasMap() {")[1].split("IOReturn callPlatformFunction(")[0]
-        self.assertIn("fAliasTries >= kAliasVerifyLimit || fAliasWaits >= kAliasWaitLimit", alias)
-        wait = alias.split("if (!fbPhys || barOff == ~0ull || fbPhys > UINT64_MAX - barOff) {")[1]
+        # The budget rules themselves are asserted in tests/test_hardware_policy.cpp; what this test still owns is
+        # that the driver uses them and that a wait costs nothing: waits are counted before any verification try.
+        self.assertIn("phx780m::aliasExhausted(fAliasTries, fAliasWaits)", alias)
+        self.assertIn("phx780m::aliasCarveOutReady(fbPhys, barOff)", alias)
+        wait = alias.split("phx780m::aliasCarveOutReady(fbPhys, barOff)) {")[1]
         self.assertIn("if (!fAliasWaits++)", wait)
         self.assertLess(alias.index("fAliasWaits++"), alias.index("fAliasTries++"))
         self.assertLess(alias.index("fAliasTries++"), alias.index("IODeviceMemory::withRange(phys, bytes)"))
-        self.assertIn("static constexpr unsigned kAliasVerifyLimit = 3, kAliasWaitLimit = 3600;", self.fb)
+        self.assertIn("static constexpr unsigned kAliasVerifyLimit = phx780m::kAliasVerifyLimit;", self.fb)
+        self.assertIn("static constexpr unsigned kAliasWaitLimit = phx780m::kAliasWaitLimit;", self.fb)
         self.assertIn("unsigned fAliasWaits = 0;", self.fb)
-        self.assertIn("if (same == n && nz) fAliasMap = m; else m->release();", alias)
+        self.assertIn("phx780m::aliasSamplesMatch(same, n, nz)", alias)
+        self.assertIn("phx780m::aliasSampleStep(words)", alias)
 
     def test_staged_policy_header_has_the_release_policy(self):
         policy = (ROOT / "src/PhxHardwarePolicy.hpp").read_bytes()
         self.assertEqual(policy, (self.stage / "src/phxaccel/PhxHardwarePolicy.hpp").read_bytes())
         self.assertIn(b"poolReleaseValid", policy)
         self.assertIn(b"pageAligned", policy)
+        self.assertIn(b"aliasExhausted", policy)
+        self.assertIn(b"aliasSamplesMatch", policy)
 
 
 if __name__ == "__main__": unittest.main()
