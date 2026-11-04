@@ -45,5 +45,33 @@ constexpr uint64_t narrowPair(uint64_t value) {
                             ((value >> 2) & 0x000000ff000000ffull);
     return 0xff000000ff000000ull | pixels;
 }
+// --- damage-only copy (debug.nvaccel_iop_damage, default off) ---
+// A frame is compared with a shadow of what the scan-out already holds in 64-byte groups, and only the groups
+// that changed are stored. On a panel where one stored byte is expensive (docs/analysis.md §1.3) that is the
+// difference between copying a whole frame and copying a cursor. The shape rules below decide when the shadow
+// still describes the scan-out; the driver does the comparing and the storing.
+constexpr unsigned kDamageGroupWords = 16u;   // one 64-byte group: the unit the comparison walks in
+// How many groups a row needs (the last one may be shorter), and how many words the given group holds.
+constexpr unsigned groupCount(unsigned words) { return (words + kDamageGroupWords - 1u) / kDamageGroupWords; }
+constexpr unsigned groupWords(unsigned words, unsigned group) {
+    const unsigned first = group * kDamageGroupWords;
+    if (first >= words) return 0u;
+    const unsigned remaining = words - first;
+    return remaining < kDamageGroupWords ? remaining : kDamageGroupWords;
+}
+// A changed group is stored as 8-byte pairs when the destination word it starts at is 8-byte aligned, and a word
+// at a time otherwise (the same rule the full copy uses for its pair loop).
+constexpr bool pairStoreEligible(uintptr_t destWordAddress) { return (destWordAddress & 7u) == 0u; }
+// What the shadow has to still describe for a comparison to be meaningful: the destination it was built from, the
+// row's word count and stride, the row count, and the format the pixels were narrowed to.
+struct CopyShape {
+    const void *dest;
+    unsigned words, rows, destStride;
+    bool narrows;
+};
+constexpr bool sameShape(const CopyShape &a, const CopyShape &b) {
+    return a.dest == b.dest && a.words == b.words && a.rows == b.rows && a.destStride == b.destStride &&
+           a.narrows == b.narrows;
+}
 }
 #endif

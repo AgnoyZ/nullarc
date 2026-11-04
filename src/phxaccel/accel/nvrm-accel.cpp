@@ -1031,6 +1031,81 @@ static uint64_t gIopLastAbs;
 static SInt64 gCntIopGap[4], gIopPhaseUsSum;
 static int gIopSse = 0;   // debug.nvaccel_iop_sse
 
+// Damage-only copy (debug.nvaccel_iop_damage, default 0 = the full copy): a shadow of what the scan-out holds is
+// kept per head, each frame is compared with it in 64-byte groups, and only the changed groups are stored. On
+// this panel one stored byte is expensive (a BAR copy of a 2560x1600 frame took ~110 ms, docs/analysis.md §1.3),
+// so a cursor move storing a few kB instead of a frame is the whole point. The shadow is dropped whenever the
+// destination, its geometry or the format changes, when another copy holds it, and while the knob is off.
+// debug.nvaccel_iop_full=1 forces exactly one full copy, which is the single-window A/B control.
+static int gIopDamage = 0;     // debug.nvaccel_iop_damage
+static int gIopFullOnce = 0;   // debug.nvaccel_iop_full
+static SInt64 gIopDamageBytes, gIopDamageBytesSum, gCntIopDamageFull, gCntIopDamageBusy;
+struct NVIopShadow {
+    uint32_t *buf;
+    size_t bytes;
+    phx780m::CopyShape shape;
+    volatile bool valid;
+    volatile UInt32 busy;
+};
+static NVIopShadow gIopShadow[kNvMaxFB];
+static void nvIopShadowDrop(unsigned head) { if (head < kNvMaxFB) gIopShadow[head].valid = false; }
+
+// Bytes stored, or -1 when the caller must do the full copy. Thread context only: this may allocate.
+static SInt64 nvIopCopyDamage(unsigned head, const volatile unsigned int *src, unsigned spr, volatile unsigned int *d,
+                              unsigned dpr, unsigned words, unsigned h, bool l10r)
+{
+    if (!gIopDamage || head >= kNvMaxFB || !words || !h) { nvIopShadowDrop(head); return -1; }
+    NVIopShadow &sh = gIopShadow[head];
+    if (!OSCompareAndSwap(0, 1, &sh.busy)) {
+        sh.valid = false;   // another copy is writing it: the shadow no longer says what the scan-out holds
+        OSAddAtomic64(1, &gCntIopDamageBusy);
+        return -1;
+    }
+    const size_t bytes = (size_t)words * 4u * h;
+    if (sh.buf && sh.bytes != bytes) { IOFreeAligned(sh.buf, sh.bytes); sh.buf = nullptr; sh.bytes = 0; }
+    if (!sh.buf) { sh.buf = (uint32_t *)IOMallocAligned(bytes, 64); sh.bytes = sh.buf ? bytes : 0; }
+    if (!sh.buf) { sh.valid = false; sh.busy = 0; return -1; }
+    const phx780m::CopyShape shape{d, words, h, dpr, l10r};
+    if (!phx780m::sameShape(sh.shape, shape)) sh.valid = false;   // another scan-out: the shadow says nothing about it
+    const bool force = !sh.valid || gIopFullOnce != 0;
+    if (gIopFullOnce) gIopFullOnce = 0;
+    if (force) OSAddAtomic64(1, &gCntIopDamageFull);
+    sh.shape = shape;
+    sh.valid = true;
+    SInt64 stored = 0;
+    for (unsigned y = 0; y < h; y++) {
+        const volatile unsigned int *sp = src + (unsigned long)y * spr;
+        uint32_t *dp = (uint32_t *)(uintptr_t)(d + (unsigned long)y * dpr);
+        uint32_t *hp = sh.buf + (unsigned long)y * words;
+        for (unsigned group = 0; group < phx780m::groupCount(words); group++) {
+            const unsigned first = group * phx780m::kDamageGroupWords;
+            const unsigned n = phx780m::groupWords(words, group);
+            uint32_t px[phx780m::kDamageGroupWords];
+            uint32_t diff = force ? 1u : 0u;
+            for (unsigned i = 0; i < n; i++) {
+                px[i] = l10r ? phx780m::narrowWord(sp[first + i]) : sp[first + i];
+                diff |= px[i] ^ hp[first + i];
+            }
+            if (!diff) continue;
+            unsigned i = 0;
+            if (phx780m::pairStoreEligible((uintptr_t)(dp + first))) {
+                for (; i + 1 < n; i += 2) {
+                    const uint64_t v = (uint64_t)px[i] | ((uint64_t)px[i + 1] << 32);
+                    __asm__ __volatile__("movnti %1, %0" : "=m"(*(uint64_t *)(void *)(dp + first + i)) : "r"(v));
+                }
+            }
+            for (; i < n; i++) __asm__ __volatile__("movnti %1, %0" : "=m"(dp[first + i]) : "r"(px[i]));
+            for (i = 0; i < n; i++) hp[first + i] = px[i];
+            stored += (SInt64)n * 4;
+        }
+    }
+    __asm__ __volatile__("sfence" ::: "memory");
+    sh.busy = 0;
+    gIopDamageBytes = stored;
+    OSAddAtomic64(stored, &gIopDamageBytesSum);
+    return stored;
+}
+
 // One row of a copied frame in 64-byte steps: SSE4.1 streaming loads (movntdqa) and non-temporal stores (movntdq).
 // Some of WindowServer's display surfaces are write-combined, and plain loads read those at ~0.5 GB/s: a frame from
 // one took 13-30 ms against 1-2 ms, and the desktop stuttered (2026-10-20); movntdqa reads them a cache line at a time.
@@ -1086,6 +1161,49 @@ static void nvIopRowSSE(const void *src, void *dst, unsigned long bytes, bool l1
         "movdqa 128(%0), %%xmm8\n\t" "movdqa 144(%0), %%xmm9\n\t"
         : : "r"(save) : "memory");
 }
+
+// The full copy every byte goes through when damage-only is off or cannot help: one row at a time, 64-byte SSE
+// steps where the addresses allow them, then 8-byte non-temporal pairs, then single words. The path rules and the
+// narrowing live in PhxCopyPath.hpp (tests/test_copy_path.cpp asserts them).
+static void nvIopCopyFull(const volatile unsigned int *src, unsigned spr, volatile unsigned int *d, unsigned dpr,
+                          unsigned words, unsigned h, bool l10r)
+{
+    // Which row path this copy may take, and the narrowing it does while copying: both live in PhxCopyPath.hpp
+    // so tests/test_copy_path.cpp can assert them (docs/analysis.md §1.3).
+    const bool wide = phx780m::wideEligible((uintptr_t)src, (uintptr_t)d, spr, dpr);
+    const bool sse = phx780m::sseEligible(gIopSse != 0, (uintptr_t)src, (uintptr_t)d, spr, dpr);
+    for (unsigned y = 0; y < h; y++) {
+        const volatile unsigned int *sp = src + (unsigned long)y * spr;
+        volatile unsigned int *dp = d + (unsigned long)y * dpr;
+        unsigned x = phx780m::sseWords(words, sse);
+        if (x) {
+            // 64-byte steps; the rest of the row takes the paths below
+            nvIopRowSSE((const void *)sp, (void *)(uintptr_t)dp, (unsigned long)x * 4, l10r);
+        }
+        if (wide) {
+            const volatile uint64_t *sq = (const volatile uint64_t *)sp;
+            uint64_t *dq = (uint64_t *)(uintptr_t)dp;
+            const unsigned pairs = words / 2;
+            if (l10r) {
+                for (unsigned i = x / 2; i < pairs; i++) {
+                    const uint64_t px = phx780m::narrowPair(sq[i]);
+                    __asm__ __volatile__("movnti %1, %0" : "=m"(dq[i]) : "r"(px));
+                }
+            } else {
+                for (unsigned i = x / 2; i < pairs; i++) __asm__ __volatile__("movnti %1, %0" : "=m"(dq[i]) : "r"((uint64_t)sq[i]));
+            }
+            x = phx780m::pairResume(words, x);
+        }
+        unsigned int *dw = (unsigned int *)(uintptr_t)dp;
+        for (; x < words; x++) {
+            const unsigned v = sp[x];
+            const unsigned px = l10r ? phx780m::narrowWord(v) : v;
+            __asm__ __volatile__("movnti %1, %0" : "=m"(dw[x]) : "r"(px));
+        }
+    }
+    __asm__ __volatile__("sfence" ::: "memory");   // the frame is in DRAM before the transaction completes
+}
+
 // A copied frame completes on the VBL tick after it was copied, as a flip latches at the next vblank. Completed at once,
 // WindowServer presented twice within one refresh whenever an app's update came between its own ticks, then skipped the
 // next: frames 3-4 ms apart followed by 12-16 ms gaps, 97 presents a second on a 120 Hz panel (2026-10-21). The
@@ -1221,40 +1339,10 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
     // Non-temporal stores (movnti, general registers only): the scan-out's system-RAM view (PhxFB) maps write-back
     // whatever cache mode it asks for, and plain stores left the frame in the CPU cache while the panel scanned the stale
     // DRAM under it, in stripes (2026-10-20). Through the BAR (uncached) they behave as plain stores.
-    // Which row path this copy may take, and the narrowing it does while copying: both live in PhxCopyPath.hpp
-    // so tests/test_copy_path.cpp can assert them (docs/analysis.md §1.3).
-    const bool wide = phx780m::wideEligible((uintptr_t)src, (uintptr_t)d, spr, dpr);
-    const bool sse = phx780m::sseEligible(gIopSse != 0, (uintptr_t)src, (uintptr_t)d, spr, dpr);
-    for (unsigned y = 0; y < h; y++) {
-        const volatile unsigned int *sp = src + (unsigned long)y * spr;
-        volatile unsigned int *dp = d + (unsigned long)y * dpr;
-        unsigned x = phx780m::sseWords(words, sse);
-        if (x) {
-            // 64-byte steps; the rest of the row takes the paths below
-            nvIopRowSSE((const void *)sp, (void *)(uintptr_t)dp, (unsigned long)x * 4, l10r);
-        }
-        if (wide) {
-            const volatile uint64_t *sq = (const volatile uint64_t *)sp;
-            uint64_t *dq = (uint64_t *)(uintptr_t)dp;
-            const unsigned pairs = words / 2;
-            if (l10r) {
-                for (unsigned i = x / 2; i < pairs; i++) {
-                    const uint64_t px = phx780m::narrowPair(sq[i]);
-                    __asm__ __volatile__("movnti %1, %0" : "=m"(dq[i]) : "r"(px));
-                }
-            } else {
-                for (unsigned i = x / 2; i < pairs; i++) __asm__ __volatile__("movnti %1, %0" : "=m"(dq[i]) : "r"((uint64_t)sq[i]));
-            }
-            x = phx780m::pairResume(words, x);
-        }
-        unsigned int *dw = (unsigned int *)(uintptr_t)dp;
-        for (; x < words; x++) {
-            const unsigned v = sp[x];
-            const unsigned px = l10r ? phx780m::narrowWord(v) : v;
-            __asm__ __volatile__("movnti %1, %0" : "=m"(dw[x]) : "r"(px));
-        }
-    }
-    __asm__ __volatile__("sfence" ::: "memory");   // the frame is in DRAM before the transaction completes
+    // Damage-only first (debug.nvaccel_iop_damage, default off): it stores the 64-byte groups that changed,
+    // and asks for the full copy below when the shadow cannot help.
+    if (nvIopCopyDamage(head, src, spr, d, dpr, words, h, l10r) < 0)
+        nvIopCopyFull(src, spr, d, dpr, words, h, l10r);
     fIopVblSeq = __atomic_load_n(&gPhxVblSeq, __ATOMIC_ACQUIRE);
     {
         uint64_t ns; absolutetime_to_nanoseconds(mach_absolute_time() - t0, &ns);
@@ -1356,6 +1444,12 @@ static SInt64 gCntIopCopySkip;
 NVACCEL_CNT(nvaccel_iop_copy_skip,    gCntIopCopySkip,    "frames kept on the panel because the surface's newest pixels were not yet in system memory");
 SYSCTL_INT(_debug, OID_AUTO, nvaccel_iop_bench, CTLFLAG_RW | CTLFLAG_LOCKED, &gIopBench, 0, "1 = time a read-only pass over the next copied frame's source (nvaccel_iop_read_us)");
 SYSCTL_INT(_debug, OID_AUTO, nvaccel_iop_sse, CTLFLAG_RW | CTLFLAG_LOCKED, &gIopSse, 0, "1 = copy frames with SSE4.1 streaming loads (fast from write-combined surfaces), 0 = 8-byte loads (default until proven)");
+SYSCTL_INT(_debug, OID_AUTO, nvaccel_iop_damage, CTLFLAG_RW | CTLFLAG_LOCKED, &gIopDamage, 0, "1 = store only the 64-byte groups a frame changed (a shadow of the scan-out is kept per head), 0 = copy every pixel (default)");
+SYSCTL_INT(_debug, OID_AUTO, nvaccel_iop_full, CTLFLAG_RW | CTLFLAG_LOCKED, &gIopFullOnce, 0, "write 1 to force exactly one full copy while damage-only is on: one A/B window without rebooting");
+NVACCEL_CNT(nvaccel_iop_damage_bytes,   gIopDamageBytes,    "bytes the last damage-only copy stored");
+NVACCEL_CNT(nvaccel_iop_damage_sum,     gIopDamageBytesSum, "bytes all damage-only copies stored");
+NVACCEL_CNT(nvaccel_iop_damage_full,    gCntIopDamageFull,  "frames the shadow could not help with, so every pixel was stored");
+NVACCEL_CNT(nvaccel_iop_damage_busy,    gCntIopDamageBusy,  "copies that found the shadow busy and copied the whole frame instead");
 NVACCEL_CNT(nvaccel_iop_read_us,      gIopReadUs,         "the last bench: microseconds to read one frame's source");
 NVACCEL_CNT(nvaccel_iop_copy_us,      gIopCopyUs,         "microseconds the last copied frame took");
 NVACCEL_CNT(nvaccel_iop_copy_us_max,  gIopCopyUsMax,      "the slowest copied frame, microseconds");
@@ -1515,6 +1609,9 @@ static void nvaccelInstallSysctl(void)
     sysctl_register_oid(&sysctl__debug_nvaccel_iop_blank);      sysctl_register_oid(&sysctl__debug_nvaccel_iop_copy_skip);
     sysctl_register_oid(&sysctl__debug_nvaccel_iop_bench);      sysctl_register_oid(&sysctl__debug_nvaccel_iop_read_us);
     sysctl_register_oid(&sysctl__debug_nvaccel_iop_sse);
+    sysctl_register_oid(&sysctl__debug_nvaccel_iop_damage);      sysctl_register_oid(&sysctl__debug_nvaccel_iop_full);
+    sysctl_register_oid(&sysctl__debug_nvaccel_iop_damage_bytes); sysctl_register_oid(&sysctl__debug_nvaccel_iop_damage_sum);
+    sysctl_register_oid(&sysctl__debug_nvaccel_iop_damage_full);  sysctl_register_oid(&sysctl__debug_nvaccel_iop_damage_busy);
     sysctl_register_oid(&sysctl__debug_nvaccel_iop_copy_us);    sysctl_register_oid(&sysctl__debug_nvaccel_iop_copy_us_max);
     sysctl_register_oid(&sysctl__debug_nvaccel_iop_copy_us_sum);
     sysctl_register_oid(&sysctl__debug_nvaccel_iop_gap1);       sysctl_register_oid(&sysctl__debug_nvaccel_iop_gap2);

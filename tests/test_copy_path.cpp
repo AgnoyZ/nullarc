@@ -127,12 +127,63 @@ void narrowing_tests() {
     }
     assert(phx780m::narrowPair(0) == 0xff000000ff000000ull);
 }
+
+// The damage-only copy walks a row in 64-byte groups and stores only the ones that changed. What must hold without
+// hardware: the groups tile a row exactly once in order, and the shape rules drop a shadow whenever the scan-out
+// it describes has changed under it.
+void damage_tests() {
+    assert(phx780m::kDamageGroupWords == 16u);   // 64 bytes: one cache line, the unit the comparison reads in
+    for (unsigned words = 1; words <= 600; ++words) {
+        unsigned covered = 0;
+        for (unsigned group = 0; group < phx780m::groupCount(words); ++group) {
+            const unsigned n = phx780m::groupWords(words, group);
+            assert(n > 0);
+            assert(n <= phx780m::kDamageGroupWords);
+            covered += n;
+        }
+        assert(covered == words);
+    }
+    // 2560 pixels is the panel: 160 whole groups, no tail.
+    assert(phx780m::groupCount(2560) == 160);
+    assert(phx780m::groupWords(2560, 0) == 16);
+    assert(phx780m::groupWords(2560, 159) == 16);
+    // 1080-wide and an odd width both end on a short group, never on an empty or over-long one.
+    assert(phx780m::groupCount(1080) == 68);
+    assert(phx780m::groupWords(1080, 67) == 8);
+    assert(phx780m::groupCount(17) == 2 && phx780m::groupWords(17, 1) == 1);
+    assert(phx780m::groupCount(16) == 1 && phx780m::groupWords(16, 0) == 16);
+    assert(phx780m::groupWords(16, 1) == 0);   // past the end: the loop never asks, this proves asking is safe
+    // 8-byte pairs only at an 8-byte-aligned destination word, exactly as the full copy's pair loop decides.
+    for (uintptr_t address = 0; address <= 32; address += 4) {
+        assert(phx780m::pairStoreEligible(address) == ((address & 7) == 0));
+    }
+    // A shadow describes one scan-out: a new destination, geometry, stride or format must invalidate it.
+    const phx780m::CopyShape base{reinterpret_cast<const void *>(uintptr_t(0x2000)), 2560, 1600, 2560, false};
+    assert(phx780m::sameShape(base, base));
+    phx780m::CopyShape other = base;
+    other.dest = reinterpret_cast<const void *>(uintptr_t(0x3000));
+    assert(!phx780m::sameShape(base, other));
+    other = base;
+    other.words = 1920;
+    assert(!phx780m::sameShape(base, other));
+    other = base;
+    other.rows = 1200;
+    assert(!phx780m::sameShape(base, other));
+    other = base;
+    other.destStride = 2688;
+    assert(!phx780m::sameShape(base, other));
+    other = base;
+    other.narrows = true;
+    assert(!phx780m::sameShape(base, other));
+}
 }
 
 int main() {
     selection_tests();
     row_split_tests();
     narrowing_tests();
-    std::printf("copy path policy: row selection, row split and ARGB2101010 narrowing agree with the driver\n");
+    damage_tests();
+    std::printf("copy path policy: row selection, row split, ARGB2101010 narrowing and the damage-only group walk "
+                "agree with the driver\n");
     return 0;
 }

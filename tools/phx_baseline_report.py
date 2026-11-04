@@ -162,7 +162,7 @@ def decide(capture):
                 "slower than it ticks: the copy is the limiter"
                 if copy_limited else
                 "the copy does not both dominate a refresh and hold the present rate below the tick rate"),
-        "if_supported": "optimise the copy loop (nvrm-accel.cpp:1225-1254) and the destination decision "
+        "if_supported": "optimise the copy loop (nvIopCopyFull()/nvIopCopyDamage() in nvrm-accel.cpp) and the destination decision "
                         "(phxfb.cpp:434-451), one boot argument per commit",
     })
 
@@ -190,7 +190,7 @@ def decide(capture):
                           "dropped_refresh_pct_at_least": THRESHOLDS["h3_dropped_refresh_pct"]},
             "why": ("this capture does not record the present cadence (debug.nvaccel_iop_gap1..4, "
                     "_vsync_waits, _vsync_late): rerun the capture with the current tools/phx_baseline.sh"),
-            "if_supported": "work on present pacing (nvrm-accel.cpp:1096-1117), A/B on debug.nvaccel_iop_vsync",
+            "if_supported": "work on present pacing (isTransactionComplete in nvrm-accel.cpp), A/B on debug.nvaccel_iop_vsync",
         })
     else:
         uneven = (cadence["present_over_tick_ratio"] > THRESHOLDS["h3_present_over_tick_ratio"]
@@ -208,7 +208,7 @@ def decide(capture):
             "why": ("frames present more often than the panel ticks, or land two or more refreshes apart: "
                     "the cadence is uneven, not merely slow"
                     if uneven else "frames land about one refresh apart, so the cadence is even"),
-            "if_supported": "work on present pacing (nvrm-accel.cpp:1096-1117), A/B on debug.nvaccel_iop_vsync",
+            "if_supported": "work on present pacing (isTransactionComplete in nvrm-accel.cpp), A/B on debug.nvaccel_iop_vsync",
         })
 
     stalled = (metrics["stall_share_pct"] >= THRESHOLDS["h4_stall_share_pct"]
@@ -222,7 +222,7 @@ def decide(capture):
         "threshold": {"stall_or_blank_share_pct_at_least": THRESHOLDS["h4_stall_share_pct"]},
         "why": ("frames are held back (surface not ready) or copied as one colour often enough to be a cause"
                 if stalled else "held-back and blank frames are rare: readiness is not where frames go"),
-        "if_supported": ("work on surface readiness (nvrm-accel.cpp:2240-2270, limit in "
+        "if_supported": ("work on surface readiness (nvAccelSurfCopyReady in nvrm-accel.cpp, limit in "
                          "phx780m::nextCopyHold) and sticky VRAM (1326-1329)"),
     })
 

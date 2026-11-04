@@ -39,8 +39,15 @@ avoids SSE so the XMM save/restore disappears with it.
 
 This is the first external evidence for our own H1 (docs/analysis.md §5): on a 780M eDP panel the BAR copy is
 quoted at ~110 ms/frame at 2560×1600, and a damage-only copy is the one optimisation that reduces stored bytes
-rather than their cost. It collides with our `PhxCopyPath.hpp` refactor in the same function, so it has to be
-re-implemented on top of ours, not merged — and it needs its own phase-1 A/B before it is adopted here.
+rather than their cost.
+
+**Taken, re-implemented rather than merged** (2026-11-04): `nvIopCopyDamage()` in `nvrm-accel.cpp` with the
+shape and grouping rules in `PhxCopyPath.hpp`, `tests/test_copy_path.cpp` asserting them. Two deliberate
+differences from theirs: the switch `debug.nvaccel_iop_damage` **defaults to 0** here (their default is 1 — a
+new path defaults to today's behaviour, docs/analysis.md §8), and the shadow is dropped by an asserted shape
+comparison (`phx780m::sameShape()`) rather than by inline conditions. `debug.nvaccel_iop_full=1` gives the
+single-window A/B either way. The benefit is unproven here until capture B5 (`damage_sum` vs `copy_us`)
+runs on the target.
 
 ### 2. Two base-code bugs found on hardware — checked against this tree
 

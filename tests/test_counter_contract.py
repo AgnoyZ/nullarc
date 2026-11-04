@@ -55,11 +55,12 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(report["violations"], [])
         self.assertFalse(report["claims"]["hardware_execution_established"])
         self.assertEqual(set(report["defaults"]), {
-            "debug.phxfb_alias", "debug.phxfb_vbl_staged", "debug.nvaccel_iop_sse", "debug.nvaccel_iop_vsync",
-            "debug.nvaccel_vm_sticky", "debug.phxbos_flush", "debug.nvaccel_iop_flip",
+            "debug.phxfb_alias", "debug.phxfb_vbl_staged", "debug.nvaccel_iop_sse", "debug.nvaccel_iop_damage",
+            "debug.nvaccel_iop_vsync", "debug.nvaccel_vm_sticky", "debug.phxbos_flush", "debug.nvaccel_iop_flip",
         })
         self.assertEqual(report["defaults"]["debug.phxfb_alias"], 1)
         self.assertEqual(report["defaults"]["debug.nvaccel_iop_sse"], 0)
+        self.assertEqual(report["defaults"]["debug.nvaccel_iop_damage"], 0)
 
     def test_renaming_a_counter_the_capture_reads_is_a_violation(self):
         with tempfile.TemporaryDirectory() as temporary:

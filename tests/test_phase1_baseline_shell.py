@@ -16,8 +16,8 @@ SCRIPT = ROOT / "tools/phx_baseline.sh"
 
 KNOBS = {
     "debug.phxfb_alias": 1, "debug.phxfb_vbl_staged": 1, "debug.nvaccel_iop": 1,
-    "debug.nvaccel_iop_sse": 1, "debug.nvaccel_iop_vsync": 1, "debug.nvaccel_vm_sticky": 1,
-    "debug.phxbos_flush": 0,
+    "debug.nvaccel_iop_sse": 1, "debug.nvaccel_iop_damage": 0, "debug.nvaccel_iop_vsync": 1,
+    "debug.nvaccel_vm_sticky": 1, "debug.phxbos_flush": 0,
 }
 COUNTERS = {
     "debug.phxfb_vbl_n": 120, "debug.phxfb_vbl_late_us_sum": 12000, "debug.phxfb_vbl_late_us_max": 350,
@@ -27,6 +27,7 @@ COUNTERS = {
     "debug.nvaccel_iop_copy_us_sum": 240000, "debug.nvaccel_vm_parked": 0, "debug.nvaccel_vm_unparked": 0,
     "debug.nvaccel_iop_gap1": 100, "debug.nvaccel_iop_gap2": 15, "debug.nvaccel_iop_gap3": 4,
     "debug.nvaccel_iop_gap4": 1, "debug.nvaccel_iop_vsync_waits": 8, "debug.nvaccel_iop_vsync_late": 1,
+    "debug.nvaccel_iop_damage_sum": 240000, "debug.nvaccel_iop_damage_full": 3,
     "debug.phxbos_handles_high": 3800, "debug.phxbos_handles_full": 0,
 }
 
@@ -125,6 +126,7 @@ class BaselineTests(unittest.TestCase):
             self.assertEqual(window["iop_vsync_waits"], 8)
             self.assertEqual(window["iop_vsync_late"], 1)
             self.assertEqual(record["knobs"]["debug.nvaccel_iop_sse"], 1)
+            self.assertEqual(record["knobs"]["debug.nvaccel_iop_damage"], 0, "the damage-only copy ships off")
             self.assertEqual(record["claims"], {"display_path_counters_read": True, "gpu_work_submitted": False,
                                                 "hardware_execution_established": False})
             # ...and the summary shows them, so a session can be read without opening the JSON.

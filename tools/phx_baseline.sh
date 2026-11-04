@@ -22,13 +22,13 @@ IOREG_BIN=${PHX_IOREG:-ioreg}
 UNAME_BIN=${PHX_UNAME:-uname}
 
 # Read-only knobs: they say which code path was measured, so a baseline is not comparable without them.
-KNOBS='debug.phxfb_alias debug.phxfb_vbl_staged debug.nvaccel_iop debug.nvaccel_iop_sse debug.nvaccel_iop_vsync debug.nvaccel_vm_sticky debug.phxbos_flush'
+KNOBS='debug.phxfb_alias debug.phxfb_vbl_staged debug.nvaccel_iop debug.nvaccel_iop_sse debug.nvaccel_iop_damage debug.nvaccel_iop_vsync debug.nvaccel_vm_sticky debug.phxbos_flush'
 # Monotonic counters (src/phxaccel/accel/phxfb.cpp, src/phxaccel/accel/nvrm-accel.cpp). The last six are the
 # present cadence H3 is decided from: frames one, two, three and four-or-more refreshes after the previous
 # one, completion checks answered "not yet", and frames completed past two refreshes without a tick. The last
 # two are the BO handle high-water mark and the BO creates refused for a full table: that limit is per client,
 # and failing allocations look like anything but "out of handles" from user space (docs/analysis.md §4).
-COUNTERS='debug.phxfb_vbl_n debug.phxfb_vbl_late_us_sum debug.phxfb_vbl_late_us_max debug.nvaccel_iop_ok debug.nvaccel_iop_ok_h0 debug.nvaccel_iop_src_res debug.nvaccel_iop_src_surf debug.nvaccel_iop_copy_skip debug.nvaccel_iop_blank debug.nvaccel_iop_fail debug.nvaccel_iop_copy_us debug.nvaccel_iop_copy_us_max debug.nvaccel_iop_copy_us_sum debug.nvaccel_vm_parked debug.nvaccel_vm_unparked debug.nvaccel_iop_gap1 debug.nvaccel_iop_gap2 debug.nvaccel_iop_gap3 debug.nvaccel_iop_gap4 debug.nvaccel_iop_vsync_waits debug.nvaccel_iop_vsync_late debug.phxbos_handles_high debug.phxbos_handles_full'
+COUNTERS='debug.phxfb_vbl_n debug.phxfb_vbl_late_us_sum debug.phxfb_vbl_late_us_max debug.nvaccel_iop_ok debug.nvaccel_iop_ok_h0 debug.nvaccel_iop_src_res debug.nvaccel_iop_src_surf debug.nvaccel_iop_copy_skip debug.nvaccel_iop_blank debug.nvaccel_iop_fail debug.nvaccel_iop_copy_us debug.nvaccel_iop_copy_us_max debug.nvaccel_iop_copy_us_sum debug.nvaccel_vm_parked debug.nvaccel_vm_unparked debug.nvaccel_iop_gap1 debug.nvaccel_iop_gap2 debug.nvaccel_iop_gap3 debug.nvaccel_iop_gap4 debug.nvaccel_iop_vsync_waits debug.nvaccel_iop_vsync_late debug.nvaccel_iop_damage_sum debug.nvaccel_iop_damage_full debug.phxbos_handles_high debug.phxbos_handles_full'
 
 usage() {
     cat <<'EOF'

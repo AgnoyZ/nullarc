@@ -38,6 +38,7 @@ EXPECTED_DEFAULTS = {
     "debug.phxfb_alias": 1,
     "debug.phxfb_vbl_staged": 1,
     "debug.nvaccel_iop_sse": 0,
+    "debug.nvaccel_iop_damage": 0,   # a new copy path ships off (docs/analysis.md §8)
     "debug.nvaccel_iop_vsync": 0,
     "debug.nvaccel_vm_sticky": 1,
     "debug.phxbos_flush": 0,

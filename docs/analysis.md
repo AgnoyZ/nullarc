@@ -58,37 +58,37 @@ Consequence for phase 1: **the first baseline datum is which of the two paths is
 
 ### 1.3 The copy itself
 
-`performTransaction` picks the source, then copies one row at a time (`nvrm-accel.cpp:1225-1254`):
+`performTransaction` picks the source, then copies one row at a time (`nvIopCopyFull()`, `nvrm-accel.cpp:1167-1204`), unless the damage-only path stores the changed 64-byte groups instead (`nvIopCopyDamage()`, `nvrm-accel.cpp:1053-1165`):
 
-- source: our VRAM resource (`nvrm-accel.cpp:1152-1159`), else the IOSurface's system memory
-  (`nvrm-accel.cpp:1163-1182`, after `nvAccelSurfCopyReady` and `nvSurfWaitReady`).
+- source: our VRAM resource, else the IOSurface's system memory
+  (after `nvAccelSurfCopyReady()`, `nvrm-accel.cpp:2340`, and `nvSurfWaitReady`).
 - narrowed formats: WindowServer moves to 10-bit `l10r` (ARGB2101010) once colour management is up and the
   panel is 8-bit XRGB, so those frames lose two bits per channel while copied
-  (`nvrm-accel.cpp:1170-1174`, `1240`, `1251`).
+  (`nvIopCopyFull()`, `nvrm-accel.cpp:1170-1174`, `1193`, `1195`).
 - inner loop: 8-byte `movnti` pairs by default; a 64-byte SSE4.1 row (movntdqa/movntdq) only when
-  `debug.nvaccel_iop_sse=1` (`nvrm-accel.cpp:1223-1247`, row routine `1043-1087`). Measured in the code's
+  `debug.nvaccel_iop_sse=1` (row selection `nvIopCopyFull()`, `nvrm-accel.cpp:1171-1172`; row routine `nvIopRowSSE()`, `nvrm-accel.cpp:1118-1161`). Measured in the code's
   own comments: 1.0 ms per frame with SSE against 2.1 ms without (`tools/phxctl/phxboot.sh:63-64`), and
   plain loads on a write-combined surface read at ~0.5 GB/s, 13-30 ms per frame
-  (`nvrm-accel.cpp:1033-1035`).
+  (`nvIopRowSSE()`, `nvrm-accel.cpp:1118-1120`).
 - the SSE routine saves ten XMM registers around every row because x86 XNU switches the FPU lazily and the
   preempted thread may be a user thread whose registers the kernel does not save
-  (`nvrm-accel.cpp:1036-1041`) — per-row overhead that today is paid per row, not per frame.
-- `sfence` before the transaction is reported complete (`nvrm-accel.cpp:1255-1255`): the frame must be in DRAM
+  (`nvIopRowSSE()` prologue, `nvrm-accel.cpp:1121-1131`) — per-row overhead paid per row, not per frame.
+- `sfence` before the transaction is reported complete (`nvIopCopyFull()`, `nvrm-accel.cpp:1203`): the frame must be in DRAM
   before the panel may read it.
 
 ### 1.4 Present pacing
 
 A copied frame is reported complete on the **next** VBL tick, as a flip would latch
-(`nvrm-accel.cpp:1088-1094`, gate in `isTransactionComplete`, `nvrm-accel.cpp:1096-1117`). The reason is
+(`nvrm-accel.cpp:1214-1236`, `isTransactionComplete`). The reason is
 recorded in the code: completing immediately let WindowServer present twice inside one refresh and then
 skip the next — "frames 3-4 ms apart followed by 12-16 ms gaps, 97 presents a second on a 120 Hz panel"
-(`nvrm-accel.cpp:1088-1090`). `debug.nvaccel_iop_vsync` defaults to 0 and `tools/phxctl/phxboot.sh:67`
+(`nvrm-accel.cpp:1214-1216`). `debug.nvaccel_iop_vsync` defaults to 0 and `tools/phxctl/phxboot.sh:67`
 turns it on for the armed panel; past two refreshes a pending transaction completes anyway
 (`phx780m::presentCompletion` in `src/phxaccel/PhxPresentPacing.hpp`, asserted by
 `tests/test_present_pacing.cpp`), so a broken VBL cannot freeze the desktop.
 
 There is also a per-head hold: at most four frames in a row are kept off the panel when the surface's
-newest pixels are still only in VRAM (`nvAccelSurfCopyReady`, `nvrm-accel.cpp:2240-2270`, limit in
+newest pixels are still only in VRAM (`nvAccelSurfCopyReady()`, `nvrm-accel.cpp:2340-2370`, limit in
 `phx780m::nextCopyHold`), so a surface that never syncs is copied stale rather than freezing the display.
 
 ## 2. There is no vblank interrupt
@@ -143,17 +143,21 @@ the capture script reads a `debug.*` OID this file does not name (or names one t
 | `debug.phxfb_vbl_n` | VBL ticks fired | `phxfb.cpp:49` |
 | `debug.phxfb_vbl_late_us_sum`, `debug.phxfb_vbl_late_us_max` | tick lateness summed / worst (both rw: writing 0 restarts) | `phxfb.cpp:50-51` |
 | `debug.nvaccel_iop` (rw) | 1 = publish display-pipe capabilities and run transactions | `nvrm-accel.cpp:1305-1307` |
-| `debug.nvaccel_iop_sse` (rw) | 1 = 64-byte SSE row copy, 0 = 8-byte loads | `nvrm-accel.cpp:1356-1356` |
-| `debug.nvaccel_iop_vsync` (rw) | 1 = complete a copied frame on the next tick | `nvrm-accel.cpp:1088-1117` |
-| `debug.nvaccel_iop_ok`, `debug.nvaccel_iop_ok_h0` … `debug.nvaccel_iop_ok_h4` | frames copied to a panel, per head | `nvrm-accel.cpp:1335-1340` |
-| `debug.nvaccel_iop_src_res`, `debug.nvaccel_iop_src_surf` | frames sourced from our VRAM / from the IOSurface | `nvrm-accel.cpp:1350-1351` |
-| `debug.nvaccel_iop_copy_skip`, `debug.nvaccel_iop_blank` | frames held back / copied frames that were one colour | `nvrm-accel.cpp:1352-1354` |
-| `debug.nvaccel_iop_fail` | copy transactions that failed | `nvrm-accel.cpp:1335-1340` |
-| `debug.nvaccel_iop_copy_us`, `debug.nvaccel_iop_copy_us_max`, `debug.nvaccel_iop_copy_us_sum` | cost of the last / slowest / all copied frames | `nvrm-accel.cpp:1358-1360` |
-| `debug.nvaccel_iop_gap1`, `debug.nvaccel_iop_gap2`, `debug.nvaccel_iop_gap3`, `debug.nvaccel_iop_gap4` | copied frames about one, two, three and four-or-more refreshes after the previous one | `nvrm-accel.cpp:1209-1218`, `1361-1364` |
-| `debug.nvaccel_iop_vsync_waits`, `debug.nvaccel_iop_vsync_late` | completion checks answered "not yet" / frames completed past two refreshes without a tick | `nvrm-accel.cpp:1367-1368` |
-| `debug.nvaccel_vm_parked`, `debug.nvaccel_vm_unparked` | surfaces that kept their VRAM across a dealloc/alloc | `nvrm-accel.cpp:1326-1329` |
-| `debug.nvaccel_iop_bench`, `debug.nvaccel_iop_read_us` | one timed read-only pass over the next source | `nvrm-accel.cpp:1355`, `1199-1207` |
+| `debug.nvaccel_iop_sse` (rw) | 1 = 64-byte SSE row copy, 0 = 8-byte loads | `nvrm-accel.cpp:1445` |
+| `debug.nvaccel_iop_damage` (rw) | 1 = store only the 64-byte groups a frame changed (a shadow of the scan-out is kept per head), 0 = copy every pixel (default) | `nvrm-accel.cpp:1446` |
+| `debug.nvaccel_iop_full` (rw) | write 1 to force exactly one full copy while damage-only is on | `nvrm-accel.cpp:1448` |
+| `debug.nvaccel_iop_damage_bytes`, `debug.nvaccel_iop_damage_sum` | bytes the last / all damage-only copies stored | `nvrm-accel.cpp:1450-1451` |
+| `debug.nvaccel_iop_damage_full`, `debug.nvaccel_iop_damage_busy` | frames the shadow could not help / copies that found it busy | `nvrm-accel.cpp:1452-1453` |
+| `debug.nvaccel_iop_vsync` (rw) | 1 = complete a copied frame on the next tick | `nvrm-accel.cpp:1463` |
+| `debug.nvaccel_iop_ok`, `debug.nvaccel_iop_ok_h0` … `debug.nvaccel_iop_ok_h4` | frames copied to a panel, per head | `nvrm-accel.cpp:1424-1429` |
+| `debug.nvaccel_iop_src_res`, `debug.nvaccel_iop_src_surf` | frames sourced from our VRAM / from the IOSurface | `nvrm-accel.cpp:1439-1440` |
+| `debug.nvaccel_iop_copy_skip`, `debug.nvaccel_iop_blank` | frames held back / copied frames that were one colour | `nvrm-accel.cpp:1443`, `1441` |
+| `debug.nvaccel_iop_fail` | copy transactions that failed | `nvrm-accel.cpp:1437` |
+| `debug.nvaccel_iop_copy_us`, `debug.nvaccel_iop_copy_us_max`, `debug.nvaccel_iop_copy_us_sum` | cost of the last / slowest / all copied frames | `nvrm-accel.cpp:1455-1457` |
+| `debug.nvaccel_iop_gap1`, `debug.nvaccel_iop_gap2`, `debug.nvaccel_iop_gap3`, `debug.nvaccel_iop_gap4` | copied frames about one, two, three and four-or-more refreshes after the previous one | `nvrm-accel.cpp:1458-1461`, counted at `1331` |
+| `debug.nvaccel_iop_vsync_waits`, `debug.nvaccel_iop_vsync_late` | completion checks answered "not yet" / frames completed past two refreshes without a tick | `nvrm-accel.cpp:1464-1465` |
+| `debug.nvaccel_vm_parked`, `debug.nvaccel_vm_unparked` | surfaces that kept their VRAM across a dealloc/alloc | `nvrm-accel.cpp:1416-1417` |
+| `debug.nvaccel_iop_bench`, `debug.nvaccel_iop_read_us` | one timed read-only pass over the next source | `nvrm-accel.cpp:1444`, `1454` |
 | `debug.phxbos_flush` (rw) | BO cache maintenance per submit/wait: 0 none, 1 clflushopt, 2 clflush | `src/phxbringup/PhxBringup.cpp:39-44` |
 | `debug.phxbos_handles_high`, `debug.phxbos_handles_full` | highest BO handle index any client got, and BO creates refused because the per-client table was full | `src/phxbringup/PhxBringup.cpp:45-54` |
 
@@ -229,6 +233,7 @@ the A/B switches, one at a time, changing nothing else:
 | B2 | `debug.phxfb_vbl_staged=0` | is the staged tick worth it, and how late is a plain deadline |
 | B3 | `debug.nvaccel_iop_vsync=0` | does the next-tick completion actually change the cadence |
 | B4 | `debug.phxfb_alias=0` | the BAR copy baseline (expected to be much worse; it is the control, not a candidate) |
+| B5 | `debug.nvaccel_iop_damage=1` | is the cost the number of stored bytes or their price: `damage_sum` says how much was stored, `copy_us` whether it got faster, `damage_full` how often the shadow could not help |
 
 Each A/B capture goes in as `label=PATH` after the baseline capture, and the report prints the change per
 metric with a noise caveat: one window per side is a single sample.
