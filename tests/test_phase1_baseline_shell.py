@@ -27,6 +27,7 @@ COUNTERS = {
     "debug.nvaccel_iop_copy_us_sum": 240000, "debug.nvaccel_vm_parked": 0, "debug.nvaccel_vm_unparked": 0,
     "debug.nvaccel_iop_gap1": 100, "debug.nvaccel_iop_gap2": 15, "debug.nvaccel_iop_gap3": 4,
     "debug.nvaccel_iop_gap4": 1, "debug.nvaccel_iop_vsync_waits": 8, "debug.nvaccel_iop_vsync_late": 1,
+    "debug.phxbos_handles_high": 3800, "debug.phxbos_handles_full": 0,
 }
 
 FAKE_SYSCTL = '''#!{python}

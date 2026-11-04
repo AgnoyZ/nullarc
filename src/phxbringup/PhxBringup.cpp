@@ -42,6 +42,16 @@ SYSCTL_INT(_debug, OID_AUTO, phxbos_flush, CTLFLAG_RW | CTLFLAG_LOCKED, &gBosFlu
            "BO cache maintenance per submit/wait: 0 none, 1 clflushopt, 2 clflush");
 SYSCTL_QUAD(_debug, OID_AUTO, phxbos_flush_bytes, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gBosFlushBytes,
             "bytes of BOs flushed from the CPU caches");
+// The BO handle table is PHXN_MAX_BOS entries per client, and running out of it is the failure that made every
+// texture allocation fail and the desktop flicker on a sibling port of this base (docs/RADEARC-REFERENCE.md §2).
+// These two counters turn that cliff into evidence: how close a session got, and whether it hit it.
+static volatile SInt64 gBosHandlesHigh;   // highest handle index handed out, any client
+static volatile SInt64 gBosHandlesFull;   // BO creates refused because no handle was free
+static volatile UInt32 gBosHandlesFullLogged;   // the log latch: the first refusal is the interesting one
+SYSCTL_QUAD(_debug, OID_AUTO, phxbos_handles_high, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gBosHandlesHigh,
+            "highest BO handle index handed out by any client (the limit is PHXN_MAX_BOS)");
+SYSCTL_QUAD(_debug, OID_AUTO, phxbos_handles_full, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gBosHandlesFull,
+            "BO creates refused because the per-client handle table was full");
 static volatile UInt32 gSysctlUp;
 
 // psp_gfx_rb_frame (64 B) — the ring entry the PSP reads. Only 5 fields are set; the rest stay zero
@@ -399,6 +409,8 @@ void PhxBringup::stop(IOService *provider) {
     if (gSysctlUp) {
         sysctl_unregister_oid(&sysctl__debug_phxbos_flush);
         sysctl_unregister_oid(&sysctl__debug_phxbos_flush_bytes);
+        sysctl_unregister_oid(&sysctl__debug_phxbos_handles_high);
+        sysctl_unregister_oid(&sysctl__debug_phxbos_handles_full);
         gSysctlUp = 0;
     }
     clearRing();
@@ -1752,6 +1764,8 @@ IOReturn PhxBringup::newUserClient(task_t owningTask, void *securityID, UInt32 t
     if (!gSysctlUp && OSCompareAndSwap(0, 1, &gSysctlUp)) {
         sysctl_register_oid(&sysctl__debug_phxbos_flush);
         sysctl_register_oid(&sysctl__debug_phxbos_flush_bytes);
+        sysctl_register_oid(&sysctl__debug_phxbos_handles_high);
+        sysctl_register_oid(&sysctl__debug_phxbos_handles_full);
     }
     if (type != PHXN_UC_TYPE)
         return kIOReturnBadArgument;
@@ -2022,8 +2036,16 @@ IOReturn IOAccelPhxNativeClient::doBoCreate(IOExternalMethodArguments *a) {
     uint32_t h = 1;
     while (h < PHXN_MAX_BOS && bos[h].md)
         h++;
-    if (h >= PHXN_MAX_BOS)
+    if (h >= PHXN_MAX_BOS) {
+        // Counted, and logged once per session: on hardware this is the difference between "every texture
+        // allocation failed" and a line that names the limit that ran out (docs/RADEARC-REFERENCE.md §2).
+        OSAddAtomic64(1, &gBosHandlesFull);
+        if (OSCompareAndSwap(0, 1, &gBosHandlesFullLogged))
+            IOLog("PhxBringup: bos: no free handle below PHXN_MAX_BOS (%u): refusing allocations until a BO is "
+                  "freed; debug.phxbos_handles_full counts these\n", PHXN_MAX_BOS);
         return kIOReturnNoResources;
+    }
+    if (static_cast<SInt64>(h) > gBosHandlesHigh) gBosHandlesHigh = static_cast<SInt64>(h);
 
     // Page alignment only: the GPU maps BOs page by page, and the client picks the VA (GEMVA) with its own alignment.
     // Handed to IOBufferMemoryDescriptor, RADV's 64 KiB..2 MiB alignment made every allocation PHYSICALLY CONTIGUOUS
@@ -2116,8 +2138,14 @@ IOReturn IOAccelPhxNativeClient::doBoImportHost(IOExternalMethodArguments *a) {
     uint32_t h = 1;
     while (h < PHXN_MAX_BOS && bos[h].md)
         h++;
-    if (h >= PHXN_MAX_BOS)
+    if (h >= PHXN_MAX_BOS) {
+        OSAddAtomic64(1, &gBosHandlesFull);
+        if (OSCompareAndSwap(0, 1, &gBosHandlesFullLogged))
+            IOLog("PhxBringup: bos: no free handle below PHXN_MAX_BOS (%u) for a host import; "
+                  "debug.phxbos_handles_full counts these\n", PHXN_MAX_BOS);
         return kIOReturnNoResources;
+    }
+    if (static_cast<SInt64>(h) > gBosHandlesHigh) gBosHandlesHigh = static_cast<SInt64>(h);
     IOMemoryDescriptor *md = IOMemoryDescriptor::withAddressRange(va, size, kIODirectionInOut, task);
     if (!md)
         return kIOReturnNoMemory;

@@ -42,16 +42,36 @@ quoted at ~110 ms/frame at 2560×1600, and a damage-only copy is the one optimis
 rather than their cost. It collides with our `PhxCopyPath.hpp` refactor in the same function, so it has to be
 re-implemented on top of ours, not merged — and it needs its own phase-1 A/B before it is adopted here.
 
-### 2. Two base-code bugs found on hardware (`src/phxbringup/PhxBringup.cpp`, `mesa-patches-phoenix/0008`)
+### 2. Two base-code bugs found on hardware — checked against this tree
 
-- **16384 BO handles and GPU mappings per client** (their build 38) — upstream's smaller table crashed
-  WindowServer and flickered the desktop on their machine.
-- **Host-import fallback off by default** (their build 41) — their own earlier feature; it **hung the GPU**, so
-  it is now opt-in.
+**BO handle ceiling: applies, and is not raised here.** They ran out of the per-client BO handle table —
+`4095` usable handles — and every `MTLTexture` allocation failed, down to 64×64, until WindowServer crashed.
+This tree has the same ceiling: `PHXN_MAX_BOS 4096u` (`src/phxbringup/PhxNativeABI.h:22`), a per-client
+`PhxClientBo entries[PHXN_MAX_BOS]` array, a `kMaxMaps = 4096` mapping table, and a silent
+`return kIOReturnNoResources` when no handle is free (`PhxBringup.cpp`).
 
-Both live in code this branch also carries from `cbb08dd`, so the question is only whether we have them
-(we do not: they are later commits). Reading the two diffs is cheap; adopting them needs a reason to believe
-the failure applies to Phoenix 1/eDP too.
+Their fix raises **both** sides: the kext table and the user-space table in their Mesa ABI header and mock. Only
+the first half is available here, and doing it alone would be worse than doing nothing: the kernel would hand
+RADV handle 4096 and beyond while a 4096-entry user-space table indexes it. Our RADV side is the pinned Mesa +
+Cobalt64 patch set, which this repository does not vendor, so the limit stays where it is and the failure is
+made visible instead:
+
+- `debug.phxbos_handles_high` — highest handle index handed out by any client (how close a session got);
+- `debug.phxbos_handles_full` — BO creates refused for a full table;
+- the first refusal logs one line naming `PHXN_MAX_BOS`, because from user space this failure looks like
+  anything but "out of handles";
+- both counters are in the phase-1 capture, so the first target session answers "are we near the cliff" with a
+  number.
+
+If a session does approach the limit, raising it becomes a two-sided change with the user-space table and it
+should be done together.
+
+**Host-import hang: does not apply.** Their hung GPU came from mapping **read-only IOSurface** imports without
+GPU write permission; those pages are written anyway, and the GPU stalled. This tree has only
+`PHXN_SEL_BOIMPORTHOST` (ABI 1.9): host imports of the caller's own writable pages, capped at 4 GiB per client
+and 1 GiB per BO. The read-only-IOSurface variant does not exist here, so there is nothing to switch off. The
+lesson is worth keeping: an import that the GPU may write must never be mapped as read-only, and their
+`debug.phxbo_host_ro=1` escape hatch is the shape to use if that path is ever added.
 
 ### 3. The `mesboot` parameterisation this branch deferred (`tools/phxctl/mesboot.c`)
 
@@ -85,9 +105,11 @@ panel needs. Useful as a map of what the work looks like, not as a drop-in.
 `FB_BASE` offsets (`0x1A8EC`/`0x1A8ED`/`0x1A8D7`, MMHUB 3.0.1). It also documents a live difference they found:
 13.0.11 selects **BASE_IDX 0** for MP0/MP1, so the mailboxes move relative to Phoenix 1's 13.0.4.
 
-Their `bringup5.sh` finding applies to us as written: hardcoded firmware payload offsets load **garbage** for a
-different firmware set, while `src/amd/rdna3_ucode_extract.cpp` already parses the headers correctly — the
-scripts simply do not use it.
+Their `bringup5.sh` finding would apply to us as written — hardcoded firmware payload offsets load **garbage**
+for a different firmware set — but it is not our path: the reference workflow is not run here, and the audited
+loader derives its extents from the firmware headers (`tools/firmware_manifest.py` →
+`PhxFirmwareProfile.h` → `phxctl firmware-sequence`). `tests/test_reference_scripts.py` keeps that substitution
+from silently reversing.
 
 ## What this branch must not take from it
 
@@ -105,7 +127,9 @@ scripts simply do not use it.
 
 - Whether the 190 MB/s store ceiling they measured is a property of their machine's carve-out mapping or of the
   path itself — our `copy_us` on the eDP target answers that, not their number.
-- Whether the 16384-handle limit and the host-import hang reproduce on Phoenix 1. Neither is established.
+- How close our target's WindowServer gets to `PHXN_MAX_BOS`. The counters answer it; nothing else can.
+- Whether raising the handle ceiling is needed at all: if a capture shows `phxbos_handles_high` well below 4095
+  and `phxbos_handles_full` at zero, the ceiling is not the problem on this machine.
 - Which `PhxBringup` properties a Phoenix 1 target would need for the chip-gated layout, and whether `phx-fb-mc-base`
   is even obtainable there without the register reads we have postponed.
 

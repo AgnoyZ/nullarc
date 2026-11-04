@@ -154,7 +154,13 @@ the capture script reads a `debug.*` OID this file does not name (or names one t
 | `debug.nvaccel_iop_vsync_waits`, `debug.nvaccel_iop_vsync_late` | completion checks answered "not yet" / frames completed past two refreshes without a tick | `nvrm-accel.cpp:1367-1368` |
 | `debug.nvaccel_vm_parked`, `debug.nvaccel_vm_unparked` | surfaces that kept their VRAM across a dealloc/alloc | `nvrm-accel.cpp:1326-1329` |
 | `debug.nvaccel_iop_bench`, `debug.nvaccel_iop_read_us` | one timed read-only pass over the next source | `nvrm-accel.cpp:1355`, `1199-1207` |
-| `debug.phxbos_flush` (rw) | BO cache maintenance per submit/wait: 0 none, 1 clflushopt, 2 clflush | `src/phxbringup/PhxBringup.cpp:35-43` |
+| `debug.phxbos_flush` (rw) | BO cache maintenance per submit/wait: 0 none, 1 clflushopt, 2 clflush | `src/phxbringup/PhxBringup.cpp:39-44` |
+| `debug.phxbos_handles_high`, `debug.phxbos_handles_full` | highest BO handle index any client got, and BO creates refused because the per-client table was full | `src/phxbringup/PhxBringup.cpp:45-54` |
+
+The handle counters exist because a sibling port of this base hit the per-client limit (`PHXN_MAX_BOS`, 4095
+usable handles) and every texture allocation started failing before WindowServer crashed — a failure that
+looks like anything but "out of handles" from user space (`docs/RADEARC-REFERENCE.md` §2). They say whether a
+capture is near the cliff without changing the limit, which needs the user-space table raised at the same time.
 
 The gap counters are what make H3 decidable: without them a capture can show that frames reach the panel
 slowly, but not whether they arrive evenly. They were readable in the code from the start and

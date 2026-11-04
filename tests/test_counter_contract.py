@@ -74,7 +74,7 @@ class ContractTests(unittest.TestCase):
     def test_dropping_a_verdict_counter_from_the_capture_is_a_violation(self):
         with tempfile.TemporaryDirectory() as temporary:
             tree = self.broken_tree(temporary, "tools/phx_baseline.sh",
-                                    " debug.nvaccel_iop_vsync_late'", "'")
+                                    " debug.nvaccel_iop_vsync_late ", " ")
             result, report = report_of(tree)
             self.assertEqual(result.returncode, 1, result.stdout)
             checks = {(item["check"], item["name"]) for item in report["violations"]}
