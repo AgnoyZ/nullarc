@@ -50,6 +50,7 @@ static void               nvAccelWriteStamp(int index, unsigned int value);
 #include <sys/sysctl.h>
 #include <libkern/OSAtomic.h>
 #include "PhxPresentPacing.hpp"   // present completion, gap buckets and copy-hold policy: pure, host-testable
+#include "PhxCopyPath.hpp"        // row-path selection and the ARGB2101010 narrowing: pure, host-testable
 extern "C" {   // kern/thread_call.h and kern/clock.h clash with the family headers here, so the KPIs are declared by hand
 struct thread_call *thread_call_allocate(void (*func)(void *, void *), void *param0);
 int thread_call_enter_delayed(struct thread_call *call, uint64_t deadline);
@@ -1220,14 +1221,16 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
     // Non-temporal stores (movnti, general registers only): the scan-out's system-RAM view (PhxFB) maps write-back
     // whatever cache mode it asks for, and plain stores left the frame in the CPU cache while the panel scanned the stale
     // DRAM under it, in stripes (2026-10-20). Through the BAR (uncached) they behave as plain stores.
-    const bool wide = ((((uintptr_t)src | (uintptr_t)d) & 7) == 0) && !(spr & 1) && !(dpr & 1);
-    const bool sse = gIopSse && ((((uintptr_t)src | (uintptr_t)d) & 15) == 0) && !(spr & 3) && !(dpr & 3);
+    // Which row path this copy may take, and the narrowing it does while copying: both live in PhxCopyPath.hpp
+    // so tests/test_copy_path.cpp can assert them (docs/analysis.md §1.3).
+    const bool wide = phx780m::wideEligible((uintptr_t)src, (uintptr_t)d, spr, dpr);
+    const bool sse = phx780m::sseEligible(gIopSse != 0, (uintptr_t)src, (uintptr_t)d, spr, dpr);
     for (unsigned y = 0; y < h; y++) {
         const volatile unsigned int *sp = src + (unsigned long)y * spr;
         volatile unsigned int *dp = d + (unsigned long)y * dpr;
-        unsigned x = 0;
-        if (sse && words >= 16) {
-            x = words & ~15u;   // 64-byte steps; the rest of the row takes the paths below
+        unsigned x = phx780m::sseWords(words, sse);
+        if (x) {
+            // 64-byte steps; the rest of the row takes the paths below
             nvIopRowSSE((const void *)sp, (void *)(uintptr_t)dp, (unsigned long)x * 4, l10r);
         }
         if (wide) {
@@ -1236,19 +1239,18 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
             const unsigned pairs = words / 2;
             if (l10r) {
                 for (unsigned i = x / 2; i < pairs; i++) {
-                    const uint64_t v = sq[i];
-                    const uint64_t px = ((v >> 6) & 0x00ff000000ff0000ull) | ((v >> 4) & 0x0000ff000000ff00ull) | ((v >> 2) & 0x000000ff000000ffull);
-                    __asm__ __volatile__("movnti %1, %0" : "=m"(dq[i]) : "r"(0xff000000ff000000ull | px));
+                    const uint64_t px = phx780m::narrowPair(sq[i]);
+                    __asm__ __volatile__("movnti %1, %0" : "=m"(dq[i]) : "r"(px));
                 }
             } else {
                 for (unsigned i = x / 2; i < pairs; i++) __asm__ __volatile__("movnti %1, %0" : "=m"(dq[i]) : "r"((uint64_t)sq[i]));
             }
-            if (x < pairs * 2) x = pairs * 2;
+            x = phx780m::pairResume(words, x);
         }
         unsigned int *dw = (unsigned int *)(uintptr_t)dp;
         for (; x < words; x++) {
             const unsigned v = sp[x];
-            const unsigned px = l10r ? 0xff000000u | ((v >> 6) & 0xff0000u) | ((v >> 4) & 0xff00u) | ((v >> 2) & 0xffu) : v;
+            const unsigned px = l10r ? phx780m::narrowWord(v) : v;
             __asm__ __volatile__("movnti %1, %0" : "=m"(dw[x]) : "r"(px));
         }
     }
