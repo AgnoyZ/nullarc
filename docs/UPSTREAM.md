@@ -26,6 +26,13 @@
 - 可参考分层驱动、无设备负向测试、运行库相对路径和回退流程；不能复制 NVIDIA 的内核模块、GSP、BAR/VRAM 地址、boot-args、SMBIOS 或安装脚本到 Radeon 780M。
 - 详细差异和许可证边界见 `NULLMOTH-REFERENCE.md`。
 
+## RadeArc（同一上游的 Phoenix 2 下游，仅参考）
+- 仓库：https://github.com/Kreytus/RadeArc
+- 审阅提交：`d8d8d18`（2026-11-03），比共同基线 `cbb08dd` 多 74 个提交；目标机是 Radeon 740M（Phoenix 2，GC 11.0.4）的**桌面** HDMI/DP，不是 780M 内屏。
+- 可参考：机器相关常量的完整清单（`docs/PORTING_AUDIT.md`，带 Linux `drivers/gpu/drm/amd` 出处）、按 `phx-chip` 与驱动发布属性改写 `mesboot` 布局的做法、实测的 damage-only 拷贝、DCN 3.1.4 寄存器计划与在用户态运行 Linux DML 的方式、以及其 CI/打包形态。
+- 不能复制：`hardware/dumps/**`（VBIOS、VFCT、EDID、ip_discovery）、发布二进制的 CI、`install.sh`/`update.sh` 安装流程；其 780M/eDP 结论不是对本目标机的复测。
+- 逐项评估见 `RADEARC-REFERENCE.md`。
+
 ## 接入要求
 每个引入组件记录上游 URL、提交 SHA/版本、许可证、修改范围和构建方法。
 不未经审计运行上游安装脚本，不提交 Apple 系统组件、原始机器固件或未经确认可分发的二进制。
