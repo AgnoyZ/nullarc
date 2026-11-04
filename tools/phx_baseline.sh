@@ -100,7 +100,7 @@ while [ "$i" -lt "$samples" ]; do
 done
 
 # All derived numbers are computed once, here, so the JSON and the summary cannot disagree.
-awk -v window="$window" -v samples="$samples" -v dir="$out" -v host="$os-$arch" '
+awk -v window="$window" -v samples="$samples" -v dir="$out" -v host="$os-$arch" -v knobs="$KNOBS" '
 function load(file, A,   line, part) {
     while ((getline line < file) > 0) if (split(line, part, " ") >= 2) A[part[1]] = part[2] + 0
     close(file)
@@ -108,7 +108,7 @@ function load(file, A,   line, part) {
 function knob_line(name,   v) { return "    \"" name "\": " (name in S0 ? S0[name] : "null") }
 BEGIN {
     load(dir "/sample-0.txt", S0)
-    nk = split("debug.phxfb_alias debug.phxfb_vbl_staged debug.nvaccel_iop debug.nvaccel_iop_sse debug.nvaccel_iop_vsync debug.nvaccel_vm_sticky debug.phxbos_flush", K, " ")
+    nk = split(knobs, K, " ")   # the same list the capture reads: one source of truth
     json = dir "/baseline.json"
     tsv = dir "/windows.tsv"
     printf "{\n  \"tool\": \"phx_baseline\",\n  \"host\": \"%s\",\n  \"window_seconds\": %d,\n  \"samples\": %d,\n", host, window, samples > json
