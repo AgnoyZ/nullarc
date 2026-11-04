@@ -89,8 +89,14 @@ fault-page registers are derived the way Linux's `gfxhub_v3_0_init_system_apertu
 scratch page standing in for Linux's dummy page.
 
 That is exactly the pattern `docs/BRINGUP-AUDIT.md` asks for and the one this branch declined to invent: the
-values come from evidence the driver itself publishes, and the tool refuses when it has none. Adopting it here
-means adding those properties to our `PhxBringup` first.
+values come from evidence the driver itself publishes, and the tool refuses when it has none.
+
+**Adopted in the verification-only form** (2026-11-04): our `PhxBringup` already publishes `phx-fb-mc-base`,
+`phx-fb-size` and `phx-fb-phys`, so `mesboot` reads them in `layout_from_driver()` and refuses to program
+anything when they are missing, misaligned, or different from the compiled reference layout
+(`PHX_LAYOUT_REFERENCE=1` overrides, for the reference machine only). That is weaker than theirs on purpose:
+they *derive* a layout for a chip whose values they learnt from a live read, while this branch can only
+*check* the one it has. Deriving our own needs the register reads still postponed in the audit.
 
 ### 4. DCN 3.1.4 display programming (later, not now)
 

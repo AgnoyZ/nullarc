@@ -24,6 +24,34 @@
 #define SEL_DBG_SYSMEM 111
 #define SEL_DBG_ADOPTQ 112
 
+static uint64_t vram_mc = 0x8000000000ull;   // MC address of VRAM offset 0 (the reference machine's: see layout_from_driver)
+#define GART_VA 0x7FFF00000000ull            // VA = GART_VA + vram offset (first 128 MiB)
+#define GART_PT 0x2400000ull             // flat PTE table (VRAM offset)
+#define GART_N 32768
+static uint64_t fb_pa = 0x6A0000000ull;       // GCMC_VM_FB_OFFSET << 24 (the reference machine's)
+
+#define SEG0(o) (0x1260u + (o))
+#define SEG1(o) (0xA000u + (o))
+// VRAM layout of the experiment (offsets), all inside the GART window
+#define KIQ_RING 0x2500000ull            // 4 KiB ring
+#define KIQ_WB   0x2501000ull            // +0 rptr report, +16 wptr poll
+#define KIQ_MQD  0x2502000ull            // 2 KiB
+#define KIQ_EOP  0x2503000ull            // 2 KiB
+/* Defaults are retained only for legacy experiments; sched-query sets every field. */
+static uint64_t scheduler_ring = 0x2510000ull, scheduler_wb = 0x2511000ull;
+static uint64_t scheduler_mqd = 0x2512000ull, scheduler_eop = 0x2513000ull;
+static uint32_t scheduler_doorbell = 0x16;
+#define SCH_RING scheduler_ring
+#define SCH_WB scheduler_wb
+#define SCH_MQD scheduler_mqd
+#define SCH_EOP scheduler_eop
+#define TESTBUF  0x2520000ull
+
+static int use_mc;
+static uint64_t bootstrap_va = GART_VA;
+#define VA(off) ((use_mc ? vram_mc : bootstrap_va) + (off))
+#define MC(off) (vram_mc + (off))
+
 static io_connect_t conn;
 
 /* Transport failure is terminal: never use a zero/partial reply or continue writes. */
@@ -58,16 +86,69 @@ static kern_return_t checked_method(io_connect_t connection, uint32_t selector,
 }
 
 
+/* The memory layout above is one Linux MMIO trace of the reference machine (Firebat U6C): vram_mc, fb_pa and the
+ * aperture are that machine's addresses, not this one's. PhxBringup publishes what it actually found
+ * (phx-fb-mc-base, phx-fb-size, phx-fb-phys), so the layout is taken from there and this tool refuses when the two
+ * disagree -- programming the reference machine's physical addresses on another machine is the failure this check
+ * exists to prevent. PHX_LAYOUT_REFERENCE=1 keeps the compiled constants for a deliberate reference-machine run. */
+static int env_on(const char *n) { const char *v = getenv(n); return v && *v && *v != '0'; }
+
+static int prop_u64(io_registry_entry_t svc, CFStringRef key, uint64_t *out)
+{
+   CFTypeRef value = IORegistryEntryCreateCFProperty(svc, key, kCFAllocatorDefault, 0);
+   if (!value) return 0;
+   const int ok = CFGetTypeID(value) == CFNumberGetTypeID() &&
+                  CFNumberGetValue((CFNumberRef)value, kCFNumberSInt64Type, out);
+   CFRelease(value);
+   return ok;
+}
+
+/* 0 = the layout is settled and safe to program, -1 = it is not (the caller must stop). */
+static int layout_from_driver(io_registry_entry_t svc)
+{
+   uint64_t mc = 0, size = 0, phys = 0, build = 0;
+   (void)prop_u64(svc, CFSTR("phx-build"), &build);
+   const int published = prop_u64(svc, CFSTR("phx-fb-mc-base"), &mc) &&
+                         prop_u64(svc, CFSTR("phx-fb-size"), &size) &&
+                         prop_u64(svc, CFSTR("phx-fb-phys"), &phys);
+   if (env_on("PHX_LAYOUT_REFERENCE")) {
+      printf("mesboot: layout = the compiled reference-machine constants (VRAM MC 0x%llx, FB phys 0x%llx), "
+             "PHX_LAYOUT_REFERENCE=1\n", (unsigned long long)vram_mc, (unsigned long long)fb_pa);
+      return 0;
+   }
+   if (!published || !mc || !phys || size < 0x8000000ull || (phys & 0xfffull)) {
+      fprintf(stderr,
+              "mesboot: PhxBringup build %llu did not publish a usable carve-out (mc 0x%llx, size 0x%llx, phys 0x%llx);"
+              " refusing to program the reference machine's addresses. Fix the kext, or run on the reference machine "
+              "with PHX_LAYOUT_REFERENCE=1\n", (unsigned long long)build, (unsigned long long)mc,
+              (unsigned long long)size, (unsigned long long)phys);
+      return -1;
+   }
+   if (mc != vram_mc || phys != fb_pa) {
+      fprintf(stderr,
+              "mesboot: this machine's carve-out (mc 0x%llx, phys 0x%llx) is not the reference layout these GART and "
+              "MES offsets were written for (mc 0x%llx, phys 0x%llx); refusing. PHX_LAYOUT_REFERENCE=1 overrides for a "
+              "deliberate reference run\n", (unsigned long long)mc, (unsigned long long)phys,
+              (unsigned long long)vram_mc, (unsigned long long)fb_pa);
+      return -1;
+   }
+   printf("mesboot: layout from PhxBringup build %llu: VRAM MC 0x%llx, FB phys 0x%llx, carve-out 0x%llx\n",
+          (unsigned long long)build, (unsigned long long)mc, (unsigned long long)phys, (unsigned long long)size);
+   return 0;
+}
 static int open_kext(void)
 {
    io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("PhxBringup"));
    if (!svc) { fprintf(stderr, "no PhxBringup\n"); return -1; }
    kern_return_t kr = IOServiceOpen(svc, mach_task_self(), UC_TYPE, &conn);
+   int layout_ok = 1;
+   if (kr == 0) layout_ok = layout_from_driver(svc) == 0;
    IOObjectRelease(svc);
    uint64_t hin[2] = {1, 0}, hout[4]; uint32_t hn = 4;
    if (kr == 0) kr = checked_scalar(conn, SEL_HELLO, hin, 2, hout, &hn);
    if (kr) { fprintf(stderr, "open: 0x%x\n", kr); return -1; }
    if (hout[0] != hin[0]) { fprintf(stderr, "incompatible PhxBringup ABI\n"); IOServiceClose(conn); return -1; }
+   if (!layout_ok) { IOServiceClose(conn); return -1; }
    return 0;
 }
 static uint32_t rd(uint32_t reg)
@@ -116,34 +197,6 @@ static uint64_t vr64(uint64_t off)
 }
 
 
-#define VRAM_MC 0x8000000000ull          // MC address of VRAM offset 0
-#define GART_VA 0x7FFF00000000ull            // VA = GART_VA + vram offset (first 128 MiB)
-#define GART_PT 0x2400000ull             // flat PTE table (VRAM offset)
-#define GART_N 32768
-#define FB_PA 0x6A0000000ull             // GCMC_VM_FB_OFFSET << 24
-
-#define SEG0(o) (0x1260u + (o))
-#define SEG1(o) (0xA000u + (o))
-// VRAM layout of the experiment (offsets), all inside the GART window
-#define KIQ_RING 0x2500000ull            // 4 KiB ring
-#define KIQ_WB   0x2501000ull            // +0 rptr report, +16 wptr poll
-#define KIQ_MQD  0x2502000ull            // 2 KiB
-#define KIQ_EOP  0x2503000ull            // 2 KiB
-/* Defaults are retained only for legacy experiments; sched-query sets every field. */
-static uint64_t scheduler_ring = 0x2510000ull, scheduler_wb = 0x2511000ull;
-static uint64_t scheduler_mqd = 0x2512000ull, scheduler_eop = 0x2513000ull;
-static uint32_t scheduler_doorbell = 0x16;
-#define SCH_RING scheduler_ring
-#define SCH_WB scheduler_wb
-#define SCH_MQD scheduler_mqd
-#define SCH_EOP scheduler_eop
-#define TESTBUF  0x2520000ull
-
-static int env_on(const char *n) { const char *v = getenv(n); return v && *v && *v != '0'; }
-static int use_mc;
-static uint64_t bootstrap_va = GART_VA;
-#define VA(off) ((use_mc ? VRAM_MC : bootstrap_va) + (off))
-#define MC(off) (VRAM_MC + (off))
 
 static _Noreturn void gart_failure(int code, const char *message)
 {
@@ -629,7 +682,7 @@ static void compute_via_mes(void)
       const int vram_t = getenv("MESBOOT_VMT")[0] == '2';
       const int pt_sys = getenv("PT_SYS") && *getenv("PT_SYS") == '1';   // page table itself in system memory
       uint64_t sysphys = phys;
-      if (vram_t) phys = FB_PA + 0x2600000ull;
+      if (vram_t) phys = fb_pa + 0x2600000ull;
       else if (pt_sys) phys = sysphys + 0x80000ull;                      // targets after the table region
       uint32_t wp = 8, hit = 0;
       static const uint64_t lowf[] = {0x77, 0x71, 0x73, 0x75, 0x7f};
@@ -709,8 +762,8 @@ static void vm8_test(void)
    const int V = 8;
    const int flat = env_on("VM8_FLAT");
    if (flat) {   // depth 0: one flat PTB covering 512 pages from VA_IB, like the working GART
-      PUT(0x0000 + 0 * 8, (FB_PA + IBO) | flags);
-      PUT(0x0000 + 1 * 8, (FB_PA + TGO) | flags);
+      PUT(0x0000 + 0 * 8, (fb_pa + IBO) | flags);
+      PUT(0x0000 + 1 * 8, (fb_pa + TGO) | flags);
       wr(SEG0(0x16f3 + 2 * V), (uint32_t)(T2 | 3)); wr(SEG0(0x16f4 + 2 * V), (uint32_t)(T2 >> 32));
       wr(SEG0(0x1688 + V), 0x01fffe01);
       wr(SEG0(0x1713 + 2 * V), (uint32_t)(VA_IB >> 12)); wr(SEG0(0x1714 + 2 * V), (uint32_t)(VA_IB >> 44));
@@ -720,9 +773,9 @@ static void vm8_test(void)
       PUT(0x1000 + ((VA_IB >> 30) & 0x1ff) * 8, T0 | 7);                     // gmc_v11: translate_further=false -> plain PDE
       PUT(0x2000 + ((VA_IB >> 21) & 0x1ff) * 8, TP | 7);
       if (env_on("VM8_IBSYS")) PUT(0x3000 + ((VA_IB >> 12) & 0x1ff) * 8, (phys + 0x20000) | 0x77 | ((uint64_t)mt << 48));   // IB page in SYSTEM memory
-      else PUT(0x3000 + ((VA_IB >> 12) & 0x1ff) * 8, (FB_PA + IBO) | flags);
+      else PUT(0x3000 + ((VA_IB >> 12) & 0x1ff) * 8, (fb_pa + IBO) | flags);
       if (env_on("VM8_SYS")) PUT(0x3000 + ((VA_T >> 12) & 0x1ff) * 8, (phys + 0x10000) | 0x77 | ((uint64_t)mt << 48));   // target = SYSTEM page
-      else PUT(0x3000 + ((VA_T >> 12) & 0x1ff) * 8, (FB_PA + TGO) | flags);
+      else PUT(0x3000 + ((VA_T >> 12) & 0x1ff) * 8, (fb_pa + TGO) | flags);
       wr(SEG0(0x16f3 + 2 * V), (uint32_t)(T2 | 3)); wr(SEG0(0x16f4 + 2 * V), (uint32_t)(T2 >> 32));
       wr(SEG0(0x1688 + V), 0x01fffe07);
       wr(SEG0(0x1713 + 2 * V), 0); wr(SEG0(0x1714 + 2 * V), 0);
@@ -909,7 +962,7 @@ static int scheduler_query(int argc, char **argv)
    if (compute) { work.arenaOffset = gart_argument(argv[8]); work.doorbellIndex = gart_argument(argv[9]); }
    if (compute && !phxMesQueueInputsValid(&work)) mes_start_failure(64, "invalid compute-probe arguments");
    if (!phxGartInputsValid(&layout) || !phxMesQueueInputsValid(&queue)) mes_start_failure(64, "invalid scheduler layout arguments");
-   const char *overrides[] = {"PTE_SYS", "FAULT_DEFAULT", "MESBOOT_MC", "MESBOOT_CS", "MESBOOT_GFX", "ADOPT", "ADOPT_GFX"};
+   const char *overrides[] = {"PTE_SYS", "FAULT_DEFAULT", "MESBOOT_MC", "MESBOOT_CS", "MESBOOT_GFX", "PHX_LAYOUT_REFERENCE", "ADOPT", "ADOPT_GFX"};
    for (unsigned i = 0; i < sizeof(overrides) / sizeof(overrides[0]); ++i)
       if (env_on(overrides[i])) mes_start_failure(64, "sched-query cannot combine legacy experiment overrides");
    if (open_kext()) return 1;

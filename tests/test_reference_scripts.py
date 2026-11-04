@@ -62,6 +62,29 @@ class ReferenceScriptTests(unittest.TestCase):
         manifest = (ROOT / "tools/firmware_manifest.py").read_text(encoding="utf-8")
         self.assertIn("payload_offset", manifest)
 
+    def test_the_layout_gate_stays_in_the_audited_tool(self):
+        # mesboot programs the reference machine's physical addresses; the gate that checks them against what the
+        # driver publishes is what keeps that from happening on a different machine (docs/BRINGUP-AUDIT.md).
+        tool = (ROOT / "tools/phxctl/mesboot.c").read_text(encoding="utf-8")
+        self.assertIn("layout_from_driver", tool)
+        self.assertIn("PHX_LAYOUT_REFERENCE", tool)
+        # The layout must be variables the gate can replace, never macros a reader might trust as facts.
+        for line in tool.splitlines():
+            self.assertNotIn("#define VRAM_MC", line)
+            self.assertNotIn("#define FB_PA", line)
+        # The audited subcommand refuses to combine the reference override with its explicit layouts.
+        self.assertIn('"PHX_LAYOUT_REFERENCE"', tool)
+        overrides = [line for line in tool.splitlines() if "const char *overrides[]" in line]
+        self.assertTrue(overrides, "the sched-query override list disappeared")
+        self.assertIn("PHX_LAYOUT_REFERENCE", overrides[0])
+
+    def test_the_layout_gate_is_refused_where_the_layout_is_checked(self):
+        # open_kext() is the single place every subcommand reaches the kext through, so the gate belongs there.
+        tool = (ROOT / "tools/phxctl/mesboot.c").read_text(encoding="utf-8")
+        open_kext = tool.split("static int open_kext(void)", 1)[1].split("static uint32_t rd(", 1)[0]
+        self.assertIn("layout_from_driver(svc)", open_kext)
+        self.assertIn("IOServiceClose(conn); return -1;", open_kext)
+
 
 if __name__ == "__main__":
     unittest.main()
