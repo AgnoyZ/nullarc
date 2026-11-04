@@ -38,6 +38,7 @@ static void IODelay(unsigned);
 static void flushLine(void *) { if (!lineFlushes) events.push_back("flush-pages"); ++lineFlushes; }
 static unsigned gSysctlUp = 0;
 static int sysctl__debug_phxbos_flush = 0, sysctl__debug_phxbos_flush_bytes = 0;
+static int sysctl__debug_phxbos_handles_high = 0, sysctl__debug_phxbos_handles_full = 0;
 static void sysctl_unregister_oid(int *) {}
 struct IOMemoryDescriptor {
     unsigned retains{0}, releases{0}, completes{0};
