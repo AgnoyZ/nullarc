@@ -8,7 +8,6 @@
 typedef const struct FakeCF *CFNumberRef;
 #define kCFNumberSInt64Type 4
 #define kCFNumberIntType 9
-#define PHX_FAKE_CF_NUMBER_KIND 7u
 __attribute__((unused)) static CFTypeID CFNumberGetTypeID(void) { return PHX_FAKE_CF_NUMBER_KIND; }
 __attribute__((unused)) static bool CFNumberGetValue(CFNumberRef number, int type, void *out)
 {

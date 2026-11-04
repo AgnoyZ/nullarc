@@ -23,6 +23,16 @@ kern_return_t IOServiceOpen(io_service_t service, mach_port_t task, uint32_t typ
 kern_return_t IOServiceClose(io_connect_t connection);
 kern_return_t IOObjectRelease(io_service_t service);
 mach_port_t mach_task_self(void);
+/* The registry hands back CF objects. The fake only needs a number-like one, and it must not reach into
+ * CFNumber.h -- withholding that header is the point of the split (CFBase.h). One slot is enough: every reader
+ * takes the value before asking for the next property. */
+__attribute__((unused)) static CFTypeRef phxFakePropertyNumber(long long value)
+{
+    static struct FakeCF store;
+    store.kind = (int)PHX_FAKE_CF_NUMBER_KIND;
+    store.number = value;
+    return &store;
+}
 /* The registry doubles model the reference machine: they answer with the carve-out that machine's driver
  * publishes (PhxBringup.cpp publishes the same three properties from its own read). A harness that wants to
  * exercise mesboot's refusal path defines PHX_FAKE_CF_WITHHOLD and gets nothing back. */
@@ -34,10 +44,10 @@ __attribute__((unused)) static CFTypeRef IORegistryEntryCreateCFProperty(io_regi
     (void)allocator;
     (void)options;
     if (!key) return 0;
-    if (!strcmp(key, "phx-fb-mc-base")) return phxFakeNumber(0x8000000000ll);
-    if (!strcmp(key, "phx-fb-size")) return phxFakeNumber(0x180000000ll);
-    if (!strcmp(key, "phx-fb-phys")) return phxFakeNumber(0x6A0000000ll);
-    if (!strcmp(key, "phx-build")) return phxFakeNumber(1);
+    if (!strcmp(key, "phx-fb-mc-base")) return phxFakePropertyNumber(0x8000000000ll);
+    if (!strcmp(key, "phx-fb-size")) return phxFakePropertyNumber(0x180000000ll);
+    if (!strcmp(key, "phx-fb-phys")) return phxFakePropertyNumber(0x6A0000000ll);
+    if (!strcmp(key, "phx-build")) return phxFakePropertyNumber(1);
     return 0;
 }
 #else

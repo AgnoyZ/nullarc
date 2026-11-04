@@ -25,6 +25,9 @@ typedef const struct FakeCF *CFTypeRef;
 typedef const void *CFAllocatorRef;
 typedef unsigned long CFTypeID;
 #define kCFAllocatorDefault ((CFAllocatorRef)0)
+/* Which fake object a CFTypeRef points at. It lives here with the representation, so a header that has to hand
+ * back a property value (IOKitLib.h's fake registry) can build one without the CFNumber API itself. */
+#define PHX_FAKE_CF_NUMBER_KIND 7u
 __attribute__((unused)) static CFTypeID CFGetTypeID(CFTypeRef value) { return (CFTypeID)value->kind; }
 __attribute__((unused)) static void CFRelease(CFTypeRef value) { (void)value; }
 #endif

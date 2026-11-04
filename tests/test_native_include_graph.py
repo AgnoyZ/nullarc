@@ -44,6 +44,15 @@ class FakeCoreFoundationTests(unittest.TestCase):
                          "the fake IOKitLib.h exports the CoreFoundation umbrella, which the real one does not")
         self.assertIn("#include <CoreFoundation/CFBase.h>", headers)
         self.assertIn("#include <CoreFoundation/CFString.h>", headers)
+        # And it must not *use* the API either: the first draft of this split had IOKitLib.h call the number
+        # constructor that moved into CFNumber.h, which broke source-tests on every harness that includes it.
+        code = "\n".join(line for line in (FAKE / "IOKit/IOKitLib.h").read_text(encoding="utf-8").splitlines()
+                         if not line.strip().startswith(("/*", "*", "//")))
+        forbidden = [name for name in ("phxFakeNumber", "CFNumberGetTypeID", "CFNumberGetValue", "CFNumberCreate",
+                                       "CFNumberRef", "kCFNumberSInt64Type") if name in code]
+        self.assertEqual(forbidden, [],
+                         "the fake IOKitLib.h reaches into the CFNumber header (or the API it declares); build the "
+                         "property value from the representation in CFBase.h instead, or every harness breaks")
 
     def test_cfnumber_lives_in_its_own_header(self):
         self.assertTrue((FAKE / "CoreFoundation/CFNumber.h").is_file())
