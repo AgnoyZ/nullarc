@@ -230,3 +230,33 @@ remain the audited `phxctl`/`mesboot` entries, and no stage is shipped here. POS
 shell tests in `tests/test_boot_gate_shell.py` exercise the real script with fake
 host commands; they run in Linux CI, and Windows only ran `sh -n` plus a manual
 smoke. No macOS host or target machine has run it.
+
+## Same-base audit from RadeArc (2026-11-03)
+
+`Kreytus/RadeArc` is a second downstream of the upstream pin this branch uses: same base `cbb08dd`, ported to
+Phoenix 2 (Radeon 740M, GC 11.0.4) in a desktop with HDMI/DP only. Its `docs/PORTING_AUDIT.md` catalogues every
+reference-machine constant in that base, so the list applies here too. Read at `main` = `d8d8d18`; the rest of
+that assessment is in `docs/RADEARC-REFERENCE.md`.
+
+| Reference-machine assumption | Where it lives in this tree (verified) | Status here |
+| --- | --- | --- |
+| `IOPCIMatch 0x19001002` only | `src/phxbringup/Info.plist`, `src/phxaccel/Info.plist` | Phoenix 1 only, by design; other Phoenix parts are out of scope |
+| `kGbAddrConfig = 0x242`, `kGcVersion = 11.0.1`, `kVisTotal = 256 MiB`, `kHiTotal = 1.5 GiB`, all sent to RADV in QueryInfo | `PhxBringup.cpp:59-65`, `1938-1945` | **still literal.** Linux reads `GB_ADDR_CONFIG` from the hardware; these are the Firebat's values |
+| GC / MMHUB / OSSSYS segment bases as absolute dwords (`SEG0` 0x1260, `SEG1` 0xA000) and the `SET_HW_RESOURCES` base tables | `mesboot.c` `SEG0()`/`SEG1()`, `SET_HW_RESOURCES` | **still literal**, copied from the Firebat discovery table |
+| MMHUB `FB_LOCATION_BASE`/`FB_LOCATION_TOP`/`FB_OFFSET` at `0x1A8EC`/`0x1A8ED`/`0x1A8D7` (MMHUB 3.0.1, segment 1 base `0x1A000`) | `PhxNativeABI.h:68-70` | **still literal**, and these are exactly the registers a chip-derived layout would have to read |
+| NBIO HDP flush at `0xE4D` (NBIF 7.7.0), SMUIO `GOLDEN_TSC` at `0x16a2d` (SMUIO 13.0.7) | `PhxNativeABI.h:114`, `PhxBringup.cpp:1961` | **still literal** |
+| PSP and SMU mailboxes in MP0/MP1 **segment 1** (`0x16000`) of 13.0.4 | `PhxNativeABI.h:72-82`, `119-122` | **still literal.** RadeArc found 13.0.11 dispatches through **segment 0**, so a chip reporting 13.0.11 needs different mailbox offsets. Phoenix 1 is 13.0.4 and unaffected — but only a live read settles which segment a target uses |
+| `mesboot`: `VRAM_MC 0x8000000000`, `FB_PA 0x6A0000000`, `GART_VA`/`GART_PT`, the KIQ/scheduler VRAM offsets | `mesboot.c:119-140` | **still literal.** Their replacement — chip-gated values read from `phx-fb-mc-base` / `phx-fb-size` / `phx-fb-phys`, refusing an unknown chip — is the pattern to adopt when this becomes in scope |
+| Firmware payload offsets and sizes as literals | `tools/phxctl/bringup5.sh:13-35` | **not this repository's path.** This workflow is not run here (`docs/BOOT-GATE.md`). The audited path derives extents from the files themselves: `tools/firmware_manifest.py` parses each header (`payload_offset`, `total`, per-component sizes) with bounds and overlap checks, `tools/firmware_profile.py` generates `PhxFirmwareProfile.h` from that audited manifest, and `phxctl firmware-sequence` loads from the generated steps with per-file SHA-256 from the reviewed lock. The literals survive only for the reference file set, in a script nothing here invokes |
+| TMR MC address `0x6A0C000000` = Firebat `FB_OFFSET` + `0xC000000` | `tools/phxctl/bringup5.sh:15` | same: reference script, not this path; `phxctl` takes the TMR extent from the checked layout instead |
+
+Two consequences worth keeping in view:
+
+1. Nothing in the table above can be parameterised from the table alone. Those are machine facts, and the only
+   honest sources are what the driver publishes about itself (`phx-fb-phys`, `phx-fb-aper-len`, `phx-build`,
+   `phx-780m-policy`) or what a live read returns. Inventing values would look safer than the literals and be
+   worse. See `docs/RADEARC-REFERENCE.md` §3 for the shape that does work.
+2. The firmware-offset finding does not apply to the audited path; it applies to the script this audit has always
+   said not to run. That is now asserted rather than remembered: `tests/test_reference_scripts.py`, and each of
+   the four reference scripts carries a "not run by this repository" banner so nobody mistakes it for the entry
+   point.

@@ -1,3 +1,7 @@
+# NOT RUN BY THIS REPOSITORY. This is the reference workflow: it arms reboot watchdogs, writes NVRAM and
+# sysctls, and is built on reference-machine constants and firmware offsets. The audited entry points here are
+# tools/phx_boot_gate.sh (staged bring-up), the phxctl/mesboot subcommands, and tools/phx_baseline.sh
+# (read-only capture). See docs/BRINGUP-AUDIT.md and docs/BOOT-GATE.md.
 SUDO_CMD="sudo"
 if [ -n "$SUDO_PASS" ]; then
     SUDO_CMD="echo '$SUDO_PASS' | sudo -S -p ''"

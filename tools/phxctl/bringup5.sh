@@ -1,4 +1,8 @@
 #!/bin/bash
+# NOT RUN BY THIS REPOSITORY. This is the reference workflow: it arms reboot watchdogs, writes NVRAM and
+# sysctls, and is built on reference-machine constants and firmware offsets. The audited entry points here are
+# tools/phx_boot_gate.sh (staged bring-up), the phxctl/mesboot subcommands, and tools/phx_baseline.sh
+# (read-only capture). See docs/BRINGUP-AUDIT.md and docs/BOOT-GATE.md.
 # Phoenix GFX power-up in the Linux driver's order: PSP ring, TOC and TMR, the firmware of every engine through
 # LOAD_IP_FW, RLC autoload, then the SMU messages that switch GFX on (EnableGfxImu with 1). Firmware from ~/gpu/fw at
 # the offsets and sizes of linux-firmware's gc_11_0_1/psp_13_0_4 files. Run as root (phxboot) or as a user with sudo.

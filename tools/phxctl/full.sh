@@ -1,4 +1,8 @@
 #!/bin/bash
+# NOT RUN BY THIS REPOSITORY. This is the reference workflow: it arms reboot watchdogs, writes NVRAM and
+# sysctls, and is built on reference-machine constants and firmware offsets. The audited entry points here are
+# tools/phx_boot_gate.sh (staged bring-up), the phxctl/mesboot subcommands, and tools/phx_baseline.sh
+# (read-only capture). See docs/BRINGUP-AUDIT.md and docs/BOOT-GATE.md.
 # full.sh <mesboot step>: power the GPU up (bringup5.sh), open the doorbells, unhalt the CP and start MES with the GART,
 # then run one mesboot step with its options from the environment (phxboot: MC=1 CS=1 ADOPT=1 GFX=1 AG=1 ... kiqsched).
 # Run as root (phxboot) or as a user with sudo. A reboot is armed for 4 minutes in case the GPU hangs the bus.
