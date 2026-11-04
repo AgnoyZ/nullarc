@@ -1065,7 +1065,8 @@ static SInt64 nvIopCopyDamage(unsigned head, const volatile unsigned int *src, u
     if (sh.buf && sh.bytes != bytes) { IOFreeAligned(sh.buf, sh.bytes); sh.buf = nullptr; sh.bytes = 0; }
     if (!sh.buf) { sh.buf = (uint32_t *)IOMallocAligned(bytes, 64); sh.bytes = sh.buf ? bytes : 0; }
     if (!sh.buf) { sh.valid = false; sh.busy = 0; return -1; }
-    const phx780m::CopyShape shape{d, words, h, dpr, l10r};
+    // Compared, never dereferenced: identity only, so dropping volatile through uintptr_t is safe here.
+    const phx780m::CopyShape shape{(const void *)(uintptr_t)d, words, h, dpr, l10r};
     if (!phx780m::sameShape(sh.shape, shape)) sh.valid = false;   // another scan-out: the shadow says nothing about it
     const bool force = !sh.valid || gIopFullOnce != 0;
     if (gIopFullOnce) gIopFullOnce = 0;
