@@ -18,7 +18,34 @@ kern_return_t IOServiceOpen(io_service_t service, mach_port_t task, uint32_t typ
 kern_return_t IOServiceClose(io_connect_t connection);
 kern_return_t IOObjectRelease(io_service_t service);
 mach_port_t mach_task_self(void);
-CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t, CFStringRef, CFAllocatorRef, uint32_t);
+/* The registry doubles model the reference machine: they answer with the carve-out that machine's driver
+ * publishes (PhxBringup.cpp publishes the same three properties from its own read). A harness that wants to
+ * exercise mesboot's refusal path defines PHX_FAKE_CF_WITHHOLD and gets nothing back. */
+#ifndef PHX_FAKE_CF_WITHHOLD
+__attribute__((unused)) static CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t service, CFStringRef key,
+                                                                        CFAllocatorRef allocator, uint32_t options)
+{
+    (void)service;
+    (void)allocator;
+    (void)options;
+    if (!key) return 0;
+    if (!strcmp(key, "phx-fb-mc-base")) return phxFakeNumber(0x8000000000ll);
+    if (!strcmp(key, "phx-fb-size")) return phxFakeNumber(0x180000000ll);
+    if (!strcmp(key, "phx-fb-phys")) return phxFakeNumber(0x6A0000000ll);
+    if (!strcmp(key, "phx-build")) return phxFakeNumber(1);
+    return 0;
+}
+#else
+__attribute__((unused)) static CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t service, CFStringRef key,
+                                                                        CFAllocatorRef allocator, uint32_t options)
+{
+    (void)service;
+    (void)key;
+    (void)allocator;
+    (void)options;
+    return 0;
+}
+#endif
 kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t selector,
     const uint64_t *input, uint32_t input_count, uint64_t *output, uint32_t *output_count);
 kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,

@@ -112,8 +112,8 @@ static int layout_from_driver(io_registry_entry_t svc)
                          prop_u64(svc, CFSTR("phx-fb-size"), &size) &&
                          prop_u64(svc, CFSTR("phx-fb-phys"), &phys);
    if (env_on("PHX_LAYOUT_REFERENCE")) {
-      printf("mesboot: layout = the compiled reference-machine constants (VRAM MC 0x%llx, FB phys 0x%llx), "
-             "PHX_LAYOUT_REFERENCE=1\n", (unsigned long long)vram_mc, (unsigned long long)fb_pa);
+      fprintf(stderr, "mesboot: layout = the compiled reference-machine constants (VRAM MC 0x%llx, FB phys 0x%llx), "
+              "PHX_LAYOUT_REFERENCE=1\n", (unsigned long long)vram_mc, (unsigned long long)fb_pa);
       return 0;
    }
    if (!published || !mc || !phys || size < 0x8000000ull || (phys & 0xfffull)) {
@@ -132,8 +132,8 @@ static int layout_from_driver(io_registry_entry_t svc)
               (unsigned long long)vram_mc, (unsigned long long)fb_pa);
       return -1;
    }
-   printf("mesboot: layout from PhxBringup build %llu: VRAM MC 0x%llx, FB phys 0x%llx, carve-out 0x%llx\n",
-          (unsigned long long)build, (unsigned long long)mc, (unsigned long long)phys, (unsigned long long)size);
+   fprintf(stderr, "mesboot: layout from PhxBringup build %llu: VRAM MC 0x%llx, FB phys 0x%llx, carve-out 0x%llx\n",
+           (unsigned long long)build, (unsigned long long)mc, (unsigned long long)phys, (unsigned long long)size);
    return 0;
 }
 static int open_kext(void)
