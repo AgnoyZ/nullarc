@@ -31,8 +31,10 @@ verdict re-derived by hand from a JSON file, a renamed counter discovered after 
 | Does the translator/plugin ABI still match, and is the generated SPIR-V valid? | `translator`, `air-runtime`, `plugin-runtime` steps | that Metal renders correctly |
 | Can the phase-1 capture read what the analysis needs, under the names the kernel actually declares? | `tests/test_phase1_baseline_shell.py`, `tools/phx_counter_contract.py` | any counter value |
 | Is the H1–H4 verdict a computation instead of an opinion? | `tools/phx_baseline_report.py`, `tests/test_baseline_report.py` | the measurement itself |
+| Do the fake headers still match the SDK's include graph, so a file that compiles on Linux also has the includes macOS requires? | `tests/test_native_include_graph.py` | the macOS compile itself — that is the `macos-kexts` job |
 
-The last four rows are what the two headless changes added; §4 explains why they are worth CI time.
+The rows from the present-pacing rule down are what the headless changes added; §4 explains why they are worth
+CI time.
 
 ## 3. What only the laptop can answer
 

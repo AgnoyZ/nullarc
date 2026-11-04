@@ -1,6 +1,10 @@
 // mesboot: Phoenix (GC 11.0.1) GART + MES bring-up experiments, driven through PhxBringup debug selectors.
 // build: clang -O2 -o mesboot mesboot.c -framework IOKit -framework CoreFoundation ; run as root (phxdebug=1)
 #include <IOKit/IOKitLib.h>
+// IOKitLib.h brings in <CoreFoundation/CFBase.h> and CFString.h, not CFNumber.h, so the layout gate's
+// CFNumberGetValue()/kCFNumberSInt64Type need this include explicitly. The fake headers used by the Linux
+// harnesses supply it through their umbrella header, which is why only the macOS build caught it (CI 41789199775).
+#include <CoreFoundation/CFNumber.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

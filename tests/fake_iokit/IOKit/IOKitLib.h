@@ -4,7 +4,12 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <CoreFoundation/CoreFoundation.h>
+#include <string.h>
+/* CFBase.h and CFString.h, not the CoreFoundation umbrella: the real <IOKit/IOKitLib.h> stops there too, so a
+ * tool that calls CFNumberGetValue() without <CoreFoundation/CFNumber.h> fails here as well as in `macos-kexts`
+ * (see tests/fake_iokit/CoreFoundation/CFBase.h). */
+#include <CoreFoundation/CFBase.h>
+#include <CoreFoundation/CFString.h>
 typedef uint32_t io_connect_t;
 typedef uint32_t io_service_t;
 typedef uint32_t io_registry_entry_t;
