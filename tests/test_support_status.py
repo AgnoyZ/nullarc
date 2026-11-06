@@ -22,6 +22,8 @@ RECORD_DIR = ROOT / "docs/validation"
 CLASSES = ("target-verified", "host-verified", "policy-asserted", "not implemented", "unknown")
 # Branch names and CI job names appear in backticks but are not paths.
 NOT_A_PATH = {"downstream/780m-tahoe"}
+# The mapping table has one meta row (the knob values describe every row), which is not a row name.
+META_ROW_NAMES = {"every row"}
 FIELD_NAME = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 
 
@@ -75,13 +77,60 @@ class SupportStatusTests(unittest.TestCase):
     def test_every_capture_field_the_table_promises_is_written_by_the_capture(self):
         # The mapping section names, per row, the field that would move it. A field the capture does not write is a
         # row that can never move, which reads as "waiting for hardware" instead of "cannot be answered".
-        start = self.text.index("## What one capture would move")
-        mapping = self.text[start:]
+        mapping = self.after_the_table()
         script = CAPTURE.read_text(encoding="utf-8")
         promised = [token for token in re.findall(r"`([^`]+)`", mapping) if FIELD_NAME.match(token)]
         self.assertGreater(len(promised), 5, "the mapping section no longer names capture fields")
         missing = sorted({field for field in promised if field not in script})
         self.assertEqual(missing, [], f"tools/phx_baseline.sh never writes {missing}, so those rows cannot move")
+
+    def test_every_undecided_row_says_what_would_decide_it(self):
+        # `unknown` means "this repository cannot decide it": the row must then point at the capture field that
+        # would, or at the section explaining why no capture can. A row in neither list is a promise nobody audits.
+        names = self.section_row_names()
+        unaddressed = [area for area, _, evidence, _, _ in self.rows
+                       if evidence.replace("`", "").startswith("unknown")
+                       and not any(area.startswith(name) for name in names)]
+        self.assertEqual(unaddressed, [], f"unknown rows with no field and no explanation: {unaddressed}")
+
+    def test_the_accounting_sections_name_rows_that_exist(self):
+        # The reverse direction: a renamed row leaves an orphan behind in the mapping tables, which is how a table
+        # like this starts describing rows that no longer exist.
+        areas = [area for area, *_ in self.rows]
+        orphans = sorted({name for name in self.section_row_names() if name not in META_ROW_NAMES
+                          and not any(area.startswith(name) for area in areas)})
+        self.assertEqual(orphans, [], f"the mapping sections name rows the table does not have: {orphans}")
+
+    def test_a_dash_in_the_move_up_cell_is_explained_in_the_no_capture_section(self):
+        start = self.text.index("## Rows no capture can move")
+        section = self.text[start:self.text.index("## How to keep this table honest", start)]
+        unexplained = [area for area, _, _, _, would in self.rows
+                       if would.strip() == "—" and area not in section]
+        self.assertEqual(unexplained, [], f"rows with a bare em dash and no explanation: {unexplained}")
+
+    def after_the_table(self):
+        """Everything after the support table: the two sections that have to account for every undecided row."""
+        return self.text[self.text.index("## What one capture would move"):]
+
+    def section_row_names(self):
+        """The row names as the two accounting sections write them (shorter than the table's area cells)."""
+        names, column, in_table = [], None, False
+        for line in self.after_the_table().splitlines():
+            if line.startswith("| capture field "):
+                column, in_table = 1, True
+                continue
+            if line.startswith("| row |"):
+                column, in_table = 0, True
+                continue
+            if not line.startswith("| "):
+                in_table = False
+                continue
+            if not in_table or set(line) <= set("|- "):
+                continue
+            cells = [cell.strip() for cell in line.strip().strip("|").split(" | ")]
+            if len(cells) == 3 and cells[column]:
+                names.append(cells[column])
+        return names
 
 
 if __name__ == "__main__":

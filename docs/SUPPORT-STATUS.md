@@ -40,12 +40,12 @@ there, every claim in this repository is host-side.
 | Frame rate, judder, "is it smooth" | Instrumented, not measured: the counters and the read-only capture exist | `unknown` | `tools/phx_baseline.sh`, `tools/phx_baseline_report.py`, `docs/analysis.md` | one phase-1 capture plus the H1–H4 verdict |
 | Panel timing and modes other than the firmware mode | Not attempted: only the firmware-lit mode, read from the OTG | `not implemented` | `docs/DISPLAY-PATH.md` | a separate mode-setting project |
 | Backlight | Not attempted | `not implemented` | `docs/DOWNSTREAM-ROADMAP.md` | — |
-| Display sleep / wake repaint | Not verified; the upstream comment describes a fragmenting-pool failure | `unknown` | `docs/analysis.md` §3, patch 0028 rationale | a wake on the target with the panel repainting |
+| Display sleep / wake repaint | Not verified; the upstream comment describes a fragmenting-pool failure | `unknown` | `docs/analysis.md` §3, patch 0028 rationale | a capture window that spans a sleep/wake: ticks continuing while `frames_on_panel` stops says the copy path died on wake, and both moving says it survived. Whether the panel actually lit stays a human look |
 | External displays (HDMI, USB-C) | Not attempted | `not implemented` | `docs/DOWNSTREAM-ROADMAP.md` | — |
 | Hardware video decode/encode | Not attempted | `not implemented` | `docs/DOWNSTREAM-ROADMAP.md` | — |
 | Install plan (what to add to an EFI, and how to revert it) | `tools/phx_install_plan.py` reads an existing `config.plist` and writes numbered operator steps plus the rollback; no apply mode, and it refuses system locations, foreign kexts and unmatched digests | `host-verified` (synthetic layouts) | `tests/test_install_plan.py`, `docs/INSTALL-PLAN.md` | one reviewed install on the target, then the driver attaching |
 | Installer, uninstaller, rollback package | None shipped and none planned: `tools/phx_boot_gate.sh` runs stages but ships none, and the plan tool writes steps instead of performing them. The security changes upstream's install needs stay the owner's decision, not the repository's action | `not implemented` | `docs/BOOT-GATE.md`, `docs/INSTALL-PLAN.md` | an installer that stays step-revertible and touches no system location |
-| Other 780M / 760M machines (Hawk Point, other panels) | Nothing is claimed for them | `unknown` | — | a report from one of those machines |
+| Other 780M / 760M machines (Hawk Point, other panels) | Nothing is claimed for them | `unknown` | `tools/target_inventory.py` (the read-only inventory a report would carry) | an inventory file from one of those machines; nothing about them can be inferred from ours |
 
 ## What one capture would move, field by field
 
@@ -62,15 +62,34 @@ not record can never move, and it would read as "waiting for hardware" instead o
 | `bos_handles_high`, `bos_handles_full` | BO handles per client | a high-water mark far from 4095 is headroom; a non-zero `bos_handles_full` is the ceiling being hit for real |
 | the `alias:` lines in the kernel log | Copy path and scan-out alias | one `samples match the BAR` line proves the carve-out view was verified at least once |
 | `phx-fb-phys` / `phx-build` in `ioreg.txt` | Framebuffer takeover | the driver publishing what it took over, on the target |
+| `frames_on_panel`, `vbl_ticks` across a sleep/wake | Display sleep / wake repaint | ticks continuing while copies stop is the wake failure; both moving says the copy path survived. Whether the panel lit is still a human look |
 | `knobs` | every row | they say which path the numbers describe; a capture whose knobs are missing is not comparable |
 
 A field in that table is a promise the tool keeps: `tests/test_phase1_baseline_shell.py` asserts the JSON carries
 it, and `tests/test_baseline_report.py` asserts the verdict tool reports it.
 
+## Rows no capture can move, and why
+
+`unknown` and `not implemented` look alike in the table and are not alike at all. The rows below are not waiting
+for the phase-1 session; listing them here keeps them from reading as gaps that one more capture would close.
+
+| row | why a capture cannot move it | what would |
+| --- | --- | --- |
+| Panel timing and modes other than the firmware mode | `not implemented`: the driver never programs the display engine, so the counters report the firmware's mode whether or not anything else could be done | a mode-setting project of its own (`docs/DISPLAY-PATH.md`) |
+| Backlight | `not implemented`: no backlight register is written, and a capture cannot tell "backlight at zero" from "backlight never touched" | backlight control code first |
+| External displays (HDMI, USB-C) | `not implemented`: there is no encoder or hotplug path to observe | an external-display project; plugging a screen in would exercise code that does not exist |
+| Hardware video decode/encode | `not implemented`, and out of scope by the work order | separate engine work |
+| Installer, uninstaller, rollback package | `not implemented`: `tools/phx_install_plan.py` writes steps and `tools/phx_boot_gate.sh` runs stages; neither ships an installer, so there is no installer whose behaviour a capture could describe | a reviewed install on the target, done by a human, and a record that says so |
+| Other 780M / 760M machines | `unknown` for *those* machines: our machine's numbers say nothing about them, and no capture of ours can | `tools/target_inventory.py` run on one of them — one file from that machine, nothing from here |
+
 ## How to keep this table honest
 
 - A row moves up only with evidence of the class above it: a CI run, a target capture, or a recorded refusal.
   Nothing here moves because a document says so — `docs/analysis.md` and the code are authoritative.
+- Every `unknown` row appears in one of the two accounting sections above, and a `—` in the move-up column is only
+  allowed for a row explained in "Rows no capture can move". `tests/test_support_status.py` enforces both, so the
+  table cannot grow a row that reads as "waiting for hardware" when it is waiting for a project, or for another
+  machine.
 - When a row changes, change it in the same commit that produces the evidence, and name the record (a
   `docs/validation/` file or a CI run) next to it.
 - `README.md`'s status table stays as upstream wrote it, because it is upstream's measurement; this file is
