@@ -166,6 +166,12 @@ usable handles) and every texture allocation started failing before WindowServer
 looks like anything but "out of handles" from user space (`docs/RADEARC-REFERENCE.md` §2). They say whether a
 capture is near the cliff without changing the limit, which needs the user-space table raised at the same time.
 
+Both the damage counters and the handle counters are recorded by `tools/phx_baseline.sh`: it read them into its
+sample file and then left them out of `baseline.json`/`summary.txt`, which made B5 unanswerable from a capture and
+the "how close to 4095" question unanswerable too. They are in the record now, as `iop_damage_bytes`,
+`iop_damage_full_frames`, `bos_handles_high` and `bos_handles_full`, and `tools/phx_baseline_report.py` reports
+them (and compares the first and third in an A/B) instead of ignoring them.
+
 The gap counters are what make H3 decidable: without them a capture can show that frames reach the panel
 slowly, but not whether they arrive evenly. They were readable in the code from the start and
 `tools/phx_baseline.sh` now records them, so one capture decides H1 through H4 together.
@@ -220,10 +226,13 @@ python3 tools/phx_baseline_report.py baseline=BASE b1-sse-off=B1 b2-plain-tick=B
 
 The capture writes `vbl_hz`, `presents_per_s`, `avg_copy_us`, `copy_share_of_refresh_pct`, `copy_skip`,
 `blank_frames`, `iop_fail`, `vbl_late_avg_us`/`_max`, the present cadence (`iop_gap1`–`iop_gap4`,
-`iop_vsync_waits`, `iop_vsync_late`) and the knob values that say which path was measured; `summary.txt`
-prints the same numbers by hand. `tools/phx_baseline_report.py` applies §9 to them and prints which
+`iop_vsync_waits`, `iop_vsync_late`), the copy economy (`iop_damage_bytes`, `iop_damage_full_frames`) and the
+client's capacity headroom (`bos_handles_high`, `bos_handles_full`) and the knob values that say which path was
+measured; `summary.txt` prints the same numbers by hand. `handles_high` is a high-water mark and is reported as
+it stands, never as a window delta. `tools/phx_baseline_report.py` applies §9 to them and prints which
 hypothesis the capture supports, which it refutes, and which it cannot decide — a capture without the
-cadence counters leaves H3 undecidable instead of guessed. Also record the `alias:` lines from the kernel
+cadence counters leaves H3 undecidable instead of guessed, and a capture taken before the copy-economy fields
+says so instead of comparing zero against zero. Also record the `alias:` lines from the kernel
 log: they say whether the carve-out view was ever verified. Then repeat the 60 s window three times with
 the A/B switches, one at a time, changing nothing else:
 
@@ -233,7 +242,7 @@ the A/B switches, one at a time, changing nothing else:
 | B2 | `debug.phxfb_vbl_staged=0` | is the staged tick worth it, and how late is a plain deadline |
 | B3 | `debug.nvaccel_iop_vsync=0` | does the next-tick completion actually change the cadence |
 | B4 | `debug.phxfb_alias=0` | the BAR copy baseline (expected to be much worse; it is the control, not a candidate) |
-| B5 | `debug.nvaccel_iop_damage=1` | is the cost the number of stored bytes or their price: `damage_sum` says how much was stored, `copy_us` whether it got faster, `damage_full` how often the shadow could not help |
+| B5 | `debug.nvaccel_iop_damage=1` | is the cost the number of stored bytes or their price: `iop_damage_bytes` says how much was stored, `avg_copy_us` whether it got faster, `iop_damage_full_frames` how often the shadow could not help (the record's field names; the sysctls behind them are `debug.nvaccel_iop_damage_sum`/`_full`) |
 
 Each A/B capture goes in as `label=PATH` after the baseline capture, and the report prints the change per
 metric with a noise caveat: one window per side is a single sample.

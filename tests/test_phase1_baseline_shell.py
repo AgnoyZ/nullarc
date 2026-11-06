@@ -28,7 +28,7 @@ COUNTERS = {
     "debug.nvaccel_iop_gap1": 100, "debug.nvaccel_iop_gap2": 15, "debug.nvaccel_iop_gap3": 4,
     "debug.nvaccel_iop_gap4": 1, "debug.nvaccel_iop_vsync_waits": 8, "debug.nvaccel_iop_vsync_late": 1,
     "debug.nvaccel_iop_damage_sum": 240000, "debug.nvaccel_iop_damage_full": 3,
-    "debug.phxbos_handles_high": 3800, "debug.phxbos_handles_full": 0,
+    "debug.phxbos_handles_high": 3800, "debug.phxbos_handles_full": 2,
 }
 
 FAKE_SYSCTL = '''#!{python}
@@ -52,9 +52,12 @@ if name in knobs:
     sys.exit(0)
 if name not in counters:
     sys.exit(1)
-# One sample per pass: the script reads its counters in a fixed order, VBL first.
+# One sample per pass: the script reads its counters in a fixed order, VBL first. Every counter doubles per
+# pass, except the ones that are not counters: the last-window maxima and the BO handle high-water mark.
 tick = int(tickfile.read_text()) if tickfile.exists() else 0
-print(counters[name] * tick if name != "debug.phxfb_vbl_late_us_max" and name != "debug.nvaccel_iop_copy_us" and name != "debug.nvaccel_iop_copy_us_max" else counters[name])
+frozen = ("debug.phxfb_vbl_late_us_max", "debug.nvaccel_iop_copy_us", "debug.nvaccel_iop_copy_us_max",
+          "debug.phxbos_handles_high")
+print(counters[name] if name in frozen else counters[name] * tick)
 if name == "debug.phxfb_vbl_n":
     tickfile.write_text(str(tick + 1))
 '''
@@ -125,6 +128,13 @@ class BaselineTests(unittest.TestCase):
             self.assertEqual(window["iop_gap4"], 1)
             self.assertEqual(window["iop_vsync_waits"], 8)
             self.assertEqual(window["iop_vsync_late"], 1)
+            # The copy economy (B5) and the capacity headroom: sampled counters that used to be read and thrown
+            # away, so the capture could not answer B5 or "how close is this client to 4095 handles".
+            self.assertEqual(window["iop_damage_bytes"], 240000)
+            self.assertEqual(window["iop_damage_full_frames"], 3)
+            self.assertEqual(window["bos_handles_high"], 3800,
+                             "a high-water mark is reported as it stands, never as a delta")
+            self.assertEqual(window["bos_handles_full"], 2)
             self.assertEqual(record["knobs"]["debug.nvaccel_iop_sse"], 1)
             self.assertEqual(record["knobs"]["debug.nvaccel_iop_damage"], 0, "the damage-only copy ships off")
             self.assertEqual(record["claims"], {"display_path_counters_read": True, "gpu_work_submitted": False,
@@ -134,6 +144,8 @@ class BaselineTests(unittest.TestCase):
             self.assertTrue(summary.strip())
             self.assertIn("cadence", summary)
             self.assertIn("vsync_late", summary)
+            self.assertIn("damage_bytes", summary)
+            self.assertIn("handles_high", summary)
             calls = [json.loads(line) for line in (state / "calls.jsonl").read_text().splitlines()]
             self.assertTrue(calls)
             self.assertFalse([c for c in calls if "-w" in c], "the baseline tool must never write a sysctl")
@@ -148,6 +160,11 @@ class BaselineTests(unittest.TestCase):
             window = json.loads((out / "baseline.json").read_text())["windows"][0]
             self.assertTrue(window["snapshot_only"])
             self.assertNotIn("copy_share_of_refresh_pct", window)
+            # A snapshot has no delta, but the totals it does have are real and belong in the record.
+            self.assertEqual(window["iop_damage_bytes_total"], 240000)
+            self.assertEqual(window["iop_damage_full_frames_total"], 3)
+            self.assertEqual(window["bos_handles_high"], 3800)
+            self.assertEqual(window["bos_handles_full_total"], 2)
             self.assertIn("snapshot only", (out / "summary.txt").read_text())
 
     def test_refuses_a_non_darwin_host(self):

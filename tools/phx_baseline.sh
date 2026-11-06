@@ -136,15 +136,24 @@ BEGIN {
             g4 = B["debug.nvaccel_iop_gap4"] - A["debug.nvaccel_iop_gap4"]
             vw = B["debug.nvaccel_iop_vsync_waits"] - A["debug.nvaccel_iop_vsync_waits"]
             vl = B["debug.nvaccel_iop_vsync_late"] - A["debug.nvaccel_iop_vsync_late"]
+            # The copy economy (B5) and the client's capacity headroom. damage_* and handles_full are counters, so
+            # the window carries deltas; handles_high is a high-water mark, so its window value is the mark itself
+            # and subtracting would invent a "handles freed" number the driver never reports.
+            dm = B["debug.nvaccel_iop_damage_sum"] - A["debug.nvaccel_iop_damage_sum"]
+            dfull = B["debug.nvaccel_iop_damage_full"] - A["debug.nvaccel_iop_damage_full"]
+            hhigh = B["debug.phxbos_handles_high"]
+            hfull = B["debug.phxbos_handles_full"] - A["debug.phxbos_handles_full"]
             hz = vbl / window
             frame_us = (hz > 0 ? 1000000.0 / hz : 0)
             avg = (ok > 0 ? cost / ok : 0)
             share = (frame_us > 0 ? 100.0 * avg / frame_us : 0)
             lateavg = (vbl > 0 ? late / vbl : 0)
-            printf "    {\"index\": %d, \"vbl_ticks\": %d, \"vbl_hz\": %.1f, \"frames_on_panel\": %d, \"presents_per_s\": %.1f, \"avg_copy_us\": %.1f, \"copy_share_of_refresh_pct\": %.1f, \"copy_skip\": %d, \"blank_frames\": %d, \"iop_fail\": %d, \"vbl_late_avg_us\": %.1f, \"vbl_late_max_us\": %d, \"iop_gap1\": %d, \"iop_gap2\": %d, \"iop_gap3\": %d, \"iop_gap4\": %d, \"iop_vsync_waits\": %d, \"iop_vsync_late\": %d}%s\n", s, vbl, hz, ok, ok / window, avg, share, skip, blank, fail, lateavg, B["debug.phxfb_vbl_late_us_max"], g1, g2, g3, g4, vw, vl, (s < samples ? "," : "") > json
-            printf "%d\t%.1f\t%.1f\t%.1f\t%.1f\t%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\n", s, hz, ok / window, avg, share, skip, blank, fail, lateavg, g1, g2, g3, g4, vw, vl > tsv
+            printf "    {\"index\": %d, \"vbl_ticks\": %d, \"vbl_hz\": %.1f, \"frames_on_panel\": %d, \"presents_per_s\": %.1f, \"avg_copy_us\": %.1f, \"copy_share_of_refresh_pct\": %.1f, \"copy_skip\": %d, \"blank_frames\": %d, \"iop_fail\": %d, \"vbl_late_avg_us\": %.1f, \"vbl_late_max_us\": %d, \"iop_gap1\": %d, \"iop_gap2\": %d, \"iop_gap3\": %d, \"iop_gap4\": %d, \"iop_vsync_waits\": %d, \"iop_vsync_late\": %d, \"iop_damage_bytes\": %d, \"iop_damage_full_frames\": %d, \"bos_handles_high\": %d, \"bos_handles_full\": %d}%s\n", s, vbl, hz, ok, ok / window, avg, share, skip, blank, fail, lateavg, B["debug.phxfb_vbl_late_us_max"], g1, g2, g3, g4, vw, vl, dm, dfull, hhigh, hfull, (s < samples ? "," : "") > json
+            printf "%d\t%.1f\t%.1f\t%.1f\t%.1f\t%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", s, hz, ok / window, avg, share, skip, blank, fail, lateavg, g1, g2, g3, g4, vw, vl, dm, dfull, hhigh, hfull > tsv
         } else {
-            printf "    {\"index\": %d, \"snapshot_only\": true, \"frames_on_panel\": %d, \"last_copy_us\": %d, \"slowest_copy_us\": %d}%s\n", s, A["debug.nvaccel_iop_ok"], A["debug.nvaccel_iop_copy_us"], A["debug.nvaccel_iop_copy_us_max"], (s < samples ? "," : "") > json
+            # A snapshot cannot measure a rate, but the totals are still real: they say how much of the copy was
+            # already skipped by the damage path and how close this client came to the handle ceiling.
+            printf "    {\"index\": %d, \"snapshot_only\": true, \"frames_on_panel\": %d, \"last_copy_us\": %d, \"slowest_copy_us\": %d, \"iop_damage_bytes_total\": %d, \"iop_damage_full_frames_total\": %d, \"bos_handles_high\": %d, \"bos_handles_full_total\": %d}%s\n", s, A["debug.nvaccel_iop_ok"], A["debug.nvaccel_iop_copy_us"], A["debug.nvaccel_iop_copy_us_max"], A["debug.nvaccel_iop_damage_sum"], A["debug.nvaccel_iop_damage_full"], A["debug.phxbos_handles_high"], A["debug.phxbos_handles_full"], (s < samples ? "," : "") > json
         }
     }
     printf "  ],\n  \"claims\": {\"display_path_counters_read\": true, \"gpu_work_submitted\": false, \"hardware_execution_established\": false},\n" > json
@@ -169,7 +178,13 @@ BEGIN {
             printf "%-8s %-5s %-5s %-5s %-5s %-11s %s\n", f[1], f[10], f[11], f[12], f[13], f[14], f[15] > sum
         }
         close(tsv)
-        printf "\ncopy_pct is one copied frame as a share of one refresh; gap1..4 count copied frames about one, two,\nthree and four-or-more refreshes after the previous one. tools/phx_baseline_report.py applies the\nthresholds in docs/analysis.md §9 to this file and prints which hypothesis the capture supports.\n" > sum
+        printf "\ncopy economy and client capacity (B5, and how close this client is to the handle ceiling):\nwindow   damage_bytes damage_full handles_high handles_full\n" > sum
+        while ((getline line < tsv) > 0) {
+            split(line, f, "\t")
+            printf "%-8s %-12s %-11s %-12s %s\n", f[1], f[16], f[17], f[18], f[19] > sum
+        }
+        close(tsv)
+        printf "\ncopy_pct is one copied frame as a share of one refresh; gap1..4 count copied frames about one, two,\nthree and four-or-more refreshes after the previous one. damage_bytes is what the damage-only copy actually\nstored in the window (0 when debug.nvaccel_iop_damage is off) and handles_high is the highest BO handle any\nclient has been given, against the 4095 usable ones. tools/phx_baseline_report.py applies the\nthresholds in docs/analysis.md §9 to this file and prints which hypothesis the capture supports.\n" > sum
     } else {
         printf "snapshot only (--window 0): the counters were read once, so there is no rate and no delta.\n" > sum
     }

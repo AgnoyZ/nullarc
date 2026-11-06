@@ -46,6 +46,12 @@ REQUIRED_WINDOW_FIELDS = (
 CADENCE_WINDOW_FIELDS = (
     "iop_gap1", "iop_gap2", "iop_gap3", "iop_gap4", "iop_vsync_waits", "iop_vsync_late",
 )
+# Fields added when the capture stopped reading the damage-only copy's bytes and the BO handle headroom and
+# throwing them away. Optional on purpose: a capture taken before that change still decides H1-H4, it just cannot
+# answer B5 (docs/analysis.md §7) or say how close a client came to the handle ceiling.
+COPY_ECONOMY_WINDOW_FIELDS = (
+    "iop_damage_bytes", "iop_damage_full_frames", "bos_handles_high", "bos_handles_full",
+)
 # Metrics compared between a baseline capture and an A/B capture.
 COMPARED_METRICS = (
     "presents_per_s", "avg_copy_us", "copy_share_of_refresh_pct", "vbl_late_avg_us", "gap1_share_pct",
@@ -100,6 +106,8 @@ def load_capture(label, path):
         "fixture": bool(record.get("fixture")),
         "has_cadence": all(isinstance(window.get(field), (int, float))
                            for window in windows for field in CADENCE_WINDOW_FIELDS),
+        "has_copy_economy": all(isinstance(window.get(field), (int, float))
+                                for window in windows for field in COPY_ECONOMY_WINDOW_FIELDS),
     }
 
 
@@ -124,6 +132,35 @@ def cadence_medians(capture):
     }
 
 
+def copy_economy(capture):
+    """What the capture can say about the copy's cost per frame and the client's BO-handle headroom.
+
+    B5 (docs/analysis.md §7) asks whether the damage-only copy is limited by bytes stored or by the cost of each
+    store; answering it needs `iop_damage_bytes` next to `avg_copy_us`, and the handle counters next to the 4095
+    usable handles say how close a client came to the ceiling that crashed a sibling port (docs/RADEARC-REFERENCE.md
+    §2). A capture taken before the script recorded these fields is not an error, but it cannot answer either.
+    """
+    if not capture["has_copy_economy"]:
+        return {"available": False,
+                "note": ("this capture carries no iop_damage_bytes / bos_handles_* windows: it predates the fields, "
+                         "so B5 and the handle headroom cannot be read from it. Rerun tools/phx_baseline.sh on the "
+                         "current build rather than inferring them.")}
+    copies = median_of(capture, "frames_on_panel")
+    damage = median_of(capture, "iop_damage_bytes")
+    return {
+        "available": True,
+        "iop_damage_bytes": damage,
+        "iop_damage_full_frames": median_of(capture, "iop_damage_full_frames"),
+        "damage_bytes_per_frame": (damage / copies) if copies else 0.0,
+        "bos_handles_high": median_of(capture, "bos_handles_high"),
+        "bos_handles_full": median_of(capture, "bos_handles_full"),
+        "note": ("B5 is an A/B, not a hypothesis: run the same window with debug.nvaccel_iop_damage=1 and compare "
+                 "iop_damage_bytes and avg_copy_us against the run with it off. bos_handles_high against the 4095 "
+                 "usable handles is how far this client is from the ceiling, and bos_handles_full above zero means "
+                 "allocations were already refused."),
+    }
+
+
 def decide(capture):
     """Apply the documented thresholds to one capture and say what is supported, undecidable, or refuted."""
     metrics = {
@@ -144,6 +181,7 @@ def decide(capture):
     metrics["blank_share_pct"] = (100.0 * metrics["blank_frames"] / (copies + metrics["blank_frames"])
                                   if copies + metrics["blank_frames"] else 0.0)
     cadence = cadence_medians(capture)
+    economy = copy_economy(capture)
 
     decisions = []
 
@@ -239,6 +277,8 @@ def decide(capture):
         "metrics": {name: round(value, 1) for name, value in metrics.items()},
         "cadence": None if cadence is None else {name: (round(value, 1) if isinstance(value, float) else value)
                                                  for name, value in cadence.items()},
+        "copy_economy": {name: (round(value, 1) if isinstance(value, float) else value)
+                         for name, value in economy.items()},
         "decisions": decisions,
         "supported": supported,
         "candidates": candidates,
@@ -267,7 +307,12 @@ def next_step(supported, candidates, undecidable):
 def compare(baseline, other):
     """Difference between a baseline capture and an A/B capture, with the noise caveat spelled out."""
     rows = []
-    for metric in COMPARED_METRICS:
+    compared = list(COMPARED_METRICS)
+    # B5 is exactly this: the damage path off in the baseline, on in the A/B. Only comparable when both captures
+    # carry the fields, so a baseline taken before them yields no row instead of a fabricated zero.
+    if baseline["has_copy_economy"] and other["has_copy_economy"]:
+        compared += ["iop_damage_bytes", "bos_handles_high"]
+    for metric in compared:
         if metric == "gap1_share_pct":
             left, right = cadence_medians(baseline), cadence_medians(other)
             if left is None or right is None:
@@ -306,12 +351,16 @@ def demo_capture():
              "avg_copy_us": 8000.0, "copy_share_of_refresh_pct": 96.0, "copy_skip": 12, "blank_frames": 0,
              "iop_fail": 0, "vbl_late_avg_us": 120.0, "vbl_late_max_us": 640.0,
              "iop_gap1": 2400, "iop_gap2": 400, "iop_gap3": 120, "iop_gap4": 80,
-             "iop_vsync_waits": 900, "iop_vsync_late": 3},
+             "iop_vsync_waits": 900, "iop_vsync_late": 3,
+             "iop_damage_bytes": 0, "iop_damage_full_frames": 3000, "bos_handles_high": 1200,
+             "bos_handles_full": 0},
             {"index": 2, "vbl_ticks": 7200, "vbl_hz": 120.0, "frames_on_panel": 3060, "presents_per_s": 51.0,
              "avg_copy_us": 7900.0, "copy_share_of_refresh_pct": 94.8, "copy_skip": 14, "blank_frames": 1,
              "iop_fail": 0, "vbl_late_avg_us": 130.0, "vbl_late_max_us": 700.0,
              "iop_gap1": 2450, "iop_gap2": 380, "iop_gap3": 110, "iop_gap4": 120,
-             "iop_vsync_waits": 950, "iop_vsync_late": 4},
+             "iop_vsync_waits": 950, "iop_vsync_late": 4,
+             "iop_damage_bytes": 0, "iop_damage_full_frames": 3046, "bos_handles_high": 1240,
+             "bos_handles_full": 0},
         ],
         "claims": {"display_path_counters_read": True, "gpu_work_submitted": False,
                    "hardware_execution_established": False},
@@ -352,6 +401,17 @@ def render_markdown(report, comparisons):
             lines.append(f"| {decision['id']} | {decision['state']} | {decision['why']} |")
         if not capture["stable"]:
             lines += ["", "Single window: provisional until a repeat window agrees."]
+        economy = capture["copy_economy"]
+        if economy.get("available"):
+            lines += ["", "Copy economy: the damage path stored {damage:.0f} B over the window ({per_frame:.0f} B per "
+                          "copied frame), {full:.0f} frames fell back to a full copy, and the BO handle high-water "
+                          "mark was {high:.0f} of 4095 with {refused:.0f} creates refused.".format(
+                              damage=economy["iop_damage_bytes"], per_frame=economy["damage_bytes_per_frame"],
+                              full=economy["iop_damage_full_frames"], high=economy["bos_handles_high"],
+                              refused=economy["bos_handles_full"]),
+                      economy["note"]]
+        else:
+            lines += ["", f"Copy economy: {economy['note']}"]
         lines += ["", f"Next step: {capture['next_step']}", ""]
     for comparison in comparisons:
         lines += [f"## A/B: {comparison['ab']} against {comparison['baseline']}", "",

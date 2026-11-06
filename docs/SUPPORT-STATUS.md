@@ -26,15 +26,16 @@ there, every claim in this repository is host-side.
 | Firmware loading (PSP, TOC, TMR, nine-file sequence) | Whole-file SHA-256 snapshots, checked extents, seventeen typed IP loads | `host-verified` (synthetic transports) | `tools/test_firmware_sequence.py`, `tools/test_firmware_control.py`, `docs/FIRMWARE-SEQUENCE.md` | a load on the target with the PSP status readback that follows it |
 | PSP / TOC lifecycle | Terminal completion checks, TMR readiness, no fabricated success | `host-verified` (fake IOKit) | `tools/test_psp_submission.py`, `docs/PSP-COMPLETION.md` | the same, on hardware |
 | GART / GPUVM bootstrap | MC and physical addresses derived, no reference constants | `host-verified` (synthetic registers) | `tools/test_gart_bootstrap.py`, `docs/GART-BOOTSTRAP.md` | a walk on hardware with the readback compared |
-| Page tables, VMID binding, retirement | Checked backing, ownership transfer, no synthetic fence retirement | `host-verified` | `tools/test_page_tables.py`, `test_vm_binding.py`, `test_vm_walk_cleanup.py`, `test_bo_retirement.py`, `test_context_retirement.py` | real GPUVM work on the target |
-| MES scheduler, queues, compute ring | Relocated layouts, checked completions, exclusive-ownership gaps documented | `host-verified` (synthetic completions) | `tools/test_mes_start.py`, `test_mes_queue.py`, `test_compute_probe.py`, `docs/MES-START.md`, `docs/QUEUE-ADOPTION.md` | a submission the GPU actually retires |
+| Page tables, VMID binding, retirement | Checked backing, ownership transfer, no synthetic fence retirement | `host-verified` | `tools/test_page_tables.py`, `tools/test_vm_binding.py`, `tools/test_vm_walk_cleanup.py`, `tools/test_bo_retirement.py`, `tools/test_context_retirement.py` | real GPUVM work on the target |
+| MES scheduler, queues, compute ring | Relocated layouts, checked completions, exclusive-ownership gaps documented | `host-verified` (synthetic completions) | `tools/test_mes_start.py`, `tools/test_mes_queue.py`, `tools/test_compute_probe.py`, `docs/MES-START.md`, `docs/QUEUE-ADOPTION.md` | a submission the GPU actually retires |
 | GFX power (SMU/IMU, RLC readiness) | Acknowledged power request, bounded boot-readiness polls | `host-verified` (synthetic) | `tools/test_firmware_sequence.py --power`, `docs/GFX-POWER.md` | a power-up on the target |
-| Shader dispatch (GFX11 probe, native GPUVM probe) | Fixed licensed shader, whole-arena guards, native ABI | `host-verified` (injected GPU writes) | `tools/test_shader_probe.py`, `test_native_shader_probe.py`, `docs/GFX11-SHADER-PROBE.md`, `docs/NATIVE-SHADER-PROBE.md` | one dispatch whose output the GPU wrote |
+| Shader dispatch (GFX11 probe, native GPUVM probe) | Fixed licensed shader, whole-arena guards, native ABI | `host-verified` (injected GPU writes) | `tools/test_shader_probe.py`, `tools/test_native_shader_probe.py`, `docs/GFX11-SHADER-PROBE.md`, `docs/NATIVE-SHADER-PROBE.md` | one dispatch whose output the GPU wrote |
 | Metal plugin, AIR→SPIR-V translator, RADV | Built, linked, signed; SPIR-V and AIR validated; metallib compiled without a device | `host-verified` on `macos-15-intel` | `macos-kexts` CI job, `docs/BUILD.md` | a Metal device created by an app on the target |
 | Probes refusing a wrong host | `metal-smoke` and `native-shader-probe` refuse a non-780M host (exit 4) | `host-verified` | `macos-kexts` CI job | — (this one is a refusal, proven where it must work) |
 | Framebuffer takeover | Takes over the mode the firmware already lit; no mode set, no display-engine programming | `policy-asserted` | `docs/DISPLAY-PATH.md`, `docs/analysis.md` §1 | the panel coming up on the target and the `phx-fb-phys` publish in the log |
 | Copy path and scan-out alias | Every frame is copied; BAR view or verified carve-out view, the alias accepted only when every sample matches the BAR and one is non-zero, and a present before publication spends no verification budget | `policy-asserted` (patch 0028) | `tests/test_hardware_policy.cpp` (budget and acceptance), `tests/test_framebuffer_path.py` (the driver calls them), `docs/DISPLAY-PATH.md` | a capture showing which destination was live, and the `alias: ... samples match the BAR` log line |
-| Copy row path and colour narrowing | 64-byte SSE / 8-byte pair / 4-byte paths chosen from alignment, stride and `debug.nvaccel_iop_sse`; ARGB2101010 → XRGB8888 while copying; `debug.nvaccel_iop_damage=1` stores only the 64-byte groups a frame changed (default off, shadow rules asserted) | `policy-asserted` | `tests/test_copy_path.cpp`, `src/phxaccel/PhxCopyPath.hpp` | a capture's `copy_us` and `damage_sum`, and a screenshot that proves the colours on the panel |
+| Copy row path and colour narrowing | 64-byte SSE / 8-byte pair / 4-byte paths chosen from alignment, stride and `debug.nvaccel_iop_sse`; ARGB2101010 → XRGB8888 while copying; `debug.nvaccel_iop_damage=1` stores only the 64-byte groups a frame changed (default off, shadow rules asserted) | `policy-asserted` | `tests/test_copy_path.cpp`, `src/phxaccel/PhxCopyPath.hpp` | `iop_damage_bytes` and `avg_copy_us` from a B5 A/B (the capture records both), and a screenshot that proves the colours on the panel |
+| BO handles per client | 4096 slots per client, 4095 usable (`PHXN_MAX_BOS`); a full table refuses the BO with `kIOReturnNoResources` and logs once; `debug.phxbos_handles_high` records the highest index handed out and `debug.phxbos_handles_full` counts the refusals | `host-verified` (counters, no ceiling test) | `tests/test_counter_contract.py` (the names are declared, captured and documented), `docs/analysis.md` §4 | a capture whose `bos_handles_high` is well below 4095 — or a non-zero `bos_handles_full`, which would prove the cliff is real on this machine. Raising the limit needs the user-space table raised at the same time, so it stays untouched until then |
 | Present pacing | Complete on the next VBL tick, force-complete past two refreshes, four held frames then copy | `policy-asserted` | `tests/test_present_pacing.cpp`, `src/phxaccel/PhxPresentPacing.hpp` | `debug.nvaccel_iop_gap*` and `_vsync_*` from the target |
 | Frame rate, judder, "is it smooth" | Instrumented, not measured: the counters and the read-only capture exist | `unknown` | `tools/phx_baseline.sh`, `tools/phx_baseline_report.py`, `docs/analysis.md` | one phase-1 capture plus the H1–H4 verdict |
 | Panel timing and modes other than the firmware mode | Not attempted: only the firmware-lit mode, read from the OTG | `not implemented` | `docs/DISPLAY-PATH.md` | a separate mode-setting project |
@@ -45,6 +46,26 @@ there, every claim in this repository is host-side.
 | Install plan (what to add to an EFI, and how to revert it) | `tools/phx_install_plan.py` reads an existing `config.plist` and writes numbered operator steps plus the rollback; no apply mode, and it refuses system locations, foreign kexts and unmatched digests | `host-verified` (synthetic layouts) | `tests/test_install_plan.py`, `docs/INSTALL-PLAN.md` | one reviewed install on the target, then the driver attaching |
 | Installer, uninstaller, rollback package | None shipped and none planned: `tools/phx_boot_gate.sh` runs stages but ships none, and the plan tool writes steps instead of performing them. The security changes upstream's install needs stay the owner's decision, not the repository's action | `not implemented` | `docs/BOOT-GATE.md`, `docs/INSTALL-PLAN.md` | an installer that stays step-revertible and touches no system location |
 | Other 780M / 760M machines (Hawk Point, other panels) | Nothing is claimed for them | `unknown` | — | a report from one of those machines |
+
+## What one capture would move, field by field
+
+Most rows above say "a capture" without saying which number. This is that mapping, and it is the reason each
+instrumented row names a field that `tools/phx_baseline.sh` actually writes: a row whose field the capture does
+not record can never move, and it would read as "waiting for hardware" instead of "cannot be answered".
+
+| capture field | row it moves | what value would move it |
+| --- | --- | --- |
+| `copy_share_of_refresh_pct`, `presents_per_s`, `vbl_hz` | Frame rate, judder | H1 supported or refuted by `tools/phx_baseline_report.py` — either way the row stops being `unknown` |
+| `vbl_late_avg_us`, `vbl_late_max_us` | Present pacing | lateness above the §9 line makes B2 the next step, below it retires the tick question |
+| `iop_gap1`–`iop_gap4`, `iop_vsync_waits`, `iop_vsync_late` | Present pacing | an even cadence refutes H3; two-or-more-refresh gaps support it |
+| `iop_damage_bytes`, `iop_damage_full_frames` | Copy row path and colour narrowing | a B5 A/B where stored bytes drop and `avg_copy_us` follows — or does not |
+| `bos_handles_high`, `bos_handles_full` | BO handles per client | a high-water mark far from 4095 is headroom; a non-zero `bos_handles_full` is the ceiling being hit for real |
+| the `alias:` lines in the kernel log | Copy path and scan-out alias | one `samples match the BAR` line proves the carve-out view was verified at least once |
+| `phx-fb-phys` / `phx-build` in `ioreg.txt` | Framebuffer takeover | the driver publishing what it took over, on the target |
+| `knobs` | every row | they say which path the numbers describe; a capture whose knobs are missing is not comparable |
+
+A field in that table is a promise the tool keeps: `tests/test_phase1_baseline_shell.py` asserts the JSON carries
+it, and `tests/test_baseline_report.py` asserts the verdict tool reports it.
 
 ## How to keep this table honest
 

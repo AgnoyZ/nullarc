@@ -204,6 +204,71 @@ class ReportTests(unittest.TestCase):
             self.assertFalse(rows["vbl_late_avg_us"]["meaningful"])
             self.assertIn("single sample", comparison["note"])
 
+    def test_a_capture_carrying_the_copy_economy_fields_reports_them(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            # The damage path off (bytes 0, every frame a full copy) and the client creeping up on 4095 handles:
+            # values the capture reads today and used to discard, so B5 and the ceiling question had no answer.
+            measured = capture(window(1, iop_damage_bytes=1_200_000, iop_damage_full_frames=40,
+                                      bos_handles_high=3900, bos_handles_full=3),
+                               window(2, iop_damage_bytes=1_400_000, iop_damage_full_frames=60,
+                                      bos_handles_high=4095, bos_handles_full=12))
+            report = self.verdict(self.write(temporary, "economy.json", measured))
+            economy = report["captures"][0]["copy_economy"]
+            self.assertTrue(economy["available"])
+            self.assertEqual(economy["iop_damage_bytes"], 1_300_000)
+            self.assertEqual(economy["iop_damage_full_frames"], 50)
+            self.assertAlmostEqual(economy["damage_bytes_per_frame"], 1300000 / 7200, places=1)
+            self.assertEqual(economy["bos_handles_high"], 3997.5)
+            self.assertEqual(economy["bos_handles_full"], 7.5)
+            self.assertIn("B5 is an A/B", economy["note"])
+            markdown = self.render(measured)
+            self.assertIn("Copy economy", markdown)
+            self.assertIn("1300000 B", markdown)
+            self.assertIn("of 4095", markdown)
+
+    def test_a_capture_without_the_copy_economy_fields_says_so_instead_of_guessing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            older = capture(window(1), window(2))
+            report = self.verdict(self.write(temporary, "older.json", older))
+            economy = report["captures"][0]["copy_economy"]
+            self.assertFalse(economy["available"])
+            self.assertIn("predates", economy["note"])
+            self.assertIn("Copy economy", self.render(older))
+            # The rest of the verdict is unaffected: an older capture still decides H1-H4.
+            self.assertEqual(report["captures"][0]["undecidable"], [])
+
+    def test_the_ab_comparison_adds_the_damage_bytes_only_when_both_sides_carry_them(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            off = capture(window(1, iop_damage_bytes=0, iop_damage_full_frames=7200, bos_handles_high=3000,
+                                 bos_handles_full=0),
+                          window(2, iop_damage_bytes=0, iop_damage_full_frames=7200, bos_handles_high=3000,
+                                 bos_handles_full=0))
+            on = capture(window(1, iop_damage_bytes=1_200_000, iop_damage_full_frames=40, bos_handles_high=3100,
+                                bos_handles_full=2),
+                         window(2, iop_damage_bytes=1_300_000, iop_damage_full_frames=60, bos_handles_high=3100,
+                                bos_handles_full=3))
+            both = self.verdict(f"off={self.write(temporary, 'off.json', off)}",
+                                f"on={self.write(temporary, 'on.json', on)}")
+            rows = {row["metric"]: row for row in both["comparisons"][0]["rows"]}
+            self.assertIn("iop_damage_bytes", rows)
+            self.assertIn("bos_handles_high", rows)
+            # The damage path is off in the baseline, so the change has no percentage: n/a, never an invented one.
+            self.assertIsNone(rows["iop_damage_bytes"]["change_pct"])
+            self.assertEqual(rows["iop_damage_bytes"]["ab"], 1250000.0)
+            older_baseline = self.verdict(f"older={self.write(temporary, 'older.json', capture(window(1), window(2)))}",
+                                          f"on={self.write(temporary, 'on2.json', on)}")
+            self.assertNotIn("iop_damage_bytes",
+                             [row["metric"] for row in older_baseline["comparisons"][0]["rows"]])
+
+    def render(self, record):
+        """The markdown the tool writes, for the assertions that a session reads rather than the JSON."""
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary) / "verdict"
+            path = self.write(temporary, "capture.json", record)
+            result = self.run_tool(str(path), "--out", str(out))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return (out / "verdict.md").read_text(encoding="utf-8")
+
     def test_a_directory_capture_and_an_output_directory_are_both_accepted_once(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary) / "capture"
