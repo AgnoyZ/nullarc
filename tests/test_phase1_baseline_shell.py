@@ -199,5 +199,41 @@ class BaselineTests(unittest.TestCase):
             self.assertEqual(self.run_script(env, "--out", str(work / "b"), "--samples", "0").returncode, 2)
 
 
+class ScriptStructureTests(unittest.TestCase):
+    """Checks that need no shell, so they also run on Windows where the execution tests are skipped.
+
+    The awk program is a single-quoted shell string. One apostrophe inside it -- "the client's capacity" -- ends
+    that string, and the script becomes a shell syntax error with a truncated awk program behind it, which is what
+    CI run `42163699236` reported:
+
+        awk: cmd. line:37: (END OF FILE) source files ... must contain complete functions or rules
+        phx_baseline.sh: 147: Syntax error: "(" unexpected
+
+    A reader cannot see that, and it only fails where awk exists, so it is asserted here.
+    """
+
+    def setUp(self):
+        self.script = SCRIPT.read_text(encoding="utf-8")
+
+    def awk_program(self):
+        start = self.script.index("awk -v window=")
+        opening = self.script.index("'", start)
+        closing = self.script.index("}' || die", start)
+        return self.script[opening + 1:closing]
+
+    def test_the_embedded_awk_program_contains_no_apostrophe(self):
+        program = self.awk_program()
+        self.assertGreater(len(program), 1000, "the awk program moved; this check reads the wrong region")
+        self.assertNotIn("'", program,
+                         "an apostrophe inside the awk program ends the shell string that holds it")
+
+    def test_the_summary_columns_have_fields_in_the_record(self):
+        # The summary's third table reads tsv columns 16..19, so the JSON has to carry the same four numbers.
+        for field in ("iop_damage_bytes", "iop_damage_full_frames", "bos_handles_high", "bos_handles_full"):
+            self.assertIn(f'\\"{field}\\":', self.script)
+        for column in ("f[16]", "f[17]", "f[18]", "f[19]"):
+            self.assertIn(column, self.script)
+
+
 if __name__ == "__main__":
     unittest.main()

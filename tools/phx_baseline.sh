@@ -136,9 +136,10 @@ BEGIN {
             g4 = B["debug.nvaccel_iop_gap4"] - A["debug.nvaccel_iop_gap4"]
             vw = B["debug.nvaccel_iop_vsync_waits"] - A["debug.nvaccel_iop_vsync_waits"]
             vl = B["debug.nvaccel_iop_vsync_late"] - A["debug.nvaccel_iop_vsync_late"]
-            # The copy economy (B5) and the client's capacity headroom. damage_* and handles_full are counters, so
-            # the window carries deltas; handles_high is a high-water mark, so its window value is the mark itself
-            # and subtracting would invent a "handles freed" number the driver never reports.
+            # The copy economy (B5) and the per-client capacity headroom. damage_* and handles_full are counters,
+            # so the window carries deltas; handles_high is a high-water mark, so its window value is the mark
+            # itself and subtracting would invent a "handles freed" number the driver never reports.
+            # NB: no apostrophes in this awk program -- it is inside a single-quoted shell string.
             dm = B["debug.nvaccel_iop_damage_sum"] - A["debug.nvaccel_iop_damage_sum"]
             dfull = B["debug.nvaccel_iop_damage_full"] - A["debug.nvaccel_iop_damage_full"]
             hhigh = B["debug.phxbos_handles_high"]
