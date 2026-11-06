@@ -260,3 +260,13 @@ Two consequences worth keeping in view:
    said not to run. That is now asserted rather than remembered: `tests/test_reference_scripts.py`, and each of
    the four reference scripts carries a "not run by this repository" banner so nobody mistakes it for the entry
    point.
+
+## Same-base audit, second pass (2026-11-06): what RadeArc found on hardware since the first read
+
+Re-read at `main` = `b3806df` (24 commits after `d8d8d18`, `docs/RADEARC-REFERENCE.md` §6). Two findings are not
+machine constants but base-code shapes, so they belong in this audit rather than in the constants table:
+
+| Finding on their hardware | Where it lives in this tree | Status here |
+| --- | --- | --- |
+| **BO pages allocated in `kernel_task`'s map** exhausted the kernel's address space: WindowServer aborted every ~30 minutes with `KERN_NO_SPACE` from `vm_map_enter` while ~1 GiB of BOs each held a kernel mapping (build 46). Their fix: allocate BO pages in the client's own map, wire with `prepare()`, and give the kernel a mapping only for the fence it writes (`kernelView`), behind `debug.phxbo_task_alloc` | `src/phxbringup/PhxBringup.cpp:2055-2056` — `IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task, kIODirectionInOut \| kIOMemoryKernelUserShared, size, PAGE_SIZE)` | **applies structurally, not fixed.** The call shape is the one they diagnosed. It cannot be observed here (it needs half an hour of a real compositor); implementing their fix is a kext ownership change — `prepare()`/release lifetime plus a kernel view for fences — that nothing in this repository can verify, so it stays a recorded item with the reference implementation named |
+| **The scan-out view's speed is a per-chip measurement, not a constant** — the 780M stores faster through the carve-out, their 8500G five times faster through the BAR (builds 43/44) | `src/phxaccel/accel/phxfb.cpp` (`debug.phxfb_alias`), `docs/analysis.md` §7 B4 | **still a fixed preference here** (0 = BAR, 1 = carve-out), and the 780M half of their result supports the expectation this tree carries. Measuring once at startup is the transferable design; it needs the target to measure on |

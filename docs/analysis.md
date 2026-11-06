@@ -241,7 +241,7 @@ the A/B switches, one at a time, changing nothing else:
 | B1 | `debug.nvaccel_iop_sse=0` (versus the arming default of 1) | how much of the copy cost is the row copy |
 | B2 | `debug.phxfb_vbl_staged=0` | is the staged tick worth it, and how late is a plain deadline |
 | B3 | `debug.nvaccel_iop_vsync=0` | does the next-tick completion actually change the cadence |
-| B4 | `debug.phxfb_alias=0` | the BAR copy baseline (expected to be much worse; it is the control, not a candidate) |
+| B4 | `debug.phxfb_alias=0` | the BAR copy baseline (expected to be much worse; it is the control, not a candidate). A sibling port measured this per chip rather than assuming it — 780M faster through the carve-out, their Phoenix 2 part 5x faster through the BAR (`docs/RADEARC-REFERENCE.md` §6) — so the expectation is supported for our chip and B4 is what confirms it here |
 | B5 | `debug.nvaccel_iop_damage=1` | is the cost the number of stored bytes or their price: `iop_damage_bytes` says how much was stored, `avg_copy_us` whether it got faster, `iop_damage_full_frames` how often the shadow could not help (the record's field names; the sysctls behind them are `debug.nvaccel_iop_damage_sum`/`_full`) |
 
 Each A/B capture goes in as `label=PATH` after the baseline capture, and the report prints the change per

@@ -28,7 +28,7 @@
 
 ## RadeArc（同一上游的 Phoenix 2 下游，仅参考）
 - 仓库：https://github.com/Kreytus/RadeArc
-- 审阅提交：`d8d8d18`（2026-11-03），比共同基线 `cbb08dd` 多 74 个提交；目标机是 Radeon 740M（Phoenix 2，GC 11.0.4）的**桌面** HDMI/DP，不是 780M 内屏。
+- 审阅提交：`d8d8d18`（2026-11-03），比共同基线 `cbb08dd` 多 74 个提交；目标机是 Radeon 740M（Phoenix 2，GC 11.0.4）的**桌面** HDMI/DP，不是 780M 内屏。复查提交：`b3806df`（2026-11-05，多 24 个提交，见 `RADEARC-REFERENCE.md` §6）：scan-out 两条视图改为开机实测选快的（780M 走 carve-out 更快、其 8500G 走 BAR 快 5 倍）、BO 页改到 client 地址空间（原来在内核映射里 30 分钟后 `KERN_NO_SPACE` 崩 WindowServer，本仓库有同一调用形态）、`debug.phxbo_clients` 按进程列 BO、Test L 第 2–5d 步已在硬件上验证。
 - 可参考：机器相关常量的完整清单（`docs/PORTING_AUDIT.md`，带 Linux `drivers/gpu/drm/amd` 出处）、按 `phx-chip` 与驱动发布属性改写 `mesboot` 布局的做法、实测的 damage-only 拷贝、DCN 3.1.4 寄存器计划与在用户态运行 Linux DML 的方式、以及其 CI/打包形态。
 - 不能复制：`hardware/dumps/**`（VBIOS、VFCT、EDID、ip_discovery）、发布二进制的 CI、`install.sh`/`update.sh` 安装流程；其 780M/eDP 结论不是对本目标机的复测。
 - 逐项评估见 `RADEARC-REFERENCE.md`。

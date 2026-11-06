@@ -4,9 +4,10 @@ A second downstream of the same upstream this branch is built on, ported to a di
 recorded here because it answers questions this branch had left open, and because adopting anything from it
 has to be deliberate: it ships things this repository must not copy.
 
-Pinned for reading: `main` = `d8d8d18` (2026-11-03), 74 commits ahead of `luuumi-dev/nullarc` `cbb08dd` — the
-same base as `downstream/780m-tahoe`. Everything below was read through the GitHub API at that commit; nothing
-was copied into this tree.
+Pinned for reading: `main` = `b3806df` (2026-11-05), 98 commits ahead of `luuumi-dev/nullarc` `cbb08dd` — the
+same base as `downstream/780m-tahoe`. The first read of this document was at `d8d8d18` (2026-11-03); §1a records
+what the 24 commits since then changed and what it means here. Everything below was read through the GitHub API at
+those commits; nothing was copied into this tree.
 
 ## What it is
 
@@ -123,6 +124,53 @@ for a different firmware set — but it is not our path: the reference workflow 
 loader derives its extents from the firmware headers (`tools/firmware_manifest.py` →
 `PhxFirmwareProfile.h` → `phxctl firmware-sequence`). `tests/test_reference_scripts.py` keeps that substitution
 from silently reversing.
+
+### 6. What changed since the first read (`d8d8d18` → `b3806df`, 24 commits, 2026-11-04/05)
+
+Read again on 2026-11-06. Five things bear on this branch; none is implemented here.
+
+**Scan-out view speed is now measured instead of assumed** (builds 43/44, `src/phxaccel/accel/phxfb.cpp`).
+`debug.phxfb_wbench` stores the same 1 MB through the system-RAM view, the BAR and a fresh write-back view and logs
+the memory-type MSRs (`PAT`, `MTRRs`, `SYSCFG`, `TOP_MEM`, `TOM2`) so the answer comes from the machine; their
+window drag still stored at ~190 MB/s, i.e. uncached. Build 44 then made `debug.phxfb_alias=1` mean **auto**: at
+the first frame whose system-RAM view matches the BAR, both views store the same 1 MB (three rounds, best of each)
+and frames use the faster one — `2` forces the carve-out, `0` the BAR, with new counters `phxfb_alias_faster`,
+`_bar_us`, `_ram_us`. Their measured result is chip-specific and it is the opposite of ours on *their* chip:
+**the 780M stores faster through the carve-out, the 8500G five times faster through the BAR.**
+*Bearing here:* our `debug.phxfb_alias` is a fixed preference (0 = BAR, 1 = carve-out) and our expectation that the
+BAR is the slow path now has independent support on the 780M — but it is still an expectation from an upstream
+comment, which is what B4 (`docs/analysis.md` §7) is meant to test. Their "measure once, then choose" is the
+transferable part, and it cannot be built without a machine to measure on.
+
+**BO pages moved out of the kernel's address space** (build 46, `src/phxbringup/PhxBringup.cpp`). WindowServer
+aborted every ~30 minutes: `KERN_NO_SPACE` in `vm_map_enter` while ~1 GiB of BOs (WindowServer 309 MiB, the
+browser/Discord GPU helpers ~450 MiB) each held a **kernel mapping from `kernel_task`**. Their per-client
+bookkeeping balanced (live = created − freed), so it was the kernel map, not a leak. They now allocate BO pages in
+the client's own map and wire them with `prepare()` like host imports; the kernel maps a BO only when a fence
+forces it (`kernelView`), behind `debug.phxbo_task_alloc` (0 returns to the old path) and
+`debug.phxbo_task_alloc_fail`. *Bearing here:* **this tree has the same call** —
+`PhxBringup.cpp:2055-2056` allocates with
+`IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task, kIODirectionInOut | kIOMemoryKernelUserShared, size, PAGE_SIZE)`.
+So the same cliff is structural here, and it would show up only after half an hour of a real compositor workload,
+i.e. exactly what no session here has produced yet. Recorded in `docs/BRINGUP-AUDIT.md`; not fixed, because the fix
+is a kext lifetime change (`prepare()`/release ownership, a kernel view for fences) that nothing available here can
+verify.
+
+**`debug.phxbo_clients`** (build 45) gives every open client a slot — pid, process name, live BOs and MiB, created
+and freed counts — so the process holding memory names itself. Our `debug.phxbos_handles_high`/`_full` only say how
+close a *handle index* came to 4095 and how many creates were refused; neither attributes memory to a process. If a
+leak ever needs chasing, that is the shape of the counter to add.
+
+**Test L is now hardware-verified step by step** (`docs/TEST_PHOENIX2.md`, +311 lines). Steps 2–5d on the 8500G:
+Linux's 60 Hz DML values on the live pipe (15 s, no underflow, exact restore), a DISPCLK/DPPCLK raise to their
+144 Hz values through the SMU (355.6 MHz), a DMUB inbox-1 `NULL` command, OPP0's DPG blank/unblank, DPMS off/on
+with Linux's SYMCLK-on-TX-off workaround (the first run lost the picture), a full mode set down and up, and a mode
+set coming up as HDMI with an AVI InfoFrame and SCDC. *Bearing here:* our panel-timing and external-display rows are
+`not implemented`; this is the closest verified reference if that project is ever started, and it is still
+HDMI/DP on a desktop — no eDP link training, no backlight, no panel power sequencing.
+
+**Their CI packaging moved to `ubuntu-latest`** because macOS runners queued and were cancelled mid-run. Worth
+knowing before this branch ever wants a package job.
 
 ## What this branch must not take from it
 
