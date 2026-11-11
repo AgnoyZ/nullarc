@@ -42,11 +42,27 @@ focused check passed; it is not counted as a full-stack pass.
 ## Shader caches
 
 Code `373bb0ab10f5a90c2960b8aee715d203887415b4`, focused run `43060440232`:
-completed/success. Results include Linux/macOS actual cache I/O under ASan/UBSan
-and macOS Foundation LRU/actual-wrapper tests. Detailed counts will be checked
-from the completed log before the final evidence update.
+completed/success. Ubuntu passed all 339 Python tests. Linux/macOS passed actual
+cache I/O under ASan/UBSan, including 480 concurrent process/thread writes; macOS
+passed 20000 Foundation LRU oracle operations and the actual-wrapper checks.
+Both kexts and the actual plugin compiled/linked/signed/strict-verified on
+macOS 15.7.9 / 24G830 with Apple Clang 17.0.0. A fresh Windows LF clone ran
+339 tests with 26 platform skips and no failures. No shader execution or speedup
+was measured. Separate full-stack run `43060440414` was cancellation-requested
+after focused success, not counted as a pass.
 
 ## Submission refusal
 
-The following change tests the actual begin/release bodies using Vulkan, witness,
-retirement and timing fakes. Native sanitizer/compilation results are pending CI.
+Code `e255533d67e8796e30d075558fdf2ebf1bb0af5e`, focused run `43061127998`:
+completed/success. All 340 Python tests and existing host/lifetime suites passed.
+Both Linux and macOS passed 33 actual begin/release-body fault cases under
+ASan/UBSan, using explicit Vulkan, witness, retirement and timing fakes. Actual
+kext/plugin builds and strict signing verification passed on the same macOS
+15.7.9 / 24G830, Apple Clang 17.0.0 host. No real fence/reset/power behavior was
+tested. Full-stack run `43061127991` was cancellation-requested after focused
+success and is not counted as a pass.
+
+## Unsupported hardware color updates
+
+Both gamma overloads and CLUT now refuse instead of silently succeeding. Host
+callback checks and actual PhxAccel compilation remain pending for that revision.

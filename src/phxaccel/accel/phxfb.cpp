@@ -337,9 +337,11 @@ public:
         return kIOReturnSuccess;
     }
     IOReturn setInterruptState(void *, UInt32) override { return kIOReturnSuccess; }
-    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { return kIOReturnSuccess; }
-    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { return kIOReturnSuccess; }
-    IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { return kIOReturnSuccess; }
+    // Firmware scan-out has no downstream LUT programming path. Do not report
+    // a successful hardware color update when no table was applied.
+    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { return kIOReturnUnsupported; }
+    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { return kIOReturnUnsupported; }
+    IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { return kIOReturnUnsupported; }
     IOReturn setApertureEnable(IOPixelAperture, IOOptionBits) override { return kIOReturnSuccess; }
     IOReturn setStartupDisplayMode(IODisplayModeID, IOIndex) override { return kIOReturnSuccess; }
     // power and connection answers as NullMoth's NMIntelFB/NVRMFB give them: acknowledge at once, never queue on the

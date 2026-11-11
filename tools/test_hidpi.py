@@ -1,10 +1,18 @@
 """Execute the real PhxAMDFB mode-information method with fake IOKit, not a GPU."""
 import argparse
+import re
 from pathlib import Path
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def color_methods(source):
+    methods = re.findall(r'^    IOReturn (?:setGammaTable|setCLUTWithEntries)\([^\n]*\) override \{[^{}]*\}', source, re.M)
+    if len(methods) != 3 or sum('setGammaTable(' in m for m in methods) != 2:
+        raise RuntimeError('Expected two gamma overloads and one CLUT callback')
+    return '\n'.join(m.replace(' override', '') for m in methods)
 
 
 def harness():
@@ -13,7 +21,8 @@ def harness():
     method = "    IOReturn getInformationForDisplayMode(" + method.split("    UInt64 getPixelFormatsForDisplayMode(", 1)[0]
     method = method.replace(" override", "")
     template = (ROOT / "tests/test_hidpi.cpp").read_text(encoding="utf-8")
-    return template.replace("    // ACTUAL_FRAMEBUFFER_METHOD", method)
+    return template.replace("    // ACTUAL_FRAMEBUFFER_METHOD", method).replace(
+        "    // ACTUAL_FRAMEBUFFER_COLOR_METHODS", color_methods(source))
 
 
 def main():

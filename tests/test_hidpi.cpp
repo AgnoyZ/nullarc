@@ -3,10 +3,15 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 using IOReturn = int;
 using IODisplayModeID = uint32_t;
 using IOFixed1616 = uint32_t;
+using UInt32 = uint32_t;
+using IOOptionBits = uint32_t;
+struct IOColorEntry { uint16_t index, red, green, blue; };
 constexpr int kIOReturnSuccess = 0, kIOReturnBadArgument = -1;
+constexpr int kIOReturnUnsupported = -2;
 constexpr uint32_t kDisplayModeValidFlag = 1, kDisplayModeSafeFlag = 2, kDisplayModeDefaultFlag = 4;
 constexpr uint32_t kDisplayModeValidForHiResFlag = 0x00800000, kDisplayModeNativeFlag = 0x02000000;
 struct IODisplayModeInformation {
@@ -19,6 +24,7 @@ struct Framebuffer {
     uint32_t fWidth = 2560, fHeight = 1600, fRefreshMilliHz = 120000;
     bool fHiDPI = false;
     // ACTUAL_FRAMEBUFFER_METHOD
+    // ACTUAL_FRAMEBUFFER_COLOR_METHODS
 };
 
 int main() {
@@ -55,5 +61,20 @@ int main() {
     fb.fRefreshMilliHz = 59940;
     assert(fb.getInformationForDisplayMode(1, &high) == kIOReturnSuccess);
     assert(high.refreshRate == (59940ull << 16) / 1000);
-    std::puts("PASS: native HiDPI policy and actual framebuffer callback; no GPU execution");
+    unsigned char table[128]; std::memset(table, 0xA5, sizeof table);
+    unsigned char saved[128]; std::memcpy(saved, table, sizeof saved);
+    IOColorEntry entries[2] = {{0, 1, 2, 3}, {1, 4, 5, 6}};
+    const auto first = entries[0], second = entries[1];
+    for (const auto count : {0u, 1u, 256u, UINT32_MAX}) {
+        assert(fb.setGammaTable(3, count, 16, table) == kIOReturnUnsupported);
+        assert(fb.setGammaTable(3, count, 16, table, false) == kIOReturnUnsupported);
+        assert(fb.setGammaTable(3, count, 16, table, true) == kIOReturnUnsupported);
+        assert(fb.setCLUTWithEntries(entries, 0, count, 0) == kIOReturnUnsupported);
+    }
+    assert(fb.setGammaTable(0, 0, 0, nullptr) == kIOReturnUnsupported);
+    assert(fb.setGammaTable(0, 0, 0, nullptr, true) == kIOReturnUnsupported);
+    assert(fb.setCLUTWithEntries(nullptr, 0, 0, 0) == kIOReturnUnsupported);
+    assert(!std::memcmp(table, saved, sizeof table));
+    assert(!std::memcmp(&entries[0], &first, sizeof first) && !std::memcmp(&entries[1], &second, sizeof second));
+    std::puts("PASS: native HiDPI policy and actual framebuffer mode/color callbacks; no GPU execution");
 }

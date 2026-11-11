@@ -10,9 +10,19 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import phx_hidpi
+from test_hidpi import color_methods
 
 
 class HiDPITests(unittest.TestCase):
+    def test_color_callback_extraction_rejects_missing_or_duplicate_methods(self):
+        source = (ROOT / 'src/phxaccel/accel/phxfb.cpp').read_text(encoding='utf-8')
+        methods = color_methods(source)
+        self.assertEqual(methods.count('setGammaTable('), 2)
+        self.assertEqual(methods.count('setCLUTWithEntries('), 1)
+        for changed in ('', source + source, source.replace('setCLUTWithEntries(', 'missing(')):
+            with self.assertRaises(RuntimeError):
+                color_methods(changed)
+
     def test_record_is_native_backing_not_logical_points(self):
         value = phx_hidpi.display_override(0x1234, 0x5678, 2560, 1600)
         self.assertEqual(value["scale-resolutions"], [bytes.fromhex("00000a000000064000000001")])

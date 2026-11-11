@@ -69,6 +69,8 @@ jobs:
         run: python3 tools/test_shader_cache.py --out build/shader-cache-tests
       - name: Execute actual submission refusal paths with sanitizers
         run: python3 tools/test_submit_begin.py --out build/submit-begin-tests
+      - name: Execute actual framebuffer mode and color callbacks
+        run: python3 tools/test_hidpi.py
       - name: Reproduce and bound actual native-submit debug reads without hardware
         run: python3 tools/test_ib_debug.py --out build/ib-debug-tests
       - name: Exercise serialized queue retirement and submission without hardware
