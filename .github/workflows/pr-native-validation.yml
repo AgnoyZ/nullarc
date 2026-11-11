@@ -1,0 +1,50 @@
+name: Native validation of upstream PRs 6-9
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Intel macOS / ${{ matrix.variant }}
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        variant: [baseline, pr6, pr7, pr8, pr9, pr6-7, pr6-7-8, pr6-7-8-9]
+    steps:
+      - name: Checkout validation harness
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: harness
+          persist-credentials: false
+      - name: Checkout disposable candidate with all PR objects
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 8aba872560a3c9b7dc7a0ddebfad001c6dddf315
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout pinned MacKernelSDK
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: acidanthera/MacKernelSDK
+          ref: 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          path: sdk
+          persist-credentials: false
+      - name: Checkout pinned Vulkan headers
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: KhronosGroup/Vulkan-Headers
+          ref: 6802bb4733b63ed5efd3adb308a6c885ef180ea1
+          path: vulkan
+          persist-credentials: false
+      - name: Compile, sanitize, sign and inspect pinned native sources
+        run: >-
+          python3 harness/tools/pr_native_validation.py
+          --source candidate --variant ${{ matrix.variant }}
+          --sdk sdk --vulkan vulkan
