@@ -38,7 +38,39 @@ behavior, sleep/wake correctness, desktop FPS, or installation readiness.
 The macOS runner is a build/test host, not the target machine.
 
 No previous self-reported PR validation is counted as this workflow's result.
-The actual run ID, source SHAs and results will be recorded after completion.
+Structured evidence is in `upstream-pr-native-20261111.json` alongside this file.
+
+## Completed results
+
+Run `42988239667`, workflow commit
+`7341c7816e71b5e805534b456752c1a534c6afb1`, completed on 2026-11-11.
+Every job used `macos-15-intel`, reporting macOS 15.7.9 (24G830), x86_64 and
+Apple Clang 17.0.0. The overall Actions conclusion is **failure**; it must not
+be presented as a fully passing CI run.
+
+| Variant | Plugin and two kexts: compile/sign/inspect | PR-specific ASan/UBSan checks | Original `make test` |
+| --- | --- | --- | --- |
+| Unmodified upstream baseline | Passed | Not applicable | Failed: existing wait-sequence assertion |
+| PR 6 | Passed | Sampler keys passed | Same failure |
+| PR 7 | Passed | Surface keys passed | Same failure |
+| PR 8 | Passed | Descriptor masks passed | Same failure |
+| PR 9 | Passed | All 43 panel-timing cases passed | Same failure |
+| PRs 6+7 | Passed | Both key suites passed | Same failure |
+| PRs 6+7+8 | Passed | All three plugin suites passed | Same failure |
+| PRs 6+7+8+9 | Passed | All four PR suites passed | Same failure |
+
+Across all eight variants, plugin export names were identical (997 symbols),
+and the plugin compiler warning messages were identical (323 warnings). The
+seven firmware fixture hashes also matched. Each job verified that its tracked
+candidate source files were unchanged after compilation and testing. These are
+native compiler, CPU correctness and structural/signature results, not runtime
+GPU acceptance. The translator, Mesa and LLVM runtime stack was not rebuilt by
+this focused PR matrix.
+
+The existing downstream Python suite was also run in a disposable LF checkout:
+324 tests, 25 platform skips, remaining tests passed. The initial Windows CRLF
+checkout caused two byte/patch comparison failures; no production source was
+changed to address them.
 
 ## First native attempt
 
@@ -50,8 +82,18 @@ this Intel macOS runner, real scheduling can let the 3-millisecond retirement
 thread finish before the simulated counter reaches its sleep phase. The same
 assertion failed in the unmodified baseline, so this is not evidence that a PR
 introduced a regression. This original test is retained without modification.
+The first attempt also saw the short-wait test's `!timed_out` assertion fail in
+the all-four-PR variant. PR 9 and PRs 6+7 passed that first complete attempt,
+consistent with the original test's scheduling sensitivity rather than a
+repeatable difference introduced by these changes.
 
 The harness now records test failures and continues through the independent
 PR tests and native builds. A test failure still fails the job; a successful
 native build is reported separately. The panel timing suite also runs directly
 because `make test` would otherwise stop before reaching it.
+
+The older downstream full-stack workflow was automatically triggered by each
+validation-only push. Those duplicate push runs were deliberately cancelled;
+the original full-stack pipeline and pinned downstream driver were left intact.
+No target driver installation, reboot, EFI modification or public binary upload
+was performed.

@@ -1,0 +1,1314 @@
+{
+  "record_date": "2026-11-11",
+  "repository": "AgnoyZ/nullarc",
+  "run_id": 42988239667,
+  "run": {
+    "conclusion": "failure",
+    "createdAt": "2026-11-11T08:35:23Z",
+    "headSha": "7341c7816e71b5e805534b456752c1a534c6afb1",
+    "status": "completed",
+    "updatedAt": "2026-11-11T08:39:28Z",
+    "url": "https://github.com/AgnoyZ/nullarc/actions/runs/42988239667"
+  },
+  "checks": {
+    "all_eight_native_builds_passed": true,
+    "all_export_names_match_baseline": true,
+    "all_plugin_warning_messages_match_baseline": true,
+    "all_firmware_fixture_hashes_match_baseline": true,
+    "only_original_unit_suite_failed": true,
+    "all_jobs_used_intel_macos_runner": true,
+    "all_individual_pr_tests_passed": true,
+    "all_combined_pr_tests_passed": true
+  },
+  "jobs": [
+    {
+      "id": 130414481711,
+      "name": "Intel macOS / pr7",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "started_at": "2026-11-11T08:35:27Z",
+      "completed_at": "2026-11-11T08:37:14Z"
+    },
+    {
+      "id": 130414481959,
+      "name": "Intel macOS / pr9",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "started_at": "2026-11-11T08:36:52Z",
+      "completed_at": "2026-11-11T08:38:06Z"
+    },
+    {
+      "id": 130414482013,
+      "name": "Intel macOS / pr8",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "started_at": "2026-11-11T08:35:27Z",
+      "completed_at": "2026-11-11T08:36:53Z"
+    },
+    {
+      "id": 130414482026,
+      "name": "Intel macOS / pr6-7",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "started_at": "2026-11-11T08:36:56Z",
+      "completed_at": "2026-11-11T08:38:38Z"
+    },
+    {
+      "id": 130414482099,
+      "name": "Intel macOS / pr6-7-8",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "started_at": "2026-11-11T08:37:19Z",
+      "completed_at": "2026-11-11T08:39:28Z"
+    },
+    {
+      "id": 130414482162,
+      "name": "Intel macOS / pr6-7-8-9",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "started_at": "2026-11-11T08:37:25Z",
+      "completed_at": "2026-11-11T08:39:11Z"
+    },
+    {
+      "id": 130414482312,
+      "name": "Intel macOS / baseline",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "started_at": "2026-11-11T08:35:27Z",
+      "completed_at": "2026-11-11T08:36:49Z"
+    },
+    {
+      "id": 130414482488,
+      "name": "Intel macOS / pr6",
+      "status": "completed",
+      "conclusion": "failure",
+      "labels": [
+        "macos-15-intel"
+      ],
+      "started_at": "2026-11-11T08:35:26Z",
+      "completed_at": "2026-11-11T08:37:22Z"
+    }
+  ],
+  "variants": {
+    "pr7": {
+      "PhxAccel": {
+        "architecture": "x86_64",
+        "bundle_identifier": "com.luuumi.PhxAccel",
+        "bytes": 350720,
+        "macho_type": 11,
+        "sha256": "db4d94b8c5c213487ca922af45127e4bb999d0663924e0d87f19508cfc22f2b3"
+      },
+      "PhxBringup": {
+        "architecture": "x86_64",
+        "bundle_identifier": "org.drip.PhxBringup",
+        "bytes": 92624,
+        "macho_type": 11,
+        "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+      },
+      "architecture": "x86_64",
+      "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "binary_artifacts_uploaded": false,
+      "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+      "conflict_resolutions": [],
+      "deployment_performed": false,
+      "failed_tests": [
+        {
+          "exit_code": 2,
+          "last_lines": [
+            "=== Running doWaitSeq Adaptive Polling & Retirement Tests ===",
+            "[PASS] test_immediate_retirement: 0 wait calls when already retired",
+            "[PASS] test_invalid_target: target > emitted correctly rejected",
+            "[PASS] test_seq_last_resolution: PHXN_SEQ_LAST resolved to emitted",
+            "[PASS] test_short_wait_fast_poll: <1ms wait uses 50us delay, zero sleep calls",
+            "Assertion failed: (g_sleep_calls > 0), function test_extended_wait_adaptive_sleep, file test_wait_seq.cpp, line 156.",
+            "/bin/sh: line 1:  3513 Abort trap: 6           $t",
+            "make: *** [test] Error 1"
+          ],
+          "output_sha256": "f37db3f55e0545f521b887b19998a62c3dea96476f71ef274ba90744ef524d94",
+          "phase": "unit-tests-asan-ubsan"
+        }
+      ],
+      "firmware_sha256": {
+        "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+        "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+        "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+        "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+        "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+        "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+        "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+      },
+      "hardware_tested": false,
+      "native_build_status": "passed",
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+      "phases": [
+        "real-firmware-fixtures",
+        "phoenix-profile",
+        "surface-key-asan-ubsan",
+        "native-metal-plugin",
+        "native-phxbringup",
+        "native-phxaccel",
+        "exported-symbols",
+        "PhxBringup-sign",
+        "PhxBringup-verify",
+        "PhxAccel-sign",
+        "PhxAccel-verify",
+        "plugin-sign",
+        "plugin-signature-verify",
+        "tracked-source-integrity"
+      ],
+      "plugin": {
+        "architecture": "x86_64",
+        "bytes": 1562992,
+        "macho_type": 8,
+        "sha256": "93639b4d838de6d7ba2a6190a4e10d8cab7918f0412e7e87ba2ab13c981969f3"
+      },
+      "plugin_exports": {
+        "count": 997,
+        "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+      },
+      "plugin_warnings": {
+        "count": 323,
+        "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+      },
+      "prs": {
+        "7": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e"
+      },
+      "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "source_commit": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e",
+      "source_tree": "5dfca53db95647071d1df159529b1374ec4e9797",
+      "status": "native-build-passed-tests-failed",
+      "variant": "pr7",
+      "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    },
+    "pr9": {
+      "PhxAccel": {
+        "architecture": "x86_64",
+        "bundle_identifier": "com.luuumi.PhxAccel",
+        "bytes": 350832,
+        "macho_type": 11,
+        "sha256": "23a64a53475a38dcae05556a836e968d200482990852e88649915474767c4434"
+      },
+      "PhxBringup": {
+        "architecture": "x86_64",
+        "bundle_identifier": "org.drip.PhxBringup",
+        "bytes": 92624,
+        "macho_type": 11,
+        "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+      },
+      "architecture": "x86_64",
+      "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "binary_artifacts_uploaded": false,
+      "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+      "conflict_resolutions": [],
+      "deployment_performed": false,
+      "failed_tests": [
+        {
+          "exit_code": 2,
+          "last_lines": [
+            "=== Running doWaitSeq Adaptive Polling & Retirement Tests ===",
+            "[PASS] test_immediate_retirement: 0 wait calls when already retired",
+            "[PASS] test_invalid_target: target > emitted correctly rejected",
+            "[PASS] test_seq_last_resolution: PHXN_SEQ_LAST resolved to emitted",
+            "[PASS] test_short_wait_fast_poll: <1ms wait uses 50us delay, zero sleep calls",
+            "Assertion failed: (g_sleep_calls > 0), function test_extended_wait_adaptive_sleep, file test_wait_seq.cpp, line 156.",
+            "/bin/sh: line 1:  9361 Abort trap: 6           $t",
+            "make: *** [test] Error 1"
+          ],
+          "output_sha256": "7caa43c0cf1d79db56a729278139446241f757dc6367d91808de75efb5406485",
+          "phase": "unit-tests-asan-ubsan"
+        }
+      ],
+      "firmware_sha256": {
+        "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+        "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+        "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+        "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+        "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+        "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+        "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+      },
+      "hardware_tested": false,
+      "native_build_status": "passed",
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+      "phases": [
+        "real-firmware-fixtures",
+        "phoenix-profile",
+        "panel-timing-asan-ubsan",
+        "native-metal-plugin",
+        "native-phxbringup",
+        "native-phxaccel",
+        "exported-symbols",
+        "PhxBringup-sign",
+        "PhxBringup-verify",
+        "PhxAccel-sign",
+        "PhxAccel-verify",
+        "plugin-sign",
+        "plugin-signature-verify",
+        "tracked-source-integrity"
+      ],
+      "plugin": {
+        "architecture": "x86_64",
+        "bytes": 1562944,
+        "macho_type": 8,
+        "sha256": "2a5ebf7eb7445e6d02f113efe798ece942a215b0577eb894d32509889fea5352"
+      },
+      "plugin_exports": {
+        "count": 997,
+        "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+      },
+      "plugin_warnings": {
+        "count": 323,
+        "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+      },
+      "prs": {
+        "9": "c9da802a8dbf3753fa15b5cd903934712c3c80f6"
+      },
+      "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "source_commit": "c9da802a8dbf3753fa15b5cd903934712c3c80f6",
+      "source_tree": "635f60648058df91e6bde0aa0e2ac8e74c180a79",
+      "status": "native-build-passed-tests-failed",
+      "variant": "pr9",
+      "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    },
+    "pr8": {
+      "PhxAccel": {
+        "architecture": "x86_64",
+        "bundle_identifier": "com.luuumi.PhxAccel",
+        "bytes": 350720,
+        "macho_type": 11,
+        "sha256": "db4d94b8c5c213487ca922af45127e4bb999d0663924e0d87f19508cfc22f2b3"
+      },
+      "PhxBringup": {
+        "architecture": "x86_64",
+        "bundle_identifier": "org.drip.PhxBringup",
+        "bytes": 92624,
+        "macho_type": 11,
+        "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+      },
+      "architecture": "x86_64",
+      "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "binary_artifacts_uploaded": false,
+      "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+      "conflict_resolutions": [],
+      "deployment_performed": false,
+      "failed_tests": [
+        {
+          "exit_code": 2,
+          "last_lines": [
+            "=== Running doWaitSeq Adaptive Polling & Retirement Tests ===",
+            "[PASS] test_immediate_retirement: 0 wait calls when already retired",
+            "[PASS] test_invalid_target: target > emitted correctly rejected",
+            "[PASS] test_seq_last_resolution: PHXN_SEQ_LAST resolved to emitted",
+            "[PASS] test_short_wait_fast_poll: <1ms wait uses 50us delay, zero sleep calls",
+            "Assertion failed: (g_sleep_calls > 0), function test_extended_wait_adaptive_sleep, file test_wait_seq.cpp, line 156.",
+            "/bin/sh: line 1:  4282 Abort trap: 6           $t",
+            "make: *** [test] Error 1"
+          ],
+          "output_sha256": "def556c475b1d22d2844dfa213dda5fc2bcbb54440d9c505c6652bf65be6c554",
+          "phase": "unit-tests-asan-ubsan"
+        }
+      ],
+      "firmware_sha256": {
+        "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+        "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+        "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+        "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+        "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+        "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+        "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+      },
+      "hardware_tested": false,
+      "native_build_status": "passed",
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+      "phases": [
+        "real-firmware-fixtures",
+        "phoenix-profile",
+        "descriptor-mask-asan-ubsan",
+        "native-metal-plugin",
+        "native-phxbringup",
+        "native-phxaccel",
+        "exported-symbols",
+        "PhxBringup-sign",
+        "PhxBringup-verify",
+        "PhxAccel-sign",
+        "PhxAccel-verify",
+        "plugin-sign",
+        "plugin-signature-verify",
+        "tracked-source-integrity"
+      ],
+      "plugin": {
+        "architecture": "x86_64",
+        "bytes": 1562992,
+        "macho_type": 8,
+        "sha256": "a5b1b0f60080e31ff765b6f5889233b78ce04bc0c89321503e9fcd29f2f5da69"
+      },
+      "plugin_exports": {
+        "count": 997,
+        "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+      },
+      "plugin_warnings": {
+        "count": 323,
+        "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+      },
+      "prs": {
+        "8": "5a8a088011946c8089bb27e10d0dba117bf1b48e"
+      },
+      "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "source_commit": "5a8a088011946c8089bb27e10d0dba117bf1b48e",
+      "source_tree": "1b4166328650f5fdc3701729765ee2fd19d2f37e",
+      "status": "native-build-passed-tests-failed",
+      "variant": "pr8",
+      "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    },
+    "pr6-7": {
+      "PhxAccel": {
+        "architecture": "x86_64",
+        "bundle_identifier": "com.luuumi.PhxAccel",
+        "bytes": 350720,
+        "macho_type": 11,
+        "sha256": "db4d94b8c5c213487ca922af45127e4bb999d0663924e0d87f19508cfc22f2b3"
+      },
+      "PhxBringup": {
+        "architecture": "x86_64",
+        "bundle_identifier": "org.drip.PhxBringup",
+        "bytes": 92624,
+        "macho_type": 11,
+        "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+      },
+      "architecture": "x86_64",
+      "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "binary_artifacts_uploaded": false,
+      "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+      "conflict_resolutions": [
+        {
+          "blocks": 1,
+          "path": ".github/workflows/ci.yml",
+          "pr": 7
+        },
+        {
+          "blocks": 1,
+          "path": "src/nmplugin/NVMTLObjects.m",
+          "pr": 7
+        }
+      ],
+      "deployment_performed": false,
+      "failed_tests": [
+        {
+          "exit_code": 2,
+          "last_lines": [
+            "=== Running doWaitSeq Adaptive Polling & Retirement Tests ===",
+            "[PASS] test_immediate_retirement: 0 wait calls when already retired",
+            "[PASS] test_invalid_target: target > emitted correctly rejected",
+            "[PASS] test_seq_last_resolution: PHXN_SEQ_LAST resolved to emitted",
+            "[PASS] test_short_wait_fast_poll: <1ms wait uses 50us delay, zero sleep calls",
+            "Assertion failed: (g_sleep_calls > 0), function test_extended_wait_adaptive_sleep, file test_wait_seq.cpp, line 156.",
+            "/bin/sh: line 1:  4805 Abort trap: 6           $t",
+            "make: *** [test] Error 1"
+          ],
+          "output_sha256": "bce89dc3a3dc588070337667dde20872563bbabc4016c782923f3c5f9ad60282",
+          "phase": "unit-tests-asan-ubsan"
+        }
+      ],
+      "firmware_sha256": {
+        "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+        "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+        "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+        "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+        "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+        "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+        "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+      },
+      "hardware_tested": false,
+      "native_build_status": "passed",
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+      "phases": [
+        "real-firmware-fixtures",
+        "phoenix-profile",
+        "sampler-key-asan-ubsan",
+        "surface-key-asan-ubsan",
+        "native-metal-plugin",
+        "native-phxbringup",
+        "native-phxaccel",
+        "exported-symbols",
+        "PhxBringup-sign",
+        "PhxBringup-verify",
+        "PhxAccel-sign",
+        "PhxAccel-verify",
+        "plugin-sign",
+        "plugin-signature-verify",
+        "tracked-source-integrity"
+      ],
+      "plugin": {
+        "architecture": "x86_64",
+        "bytes": 1563040,
+        "macho_type": 8,
+        "sha256": "780506d44fb1378966f713ffb8b6fc5d4a918ce6cb376388cde37cd801a6f0e0"
+      },
+      "plugin_exports": {
+        "count": 997,
+        "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+      },
+      "plugin_warnings": {
+        "count": 323,
+        "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+      },
+      "prs": {
+        "6": "55764a0b69658a92870fc2b75e0be3a695382e38",
+        "7": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e"
+      },
+      "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "source_commit": "68d913b491d6802438fbad0feab72d367f49763f",
+      "source_tree": "bad2f784af6c1a057f8988ad77c4a7161275d7c4",
+      "status": "native-build-passed-tests-failed",
+      "variant": "pr6-7",
+      "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    },
+    "pr6-7-8": {
+      "PhxAccel": {
+        "architecture": "x86_64",
+        "bundle_identifier": "com.luuumi.PhxAccel",
+        "bytes": 350720,
+        "macho_type": 11,
+        "sha256": "db4d94b8c5c213487ca922af45127e4bb999d0663924e0d87f19508cfc22f2b3"
+      },
+      "PhxBringup": {
+        "architecture": "x86_64",
+        "bundle_identifier": "org.drip.PhxBringup",
+        "bytes": 92624,
+        "macho_type": 11,
+        "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+      },
+      "architecture": "x86_64",
+      "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "binary_artifacts_uploaded": false,
+      "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+      "conflict_resolutions": [
+        {
+          "blocks": 1,
+          "path": ".github/workflows/ci.yml",
+          "pr": 7
+        },
+        {
+          "blocks": 1,
+          "path": "src/nmplugin/NVMTLObjects.m",
+          "pr": 7
+        },
+        {
+          "blocks": 1,
+          "path": ".github/workflows/ci.yml",
+          "pr": 8
+        },
+        {
+          "blocks": 1,
+          "path": "Makefile",
+          "pr": 8
+        }
+      ],
+      "deployment_performed": false,
+      "failed_tests": [
+        {
+          "exit_code": 2,
+          "last_lines": [
+            "=== Running doWaitSeq Adaptive Polling & Retirement Tests ===",
+            "[PASS] test_immediate_retirement: 0 wait calls when already retired",
+            "[PASS] test_invalid_target: target > emitted correctly rejected",
+            "[PASS] test_seq_last_resolution: PHXN_SEQ_LAST resolved to emitted",
+            "[PASS] test_short_wait_fast_poll: <1ms wait uses 50us delay, zero sleep calls",
+            "Assertion failed: (g_sleep_calls > 0), function test_extended_wait_adaptive_sleep, file test_wait_seq.cpp, line 156.",
+            "/bin/sh: line 1:  3164 Abort trap: 6           $t",
+            "make: *** [test] Error 1"
+          ],
+          "output_sha256": "b2814d19cab02b76df26241e3743851b2686e3d455860514b2465c2b99f3f69a",
+          "phase": "unit-tests-asan-ubsan"
+        }
+      ],
+      "firmware_sha256": {
+        "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+        "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+        "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+        "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+        "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+        "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+        "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+      },
+      "hardware_tested": false,
+      "native_build_status": "passed",
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+      "phases": [
+        "real-firmware-fixtures",
+        "phoenix-profile",
+        "sampler-key-asan-ubsan",
+        "surface-key-asan-ubsan",
+        "descriptor-mask-asan-ubsan",
+        "native-metal-plugin",
+        "native-phxbringup",
+        "native-phxaccel",
+        "exported-symbols",
+        "PhxBringup-sign",
+        "PhxBringup-verify",
+        "PhxAccel-sign",
+        "PhxAccel-verify",
+        "plugin-sign",
+        "plugin-signature-verify",
+        "tracked-source-integrity"
+      ],
+      "plugin": {
+        "architecture": "x86_64",
+        "bytes": 1563072,
+        "macho_type": 8,
+        "sha256": "9041dfd986d75e1584e1b9bc0d443745f128881122b7ab48976a24718bb87dc2"
+      },
+      "plugin_exports": {
+        "count": 997,
+        "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+      },
+      "plugin_warnings": {
+        "count": 323,
+        "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+      },
+      "prs": {
+        "6": "55764a0b69658a92870fc2b75e0be3a695382e38",
+        "7": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e",
+        "8": "5a8a088011946c8089bb27e10d0dba117bf1b48e"
+      },
+      "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "source_commit": "d7a9af32f4c36ca031194c8df0513b1a2b1f8ad3",
+      "source_tree": "2200d6ffb24162628d731ff666afb9bdb6a8d9ed",
+      "status": "native-build-passed-tests-failed",
+      "variant": "pr6-7-8",
+      "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    },
+    "pr6-7-8-9": {
+      "PhxAccel": {
+        "architecture": "x86_64",
+        "bundle_identifier": "com.luuumi.PhxAccel",
+        "bytes": 350832,
+        "macho_type": 11,
+        "sha256": "23a64a53475a38dcae05556a836e968d200482990852e88649915474767c4434"
+      },
+      "PhxBringup": {
+        "architecture": "x86_64",
+        "bundle_identifier": "org.drip.PhxBringup",
+        "bytes": 92624,
+        "macho_type": 11,
+        "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+      },
+      "architecture": "x86_64",
+      "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "binary_artifacts_uploaded": false,
+      "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+      "conflict_resolutions": [
+        {
+          "blocks": 1,
+          "path": ".github/workflows/ci.yml",
+          "pr": 7
+        },
+        {
+          "blocks": 1,
+          "path": "src/nmplugin/NVMTLObjects.m",
+          "pr": 7
+        },
+        {
+          "blocks": 1,
+          "path": ".github/workflows/ci.yml",
+          "pr": 8
+        },
+        {
+          "blocks": 1,
+          "path": "Makefile",
+          "pr": 8
+        },
+        {
+          "blocks": 1,
+          "path": "Makefile",
+          "pr": 9
+        }
+      ],
+      "deployment_performed": false,
+      "failed_tests": [
+        {
+          "exit_code": 2,
+          "last_lines": [
+            "=== Running doWaitSeq Adaptive Polling & Retirement Tests ===",
+            "[PASS] test_immediate_retirement: 0 wait calls when already retired",
+            "[PASS] test_invalid_target: target > emitted correctly rejected",
+            "[PASS] test_seq_last_resolution: PHXN_SEQ_LAST resolved to emitted",
+            "[PASS] test_short_wait_fast_poll: <1ms wait uses 50us delay, zero sleep calls",
+            "Assertion failed: (g_sleep_calls > 0), function test_extended_wait_adaptive_sleep, file test_wait_seq.cpp, line 156.",
+            "/bin/sh: line 1:  2915 Abort trap: 6           $t",
+            "make: *** [test] Error 1"
+          ],
+          "output_sha256": "131794120a8c4c2459ffefa2b852eee6b28cb043b04d9fb345890a6f44a5ae6a",
+          "phase": "unit-tests-asan-ubsan"
+        }
+      ],
+      "firmware_sha256": {
+        "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+        "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+        "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+        "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+        "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+        "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+        "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+      },
+      "hardware_tested": false,
+      "native_build_status": "passed",
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+      "phases": [
+        "real-firmware-fixtures",
+        "phoenix-profile",
+        "panel-timing-asan-ubsan",
+        "sampler-key-asan-ubsan",
+        "surface-key-asan-ubsan",
+        "descriptor-mask-asan-ubsan",
+        "native-metal-plugin",
+        "native-phxbringup",
+        "native-phxaccel",
+        "exported-symbols",
+        "PhxBringup-sign",
+        "PhxBringup-verify",
+        "PhxAccel-sign",
+        "PhxAccel-verify",
+        "plugin-sign",
+        "plugin-signature-verify",
+        "tracked-source-integrity"
+      ],
+      "plugin": {
+        "architecture": "x86_64",
+        "bytes": 1563072,
+        "macho_type": 8,
+        "sha256": "9041dfd986d75e1584e1b9bc0d443745f128881122b7ab48976a24718bb87dc2"
+      },
+      "plugin_exports": {
+        "count": 997,
+        "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+      },
+      "plugin_warnings": {
+        "count": 323,
+        "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+      },
+      "prs": {
+        "6": "55764a0b69658a92870fc2b75e0be3a695382e38",
+        "7": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e",
+        "8": "5a8a088011946c8089bb27e10d0dba117bf1b48e",
+        "9": "c9da802a8dbf3753fa15b5cd903934712c3c80f6"
+      },
+      "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "source_commit": "e18328906f26d560fdb514a5758c7c69a2ba390c",
+      "source_tree": "be5bad075eb8a1cdbc267c29d49ed35b8dc51fd2",
+      "status": "native-build-passed-tests-failed",
+      "variant": "pr6-7-8-9",
+      "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    },
+    "baseline": {
+      "PhxAccel": {
+        "architecture": "x86_64",
+        "bundle_identifier": "com.luuumi.PhxAccel",
+        "bytes": 350720,
+        "macho_type": 11,
+        "sha256": "db4d94b8c5c213487ca922af45127e4bb999d0663924e0d87f19508cfc22f2b3"
+      },
+      "PhxBringup": {
+        "architecture": "x86_64",
+        "bundle_identifier": "org.drip.PhxBringup",
+        "bytes": 92624,
+        "macho_type": 11,
+        "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+      },
+      "architecture": "x86_64",
+      "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "binary_artifacts_uploaded": false,
+      "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+      "conflict_resolutions": [],
+      "deployment_performed": false,
+      "failed_tests": [
+        {
+          "exit_code": 2,
+          "last_lines": [
+            "=== Running doWaitSeq Adaptive Polling & Retirement Tests ===",
+            "[PASS] test_immediate_retirement: 0 wait calls when already retired",
+            "[PASS] test_invalid_target: target > emitted correctly rejected",
+            "[PASS] test_seq_last_resolution: PHXN_SEQ_LAST resolved to emitted",
+            "[PASS] test_short_wait_fast_poll: <1ms wait uses 50us delay, zero sleep calls",
+            "Assertion failed: (g_sleep_calls > 0), function test_extended_wait_adaptive_sleep, file test_wait_seq.cpp, line 156.",
+            "/bin/sh: line 1:  8343 Abort trap: 6           $t",
+            "make: *** [test] Error 1"
+          ],
+          "output_sha256": "effaa0907331eb27b28caa76f1c8da68d45d20f0b6b768bedee5403214e61ad2",
+          "phase": "unit-tests-asan-ubsan"
+        }
+      ],
+      "firmware_sha256": {
+        "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+        "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+        "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+        "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+        "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+        "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+        "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+      },
+      "hardware_tested": false,
+      "native_build_status": "passed",
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+      "phases": [
+        "real-firmware-fixtures",
+        "phoenix-profile",
+        "native-metal-plugin",
+        "native-phxbringup",
+        "native-phxaccel",
+        "exported-symbols",
+        "PhxBringup-sign",
+        "PhxBringup-verify",
+        "PhxAccel-sign",
+        "PhxAccel-verify",
+        "plugin-sign",
+        "plugin-signature-verify",
+        "tracked-source-integrity"
+      ],
+      "plugin": {
+        "architecture": "x86_64",
+        "bytes": 1562944,
+        "macho_type": 8,
+        "sha256": "2a5ebf7eb7445e6d02f113efe798ece942a215b0577eb894d32509889fea5352"
+      },
+      "plugin_exports": {
+        "count": 997,
+        "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+      },
+      "plugin_warnings": {
+        "count": 323,
+        "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+      },
+      "prs": {},
+      "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "source_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "source_tree": "c77b527c029a3f8e22a7804166661bb03722eacd",
+      "status": "native-build-passed-tests-failed",
+      "variant": "baseline",
+      "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    },
+    "pr6": {
+      "PhxAccel": {
+        "architecture": "x86_64",
+        "bundle_identifier": "com.luuumi.PhxAccel",
+        "bytes": 350720,
+        "macho_type": 11,
+        "sha256": "db4d94b8c5c213487ca922af45127e4bb999d0663924e0d87f19508cfc22f2b3"
+      },
+      "PhxBringup": {
+        "architecture": "x86_64",
+        "bundle_identifier": "org.drip.PhxBringup",
+        "bytes": 92624,
+        "macho_type": 11,
+        "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+      },
+      "architecture": "x86_64",
+      "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "binary_artifacts_uploaded": false,
+      "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+      "conflict_resolutions": [],
+      "deployment_performed": false,
+      "failed_tests": [
+        {
+          "exit_code": 2,
+          "last_lines": [
+            "=== Running doWaitSeq Adaptive Polling & Retirement Tests ===",
+            "[PASS] test_immediate_retirement: 0 wait calls when already retired",
+            "[PASS] test_invalid_target: target > emitted correctly rejected",
+            "[PASS] test_seq_last_resolution: PHXN_SEQ_LAST resolved to emitted",
+            "[PASS] test_short_wait_fast_poll: <1ms wait uses 50us delay, zero sleep calls",
+            "Assertion failed: (g_sleep_calls > 0), function test_extended_wait_adaptive_sleep, file test_wait_seq.cpp, line 156.",
+            "/bin/sh: line 1:  4781 Abort trap: 6           $t",
+            "make: *** [test] Error 1"
+          ],
+          "output_sha256": "1c211c2732fe0ddc238dc562aaa7a3e5412058d3e41b060f860974c349ff53a2",
+          "phase": "unit-tests-asan-ubsan"
+        }
+      ],
+      "firmware_sha256": {
+        "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+        "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+        "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+        "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+        "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+        "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+        "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+      },
+      "hardware_tested": false,
+      "native_build_status": "passed",
+      "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+      "phases": [
+        "real-firmware-fixtures",
+        "phoenix-profile",
+        "sampler-key-asan-ubsan",
+        "native-metal-plugin",
+        "native-phxbringup",
+        "native-phxaccel",
+        "exported-symbols",
+        "PhxBringup-sign",
+        "PhxBringup-verify",
+        "PhxAccel-sign",
+        "PhxAccel-verify",
+        "plugin-sign",
+        "plugin-signature-verify",
+        "tracked-source-integrity"
+      ],
+      "plugin": {
+        "architecture": "x86_64",
+        "bytes": 1562992,
+        "macho_type": 8,
+        "sha256": "49668f9ff3a50ded4643f36c6bc3778bf312aa59b5d81e4d0a07aa4cb4465143"
+      },
+      "plugin_exports": {
+        "count": 997,
+        "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+      },
+      "plugin_warnings": {
+        "count": 323,
+        "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+      },
+      "prs": {
+        "6": "55764a0b69658a92870fc2b75e0be3a695382e38"
+      },
+      "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "source_commit": "55764a0b69658a92870fc2b75e0be3a695382e38",
+      "source_tree": "5eb020602c07fe27cb3b368b33981db78603f6a3",
+      "status": "native-build-passed-tests-failed",
+      "variant": "pr6",
+      "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+    }
+  },
+  "prior_attempt": {
+    "run_id": 42987480599,
+    "workflow_sha": "da49ef4b9e1877c887e50a5df8222277fca155ec",
+    "conclusion": "failure",
+    "reports": [
+      {
+        "architecture": "x86_64",
+        "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "binary_artifacts_uploaded": false,
+        "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+        "conflict_resolutions": [],
+        "deployment_performed": false,
+        "firmware_sha256": {
+          "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+          "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+          "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+          "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+          "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+          "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+          "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+        },
+        "hardware_tested": false,
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+        "phases": [
+          "real-firmware-fixtures"
+        ],
+        "prs": {
+          "7": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e"
+        },
+        "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+        "source_commit": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e",
+        "source_tree": "5dfca53db95647071d1df159529b1374ec4e9797",
+        "status": "failed",
+        "variant": "pr7",
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+      },
+      {
+        "PhxAccel": {
+          "architecture": "x86_64",
+          "bundle_identifier": "com.luuumi.PhxAccel",
+          "bytes": 350832,
+          "macho_type": 11,
+          "sha256": "23a64a53475a38dcae05556a836e968d200482990852e88649915474767c4434"
+        },
+        "PhxBringup": {
+          "architecture": "x86_64",
+          "bundle_identifier": "org.drip.PhxBringup",
+          "bytes": 92624,
+          "macho_type": 11,
+          "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+        },
+        "architecture": "x86_64",
+        "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "binary_artifacts_uploaded": false,
+        "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+        "conflict_resolutions": [],
+        "deployment_performed": false,
+        "firmware_sha256": {
+          "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+          "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+          "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+          "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+          "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+          "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+          "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+        },
+        "hardware_tested": false,
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+        "phases": [
+          "real-firmware-fixtures",
+          "unit-tests-asan-ubsan",
+          "phoenix-profile",
+          "native-metal-plugin",
+          "native-phxbringup",
+          "native-phxaccel",
+          "exported-symbols",
+          "PhxBringup-sign",
+          "PhxBringup-verify",
+          "PhxAccel-sign",
+          "PhxAccel-verify",
+          "plugin-sign",
+          "plugin-signature-verify",
+          "tracked-source-integrity"
+        ],
+        "plugin": {
+          "architecture": "x86_64",
+          "bytes": 1562944,
+          "macho_type": 8,
+          "sha256": "2a5ebf7eb7445e6d02f113efe798ece942a215b0577eb894d32509889fea5352"
+        },
+        "plugin_exports": {
+          "count": 997,
+          "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+        },
+        "plugin_warnings": {
+          "count": 323,
+          "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+        },
+        "prs": {
+          "9": "c9da802a8dbf3753fa15b5cd903934712c3c80f6"
+        },
+        "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+        "source_commit": "c9da802a8dbf3753fa15b5cd903934712c3c80f6",
+        "source_tree": "635f60648058df91e6bde0aa0e2ac8e74c180a79",
+        "status": "passed",
+        "variant": "pr9",
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+      },
+      {
+        "architecture": "x86_64",
+        "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "binary_artifacts_uploaded": false,
+        "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+        "conflict_resolutions": [],
+        "deployment_performed": false,
+        "firmware_sha256": {
+          "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+          "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+          "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+          "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+          "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+          "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+          "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+        },
+        "hardware_tested": false,
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+        "phases": [
+          "real-firmware-fixtures"
+        ],
+        "prs": {
+          "8": "5a8a088011946c8089bb27e10d0dba117bf1b48e"
+        },
+        "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+        "source_commit": "5a8a088011946c8089bb27e10d0dba117bf1b48e",
+        "source_tree": "1b4166328650f5fdc3701729765ee2fd19d2f37e",
+        "status": "failed",
+        "variant": "pr8",
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+      },
+      {
+        "PhxAccel": {
+          "architecture": "x86_64",
+          "bundle_identifier": "com.luuumi.PhxAccel",
+          "bytes": 350720,
+          "macho_type": 11,
+          "sha256": "db4d94b8c5c213487ca922af45127e4bb999d0663924e0d87f19508cfc22f2b3"
+        },
+        "PhxBringup": {
+          "architecture": "x86_64",
+          "bundle_identifier": "org.drip.PhxBringup",
+          "bytes": 92624,
+          "macho_type": 11,
+          "sha256": "bb1389d7d93b17543454ab9fa7c90aa128e1086a344ba58ffa12a927974de820"
+        },
+        "architecture": "x86_64",
+        "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "binary_artifacts_uploaded": false,
+        "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+        "conflict_resolutions": [
+          {
+            "blocks": 1,
+            "path": ".github/workflows/ci.yml",
+            "pr": 7
+          },
+          {
+            "blocks": 1,
+            "path": "src/nmplugin/NVMTLObjects.m",
+            "pr": 7
+          }
+        ],
+        "deployment_performed": false,
+        "firmware_sha256": {
+          "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+          "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+          "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+          "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+          "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+          "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+          "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+        },
+        "hardware_tested": false,
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+        "phases": [
+          "real-firmware-fixtures",
+          "unit-tests-asan-ubsan",
+          "phoenix-profile",
+          "sampler-key-asan-ubsan",
+          "surface-key-asan-ubsan",
+          "native-metal-plugin",
+          "native-phxbringup",
+          "native-phxaccel",
+          "exported-symbols",
+          "PhxBringup-sign",
+          "PhxBringup-verify",
+          "PhxAccel-sign",
+          "PhxAccel-verify",
+          "plugin-sign",
+          "plugin-signature-verify",
+          "tracked-source-integrity"
+        ],
+        "plugin": {
+          "architecture": "x86_64",
+          "bytes": 1563040,
+          "macho_type": 8,
+          "sha256": "780506d44fb1378966f713ffb8b6fc5d4a918ce6cb376388cde37cd801a6f0e0"
+        },
+        "plugin_exports": {
+          "count": 997,
+          "names_sha256": "ce01e4a9ecc5869a7c3680c1035c6be6014df86e6f41df0c7f2f681518d61a61"
+        },
+        "plugin_warnings": {
+          "count": 323,
+          "messages_sha256": "b747ad39701776d1a48883052fa81dec8b151ec1b7296bb9eae7b3e8f4a9c68d"
+        },
+        "prs": {
+          "6": "55764a0b69658a92870fc2b75e0be3a695382e38",
+          "7": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e"
+        },
+        "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+        "source_commit": "6e39231e37b65d52d8a42818cf3e6d573fb2b47c",
+        "source_tree": "bad2f784af6c1a057f8988ad77c4a7161275d7c4",
+        "status": "passed",
+        "variant": "pr6-7",
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+      },
+      {
+        "architecture": "x86_64",
+        "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "binary_artifacts_uploaded": false,
+        "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+        "conflict_resolutions": [
+          {
+            "blocks": 1,
+            "path": ".github/workflows/ci.yml",
+            "pr": 7
+          },
+          {
+            "blocks": 1,
+            "path": "src/nmplugin/NVMTLObjects.m",
+            "pr": 7
+          },
+          {
+            "blocks": 1,
+            "path": ".github/workflows/ci.yml",
+            "pr": 8
+          },
+          {
+            "blocks": 1,
+            "path": "Makefile",
+            "pr": 8
+          }
+        ],
+        "deployment_performed": false,
+        "firmware_sha256": {
+          "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+          "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+          "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+          "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+          "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+          "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+          "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+        },
+        "hardware_tested": false,
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+        "phases": [
+          "real-firmware-fixtures"
+        ],
+        "prs": {
+          "6": "55764a0b69658a92870fc2b75e0be3a695382e38",
+          "7": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e",
+          "8": "5a8a088011946c8089bb27e10d0dba117bf1b48e"
+        },
+        "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+        "source_commit": "9e3aa8bd49afa1fcdcf1f100adbc332b0f343eb1",
+        "source_tree": "2200d6ffb24162628d731ff666afb9bdb6a8d9ed",
+        "status": "failed",
+        "variant": "pr6-7-8",
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+      },
+      {
+        "architecture": "x86_64",
+        "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "binary_artifacts_uploaded": false,
+        "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+        "conflict_resolutions": [],
+        "deployment_performed": false,
+        "firmware_sha256": {
+          "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+          "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+          "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+          "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+          "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+          "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+          "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+        },
+        "hardware_tested": false,
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+        "phases": [
+          "real-firmware-fixtures"
+        ],
+        "prs": {
+          "6": "55764a0b69658a92870fc2b75e0be3a695382e38"
+        },
+        "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+        "source_commit": "55764a0b69658a92870fc2b75e0be3a695382e38",
+        "source_tree": "5eb020602c07fe27cb3b368b33981db78603f6a3",
+        "status": "failed",
+        "variant": "pr6",
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+      },
+      {
+        "architecture": "x86_64",
+        "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "binary_artifacts_uploaded": false,
+        "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+        "conflict_resolutions": [],
+        "deployment_performed": false,
+        "firmware_sha256": {
+          "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+          "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+          "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+          "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+          "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+          "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+          "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+        },
+        "hardware_tested": false,
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+        "phases": [
+          "real-firmware-fixtures"
+        ],
+        "prs": {},
+        "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+        "source_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "source_tree": "c77b527c029a3f8e22a7804166661bb03722eacd",
+        "status": "failed",
+        "variant": "baseline",
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+      },
+      {
+        "architecture": "x86_64",
+        "baseline": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "binary_artifacts_uploaded": false,
+        "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+        "conflict_resolutions": [
+          {
+            "blocks": 1,
+            "path": ".github/workflows/ci.yml",
+            "pr": 7
+          },
+          {
+            "blocks": 1,
+            "path": "src/nmplugin/NVMTLObjects.m",
+            "pr": 7
+          },
+          {
+            "blocks": 1,
+            "path": ".github/workflows/ci.yml",
+            "pr": 8
+          },
+          {
+            "blocks": 1,
+            "path": "Makefile",
+            "pr": 8
+          },
+          {
+            "blocks": 1,
+            "path": "Makefile",
+            "pr": 9
+          }
+        ],
+        "deployment_performed": false,
+        "firmware_sha256": {
+          "dcn_3_1_4_dmcub.bin": "454d3eb73045d0a46f9014c42c76df9e65ae9e5da45b8c331584443fe49a8516",
+          "gc_11_0_1_imu.bin": "ac71f4eec713fc35b4a1fe27531e3eb04edd81eeac2cef64df01ac50d8510805",
+          "gc_11_0_1_me.bin": "62c5e749ad848941e5d8b85f66eeb2b969ee82919724dfd94dbf6e354be8befc",
+          "gc_11_0_1_mec.bin": "b0a4006b3934adc1d7996e6d901206dea37203b4839debe4a5ed4e393a615cbb",
+          "gc_11_0_1_pfp.bin": "449c72cae1c57838185197ad4003aeee7ccbdba892a28bb2624d9e85f57a2df1",
+          "gc_11_0_1_rlc.bin": "5f07dc1f0a75ecd9cb56d805ea869184a50ed9e43d811ebf833b8906534650ef",
+          "sdma_6_0_1.bin": "708c2c2c45262c98ebe8e34e32c3f1ce8eb5b007bab560c9ea9b576a8e4d6768"
+        },
+        "hardware_tested": false,
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830",
+        "phases": [
+          "real-firmware-fixtures"
+        ],
+        "prs": {
+          "6": "55764a0b69658a92870fc2b75e0be3a695382e38",
+          "7": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e",
+          "8": "5a8a088011946c8089bb27e10d0dba117bf1b48e",
+          "9": "c9da802a8dbf3753fa15b5cd903934712c3c80f6"
+        },
+        "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+        "source_commit": "0281d537c3248178372cf64de0e3a6ed8ca9d2a5",
+        "source_tree": "be5bad075eb8a1cdbc267c29d49ed35b8dc51fd2",
+        "status": "failed",
+        "variant": "pr6-7-8-9",
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+      }
+    ]
+  },
+  "local_source_checks": {
+    "tests_run": 324,
+    "skipped": 25,
+    "result": "passed in disposable LF checkout"
+  },
+  "scope": {
+    "gpu_execution": false,
+    "driver_installation": false,
+    "public_binary_upload": false,
+    "runtime_stack_rebuild": false
+  }
+}
