@@ -66,7 +66,8 @@ build/phx-hidpi-probe > build/hidpi-before.json
 sw_vers -buildVersion
 ```
 
-无显示器的构建宿主允许输出空列表；枚举失败返回非零。目标机上则必须能识别
+无显示器的构建宿主允许输出空列表；枚举失败返回非零。报告中的 `built_in` /
+`hi_dpi_2x` 使用 JSON 布尔类型；CI 校验类型与尺寸关系。目标机上则必须能识别
 `PhxAMDFB` 对应的内屏。`hi_dpi_2x=true` 只表示某个 CoreGraphics 模式的 backing
 宽高恰好是逻辑宽高的两倍，**不表示该模式当前已选中、与 GOP 同尺寸或 GPU 加速成功**。
 应同时核对 `current`、固件尺寸与下面的 framebuffer 属性。

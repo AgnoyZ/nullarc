@@ -45,7 +45,21 @@ jobs:
         run: |
           mkdir -p build
           xcrun clang -arch x86_64 -fobjc-arc -Wall -Wextra -Werror tools/phx_hidpi_probe.m -framework Foundation -framework CoreGraphics -o build/phx-hidpi-probe
-          build/phx-hidpi-probe
+          build/phx-hidpi-probe > build/hidpi-host.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('build/hidpi-host.json').read_text())
+          assert report['read_only'] is True and report['acceleration_verified'] is False
+          for display in report['displays']:
+              assert type(display['built_in']) is bool
+              for mode in [display['current'], *display['modes']]:
+                  assert type(mode['hi_dpi_2x']) is bool
+                  w, h = mode['logical_width'], mode['logical_height']
+                  expected = bool(w and h and mode['pixel_width'] == w * 2 and mode['pixel_height'] == h * 2)
+                  assert mode['hi_dpi_2x'] == expected
+          print(json.dumps(report, indent=2))
+          PY
       - name: Confirm tracked sources unchanged
         run: git diff --exit-code HEAD -- src tools tests
       - name: State evidence and publication limits

@@ -5,8 +5,8 @@ differs per area, and because `README.md`'s status table describes **upstream's 
 branch: nothing in this fork has been run on any laptop yet.
 
 **No row below is `target-verified`.** The target is a ThinkBook with a Radeon 780M (Phoenix, gfx1103, PCI
-`1002:1900`) on an external-disk macOS Tahoe install; until the phase-1 capture (`docs/analysis.md` §7) has run
-there, every claim in this repository is host-side.
+`1002:1900`), planned for macOS Tahoe on an external disk. Migration and the actual target OS build remain
+unverified; until the phase-1 capture (`docs/analysis.md` §7) has run there, every claim in this repository is host-side.
 
 ## Evidence classes
 

@@ -8,7 +8,7 @@ static NSDictionary *describe(CGDisplayModeRef mode) {
     size_t pw = CGDisplayModeGetPixelWidth(mode), ph = CGDisplayModeGetPixelHeight(mode);
     return @{ @"logical_width": @(w), @"logical_height": @(h),
               @"pixel_width": @(pw), @"pixel_height": @(ph),
-              @"hi_dpi_2x": @(w && h && pw == w * 2 && ph == h * 2),
+              @"hi_dpi_2x": @((BOOL)(w && h && pw == w * 2 && ph == h * 2)),
               @"refresh_hz": @(CGDisplayModeGetRefreshRate(mode)),
               @"io_flags": @(CGDisplayModeGetIOFlags(mode)) };
 }
@@ -29,7 +29,7 @@ int main(void) {
             NSMutableArray *items = [NSMutableArray array];
             for (CFIndex j = 0; j < CFArrayGetCount(modes); j++)
                 [items addObject:describe((CGDisplayModeRef)CFArrayGetValueAtIndex(modes, j))];
-            [displays addObject:@{ @"built_in": @(CGDisplayIsBuiltin(ids[i])),
+            [displays addObject:@{ @"built_in": @((BOOL)CGDisplayIsBuiltin(ids[i])),
                 @"vendor_id": @(CGDisplayVendorNumber(ids[i])),
                 @"product_id": @(CGDisplayModelNumber(ids[i])),
                 @"current": describe(current), @"modes": items }];
