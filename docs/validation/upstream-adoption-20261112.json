@@ -1,0 +1,1555 @@
+{
+  "record_date": "2026-11-12",
+  "repository": "AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "code_commit": "661fd3ca15acae4515321daeea29961450f86fa7",
+  "stages": [
+    {
+      "upstream_pr": 6,
+      "upstream_commit": "55764a0b69658a92870fc2b75e0be3a695382e38",
+      "downstream_commit": "4d09aa9072a8594efb6d7e500da1f73c66f8a9a8",
+      "focused_run_id": 43066219417,
+      "run": {
+        "conclusion": "success",
+        "createdAt": "2026-11-11T17:14:32Z",
+        "headBranch": "downstream/780m-tahoe",
+        "headSha": "4d09aa9072a8594efb6d7e500da1f73c66f8a9a8",
+        "jobs": [
+          {
+            "name": "native-components",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+              {
+                "completedAt": "2026-11-11T17:14:37Z",
+                "conclusion": "success",
+                "name": "Set up job",
+                "number": 1,
+                "startedAt": "2026-11-11T17:14:36Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:40Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 2,
+                "startedAt": "2026-11-11T17:14:37Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:43Z",
+                "conclusion": "success",
+                "name": "Record actual source and compiler host",
+                "number": 3,
+                "startedAt": "2026-11-11T17:14:40Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:47Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 4,
+                "startedAt": "2026-11-11T17:14:43Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:53Z",
+                "conclusion": "success",
+                "name": "Execute allocation methods with sanitizers",
+                "number": 5,
+                "startedAt": "2026-11-11T17:14:47Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:55Z",
+                "conclusion": "success",
+                "name": "Execute actual capability query bodies with sanitizers",
+                "number": 6,
+                "startedAt": "2026-11-11T17:14:53Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:58Z",
+                "conclusion": "success",
+                "name": "Execute cache I/O and Foundation LRU with sanitizers",
+                "number": 7,
+                "startedAt": "2026-11-11T17:14:55Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:59Z",
+                "conclusion": "success",
+                "name": "Execute actual submission refusal paths with sanitizers",
+                "number": 8,
+                "startedAt": "2026-11-11T17:14:58Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:59Z",
+                "conclusion": "success",
+                "name": "Execute actual framebuffer mode and unsupported color callbacks",
+                "number": 9,
+                "startedAt": "2026-11-11T17:14:59Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:02Z",
+                "conclusion": "success",
+                "name": "Execute adopted sampler keys with ASan and UBSan",
+                "number": 10,
+                "startedAt": "2026-11-11T17:14:59Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:05Z",
+                "conclusion": "success",
+                "name": "Compile both kernel components without installation",
+                "number": 11,
+                "startedAt": "2026-11-11T17:15:02Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:09Z",
+                "conclusion": "success",
+                "name": "Checkout pinned Vulkan headers",
+                "number": 12,
+                "startedAt": "2026-11-11T17:15:05Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:31Z",
+                "conclusion": "success",
+                "name": "Compile and sign actual Metal plugin without creating a device",
+                "number": 13,
+                "startedAt": "2026-11-11T17:15:09Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:31Z",
+                "conclusion": "success",
+                "name": "Check source integrity and evidence limits",
+                "number": 14,
+                "startedAt": "2026-11-11T17:15:31Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:32Z",
+                "conclusion": "success",
+                "name": "Post Checkout pinned Vulkan headers",
+                "number": 26,
+                "startedAt": "2026-11-11T17:15:31Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:33Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 27,
+                "startedAt": "2026-11-11T17:15:32Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:35Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 28,
+                "startedAt": "2026-11-11T17:15:33Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:36Z",
+                "conclusion": "success",
+                "name": "Complete job",
+                "number": 29,
+                "startedAt": "2026-11-11T17:15:35Z",
+                "status": "completed"
+              }
+            ]
+          },
+          {
+            "name": "host-contracts",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+              {
+                "completedAt": "2026-11-11T17:14:36Z",
+                "conclusion": "success",
+                "name": "Set up job",
+                "number": 1,
+                "startedAt": "2026-11-11T17:14:35Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:14:37Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 2,
+                "startedAt": "2026-11-11T17:14:36Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:14Z",
+                "conclusion": "success",
+                "name": "Run python3 -m unittest discover -s tests -v",
+                "number": 3,
+                "startedAt": "2026-11-11T17:14:37Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:19Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_bo_create.py --out build/bo-create",
+                "number": 4,
+                "startedAt": "2026-11-11T17:15:14Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:19Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_metal_capabilities.py --out build/metal-capabilities",
+                "number": 5,
+                "startedAt": "2026-11-11T17:15:19Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:20Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_shader_cache.py --out build/shader-cache",
+                "number": 6,
+                "startedAt": "2026-11-11T17:15:19Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:20Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_submit_begin.py --out build/submit-begin",
+                "number": 7,
+                "startedAt": "2026-11-11T17:15:20Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:21Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_hidpi.py",
+                "number": 8,
+                "startedAt": "2026-11-11T17:15:20Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:24Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_bo_retirement.py --out build/bo-retirement",
+                "number": 9,
+                "startedAt": "2026-11-11T17:15:21Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:27Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_context_retirement.py --out build/context-retirement",
+                "number": 10,
+                "startedAt": "2026-11-11T17:15:24Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:29Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup",
+                "number": 11,
+                "startedAt": "2026-11-11T17:15:27Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:30Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 22,
+                "startedAt": "2026-11-11T17:15:29Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:15:30Z",
+                "conclusion": "success",
+                "name": "Complete job",
+                "number": 23,
+                "startedAt": "2026-11-11T17:15:30Z",
+                "status": "completed"
+              }
+            ]
+          }
+        ],
+        "status": "completed",
+        "updatedAt": "2026-11-11T17:15:50Z",
+        "url": "https://github.com/AgnoyZ/nullarc/actions/runs/43066219417"
+      },
+      "observations": {
+        "ubuntu_python": {
+          "ran": 343,
+          "skipped": 1,
+          "failures": 0
+        },
+        "windows_python": {
+          "ran": 343,
+          "skipped": 26,
+          "failures": 0
+        },
+        "native_host": {
+          "os": "macOS 15.7.9",
+          "build": "24G830",
+          "compiler": "Apple Clang 17.0.0"
+        },
+        "sampler_key": {
+          "boundary_indices": 517,
+          "concurrent_lookups": 262144
+        }
+      },
+      "redundant_full_stack": {
+        "run_id": 43066219226,
+        "conclusion": "cancelled",
+        "headSha": "4d09aa9072a8594efb6d7e500da1f73c66f8a9a8",
+        "status": "completed",
+        "counted_as_pass": false
+      }
+    },
+    {
+      "upstream_pr": 7,
+      "upstream_commit": "394f162ae7bf5cc9d57bb673a9a6b326c46c325e",
+      "downstream_commit": "8533c265a2fe26eb18ee5d69e238fc36eae28c30",
+      "focused_run_id": 43066748231,
+      "run": {
+        "conclusion": "success",
+        "createdAt": "2026-11-11T17:17:44Z",
+        "headBranch": "downstream/780m-tahoe",
+        "headSha": "8533c265a2fe26eb18ee5d69e238fc36eae28c30",
+        "jobs": [
+          {
+            "name": "host-contracts",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+              {
+                "completedAt": "2026-11-11T17:17:48Z",
+                "conclusion": "success",
+                "name": "Set up job",
+                "number": 1,
+                "startedAt": "2026-11-11T17:17:47Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:17:49Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 2,
+                "startedAt": "2026-11-11T17:17:48Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:20Z",
+                "conclusion": "success",
+                "name": "Run python3 -m unittest discover -s tests -v",
+                "number": 3,
+                "startedAt": "2026-11-11T17:17:49Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:24Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_bo_create.py --out build/bo-create",
+                "number": 4,
+                "startedAt": "2026-11-11T17:18:20Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:25Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_metal_capabilities.py --out build/metal-capabilities",
+                "number": 5,
+                "startedAt": "2026-11-11T17:18:24Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:25Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_shader_cache.py --out build/shader-cache",
+                "number": 6,
+                "startedAt": "2026-11-11T17:18:25Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:25Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_submit_begin.py --out build/submit-begin",
+                "number": 7,
+                "startedAt": "2026-11-11T17:18:25Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:26Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_hidpi.py",
+                "number": 8,
+                "startedAt": "2026-11-11T17:18:25Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:28Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_bo_retirement.py --out build/bo-retirement",
+                "number": 9,
+                "startedAt": "2026-11-11T17:18:26Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:30Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_context_retirement.py --out build/context-retirement",
+                "number": 10,
+                "startedAt": "2026-11-11T17:18:28Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:32Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup",
+                "number": 11,
+                "startedAt": "2026-11-11T17:18:30Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:33Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 22,
+                "startedAt": "2026-11-11T17:18:32Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:33Z",
+                "conclusion": "success",
+                "name": "Complete job",
+                "number": 23,
+                "startedAt": "2026-11-11T17:18:33Z",
+                "status": "completed"
+              }
+            ]
+          },
+          {
+            "name": "native-components",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+              {
+                "completedAt": "2026-11-11T17:17:48Z",
+                "conclusion": "success",
+                "name": "Set up job",
+                "number": 1,
+                "startedAt": "2026-11-11T17:17:47Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:17:52Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 2,
+                "startedAt": "2026-11-11T17:17:48Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:17:54Z",
+                "conclusion": "success",
+                "name": "Record actual source and compiler host",
+                "number": 3,
+                "startedAt": "2026-11-11T17:17:52Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:17:59Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 4,
+                "startedAt": "2026-11-11T17:17:54Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:05Z",
+                "conclusion": "success",
+                "name": "Execute allocation methods with sanitizers",
+                "number": 5,
+                "startedAt": "2026-11-11T17:17:59Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:07Z",
+                "conclusion": "success",
+                "name": "Execute actual capability query bodies with sanitizers",
+                "number": 6,
+                "startedAt": "2026-11-11T17:18:05Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:15Z",
+                "conclusion": "success",
+                "name": "Execute cache I/O and Foundation LRU with sanitizers",
+                "number": 7,
+                "startedAt": "2026-11-11T17:18:07Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:15Z",
+                "conclusion": "success",
+                "name": "Execute actual submission refusal paths with sanitizers",
+                "number": 8,
+                "startedAt": "2026-11-11T17:18:15Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:16Z",
+                "conclusion": "success",
+                "name": "Execute actual framebuffer mode and unsupported color callbacks",
+                "number": 9,
+                "startedAt": "2026-11-11T17:18:15Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:20Z",
+                "conclusion": "success",
+                "name": "Execute adopted sampler keys with ASan and UBSan",
+                "number": 10,
+                "startedAt": "2026-11-11T17:18:16Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:22Z",
+                "conclusion": "success",
+                "name": "Execute adopted IOSurface registry and monitor keys with sanitizers",
+                "number": 11,
+                "startedAt": "2026-11-11T17:18:20Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:23Z",
+                "conclusion": "success",
+                "name": "Compile optional IOSurface GPU probe without executing it",
+                "number": 12,
+                "startedAt": "2026-11-11T17:18:22Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:27Z",
+                "conclusion": "success",
+                "name": "Compile both kernel components without installation",
+                "number": 13,
+                "startedAt": "2026-11-11T17:18:23Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:32Z",
+                "conclusion": "success",
+                "name": "Checkout pinned Vulkan headers",
+                "number": 14,
+                "startedAt": "2026-11-11T17:18:27Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:57Z",
+                "conclusion": "success",
+                "name": "Compile and sign actual Metal plugin without creating a device",
+                "number": 15,
+                "startedAt": "2026-11-11T17:18:32Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:57Z",
+                "conclusion": "success",
+                "name": "Check source integrity and evidence limits",
+                "number": 16,
+                "startedAt": "2026-11-11T17:18:57Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:58Z",
+                "conclusion": "success",
+                "name": "Post Checkout pinned Vulkan headers",
+                "number": 30,
+                "startedAt": "2026-11-11T17:18:57Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:18:59Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 31,
+                "startedAt": "2026-11-11T17:18:58Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:19:00Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 32,
+                "startedAt": "2026-11-11T17:18:59Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:19:00Z",
+                "conclusion": "success",
+                "name": "Complete job",
+                "number": 33,
+                "startedAt": "2026-11-11T17:19:00Z",
+                "status": "completed"
+              }
+            ]
+          }
+        ],
+        "status": "completed",
+        "updatedAt": "2026-11-11T17:19:09Z",
+        "url": "https://github.com/AgnoyZ/nullarc/actions/runs/43066748231"
+      },
+      "observations": {
+        "ubuntu_python": {
+          "ran": 343,
+          "skipped": 1,
+          "failures": 0
+        },
+        "windows_python": {
+          "ran": 343,
+          "skipped": 26,
+          "failures": 0
+        },
+        "native_host": {
+          "os": "macOS 15.7.9",
+          "build": "24G830",
+          "compiler": "Apple Clang 17.0.0"
+        },
+        "sampler_key": {
+          "boundary_indices": 517,
+          "concurrent_lookups": 262144
+        },
+        "iosurface_key": {
+          "boundary_identities": 77,
+          "concurrent_cycles": 16384,
+          "gpu_probe": "compiled-not-run"
+        }
+      },
+      "redundant_full_stack": {
+        "run_id": 43066748208,
+        "conclusion": "cancelled",
+        "headSha": "8533c265a2fe26eb18ee5d69e238fc36eae28c30",
+        "status": "completed",
+        "counted_as_pass": false
+      }
+    },
+    {
+      "upstream_pr": 8,
+      "upstream_commit": "5a8a088011946c8089bb27e10d0dba117bf1b48e",
+      "downstream_commit": "0c594e1be3f4d2452459604eb74fcfad6f6ce8ac",
+      "focused_run_id": 43067411274,
+      "run": {
+        "conclusion": "success",
+        "createdAt": "2026-11-11T17:21:44Z",
+        "headBranch": "downstream/780m-tahoe",
+        "headSha": "0c594e1be3f4d2452459604eb74fcfad6f6ce8ac",
+        "jobs": [
+          {
+            "name": "host-contracts",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+              {
+                "completedAt": "2026-11-11T17:21:47Z",
+                "conclusion": "success",
+                "name": "Set up job",
+                "number": 1,
+                "startedAt": "2026-11-11T17:21:47Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:21:48Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 2,
+                "startedAt": "2026-11-11T17:21:47Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:12Z",
+                "conclusion": "success",
+                "name": "Run python3 -m unittest discover -s tests -v",
+                "number": 3,
+                "startedAt": "2026-11-11T17:21:48Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:16Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_bo_create.py --out build/bo-create",
+                "number": 4,
+                "startedAt": "2026-11-11T17:22:12Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:17Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_metal_capabilities.py --out build/metal-capabilities",
+                "number": 5,
+                "startedAt": "2026-11-11T17:22:16Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:17Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_shader_cache.py --out build/shader-cache",
+                "number": 6,
+                "startedAt": "2026-11-11T17:22:17Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:17Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_submit_begin.py --out build/submit-begin",
+                "number": 7,
+                "startedAt": "2026-11-11T17:22:17Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:18Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_hidpi.py",
+                "number": 8,
+                "startedAt": "2026-11-11T17:22:17Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:20Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_bo_retirement.py --out build/bo-retirement",
+                "number": 9,
+                "startedAt": "2026-11-11T17:22:18Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:22Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_context_retirement.py --out build/context-retirement",
+                "number": 10,
+                "startedAt": "2026-11-11T17:22:20Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:23Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup",
+                "number": 11,
+                "startedAt": "2026-11-11T17:22:22Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:26Z",
+                "conclusion": "success",
+                "name": "Checkout pinned Vulkan headers for descriptor tests",
+                "number": 12,
+                "startedAt": "2026-11-11T17:22:23Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:27Z",
+                "conclusion": "success",
+                "name": "Execute adopted descriptor masks with sanitizers",
+                "number": 13,
+                "startedAt": "2026-11-11T17:22:26Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:27Z",
+                "conclusion": "success",
+                "name": "Post Checkout pinned Vulkan headers for descriptor tests",
+                "number": 25,
+                "startedAt": "2026-11-11T17:22:27Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:27Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 26,
+                "startedAt": "2026-11-11T17:22:27Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:27Z",
+                "conclusion": "success",
+                "name": "Complete job",
+                "number": 27,
+                "startedAt": "2026-11-11T17:22:27Z",
+                "status": "completed"
+              }
+            ]
+          },
+          {
+            "name": "native-components",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+              {
+                "completedAt": "2026-11-11T17:21:50Z",
+                "conclusion": "success",
+                "name": "Set up job",
+                "number": 1,
+                "startedAt": "2026-11-11T17:21:48Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:21:53Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 2,
+                "startedAt": "2026-11-11T17:21:50Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:21:56Z",
+                "conclusion": "success",
+                "name": "Record actual source and compiler host",
+                "number": 3,
+                "startedAt": "2026-11-11T17:21:53Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:00Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 4,
+                "startedAt": "2026-11-11T17:21:56Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:09Z",
+                "conclusion": "success",
+                "name": "Execute allocation methods with sanitizers",
+                "number": 5,
+                "startedAt": "2026-11-11T17:22:00Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:12Z",
+                "conclusion": "success",
+                "name": "Execute actual capability query bodies with sanitizers",
+                "number": 6,
+                "startedAt": "2026-11-11T17:22:09Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:17Z",
+                "conclusion": "success",
+                "name": "Execute cache I/O and Foundation LRU with sanitizers",
+                "number": 7,
+                "startedAt": "2026-11-11T17:22:12Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:18Z",
+                "conclusion": "success",
+                "name": "Execute actual submission refusal paths with sanitizers",
+                "number": 8,
+                "startedAt": "2026-11-11T17:22:17Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:19Z",
+                "conclusion": "success",
+                "name": "Execute actual framebuffer mode and unsupported color callbacks",
+                "number": 9,
+                "startedAt": "2026-11-11T17:22:18Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:24Z",
+                "conclusion": "success",
+                "name": "Execute adopted sampler keys with ASan and UBSan",
+                "number": 10,
+                "startedAt": "2026-11-11T17:22:19Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:26Z",
+                "conclusion": "success",
+                "name": "Execute adopted IOSurface registry and monitor keys with sanitizers",
+                "number": 11,
+                "startedAt": "2026-11-11T17:22:24Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:27Z",
+                "conclusion": "success",
+                "name": "Compile optional IOSurface GPU probe without executing it",
+                "number": 12,
+                "startedAt": "2026-11-11T17:22:26Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:31Z",
+                "conclusion": "success",
+                "name": "Compile both kernel components without installation",
+                "number": 13,
+                "startedAt": "2026-11-11T17:22:27Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:36Z",
+                "conclusion": "success",
+                "name": "Checkout pinned Vulkan headers",
+                "number": 14,
+                "startedAt": "2026-11-11T17:22:31Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:37Z",
+                "conclusion": "success",
+                "name": "Execute adopted descriptor masks with sanitizers",
+                "number": 15,
+                "startedAt": "2026-11-11T17:22:36Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:56Z",
+                "conclusion": "success",
+                "name": "Compile and sign actual Metal plugin without creating a device",
+                "number": 16,
+                "startedAt": "2026-11-11T17:22:37Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:56Z",
+                "conclusion": "success",
+                "name": "Check source integrity and evidence limits",
+                "number": 17,
+                "startedAt": "2026-11-11T17:22:56Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:57Z",
+                "conclusion": "success",
+                "name": "Post Checkout pinned Vulkan headers",
+                "number": 32,
+                "startedAt": "2026-11-11T17:22:56Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:58Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 33,
+                "startedAt": "2026-11-11T17:22:57Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:59Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 34,
+                "startedAt": "2026-11-11T17:22:58Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:22:59Z",
+                "conclusion": "success",
+                "name": "Complete job",
+                "number": 35,
+                "startedAt": "2026-11-11T17:22:59Z",
+                "status": "completed"
+              }
+            ]
+          }
+        ],
+        "status": "completed",
+        "updatedAt": "2026-11-11T17:23:02Z",
+        "url": "https://github.com/AgnoyZ/nullarc/actions/runs/43067411274"
+      },
+      "observations": {
+        "ubuntu_python": {
+          "ran": 343,
+          "skipped": 1,
+          "failures": 0
+        },
+        "windows_python": {
+          "ran": 343,
+          "skipped": 26,
+          "failures": 0
+        },
+        "native_host": {
+          "os": "macOS 15.7.9",
+          "build": "24G830",
+          "compiler": "Apple Clang 17.0.0"
+        },
+        "sampler_key": {
+          "boundary_indices": 517,
+          "concurrent_lookups": 262144
+        },
+        "iosurface_key": {
+          "boundary_identities": 77,
+          "concurrent_cycles": 16384,
+          "gpu_probe": "compiled-not-run"
+        },
+        "descriptor_masks": {
+          "hosts": [
+            "Ubuntu",
+            "Intel macOS"
+          ],
+          "configurations": [
+            "unset",
+            "0",
+            "1"
+          ],
+          "cases_per_configuration_per_host": 321,
+          "legacy_mismatches": 0,
+          "shader_fixture_files": 0,
+          "synthetic_first_write_counts": [
+            4,
+            193,
+            4
+          ]
+        }
+      },
+      "redundant_full_stack": {
+        "run_id": 43067411233,
+        "conclusion": "cancelled",
+        "headSha": "0c594e1be3f4d2452459604eb74fcfad6f6ce8ac",
+        "status": "completed",
+        "counted_as_pass": false
+      }
+    },
+    {
+      "upstream_pr": 9,
+      "upstream_commit": "c9da802a8dbf3753fa15b5cd903934712c3c80f6",
+      "downstream_commit": "661fd3ca15acae4515321daeea29961450f86fa7",
+      "focused_run_id": 43068258971,
+      "run": {
+        "conclusion": "success",
+        "createdAt": "2026-11-11T17:26:54Z",
+        "headBranch": "downstream/780m-tahoe",
+        "headSha": "661fd3ca15acae4515321daeea29961450f86fa7",
+        "jobs": [
+          {
+            "name": "host-contracts",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+              {
+                "completedAt": "2026-11-11T17:26:58Z",
+                "conclusion": "success",
+                "name": "Set up job",
+                "number": 1,
+                "startedAt": "2026-11-11T17:26:58Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:00Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 2,
+                "startedAt": "2026-11-11T17:26:58Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:37Z",
+                "conclusion": "success",
+                "name": "Run python3 -m unittest discover -s tests -v",
+                "number": 3,
+                "startedAt": "2026-11-11T17:27:00Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:39Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_bo_create.py --out build/bo-create",
+                "number": 4,
+                "startedAt": "2026-11-11T17:27:37Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:40Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_metal_capabilities.py --out build/metal-capabilities",
+                "number": 5,
+                "startedAt": "2026-11-11T17:27:39Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:40Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_shader_cache.py --out build/shader-cache",
+                "number": 6,
+                "startedAt": "2026-11-11T17:27:40Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:40Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_submit_begin.py --out build/submit-begin",
+                "number": 7,
+                "startedAt": "2026-11-11T17:27:40Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:41Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_hidpi.py",
+                "number": 8,
+                "startedAt": "2026-11-11T17:27:40Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:41Z",
+                "conclusion": "success",
+                "name": "Execute adopted read-only panel timing with sanitizers",
+                "number": 9,
+                "startedAt": "2026-11-11T17:27:41Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:44Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_bo_retirement.py --out build/bo-retirement",
+                "number": 10,
+                "startedAt": "2026-11-11T17:27:41Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:47Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_context_retirement.py --out build/context-retirement",
+                "number": 11,
+                "startedAt": "2026-11-11T17:27:44Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:50Z",
+                "conclusion": "success",
+                "name": "Run python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup",
+                "number": 12,
+                "startedAt": "2026-11-11T17:27:47Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:52Z",
+                "conclusion": "success",
+                "name": "Checkout pinned Vulkan headers for descriptor tests",
+                "number": 13,
+                "startedAt": "2026-11-11T17:27:50Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:53Z",
+                "conclusion": "success",
+                "name": "Execute adopted descriptor masks with sanitizers",
+                "number": 14,
+                "startedAt": "2026-11-11T17:27:52Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:54Z",
+                "conclusion": "success",
+                "name": "Post Checkout pinned Vulkan headers for descriptor tests",
+                "number": 27,
+                "startedAt": "2026-11-11T17:27:53Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:54Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 28,
+                "startedAt": "2026-11-11T17:27:54Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:54Z",
+                "conclusion": "success",
+                "name": "Complete job",
+                "number": 29,
+                "startedAt": "2026-11-11T17:27:54Z",
+                "status": "completed"
+              }
+            ]
+          },
+          {
+            "name": "native-components",
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+              {
+                "completedAt": "2026-11-11T17:27:00Z",
+                "conclusion": "success",
+                "name": "Set up job",
+                "number": 1,
+                "startedAt": "2026-11-11T17:26:59Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:03Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 2,
+                "startedAt": "2026-11-11T17:27:00Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:04Z",
+                "conclusion": "success",
+                "name": "Record actual source and compiler host",
+                "number": 3,
+                "startedAt": "2026-11-11T17:27:03Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:06Z",
+                "conclusion": "success",
+                "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 4,
+                "startedAt": "2026-11-11T17:27:04Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:11Z",
+                "conclusion": "success",
+                "name": "Execute allocation methods with sanitizers",
+                "number": 5,
+                "startedAt": "2026-11-11T17:27:06Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:15Z",
+                "conclusion": "success",
+                "name": "Execute actual capability query bodies with sanitizers",
+                "number": 6,
+                "startedAt": "2026-11-11T17:27:11Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:17Z",
+                "conclusion": "success",
+                "name": "Execute cache I/O and Foundation LRU with sanitizers",
+                "number": 7,
+                "startedAt": "2026-11-11T17:27:15Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:17Z",
+                "conclusion": "success",
+                "name": "Execute actual submission refusal paths with sanitizers",
+                "number": 8,
+                "startedAt": "2026-11-11T17:27:17Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:18Z",
+                "conclusion": "success",
+                "name": "Execute actual framebuffer mode and unsupported color callbacks",
+                "number": 9,
+                "startedAt": "2026-11-11T17:27:17Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:19Z",
+                "conclusion": "success",
+                "name": "Execute adopted read-only panel timing with sanitizers",
+                "number": 10,
+                "startedAt": "2026-11-11T17:27:18Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:20Z",
+                "conclusion": "success",
+                "name": "Execute adopted sampler keys with ASan and UBSan",
+                "number": 11,
+                "startedAt": "2026-11-11T17:27:19Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:21Z",
+                "conclusion": "success",
+                "name": "Execute adopted IOSurface registry and monitor keys with sanitizers",
+                "number": 12,
+                "startedAt": "2026-11-11T17:27:20Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:22Z",
+                "conclusion": "success",
+                "name": "Compile optional IOSurface GPU probe without executing it",
+                "number": 13,
+                "startedAt": "2026-11-11T17:27:21Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:25Z",
+                "conclusion": "success",
+                "name": "Compile both kernel components without installation",
+                "number": 14,
+                "startedAt": "2026-11-11T17:27:22Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:29Z",
+                "conclusion": "success",
+                "name": "Checkout pinned Vulkan headers",
+                "number": 15,
+                "startedAt": "2026-11-11T17:27:25Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:30Z",
+                "conclusion": "success",
+                "name": "Execute adopted descriptor masks with sanitizers",
+                "number": 16,
+                "startedAt": "2026-11-11T17:27:29Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:47Z",
+                "conclusion": "success",
+                "name": "Compile and sign actual Metal plugin without creating a device",
+                "number": 17,
+                "startedAt": "2026-11-11T17:27:30Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:47Z",
+                "conclusion": "success",
+                "name": "Check source integrity and evidence limits",
+                "number": 18,
+                "startedAt": "2026-11-11T17:27:47Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:48Z",
+                "conclusion": "success",
+                "name": "Post Checkout pinned Vulkan headers",
+                "number": 34,
+                "startedAt": "2026-11-11T17:27:47Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:48Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 35,
+                "startedAt": "2026-11-11T17:27:48Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:49Z",
+                "conclusion": "success",
+                "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                "number": 36,
+                "startedAt": "2026-11-11T17:27:48Z",
+                "status": "completed"
+              },
+              {
+                "completedAt": "2026-11-11T17:27:49Z",
+                "conclusion": "success",
+                "name": "Complete job",
+                "number": 37,
+                "startedAt": "2026-11-11T17:27:49Z",
+                "status": "completed"
+              }
+            ]
+          }
+        ],
+        "status": "completed",
+        "updatedAt": "2026-11-11T17:27:57Z",
+        "url": "https://github.com/AgnoyZ/nullarc/actions/runs/43068258971"
+      },
+      "observations": {
+        "ubuntu_python": {
+          "ran": 344,
+          "skipped": 1,
+          "failures": 0
+        },
+        "windows_python": {
+          "ran": 344,
+          "skipped": 26,
+          "failures": 0
+        },
+        "native_host": {
+          "os": "macOS 15.7.9",
+          "build": "24G830",
+          "compiler": "Apple Clang 17.0.0"
+        },
+        "sampler_key": {
+          "boundary_indices": 517,
+          "concurrent_lookups": 262144
+        },
+        "iosurface_key": {
+          "boundary_identities": 77,
+          "concurrent_cycles": 16384,
+          "gpu_probe": "compiled-not-run"
+        },
+        "descriptor_masks": {
+          "hosts": [
+            "Ubuntu",
+            "Intel macOS"
+          ],
+          "configurations": [
+            "unset",
+            "0",
+            "1"
+          ],
+          "cases_per_configuration_per_host": 321,
+          "legacy_mismatches": 0,
+          "shader_fixture_files": 0,
+          "synthetic_first_write_counts": [
+            4,
+            193,
+            4
+          ]
+        },
+        "panel_timing": {
+          "decoder_cases_per_host": 43,
+          "actual_callback_with_iokit_fakes": "passed-on-both-hosts"
+        }
+      },
+      "redundant_full_stack": {
+        "run_id": 43068258851,
+        "conclusion": "cancelled",
+        "headSha": "661fd3ca15acae4515321daeea29961450f86fa7",
+        "status": "completed",
+        "counted_as_pass": false
+      }
+    }
+  ],
+  "independent_hidpi_run": {
+    "run_id": 43068258882,
+    "conclusion": "success",
+    "createdAt": "2026-11-11T17:26:54Z",
+    "headBranch": "downstream/780m-tahoe",
+    "headSha": "661fd3ca15acae4515321daeea29961450f86fa7",
+    "jobs": [
+      {
+        "name": "native-hidpi",
+        "status": "completed",
+        "conclusion": "success",
+        "steps": [
+          {
+            "completedAt": "2026-11-11T17:27:04Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-11-11T17:27:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:09Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "number": 2,
+            "startedAt": "2026-11-11T17:27:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:14Z",
+            "conclusion": "success",
+            "name": "Record compiler host and source revision",
+            "number": 3,
+            "startedAt": "2026-11-11T17:27:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:15Z",
+            "conclusion": "success",
+            "name": "Check native override generation and refusal paths",
+            "number": 4,
+            "startedAt": "2026-11-11T17:27:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:21Z",
+            "conclusion": "success",
+            "name": "Run actual framebuffer callback with ASan and UBSan",
+            "number": 5,
+            "startedAt": "2026-11-11T17:27:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:24Z",
+            "conclusion": "success",
+            "name": "Checkout pinned MacKernelSDK",
+            "number": 6,
+            "startedAt": "2026-11-11T17:27:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:27Z",
+            "conclusion": "success",
+            "name": "Compile and sign actual PhxAccel including PhxAMDFB",
+            "number": 7,
+            "startedAt": "2026-11-11T17:27:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:29Z",
+            "conclusion": "success",
+            "name": "Compile read-only CoreGraphics probe and inventory the non-target host",
+            "number": 8,
+            "startedAt": "2026-11-11T17:27:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:29Z",
+            "conclusion": "success",
+            "name": "Confirm tracked sources unchanged",
+            "number": 9,
+            "startedAt": "2026-11-11T17:27:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:30Z",
+            "conclusion": "success",
+            "name": "State evidence and publication limits",
+            "number": 10,
+            "startedAt": "2026-11-11T17:27:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:31Z",
+            "conclusion": "success",
+            "name": "Post Checkout pinned MacKernelSDK",
+            "number": 19,
+            "startedAt": "2026-11-11T17:27:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:32Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "number": 20,
+            "startedAt": "2026-11-11T17:27:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-11-11T17:27:32Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 21,
+            "startedAt": "2026-11-11T17:27:32Z",
+            "status": "completed"
+          }
+        ]
+      }
+    ],
+    "status": "completed",
+    "updatedAt": "2026-11-11T17:27:34Z",
+    "url": "https://github.com/AgnoyZ/nullarc/actions/runs/43068258882"
+  },
+  "limits": {
+    "hardware_tested": false,
+    "drivers_deployed": false,
+    "efi_or_os_settings_changed": false,
+    "target_tahoe_build_verified": false,
+    "focused_binary_artifacts_uploaded": false,
+    "performance_speedup_measured": false,
+    "upstream_github_prs_merged_by_this_work": false
+  },
+  "initial_local_setup_failure": "The first PR 6 staged snapshot produced 13 clean-source fixture-setup errors. A committed disposable snapshot reran successfully; no guard was weakened.",
+  "scope": "Actual downstream source adoption in four separate commits. Native compiler/signature and CPU sanitizer evidence, not target GPU/display acceptance. Original candidate-matrix evidence remains historical."
+}

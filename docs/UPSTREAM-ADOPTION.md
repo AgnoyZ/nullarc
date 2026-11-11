@@ -10,7 +10,7 @@ not establish that the current downstream combination works on a GPU.
 | 6, sampler slot keys | `55764a0b69658a92870fc2b75e0be3a695382e38` | Adopted in `4d09aa9`; downstream CI `43066219417` completed/success |
 | 7, IOSurface keys | `394f162ae7bf5cc9d57bb673a9a6b326c46c325e` | Adopted in `8533c26`; downstream CI `43066748231` completed/success |
 | 8, descriptor masks | `5a8a088011946c8089bb27e10d0dba117bf1b48e` | Adopted in `0c594e1`; downstream CI `43067411274` completed/success |
-| 9, read-only panel timing | `c9da802a8dbf3753fa15b5cd903934712c3c80f6` | Adopted; downstream native CI pending for this revision; does not set modes |
+| 9, read-only panel timing | `c9da802a8dbf3753fa15b5cd903934712c3c80f6` | Adopted in `661fd3c`; downstream CI `43068258971` and independent HiDPI CI `43068258882` completed/success |
 
 ## PR 6
 
@@ -27,8 +27,9 @@ workflow instead of copying upstream's floating-action/main-only CI job. The
 sanitizer test checks 517 indices, immutable key identity, 262144 concurrent
 lookups and interchange with legacy dictionary keys. A clean disposable Windows
 LF snapshot ran 343 Python tests with 26 platform skips and no failures. The
-first snapshot was refused by existing clean-source guards before testing;
-the rerun used a committed disposable snapshot without weakening those guards.
+initial uncommitted snapshot produced 13 clean-source fixture-setup errors;
+the successful rerun used a committed disposable snapshot without weakening
+those guards.
 Downstream run `43066219417` passed both host/native jobs on macOS 15.7.9 /
 24G830 with Apple Clang 17.0.0, including the 517-index/262144-lookup sanitizer
 test and actual kext/plugin builds and strict signature checks. Ubuntu ran
@@ -113,7 +114,25 @@ SDK compilation verifies the real types separately from IOKit test doubles.
 There is no new mode, higher refresh, EDID/DDC implementation or target display
 acceptance claim.
 The clean Windows LF snapshot ran 344 tests with 26 platform skips and no
-failures. Current downstream native results remain pending for this revision.
+failures. Downstream run `43068258971` completed/success for both host/native
+jobs. Ubuntu ran 344 tests with one skip and no failures. Both hosts passed
+the decoder's 43 cases, the actual mode/timing/color callback harness and
+descriptor configurations. The native job also passed the adopted sampler/
+IOSurface tests, compile-only optional probe, actual kext/plugin builds and
+strict signature checks. Host macOS was 15.7.9 / 24G830 with Apple Clang 17.0.0;
+this is not an installed target Tahoe build. Independent native HiDPI run
+`43068258882` passed as well, including actual PhxAccel and the read-only probe.
+
+## Final evidence
+
+`validation/upstream-adoption-20261112.json` records each adopted upstream pin,
+downstream source commit, successful focused run/job/step metadata, observed
+test counts and the independent final HiDPI run. The earlier eight-candidate
+matrix remains historical and is not substituted for these downstream results.
+Each code revision's redundant full-stack run was confirmed cancelled and is
+not counted as a pass. Native builds retain existing warnings. The one Ubuntu
+skip needs an upstream Git object not present in its shallow checkout; Windows
+platform skips are not native execution passes.
 
 ## Rollback and publication
 
