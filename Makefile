@@ -59,3 +59,7 @@ clean:
 .PHONY: test-nmplugin-surface-key
 test-nmplugin-surface-key:
 	python3 tests/test_nmplugin_surface_key.py
+
+.PHONY: test-nmplugin-descriptor-mask
+test-nmplugin-descriptor-mask:
+	python3 tests/test_nmplugin_descriptor_mask.py

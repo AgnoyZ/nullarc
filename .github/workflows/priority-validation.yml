@@ -2,7 +2,7 @@ name: Priority improvement validation
 on:
   push:
     branches: [downstream/780m-tahoe]
-    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'Makefile', 'tests/test_nmplugin*', 'tests/surface_key*', 'tools/iosurf/surface_sync_probe.m', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', '.github/workflows/priority-validation.yml']
+    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'Makefile', 'tests/test_nmplugin*', 'tests/surface_key*', 'tests/descriptor_mask/**', 'tools/iosurf/surface_sync_probe.m', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', '.github/workflows/priority-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,17 @@ jobs:
       - run: python3 tools/test_bo_retirement.py --out build/bo-retirement
       - run: python3 tools/test_context_retirement.py --out build/context-retirement
       - run: python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup
+      - name: Checkout pinned Vulkan headers for descriptor tests
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: KhronosGroup/Vulkan-Headers
+          ref: 6802bb4733b63ed5efd3adb308a6c885ef180ea1
+          path: build-vulkan-headers
+          persist-credentials: false
+      - name: Execute adopted descriptor masks with sanitizers
+        env:
+          CPPFLAGS: -Ibuild-vulkan-headers/include
+        run: make test-nmplugin-descriptor-mask
   native-components:
     runs-on: macos-15-intel
     timeout-minutes: 20
@@ -75,6 +86,10 @@ jobs:
           ref: 6802bb4733b63ed5efd3adb308a6c885ef180ea1
           path: build-vulkan-headers
           persist-credentials: false
+      - name: Execute adopted descriptor masks with sanitizers
+        env:
+          CPPFLAGS: -Ibuild-vulkan-headers/include
+        run: make test-nmplugin-descriptor-mask
       - name: Compile and sign actual Metal plugin without creating a device
         run: |
           python3 - <<'PY'

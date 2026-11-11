@@ -8,8 +8,8 @@ not establish that the current downstream combination works on a GPU.
 | PR | Reviewed upstream commit | Downstream source status |
 | --- | --- | --- |
 | 6, sampler slot keys | `55764a0b69658a92870fc2b75e0be3a695382e38` | Adopted in `4d09aa9`; downstream CI `43066219417` completed/success |
-| 7, IOSurface keys | `394f162ae7bf5cc9d57bb673a9a6b326c46c325e` | Adopted; downstream native CI pending for this revision |
-| 8, descriptor masks | `5a8a088011946c8089bb27e10d0dba117bf1b48e` | Awaiting downstream integration review |
+| 7, IOSurface keys | `394f162ae7bf5cc9d57bb673a9a6b326c46c325e` | Adopted in `8533c26`; downstream CI `43066748231` completed/success |
+| 8, descriptor masks | `5a8a088011946c8089bb27e10d0dba117bf1b48e` | Adopted; downstream native CI pending for this revision |
 | 9, read-only panel timing | `c9da802a8dbf3753fa15b5cd903934712c3c80f6` | Awaiting downstream integration review; does not set modes |
 
 ## PR 6
@@ -56,6 +56,30 @@ including replacement, weak lifetime, large-plane identity and monitor release.
 It also compiles the optional isolated GPU probe without executing it. Screenshot,
 video, multi-window and real IOSurface/GPU acceptance remain pending on target;
 the hosted CPU doubles do not establish those behaviors.
+The clean Windows LF snapshot ran 343 tests with 26 platform skips and no
+failures. Downstream run `43066748231` completed/success for host/native jobs,
+including the actual registry/monitor sanitizer test, compile-only probe and
+actual kext/plugin builds with strict signature verification.
+
+## PR 8
+
+Review confirmed that set 3 framebuffer-fetch descriptors are bound independently
+by the current downstream draw path, as set 2 heap descriptors already are. The
+new masks exclude both from ordinary stage snapshots. Invalid/unknown masks,
+tessellation and disabled H3 retain their existing conservative fallbacks;
+`NVMTL_DESC_MASK=0` selects the legacy mask logic in an isolated process that
+preserves that diagnostic control. No shader semantics or synchronization policy
+is changed. The original backport provenance comment and the component's
+PolyForm notices remain intact. Plain test fixtures/runners without their own
+notice use the root MIT-or-GPL-2.0-only rule; generated production harnesses are
+not published. Existing licence files are unchanged.
+
+Both Ubuntu and Intel macOS run the actual parser/initializer/snapshot/writer
+test with Vulkan API doubles under ASan/UBSan, in unset/0/1 configurations,
+using pinned Vulkan headers. Tests cover binding identities, descriptor reuse,
+texel/storage buffers, malformed instructions and allocation/address failures.
+The synthetic first-write reduction from 193 to 4 is not a measured GPU or
+desktop performance result. Real framebuffer-fetch rendering remains pending.
 The clean Windows LF snapshot ran 343 tests with 26 platform skips and no
 failures. Current downstream native results remain pending for this revision.
 
