@@ -26,6 +26,12 @@ RESOLVABLE = {".github/workflows/ci.yml", "Makefile", "src/nmplugin/NVMTLObjects
 SANITIZERS = "-std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer"
 
 
+class CommandFailure(RuntimeError):
+    def __init__(self, args, code, output):
+        super().__init__(f"Command failed ({code}): {args[0]}")
+        self.code, self.output = code, output
+
+
 def run(args, cwd, env=None):
     print("RUN " + " ".join(map(str, args)), flush=True)
     result = subprocess.run(list(map(str, args)), cwd=cwd, env=env,
@@ -33,7 +39,7 @@ def run(args, cwd, env=None):
                             text=True, encoding="utf-8", errors="replace")
     print(result.stdout, end="", flush=True)
     if result.returncode:
-        raise RuntimeError(f"Command failed ({result.returncode}): {args[0]}")
+        raise CommandFailure(args, result.returncode, result.stdout)
     return result.stdout
 
 
@@ -141,7 +147,7 @@ def main():
     if not args.prepare_only and (platform.system() != "Darwin" or platform.machine() != "x86_64"):
         parser.error("Native validation requires Intel macOS; Windows preparation is not a build pass")
     report = {"variant": args.variant, "hardware_tested": False, "deployment_performed": False,
-              "binary_artifacts_uploaded": False, "phases": [], "status": "failed"}
+              "binary_artifacts_uploaded": False, "phases": [], "failed_tests": [], "status": "failed"}
     try:
         report.update(prepare(root, args.variant))
         if args.prepare_only:
@@ -160,8 +166,16 @@ def main():
         env.update({"REQUIRE_FIXTURES": "1", "CPPFLAGS": "-I" + str(vulkan / "include"),
                     "ASAN_OPTIONS": "halt_on_error=1", "UBSAN_OPTIONS": "halt_on_error=1"})
 
-        def phase(name, command):
-            text = run(command, root, env)
+        def phase(name, command, test=False):
+            try:
+                text = run(command, root, env)
+            except CommandFailure as error:
+                if not test:
+                    raise
+                report["failed_tests"].append({"phase": name, "exit_code": error.code,
+                                                "output_sha256": digest(error.output.encode()),
+                                                "last_lines": error.output.splitlines()[-8:]})
+                return error.output
             report["phases"].append(name)
             return text
 
@@ -169,11 +183,15 @@ def main():
         report["firmware_sha256"] = {
             path.name: digest(path.read_bytes()) for path in sorted((root / "tests/fixtures/phoenix").glob("*.bin"))
         }
-        phase("unit-tests-asan-ubsan", ["make", "test", "CXX=clang++", "CXXFLAGS=" + SANITIZERS])
-        phase("phoenix-profile", [sys.executable, "tests/test_phx_profile.py"])
+        phase("unit-tests-asan-ubsan", ["make", "test", "CXX=clang++", "CXXFLAGS=" + SANITIZERS], test=True)
+        phase("phoenix-profile", [sys.executable, "tests/test_phx_profile.py"], test=True)
+        # make test stops at the existing wait-sequence assertion on this host;
+        # execute the already-built timing suite independently as well.
+        if 9 in VARIANTS[args.variant]:
+            phase("panel-timing-asan-ubsan", ["build/tests/test_panel_timing"], test=True)
         for n, target in ((6, "sampler-key"), (7, "surface-key"), (8, "descriptor-mask")):
             if n in VARIANTS[args.variant]:
-                phase(target + "-asan-ubsan", ["make", "test-nmplugin-" + target])
+                phase(target + "-asan-ubsan", ["make", "test-nmplugin-" + target], test=True)
         plugin_log = phase("native-metal-plugin", ["sh", "src/nmplugin/build.sh", vulkan / "include"])
         warnings = sorted(re.findall(r"warning: (.*)", plugin_log))
         report["plugin_warnings"] = {"count": len(warnings),
@@ -196,6 +214,10 @@ def main():
         phase("plugin-signature-verify", ["codesign", "--verify", "--strict", plugin])
         report["plugin"] = inspect_macho(plugin, 8)
         phase("tracked-source-integrity", ["git", "diff", "--exit-code", "HEAD", "--", "src", "tests", "Makefile"])
+        report["native_build_status"] = "passed"
+        if report["failed_tests"]:
+            report["status"] = "native-build-passed-tests-failed"
+            raise RuntimeError("Original tests failed; native builds and independent tests completed; see report")
         report["status"] = "passed"
     finally:
         if not args.prepare_only:

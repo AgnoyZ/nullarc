@@ -39,3 +39,19 @@ The macOS runner is a build/test host, not the target machine.
 
 No previous self-reported PR validation is counted as this workflow's result.
 The actual run ID, source SHAs and results will be recorded after completion.
+
+## First native attempt
+
+Run `42987480599` exposed an unchanged baseline test failure in
+`tests/test_wait_seq.cpp`: `test_extended_wait_adaptive_sleep` asserted
+`g_sleep_calls > 0`. The test's mock 50-microsecond delay uses an actual host
+sleep while the simulated wait engine advances a fixed 50 microseconds. On
+this Intel macOS runner, real scheduling can let the 3-millisecond retirement
+thread finish before the simulated counter reaches its sleep phase. The same
+assertion failed in the unmodified baseline, so this is not evidence that a PR
+introduced a regression. This original test is retained without modification.
+
+The harness now records test failures and continues through the independent
+PR tests and native builds. A test failure still fails the job; a successful
+native build is reported separately. The panel timing suite also runs directly
+because `make test` would otherwise stop before reaching it.
