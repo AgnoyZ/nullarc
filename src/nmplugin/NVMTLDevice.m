@@ -21,6 +21,7 @@
 #include <stdatomic.h>
 #include <time.h>
 #include "nvmtl_sample_positions.h"
+#include "nvmtl_capabilities.h"
 #include "nvmtl_log_failure.h"
 #include <sys/sysctl.h>
 #ifndef NVMTL_RELEASE
@@ -1763,15 +1764,15 @@ static void nvmtl_log_compute_descriptor(MTLComputePipelineDescriptor *d) {
         if (h) dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ h(ps, e); });
     }}];
 }
-- (BOOL)supportsFunctionPointers { return YES; }
-- (BOOL)supportsFunctionPointersFromRender { return YES; }
-- (BOOL)supportsDynamicLibraries { return YES; }
-- (BOOL)supportsRenderDynamicLibraries { return YES; }
+- (BOOL)supportsFunctionPointers { return nvmtl_capability_supported(NVMTL_CAP_FUNCTION_POINTERS, nvmtl_vk_backend_ready(), nvmtl_translation_capabilities()); }
+- (BOOL)supportsFunctionPointersFromRender { return nvmtl_capability_supported(NVMTL_CAP_RENDER_FUNCTION_POINTERS, nvmtl_vk_backend_ready(), nvmtl_translation_capabilities()); }
+- (BOOL)supportsDynamicLibraries { return nvmtl_capability_supported(NVMTL_CAP_DYNAMIC_LIBRARIES, nvmtl_vk_backend_ready(), nvmtl_translation_capabilities()); }
+- (BOOL)supportsRenderDynamicLibraries { return nvmtl_capability_supported(NVMTL_CAP_RENDER_DYNAMIC_LIBRARIES, nvmtl_vk_backend_ready(), nvmtl_translation_capabilities()); }
 - (id<MTLDynamicLibrary>)newDynamicLibrary:(id<MTLLibrary>)lib error:(NSError **)err { return nvmtl_new_dylib(lib, err); }
 - (id<MTLDynamicLibrary>)newDynamicLibraryWithURL:(NSURL *)url error:(NSError **)err { return nvmtl_new_dylib_url(url, err); }
 - (id<MTLBinaryArchive>)newBinaryArchiveWithDescriptor:(MTLBinaryArchiveDescriptor *)d error:(NSError **)err { return nvmtl_new_binary_archive(d, err); }
-- (BOOL)supportsShaderBarycentricCoordinates { return YES; }
-- (BOOL)areBarycentricCoordsSupported { return YES; }
+- (BOOL)supportsShaderBarycentricCoordinates { return NO; }
+- (BOOL)areBarycentricCoordsSupported { return NO; }
 - (BOOL)supportsPrimitiveMotionBlur { return NO; }
 - (NSMutableDictionary *)copyIOSurfaceSharedTextureProperties:(MTLTextureDescriptor *)d {
     const char *why = NULL; uint32_t vkf = 0, bpp = 0; int a8 = 0; MTLPixelFormat f = d ? d.pixelFormat : MTLPixelFormatInvalid;
@@ -1994,14 +1995,10 @@ static void nvmtl_log_compute_descriptor(MTLComputePipelineDescriptor *d) {
 - (id<MTLSharedEvent>)newSharedEvent { NVMTLSharedEvent *e = [NVMTLSharedEvent new]; e->_dev = self; return e; }
 - (MTLArgumentBuffersTier)argumentBuffersSupport { return MTLArgumentBuffersTier2; }
 - (BOOL)supportsFamily:(MTLGPUFamily)f {
-    switch ((NSInteger)f) {
-        case MTLGPUFamilyMac2: case MTLGPUFamilyCommon1: case MTLGPUFamilyCommon2: case MTLGPUFamilyCommon3: return YES;
-        case 2001 : return YES;
-        case 5001 : return YES;
-        default: return NO;
-    }
+    // A family promises its whole feature/limit set. No such conformance coverage exists yet.
+    (void)f; return NO;
 }
-- (BOOL)supportsFeatureSet:(MTLFeatureSet)fs { return fs >= 10000 && fs <= 10005; }
+- (BOOL)supportsFeatureSet:(MTLFeatureSet)fs { (void)fs; return NO; }
 - (id<MTLHeap>)newHeapWithDescriptor:(MTLHeapDescriptor *)hd {
     if (!hd || !hd.size) { nvlog("newHeapWithDescriptor: no size"); return nil; }
     NVMTLHeap *h = [NVMTLHeap new];

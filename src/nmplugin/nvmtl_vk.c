@@ -1083,6 +1083,8 @@ void nvmtl_vk_limits(uint32_t *layers, uint32_t *shared_bytes, uint32_t wg[3], u
     if (sm) *sm = up ? g_sm_count : 0;
 }
 
+int nvmtl_vk_backend_ready(void) { return g_state == 1; }
+
 void nvmtl_vk_pubcaps(uint32_t *color_samples, uint32_t *depth_samples, uint64_t *max_storage_range, uint64_t *linear_align) {
     int up = g_state == 1;
     if (color_samples) *color_samples = up ? (uint32_t)(g_lim.framebufferColorSampleCounts & g_lim.sampledImageColorSampleCounts) : 0;

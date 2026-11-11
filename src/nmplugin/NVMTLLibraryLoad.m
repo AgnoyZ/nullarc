@@ -2350,6 +2350,16 @@ static id<MTLIntersectionFunctionTable> nvmtl_ift_new(MTLIntersectionFunctionTab
 }
 @end
 
+uint32_t nvmtl_translation_capabilities(void) {
+    if (!nvmtl_xlate_ready()) return 0;
+    uint32_t caps = 0;
+    if (xlate_vrefs) caps |= NVMTL_TRANSLATOR_VISIBLE_REFS;
+    if (xlate_link) caps |= NVMTL_TRANSLATOR_LINK_VISIBLE;
+    if (xlate_link_rt) caps |= NVMTL_TRANSLATOR_LINK_RUNTIME;
+    if (xlate_link_ext) caps |= NVMTL_TRANSLATOR_LINK_EXTERNS;
+    return caps;
+}
+
 id nvmtl_new_dylib(id<MTLLibrary> lib, NSError **err) {
     if (err) *err = nil;
     if (![(id)lib isKindOfClass:[NVMTLLibrary class]]) {

@@ -2,7 +2,7 @@ name: Priority improvement validation
 on:
   push:
     branches: [downstream/780m-tahoe]
-    paths: ['src/phxbringup/**', 'src/nmplugin/**', 'tools/test_bo_create.py', 'tests/test_bo_create*', '.github/workflows/priority-validation.yml']
+    paths: ['src/phxbringup/**', 'src/nmplugin/**', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', '.github/workflows/priority-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,6 +16,7 @@ jobs:
           persist-credentials: false
       - run: python3 -m unittest discover -s tests -v
       - run: python3 tools/test_bo_create.py --out build/bo-create
+      - run: python3 tools/test_metal_capabilities.py --out build/metal-capabilities
       - run: python3 tools/test_bo_retirement.py --out build/bo-retirement
       - run: python3 tools/test_context_retirement.py --out build/context-retirement
       - run: python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup
@@ -39,6 +40,8 @@ jobs:
           persist-credentials: false
       - name: Execute allocation methods with sanitizers
         run: python3 tools/test_bo_create.py --out build/bo-create
+      - name: Execute actual capability query bodies with sanitizers
+        run: python3 tools/test_metal_capabilities.py --out build/metal-capabilities
       - name: Compile both kernel components without installation
         run: |
           bash src/phxbringup/build.sh ./build-sdk
