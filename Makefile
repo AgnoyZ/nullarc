@@ -8,7 +8,8 @@ TEST_BIN_DIR = build/tests
 TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_rdna3_ip_dcn \
         $(TEST_BIN_DIR)/test_rdna3_ucode \
-        $(TEST_BIN_DIR)/test_r3n_abi
+        $(TEST_BIN_DIR)/test_r3n_abi \
+        $(TEST_BIN_DIR)/test_panel_timing
 
 .PHONY: all test test-nmplugin-sampler-key clean kext fixtures
 
@@ -63,3 +64,10 @@ test-nmplugin-surface-key:
 .PHONY: test-nmplugin-descriptor-mask
 test-nmplugin-descriptor-mask:
 	python3 tests/test_nmplugin_descriptor_mask.py
+
+$(TEST_BIN_DIR)/test_panel_timing: src/phxaccel/tests/panel_timing.cpp src/phxaccel/accel/phx_panel_timing.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) $< -o $@
+
+.PHONY: test-panel-timing
+test-panel-timing: $(TEST_BIN_DIR)/test_panel_timing
+	./$(TEST_BIN_DIR)/test_panel_timing

@@ -10,10 +10,17 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import phx_hidpi
-from test_hidpi import color_methods
+from test_hidpi import color_methods, timing_method
 
 
 class HiDPITests(unittest.TestCase):
+    def test_timing_callback_extraction_rejects_missing_or_duplicate_methods(self):
+        source = (ROOT / 'src/phxaccel/accel/phxfb.cpp').read_text(encoding='utf-8')
+        self.assertIn('fPanelTimingValid', timing_method(source))
+        for changed in ('', source + source, source.replace('getTimingInfoForDisplayMode(', 'missing(')):
+            with self.assertRaises(RuntimeError):
+                timing_method(changed)
+
     def test_color_callback_extraction_rejects_missing_or_duplicate_methods(self):
         source = (ROOT / 'src/phxaccel/accel/phxfb.cpp').read_text(encoding='utf-8')
         methods = color_methods(source)

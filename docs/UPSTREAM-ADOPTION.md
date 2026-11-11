@@ -9,8 +9,8 @@ not establish that the current downstream combination works on a GPU.
 | --- | --- | --- |
 | 6, sampler slot keys | `55764a0b69658a92870fc2b75e0be3a695382e38` | Adopted in `4d09aa9`; downstream CI `43066219417` completed/success |
 | 7, IOSurface keys | `394f162ae7bf5cc9d57bb673a9a6b326c46c325e` | Adopted in `8533c26`; downstream CI `43066748231` completed/success |
-| 8, descriptor masks | `5a8a088011946c8089bb27e10d0dba117bf1b48e` | Adopted; downstream native CI pending for this revision |
-| 9, read-only panel timing | `c9da802a8dbf3753fa15b5cd903934712c3c80f6` | Awaiting downstream integration review; does not set modes |
+| 8, descriptor masks | `5a8a088011946c8089bb27e10d0dba117bf1b48e` | Adopted in `0c594e1`; downstream CI `43067411274` completed/success |
+| 9, read-only panel timing | `c9da802a8dbf3753fa15b5cd903934712c3c80f6` | Adopted; downstream native CI pending for this revision; does not set modes |
 
 ## PR 6
 
@@ -81,6 +81,38 @@ texel/storage buffers, malformed instructions and allocation/address failures.
 The synthetic first-write reduction from 193 to 4 is not a measured GPU or
 desktop performance result. Real framebuffer-fetch rendering remains pending.
 The clean Windows LF snapshot ran 343 tests with 26 platform skips and no
+failures. Downstream run `43067411274` completed/success for both host/native
+jobs, with 321 descriptor cases per configuration on each host and zero legacy
+mismatches. The synthetic first-write counts were 4/193/4 in unset/0/1 modes.
+The prior sampler/IOSurface suites and actual kext/plugin compilation/signature
+checks also passed; Ubuntu ran 343 tests with one skip and no failures.
+
+## PR 9
+
+The downstream now reads the existing OTG0 timing fields before/after the
+existing refresh measurement. Only matching, bounded, progressive fixed-rate
+snapshots whose active area matches the boot console produce detailed timing.
+Unknown, changing, interlaced or variable modes retain the previous fallback.
+The pixel clock is estimated from existing measured/snapped refresh; clock
+min/max stay zero. This changes the information returned to IOFramebuffer,
+but writes no display registers and changes neither VBL policy nor completion
+waits. Native-2x HiDPI flags and physical geometry remain independent.
+
+The only integration conflict was the header insertion; all existing platform,
+hardware-policy and HiDPI includes are retained. Current gamma/CLUT refusal
+and removal of unsupported gamma advertisements are preserved. All adopted
+files are under `src/phxaccel`'s existing PolyForm Noncommercial licence; no
+notices or licence files are replaced. The imported 11-field timing fixture is
+an upstream test input, not a new observation of this downstream target.
+
+The original decoder's 43 cases are included in the default unit target and an
+independent sanitizer target on Ubuntu/macOS. The existing actual framebuffer
+callback harness additionally checks detailed timing/fallback, invalid modes,
+clock bounds, polarity, cleared reserved data and HiDPI independence. Native
+SDK compilation verifies the real types separately from IOKit test doubles.
+There is no new mode, higher refresh, EDID/DDC implementation or target display
+acceptance claim.
+The clean Windows LF snapshot ran 344 tests with 26 platform skips and no
 failures. Current downstream native results remain pending for this revision.
 
 ## Rollback and publication

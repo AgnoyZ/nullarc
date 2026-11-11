@@ -20,6 +20,10 @@ jobs:
       - run: python3 tools/test_shader_cache.py --out build/shader-cache
       - run: python3 tools/test_submit_begin.py --out build/submit-begin
       - run: python3 tools/test_hidpi.py
+      - name: Execute adopted read-only panel timing with sanitizers
+        run: >-
+          make test-panel-timing CXX=clang++
+          CXXFLAGS="-std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer"
       - run: python3 tools/test_bo_retirement.py --out build/bo-retirement
       - run: python3 tools/test_context_retirement.py --out build/context-retirement
       - run: python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup
@@ -62,6 +66,10 @@ jobs:
         run: python3 tools/test_submit_begin.py --out build/submit-begin
       - name: Execute actual framebuffer mode and unsupported color callbacks
         run: python3 tools/test_hidpi.py
+      - name: Execute adopted read-only panel timing with sanitizers
+        run: >-
+          make test-panel-timing CXX=clang++
+          CXXFLAGS="-std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer"
       - name: Execute adopted sampler keys with ASan and UBSan
         run: make test-nmplugin-sampler-key
       - name: Execute adopted IOSurface registry and monitor keys with sanitizers

@@ -1,4 +1,4 @@
-"""Execute the real PhxAMDFB mode-information method with fake IOKit, not a GPU."""
+"""Execute real PhxAMDFB mode/timing/color callbacks with fake IOKit, not a GPU."""
 import argparse
 import re
 from pathlib import Path
@@ -15,6 +15,15 @@ def color_methods(source):
     return '\n'.join(m.replace(' override', '') for m in methods)
 
 
+def timing_method(source):
+    signature = '    IOReturn getTimingInfoForDisplayMode('
+    following = '    IOItemCount getConnectionCount()'
+    if source.count(signature) != 1 or source.count(following) != 1:
+        raise RuntimeError('Expected exactly one timing callback and following connection method')
+    method = signature + source.split(signature, 1)[1].split(following, 1)[0]
+    return method.replace(' override', '')
+
+
 def harness():
     source = (ROOT / "src/phxaccel/accel/phxfb.cpp").read_text(encoding="utf-8")
     method = source.split("    IOReturn getInformationForDisplayMode(", 1)[1]
@@ -22,7 +31,8 @@ def harness():
     method = method.replace(" override", "")
     template = (ROOT / "tests/test_hidpi.cpp").read_text(encoding="utf-8")
     return template.replace("    // ACTUAL_FRAMEBUFFER_METHOD", method).replace(
-        "    // ACTUAL_FRAMEBUFFER_COLOR_METHODS", color_methods(source))
+        "    // ACTUAL_FRAMEBUFFER_COLOR_METHODS", color_methods(source)).replace(
+        "    // ACTUAL_FRAMEBUFFER_TIMING_METHOD", timing_method(source))
 
 
 def main():
