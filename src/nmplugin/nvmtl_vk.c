@@ -3377,12 +3377,13 @@ static int nvmtl_spirv_ssbo_table(const void *spv, size_t n)
 static _Atomic unsigned long long g_g1_refused;
 static NSData *nvmtl_address_shader_g0(const void *data, size_t len, uint32_t flags, uint32_t *info);
 static NSData *nvmtl_address_shader_g_uncached(const void *data, size_t len, uint32_t flags, uint32_t *info);
+#include "nvmtl_lru_cache.h"
 static NSData *nvmtl_address_shader_g(const void *data, size_t len, uint32_t flags, uint32_t *info) {
-    static NSMutableDictionary *cache; static pthread_mutex_t lk = PTHREAD_MUTEX_INITIALIZER;
+    static NVMTLLRUCache *cache; static pthread_mutex_t lk = PTHREAD_MUTEX_INITIALIZER;
     NSMutableData *key = [NSMutableData dataWithBytes:&flags length:sizeof flags];
     [key appendBytes:data length:len];
     pthread_mutex_lock(&lk);
-    NSArray *hit = cache[key];
+    NSArray *hit = [cache objectForKey:key];
     pthread_mutex_unlock(&lk);
     if (hit) {
         if (info) memcpy(info, [hit[1] bytes], 4 * sizeof *info);
@@ -3392,8 +3393,11 @@ static NSData *nvmtl_address_shader_g(const void *data, size_t len, uint32_t fla
     NSData *d = nvmtl_address_shader_g_uncached(data, len, flags, got);
     if (info) memcpy(info, got, sizeof got);
     pthread_mutex_lock(&lk);
-    if (!cache || cache.count >= 4096) cache = [NSMutableDictionary new];
-    cache[key] = @[d ?: (id)[NSNull null], [NSData dataWithBytes:got length:sizeof got]];
+    if (!cache) cache = [[NVMTLLRUCache alloc] initWithCountLimit:4096 costLimit:64u << 20];
+    const NSUInteger limit = 64u << 20;
+    if (key.length <= limit - sizeof got && d.length <= limit - sizeof got - key.length)
+        [cache setObject:@[d ?: (id)[NSNull null], [NSData dataWithBytes:got length:sizeof got]]
+                  forKey:key cost:key.length + d.length + sizeof got];
     pthread_mutex_unlock(&lk);
     return d;
 }

@@ -28,5 +28,18 @@ real GPU execution nor a migrated Tahoe installation.
 
 ## Metal optional declarations
 
-Implementation and dependency-matrix tests are added separately; native and
-host CI results will be recorded after that revision finishes.
+Code `330b54dbe84d7fd7d5c7a68925736358279e9ebe`, focused run `43058841913`:
+completed/success. Ubuntu ran all 337 Python tests and the lifetime/allocation
+suites. Both Linux and macOS passed the 96-combination actual capability/dependency
+body harness under ASan/UBSan. macOS 15.7.9 / 24G830, Apple Clang 17.0.0 also
+compiled, linked, signed and strict-verified both kexts and the actual Metal plugin.
+This is host compilation/dependency behavior, not whole-family Metal conformance,
+target GPU execution or a Tahoe migration.
+
+The separate full-stack run `43058841865` was cancellation-requested after the
+focused check passed; it is not counted as a full-stack pass.
+
+## Shader caches
+
+The current cache change adds actual-header I/O and Foundation/actual-wrapper
+sanitizer tests; results remain pending until its committed revision finishes CI.
