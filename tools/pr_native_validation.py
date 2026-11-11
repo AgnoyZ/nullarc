@@ -8,6 +8,7 @@ import platform
 import re
 import subprocess
 import sys
+from pr_wait_seq_overlay import deterministic_wait
 
 BASE = "8aba872560a3c9b7dc7a0ddebfad001c6dddf315"
 HEADS = {
@@ -183,10 +184,18 @@ def main():
         report["firmware_sha256"] = {
             path.name: digest(path.read_bytes()) for path in sorted((root / "tests/fixtures/phoenix").glob("*.bin"))
         }
-        phase("unit-tests-asan-ubsan", ["make", "test", "CXX=clang++", "CXXFLAGS=" + SANITIZERS], test=True)
+        # The pinned upstream model mixed virtual waited-time with wall-clock
+        # sleeps and worker scheduling. Review/hash the test-only overlay, keep
+        # its engine/assertions, and restore it before production compilation.
+        with deterministic_wait(root) as overlay:
+            report["test_overlays"] = [overlay]
+            phase("unit-tests-asan-ubsan", ["make", "test", "CXX=clang++", "CXXFLAGS=" + SANITIZERS], test=True)
+            phase("deterministic-wait-model-repeat", [sys.executable, "-c",
+                  "import subprocess; [subprocess.run(['build/tests/test_wait_seq'], check=True, stdout=subprocess.DEVNULL) for _ in range(20)]; print('20 deterministic wait-model runs passed; not the kernel method')"], test=True)
+        phase("restored-wait-test-integrity", ["git", "diff", "--exit-code", "HEAD", "--", "tests/test_wait_seq.cpp"])
+        report["test_overlay_restored"] = True
         phase("phoenix-profile", [sys.executable, "tests/test_phx_profile.py"], test=True)
-        # make test stops at the existing wait-sequence assertion on this host;
-        # execute the already-built timing suite independently as well.
+        # Keep an independent panel phase even when another model test fails.
         if 9 in VARIANTS[args.variant]:
             phase("panel-timing-asan-ubsan", ["build/tests/test_panel_timing"], test=True)
         for n, target in ((6, "sampler-key"), (7, "surface-key"), (8, "descriptor-mask")):
