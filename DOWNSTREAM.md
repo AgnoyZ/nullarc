@@ -74,6 +74,13 @@ validation evidence and research documents that used to live in `AgnoyZ/radeon-7
 
 ## Behaviour changes to be aware of
 
+The 2026-11-12 priority pass is recorded in [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md)
+and [host validation evidence](docs/validation/priority-host-20261112.md). It adds checked BO
+arithmetic/provenance, dependency-gated optional Metal claims, bounded shader-cache eviction
+and checked cache files, refusal of a submission whose upload prologue failed, and explicit
+unsupported hardware gamma/CLUT responses. These are host-tested correctness changes;
+GPU execution, display behavior, kernel-map pressure and the installed Tahoe build remain unverified.
+
 - The kernel components start only with `phx780m=1`, on Darwin 25 and PCI `1002:1900`. Without the boot
   argument they decline to start.
 - No synthetic fence retirement: a submit/wait that has no hardware behind it returns `kIOReturnNotReady`
@@ -119,9 +126,9 @@ sh src/phxaccel/build.sh /path/to/MacKernelSDK
 The boot gate is used without installing anything:
 
 ```sh
-sh tools/phx_boot_gate.sh --check --stages /path/to/reviewed-stages --expected-build 32
+sh tools/phx_boot_gate.sh --check --stages /path/to/reviewed-stages --expected-build 33
 sh tools/phx_boot_gate.sh --state /private/var/phxgate --stages /path/to/reviewed-stages \
-    --expected-build 32 --release /path/to/release-hold.sh --timeout 60
+    --expected-build 33 --release /path/to/release-hold.sh --timeout 60
 ```
 
 ## Licensing and provenance

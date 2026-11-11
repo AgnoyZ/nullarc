@@ -98,11 +98,11 @@ sh tools/phx_boot_gate.sh --state DIR --stages DIR --expected-build N \
 
 ```sh
 # 只读检查：不会写任何状态
-sudo sh tools/phx_boot_gate.sh --check --stages /path/to/reviewed-stages --expected-build 32
+sudo sh tools/phx_boot_gate.sh --check --stages /path/to/reviewed-stages --expected-build 33
 
 # 真正运行：状态目录与阶段目录都必须是绝对路径
 sudo sh tools/phx_boot_gate.sh --state /private/var/phxgate --stages /path/to/reviewed-stages \
-    --expected-build 32 --release /path/to/release-hold.sh --timeout 60
+    --expected-build 33 --release /path/to/release-hold.sh --timeout 60
 ```
 
 本仓库不提供 LaunchDaemon、安装脚本或默认阶段目录；是否把它接进开机流程属于部署决定，
