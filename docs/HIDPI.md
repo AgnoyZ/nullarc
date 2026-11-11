@@ -54,6 +54,7 @@ EDID 改写、系统安装或安全设置步骤。
 ```sh
 python3 -m unittest discover -s tests -p 'test_hidpi_tools.py' -v
 python3 tools/test_hidpi.py
+mkdir -p build
 xcrun clang -arch x86_64 -fobjc-arc -Wall -Wextra -Werror \
   tools/phx_hidpi_probe.m -framework Foundation -framework CoreGraphics \
   -o build/phx-hidpi-probe
@@ -138,4 +139,4 @@ ioreg -r -c PhxAMDFB -d 1 -l | grep -E '"(PhxFBHiDPI|PhxFBHiDPILogicalWidth|PhxF
 与 Mach-O 身份检查，并构建/运行只读探针。没有上传二进制或安装/加载 kext。
 CPU harness 使用真实 `getInformationForDisplayMode()` 方法，断言只有标志改变，
 物理尺寸、刷新率和拒绝路径保留；它不模拟 CoreDisplay，也不执行 GPU 命令。
-已完成的结果另记于 `docs/validation/`；目标验收必须满足上节标准。
+已完成的宿主结果记于 `docs/validation/hidpi-native-20261112.md`；目标验收必须满足上节标准。
