@@ -5746,9 +5746,20 @@ int nvmtl_vk_submit_begin_at(nvk_cmdbuf *c, nvmtl_inflight *f, const char *who)
             pvkCmdPipelineBarrier(pre->cb.cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &mb, 0, NULL, 0, NULL);
             pr = pvkEndCommandBuffer(pre->cb.cb);
         }
-        if (pre->n && pr == VK_SUCCESS) cbs[ncb++] = pre->cb.cb;
+        if (pre->n && pr != VK_SUCCESS) {
+            g_pre_fail++;
+            nvlog("vk: pre-submit prologue End -> %d - refusing main submission with %u missing uploads/fills (%llu bytes)", pr, pre->n, pre->bytes);
+            // Neither buffer reached QueueSubmit. Release only these known-unsubmitted
+            // resources; the submit/wait failure paths below still retain uncertain work.
+            nvmtl_cmd_retire(&pre->cb); nvmtl_pre_drop(pre); pre->begun = 0;
+            pvkDestroyFence(g_dev, fence, NULL);
+            nvmtl_cmd_retire(c);
+            if (pr == VK_ERROR_DEVICE_LOST) g_state = -1;
+            pthread_mutex_unlock(&nvmtl_submit_mutex);
+            return pr == VK_ERROR_DEVICE_LOST ? -2 : -1;
+        }
+        if (pre->n) cbs[ncb++] = pre->cb.cb;
         else {
-            if (pre->n) { g_pre_fail++; nvlog("vk: pre-submit prologue End -> %d - %u uploads/fills (%llu bytes) LOST, the GPU keeps the old bytes", pr, pre->n, pre->bytes); }
             nvmtl_cmd_retire(&pre->cb); nvmtl_pre_drop(pre); pre->begun = 0;
         }
     }

@@ -41,5 +41,12 @@ focused check passed; it is not counted as a full-stack pass.
 
 ## Shader caches
 
-The current cache change adds actual-header I/O and Foundation/actual-wrapper
-sanitizer tests; results remain pending until its committed revision finishes CI.
+Code `373bb0ab10f5a90c2960b8aee715d203887415b4`, focused run `43060440232`:
+completed/success. Results include Linux/macOS actual cache I/O under ASan/UBSan
+and macOS Foundation LRU/actual-wrapper tests. Detailed counts will be checked
+from the completed log before the final evidence update.
+
+## Submission refusal
+
+The following change tests the actual begin/release bodies using Vulkan, witness,
+retirement and timing fakes. Native sanitizer/compilation results are pending CI.
