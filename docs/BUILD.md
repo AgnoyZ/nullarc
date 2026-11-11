@@ -1,5 +1,11 @@
 # Source build and tests
 
+The opt-in native-2x HiDPI candidate, offline override generator and read-only
+CoreGraphics probe are described in `HIDPI.md`. Its focused
+`.github/workflows/hidpi-validation.yml` compiles PhxAccel and the probe on Intel
+macOS and runs the actual mode callback with ASan/UBSan; it does not install or
+load a driver, change display modes or upload binaries.
+
 ## Windows / Linux / macOS: source preparation tests
 Requires Python 3.10+ and Git. No driver is loaded.
 

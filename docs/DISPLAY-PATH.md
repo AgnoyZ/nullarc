@@ -4,6 +4,10 @@
 目标机验收方法。它是源码修改说明，**不是实机验证结果**：本次没有 Mac 构建、没有加载
 kext、没有在 ThinkBook 上接管内屏。
 
+2026-11-11 新增的 `phxfbhires=1` 原生 2× HiDPI 候选及独立 CI 说明见
+`HIDPI.md`：只改模式标志，nominal/active/backing 像素与本文件的 CPU 拷贝路径
+保持一致，不增加硬件模式或缩放器。目标机显示效果仍未验证。
+
 ## 上游实现的实际路径
 
 `src/phxaccel/accel/phxfb.cpp` 是 WindowServer 实际合成的那个 `IOFramebuffer`

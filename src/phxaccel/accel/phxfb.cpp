@@ -22,6 +22,7 @@
 #include "nvrm_gpuva_abi.h"
 #include <libkern/version.h>
 #include "PhxHardwarePolicy.hpp"
+#include "PhxHiDPI.hpp"
 
 void phxAgdcInstall();   // phxagdc.cpp: the AppleGraphicsDeviceControl that reports this panel (debug.phxagdc)
 void phxAgdcRemove();
@@ -79,6 +80,7 @@ class PhxAMDFB : public IOFramebuffer {
     bool fBeside = false;   // another framebuffer (the firmware's IONDRV one) already drives this GPU: not the console
     IOPhysicalAddress fBase = 0;
     uint32_t fWidth = 0, fHeight = 0, fRowBytes = 0;
+    bool fHiDPI = false;   // phxfbhires=1: native 2x only; CoreDisplay owns the logical desktop
     static constexpr uint64_t kFrameNs = 16666667ull;   // 60 Hz, when the refresh cannot be measured
     uint64_t fFrameNs = kFrameNs;
     uint32_t fRefreshMilliHz = 60000, fHTotal = 0, fVTotal = 0;
@@ -287,6 +289,12 @@ public:
         bzero(info, sizeof(*info));
         info->maxDepthIndex = 0; info->nominalWidth = fWidth; info->nominalHeight = fHeight;
         info->refreshRate = (IOFixed1616)(((uint64_t)fRefreshMilliHz << 16) / 1000); info->flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag;
+        // nominal/active dimensions stay in physical pixels. CoreDisplay may offer
+        // the half-sized logical mode with the native scale-resolutions override;
+        // that selection still needs target-machine verification.
+        // Advertising up/downsampling here would be false: the copy path requires
+        // the source to be exactly the scan-out's size.
+        if (fHiDPI) info->flags |= kDisplayModeNativeFlag | kDisplayModeValidForHiResFlag;
         return kIOReturnSuccess;
     }
     UInt64 getPixelFormatsForDisplayMode(IODisplayModeID, IOIndex) override { return 0; }
@@ -511,6 +519,9 @@ bool PhxAMDFB::start(IOService *provider)
         return false;
     }
     fWidth = (uint32_t)v.v_width; fHeight = (uint32_t)v.v_height; fRowBytes = (uint32_t)v.v_rowBytes;
+    int hiRes = 0;
+    fHiDPI = PE_parse_boot_argn("phxfbhires", &hiRes, sizeof hiRes) && hiRes == 1
+        && phx780m::nativeHiDPIEligible(fWidth, fHeight, fRowBytes);
     // once the video console is up, the platform expert hands out the console's kernel mapping, not the physical
     // address. The GOP surface sits in one of the GPU's BARs (VRAM aperture): find the BAR whose start holds the same
     // pixels as the console mapping. (A descriptor over the mapping would need prepare(): getPhysicalSegment on an
@@ -556,6 +567,13 @@ bool PhxAMDFB::start(IOService *provider)
     fVa = IORangeAllocator::withRange(kVaSize - 1, PAGE_SIZE, 0, IORangeAllocator::kLocking);
     poolInit();
     setProperty("built-in", kOSBooleanTrue);
+    setProperty("PhxFBHiDPI", fHiDPI ? kOSBooleanTrue : kOSBooleanFalse);
+    if (fHiDPI) {
+        setProperty("PhxFBHiDPILogicalWidth", fWidth / 2, 32);
+        setProperty("PhxFBHiDPILogicalHeight", fHeight / 2, 32);
+        PFBLOG("native HiDPI eligible: %ux%u pixels, looks like %ux%u; CoreDisplay selection unverified",
+               fWidth, fHeight, fWidth / 2, fHeight / 2);
+    }
     setProperty("PhxFBWidth", fWidth, 32); setProperty("PhxFBHeight", fHeight, 32);   // the AGDC's panel timing reads these
     measureRefresh();
     setProperty("PhxFBRefreshMilliHz", fRefreshMilliHz, 32);

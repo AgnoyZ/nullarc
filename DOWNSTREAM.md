@@ -81,6 +81,10 @@ validation evidence and research documents that used to live in `AgnoyZ/radeon-7
 - Graphics packets are no longer silently run on the compute queue (or vice versa).
 - The downstream `mesboot`/`phxctl` paths are stricter than upstream's scripts and will refuse layouts or
   replies upstream accepted.
+- `phxfbhires=1` opts the existing firmware mode into the native-2x HiDPI candidate
+  (half-sized logical desktop, unchanged physical pixels). It is off by default;
+  `docs/HIDPI.md` covers the offline display override, read-only mode probe and
+  target acceptance. Arbitrary resampling and target display success are unverified.
 
 ## Repository layout
 

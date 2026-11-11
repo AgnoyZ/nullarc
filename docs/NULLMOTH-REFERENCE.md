@@ -63,3 +63,17 @@ AMD 真机工作：
 - 该提交的仓库 `LICENSE` 为 PolyForm Noncommercial 1.0.0，仓库还包含 LGPL
   翻译器、Mesa 和 NVIDIA 固件等不同来源；不能因“参考”而推断代码或二进制可再分发。
 - 本文件只记录架构比较，没有复制 NullMoth 源代码、固件或二进制。
+
+## 2026-11-11：HiDPI 专项复查
+
+为 HiDPI 任务另行固定审阅提交 `7412cdde81447f78da0ebb64216dc258d8beaedb`；
+不替换上面 2026-10-31 的历史审阅。该提交根许可仍为 PolyForm Noncommercial
+1.0.0，已核对所需 NullMoth copyright notice 和组件级 `NOTICE`，没有复制代码
+或二进制。许可文件与原有通知保持不变。
+
+`NVRMFB` 的 HiRes 模式标志可以借鉴，但 `nvfbhidpi=1` 的大渲染面、
+NVIDIA 硬件缩放器和旋转尺寸发布不能直接搬到 PhxAMDFB。当前 AMD 路径仍是
+固件单模式，present 源尺寸必须等于 scan-out。本次因此只增加默认关闭的
+原生 2× 候选（物理像素不变、逻辑尺寸减半）、离线覆盖文件生成器与只读
+CoreGraphics 探针；不声明任意缩放、目标运行成功或加速。
+具体实现、12 字节记录格式、人工验收与回滚见 `HIDPI.md`。
