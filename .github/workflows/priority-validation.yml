@@ -2,7 +2,7 @@ name: Priority improvement validation
 on:
   push:
     branches: [downstream/780m-tahoe]
-    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', '.github/workflows/priority-validation.yml']
+    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'Makefile', 'tests/test_nmplugin_sampler_key.m', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', '.github/workflows/priority-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -51,6 +51,8 @@ jobs:
         run: python3 tools/test_submit_begin.py --out build/submit-begin
       - name: Execute actual framebuffer mode and unsupported color callbacks
         run: python3 tools/test_hidpi.py
+      - name: Execute adopted sampler keys with ASan and UBSan
+        run: make test-nmplugin-sampler-key
       - name: Compile both kernel components without installation
         run: |
           bash src/phxbringup/build.sh ./build-sdk

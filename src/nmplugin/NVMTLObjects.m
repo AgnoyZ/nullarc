@@ -11,6 +11,7 @@
 void nvlog(const char *fmt, ...);
 
 #import "NVMTLObjects.h"
+#import "nvmtl_sampler_key.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 static int nvmtl_trace_on(void);
@@ -3089,7 +3090,7 @@ static NVMTLBuffer *nvmtl_bytes_ring(NVMTLCommandBuffer *cb, NSUInteger len, siz
         nvlog("setFragmentSamplerState: invalid index or bind failure"); return;
     }
     if (!_fragmentSamplers) _fragmentSamplers=[NSMutableDictionary new];
-    NSString *key=[@(i) stringValue];
+    NSString *key=nvmtl_sampler_index_key(i);
     if (nvmtl_pixel_sampler_update(_fragmentSamplers,key,ns ? ns->_pixelState : nil)) _pixelSamplerKey=nil;
     nvtrace("FRAGMENT SAMPLER[%lu] pixel=%d bound=%d %p min %u mag %u mip %u lod %.2f..%.2f",(unsigned long)i,ns && ns->_pixelState!=nil,ns!=nil,(__bridge void *)ns,
             ns ? ns->_s.desc.min_filter : 9u, ns ? ns->_s.desc.mag_filter : 9u, ns ? ns->_s.desc.mip_filter : 9u, ns ? ns->_s.desc.lod_min : 0.f, ns ? ns->_s.desc.lod_max : 0.f);
@@ -3101,7 +3102,7 @@ static NVMTLBuffer *nvmtl_bytes_ring(NVMTLCommandBuffer *cb, NSUInteger len, siz
         nvlog("setVertexSamplerState: invalid index or bind failure"); return;
     }
     if (!_vertexSamplers) _vertexSamplers=[NSMutableDictionary new];
-    NSString *key=[@(i) stringValue];
+    NSString *key=nvmtl_sampler_index_key(i);
     if (nvmtl_pixel_sampler_update(_vertexSamplers,key,ns ? ns->_pixelState : nil)) _pixelSamplerKey=nil;
     nvtrace("VERTEX SAMPLER[%lu] pixel=%d bound=%d",(unsigned long)i,ns && ns->_pixelState!=nil,ns!=nil);
     if(ns) { if (!_cb->_resources) _cb->_resources=[NVMTLResSet new];[_cb->_resources addObject:ns]; }
@@ -3470,7 +3471,7 @@ static NVMTLBuffer *nvmtl_bytes_ring(NVMTLCommandBuffer *cb, NSUInteger len, siz
     NVMTLSamplerState *ns = (NVMTLSamplerState *)ss;
     nvtrace("FRAGMENT SAMPLER[%lu] clamp %.2f..%.2f", (unsigned long)i, lo, hi);
     if (ns && i < 16) { const nvk_sampler *v = [ns nvmtlClampedLo:lo hi:hi]; if (v != &ns->_s) nvmtl_vk_bind_sampler(&_cb->_c, NVMTL_SET_FRAGMENT, (uint32_t)i, v); }
-    NSString *key=[@(i) stringValue];
+    NSString *key=nvmtl_sampler_index_key(i);
     if(_fragmentSamplers[key]) {
         NSMutableDictionary *state=[_fragmentSamplers[key] mutableCopy];
         state[@"lod_min_clamp"]=@(lo);state[@"lod_max_clamp"]=@(hi);
@@ -3481,7 +3482,7 @@ static NVMTLBuffer *nvmtl_bytes_ring(NVMTLCommandBuffer *cb, NSUInteger len, siz
     [self setVertexSamplerState:ss atIndex:i];
     NVMTLSamplerState *ns = (NVMTLSamplerState *)ss;
     if (ns && i < 16) { const nvk_sampler *v = [ns nvmtlClampedLo:lo hi:hi]; if (v != &ns->_s) nvmtl_vk_bind_sampler(&_cb->_c, NVMTL_SET_VERTEX, (uint32_t)i, v); }
-    NSString *key=[@(i) stringValue];
+    NSString *key=nvmtl_sampler_index_key(i);
     if(_vertexSamplers[key]) {
         NSMutableDictionary *state=[_vertexSamplers[key] mutableCopy];
         state[@"lod_min_clamp"]=@(lo);state[@"lod_max_clamp"]=@(hi);
@@ -4631,7 +4632,7 @@ static void nvmtl_zprobe_drain(void) {
         if (ns) _sassSamplers[@(i)] = ns; else [_sassSamplers removeObjectForKey:@(i)];
     }
     if (!_samplers) _samplers = [NSMutableDictionary new];
-    NSString *key = [NSString stringWithFormat:@"%lu", (unsigned long)i];
+    NSString *key = nvmtl_sampler_index_key(i);
     id was = _samplers[key], now = ns ? ns->_pixelState : nil;
     if (ns && ns->_pixelState) _samplers[key] = ns->_pixelState;
     else [_samplers removeObjectForKey:key];

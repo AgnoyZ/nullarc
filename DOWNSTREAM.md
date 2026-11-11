@@ -74,6 +74,9 @@ validation evidence and research documents that used to live in `AgnoyZ/radeon-7
 
 ## Behaviour changes to be aware of
 
+Source adoption of upstream PRs 6-9 is tracked separately from candidate testing
+in [docs/UPSTREAM-ADOPTION.md](docs/UPSTREAM-ADOPTION.md).
+
 The 2026-11-12 priority pass is recorded in [docs/IMPROVEMENT-PLAN.md](docs/IMPROVEMENT-PLAN.md)
 and [host validation evidence](docs/validation/priority-host-20261112.md). It adds checked BO
 arithmetic/provenance, dependency-gated optional Metal claims, bounded shader-cache eviction
