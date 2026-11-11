@@ -1,0 +1,70 @@
+name: Priority improvement validation
+on:
+  push:
+    branches: [downstream/780m-tahoe]
+    paths: ['src/phxbringup/**', 'src/nmplugin/**', 'tools/test_bo_create.py', 'tests/test_bo_create*', '.github/workflows/priority-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s tests -v
+      - run: python3 tools/test_bo_create.py --out build/bo-create
+      - run: python3 tools/test_bo_retirement.py --out build/bo-retirement
+      - run: python3 tools/test_context_retirement.py --out build/context-retirement
+      - run: python3 tools/test_vm_walk_cleanup.py --out build/vm-walk-cleanup
+  native-components:
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Record actual source and compiler host
+        run: |
+          git rev-parse HEAD
+          sw_vers
+          xcrun clang --version
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: acidanthera/MacKernelSDK
+          ref: 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          path: build-sdk
+          persist-credentials: false
+      - name: Execute allocation methods with sanitizers
+        run: python3 tools/test_bo_create.py --out build/bo-create
+      - name: Compile both kernel components without installation
+        run: |
+          bash src/phxbringup/build.sh ./build-sdk
+          codesign --force --sign - src/phxbringup/build/PhxBringup.kext
+          codesign --verify --strict src/phxbringup/build/PhxBringup.kext
+          bash src/phxaccel/build.sh ./build-sdk
+          codesign --verify --strict src/phxaccel/build/PhxAccel.kext
+      - name: Checkout pinned Vulkan headers
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: KhronosGroup/Vulkan-Headers
+          ref: 6802bb4733b63ed5efd3adb308a6c885ef180ea1
+          path: build-vulkan-headers
+          persist-credentials: false
+      - name: Compile and sign actual Metal plugin without creating a device
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools')
+          from build_userspace import build_plugin
+          def run(*args):
+              subprocess.run(args, check=True)
+          print(json.dumps(build_plugin(Path('.'), Path('build-vulkan-headers'), Path('build/native'), run), indent=2))
+          PY
+      - name: Check source integrity and evidence limits
+        run: |
+          git diff --exit-code HEAD -- src tools tests
+          echo 'Host contracts and compilation only. No target GPU execution, installation or binary upload.'

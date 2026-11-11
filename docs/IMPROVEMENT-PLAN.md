@@ -1,0 +1,40 @@
+# Prioritized downstream improvements
+
+Status at 2026-11-12. Scope: `downstream/780m-tahoe`, Radeon 780M
+`1002:1900`, planned Tahoe. The target OS installation/build and real GPU
+execution remain unverified. The reference is the ignored source checkout of
+NullMoth `7412cdde81447f78da0ebb64216dc258d8beaedb`; NVIDIA hardware routines
+are not AMD implementation evidence. No reference source is copied by the
+allocation change below. Existing component licences and notices remain intact.
+
+| Priority | Work | Current result / remaining acceptance |
+| --- | --- | --- |
+| P0.1 | Hardware parameters and resource provenance | QueryInfo now explicitly flags the assumed GC/address profile and system-memory software budgets. Registry metadata distinguishes these from target measurements. Actual IP discovery and exclusive firmware/display reservations still require target evidence; no new register reads or guessed values are introduced. |
+| P0.2 | BO lifetime and kernel VA pressure | Reject size-rounding overflow, use subtraction-based budgets for every pool/import, reject a missing kernel view before zeroing. Retain existing descriptor ownership, delayed unmap/free and client quarantine. Moving allocations into the client task is deferred until DMA pinning, temporary kernel views, fence writes, flush paths and client-death lifetimes can be validated together. |
+| P0.3 | Truthful Metal capabilities | Next: audit advertised optional features against backend/translator availability and positive implementation evidence. Do not infer unified memory solely from APU identity. |
+| P1.1 | Present cost | Existing copy/alias/damage counters and A/B report pipeline remain the baseline. Measure on target before changing copy/sync defaults or claiming a speedup. |
+| P1.2 | Shader caches | Next: bounded eviction and corruption/concurrency-safe cache files, retaining existing cache validation and write paths where correct. |
+| P1.3 | Device loss / power | Audit loss propagation before any suspend/resume work. No speculative AMD resets, firmware reboots or NVIDIA power routines. |
+| P2 | Display discovery | Retain the native-2x opt-in candidate and read-only probe. EDID/DDC, extra timing modes, hardware gamma and backlight require separate AMD implementation and hardware validation. |
+| Engineering | Native checks / upstream PRs | Add focused host/native CI without binary uploads. Upstream sampler/surface/descriptor candidates remain unmerged; their timing-sensitive upstream wait harness must be fixed independently before calling that matrix green. |
+
+## Allocation contract and rollback
+
+`PhxBoPolicy.hpp` checks the size before adding 4095. A failed check leaves its
+output unchanged. Each pool check requires nonzero size, sane existing usage,
+and `size <= budget - used`; callers debit only after a descriptor and kernel
+view exist. Host import still calls `prepare()` and releases on pin failure.
+The new QueryInfo bits are additive diagnostics; wire sizes and ABI minor 12
+are unchanged. Existing consumers may ignore unknown flag bits.
+
+`tools/test_bo_create.py` extracts the actual current allocation/import methods
+and budgets, rejects missing/duplicate definitions, runs 30 fault/boundary
+cases with ASan/UBSan on POSIX Clang, and hashes its inputs. It also exhausts
+small budget combinations and the 4095 overflowing page-rounding inputs.
+Its descriptor/task/pin/lock observations are fakes, not memory-pressure or GPU
+evidence. Windows only checks extraction/refusal; native execution is in the
+focused `priority-validation.yml` workflow alongside existing lifetime suites
+and real kernel/plugin compilation. Results must be recorded after CI finishes.
+
+Rollback this isolated source experiment by reverting its commit. It changes no
+EFI, boot configuration, firmware, disk, OS security or deployed driver.

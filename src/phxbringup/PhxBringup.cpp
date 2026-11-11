@@ -29,8 +29,9 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
               "TOC size response stays within command storage");
 #include <libkern/version.h>
 #include "PhxHardwarePolicy.hpp"
+#include "PhxBoPolicy.hpp"
 
-#define PHX_KEXT_BUILD 32u
+#define PHX_KEXT_BUILD 33u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -65,12 +66,13 @@ struct PhxGfxRbFrame {
 } __attribute__((packed));
 static_assert(sizeof(PhxGfxRbFrame) == 64, "PhxGfxRbFrame must be 64 B");
 
-// Canned "phoenix" table (Mesa amdgpu_devices.c): GB_ADDR_CONFIG and GC 11.0.1.
+// Compatibility profile from Mesa's canned phoenix table, NOT target-derived IP discovery.
+// QueryInfo and registry properties label this assumption; PCI identity alone does not verify it.
 static constexpr uint32_t kGbAddrConfig = 0x00000242;
 static constexpr uint32_t kGcVersion = (11u << 16) | (0u << 8) | 1u;
 
-// Pools reported to RADV. E1 backs every BO with system memory, so these are budgets, not hardware:
-// BAR0 is 256 MiB on this machine, the UMA carve-out 6 GiB.
+// Per-client software budgets reported to RADV. Every allocated BO uses system memory.
+// These values do not measure BAR0, the target's UMA carve-out or exclusive VRAM ownership.
 static constexpr uint64_t kVisTotal = 256ull << 20;
 static constexpr uint64_t kHiTotal = 1536ull << 20;
 static constexpr uint64_t kGttCap = 512ull << 20;
@@ -381,6 +383,8 @@ bool PhxBringup::start(IOService *provider) {
     setProperty("phx-780m-policy", "strict-execution-v1");
     setProperty("phx-build", PHX_KEXT_BUILD, 32);
     setProperty("phx-stage", "E3");
+    setProperty("phx-hw-profile", "phoenix-canned-unverified");
+    setProperty("phx-memory-model", "system-backed-software-budgets");
     setProperty("phx-debug", debug);
     setProperty("phx-fb-aper-phys", fbAperPhys, 64);
     setProperty("phx-fb-aper-len", fbAperLen, 64);
@@ -1947,7 +1951,8 @@ IOReturn IOAccelPhxNativeClient::doQueryInfo(IOExternalMethodArguments *a) {
     inf.abi_version = PHXN_ABI_VERSION;
     inf.kext_build = PHX_KEXT_BUILD;
     inf.reserved[2] = PHXN_ABI_MINOR;
-    inf.flags = PHXN_INFO_NATIVE_BOOT | (owner->gpuReady() ? PHXN_INFO_S1B_POSITIVE : 0);
+    inf.flags = PHXN_INFO_NATIVE_BOOT | PHXN_INFO_ASSUMED_PROFILE | PHXN_INFO_SOFTWARE_BUDGETS |
+        (owner->gpuReady() ? PHXN_INFO_S1B_POSITIVE : 0);
     inf.vmid = PHXN_VMID;
     inf.gb_addr_config = kGbAddrConfig;
     inf.gc_version = kGcVersion;
@@ -1995,10 +2000,9 @@ IOReturn IOAccelPhxNativeClient::doBoCreate(IOExternalMethodArguments *a) {
     if (!shape(a, 0, 4, sizeof(phxn_gem_create_in), 0))
         return kIOReturnBadArgument;
     const phxn_gem_create_in *in = static_cast<const phxn_gem_create_in *>(a->structureInput);
-    uint64_t size = in->bo_size;
-    if (size == 0)
+    uint64_t size = 0;
+    if (!phx780m::boPageSize(in->bo_size, &size))
         return kIOReturnBadArgument;
-    size = (size + 4095) & ~4095ull;
     uint64_t align = in->alignment;
     if (align && ((align & (align - 1)) || align > (2ull << 20)))
         return kIOReturnBadArgument;
@@ -2013,12 +2017,12 @@ IOReturn IOAccelPhxNativeClient::doBoCreate(IOExternalMethodArguments *a) {
     uint32_t domain, bits;
     uint64_t *pool;
     if (d & PHX_AMDGPU_GEM_DOMAIN_VRAM) {
-        if (visUsed + size <= kVisTotal) {
+        if (phx780m::boBudgetFits(visUsed, size, kVisTotal)) {
             domain = 4;
             bits = PHXN_PLACED_CPU_MAPPABLE | PHXN_PLACED_ZEROED;
             pool = &visUsed;
         } else if ((f & PHX_AMDGPU_GEM_CREATE_NO_CPU_ACCESS) && !(f & PHX_AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED) &&
-                   hiUsed + size <= kHiTotal) {
+                   phx780m::boBudgetFits(hiUsed, size, kHiTotal)) {
             domain = 4;
             bits = PHXN_PLACED_HI_POOL | PHXN_PLACED_ZEROED;
             pool = &hiUsed;
@@ -2026,7 +2030,7 @@ IOReturn IOAccelPhxNativeClient::doBoCreate(IOExternalMethodArguments *a) {
             return kIOReturnNoMemory;
         }
     } else {
-        if (size > kGttMaxBo || gttUsed + size > kGttCap)
+        if (size > kGttMaxBo || !phx780m::boBudgetFits(gttUsed, size, kGttCap))
             return kIOReturnNoMemory;
         domain = 2;
         bits = PHXN_PLACED_ZEROED;
@@ -2056,9 +2060,14 @@ IOReturn IOAccelPhxNativeClient::doBoCreate(IOExternalMethodArguments *a) {
         kernel_task, kIODirectionInOut | kIOMemoryKernelUserShared, size, PAGE_SIZE);
     if (!md)
         return kIOReturnNoMemory;
-    bzero(md->getBytesNoCopy(), size);
+    void *bytes = md->getBytesNoCopy();
+    if (!bytes) {
+        md->release();
+        return kIOReturnNoMemory;
+    }
+    bzero(bytes, size);
     *pool += size;
-    bos[h] = Bo{md, size, domain, bits, static_cast<uint8_t *>(md->getBytesNoCopy()), false, false};
+    bos[h] = Bo{md, size, domain, bits, static_cast<uint8_t *>(bytes), false, false};
     a->scalarOutput[0] = h;
     a->scalarOutput[1] = size;
     a->scalarOutput[2] = domain;
@@ -2133,7 +2142,7 @@ IOReturn IOAccelPhxNativeClient::doBoImportHost(IOExternalMethodArguments *a) {
     const uint64_t va = a->scalarInput[0], size = a->scalarInput[1];
     if (!va || !size || (va & 4095) || (size & 4095) || a->scalarInput[2] || a->scalarInput[3] || !task)
         return kIOReturnBadArgument;
-    if (size > kHostMaxBo || hostUsed + size > kHostCap)
+    if (size > kHostMaxBo || !phx780m::boBudgetFits(hostUsed, size, kHostCap))
         return kIOReturnNoMemory;
     uint32_t h = 1;
     while (h < PHXN_MAX_BOS && bos[h].md)

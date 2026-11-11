@@ -133,6 +133,9 @@ enum {
 #define PHXN_INFO_HUNG         (1u << 0)
 #define PHXN_INFO_S1B_POSITIVE (1u << 1)
 #define PHXN_INFO_NATIVE_BOOT  (1u << 2)
+/* Additive diagnostic flags, not proof of GPU execution or a new ABI layout. */
+#define PHXN_INFO_ASSUMED_PROFILE (1u << 3) /* GC/address profile has not been target-discovered */
+#define PHXN_INFO_SOFTWARE_BUDGETS (1u << 4) /* pool totals are per-client system-memory budgets */
 
 /* BoCreate scalar out [3] */
 #define PHXN_PLACED_CPU_MAPPABLE (1u << 0)
