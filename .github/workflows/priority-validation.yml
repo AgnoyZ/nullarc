@@ -2,7 +2,7 @@ name: Priority improvement validation
 on:
   push:
     branches: [downstream/780m-tahoe]
-    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'Makefile', 'tests/test_nmplugin_sampler_key.m', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', '.github/workflows/priority-validation.yml']
+    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'Makefile', 'tests/test_nmplugin*', 'tests/surface_key*', 'tools/iosurf/surface_sync_probe.m', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', '.github/workflows/priority-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -53,6 +53,14 @@ jobs:
         run: python3 tools/test_hidpi.py
       - name: Execute adopted sampler keys with ASan and UBSan
         run: make test-nmplugin-sampler-key
+      - name: Execute adopted IOSurface registry and monitor keys with sanitizers
+        run: make test-nmplugin-surface-key
+      - name: Compile optional IOSurface GPU probe without executing it
+        run: >-
+          xcrun clang -O1 -g -fobjc-arc -Wall -Wextra -Werror
+          tools/iosurf/surface_sync_probe.m
+          -framework Foundation -framework Metal -framework IOSurface -framework IOKit
+          -o build/tests/surface_sync_probe
       - name: Compile both kernel components without installation
         run: |
           bash src/phxbringup/build.sh ./build-sdk

@@ -7,8 +7,8 @@ not establish that the current downstream combination works on a GPU.
 
 | PR | Reviewed upstream commit | Downstream source status |
 | --- | --- | --- |
-| 6, sampler slot keys | `55764a0b69658a92870fc2b75e0be3a695382e38` | Adopted; downstream native CI pending for this revision |
-| 7, IOSurface keys | `394f162ae7bf5cc9d57bb673a9a6b326c46c325e` | Next, separately reviewed and tested |
+| 6, sampler slot keys | `55764a0b69658a92870fc2b75e0be3a695382e38` | Adopted in `4d09aa9`; downstream CI `43066219417` completed/success |
+| 7, IOSurface keys | `394f162ae7bf5cc9d57bb673a9a6b326c46c325e` | Adopted; downstream native CI pending for this revision |
 | 8, descriptor masks | `5a8a088011946c8089bb27e10d0dba117bf1b48e` | Awaiting downstream integration review |
 | 9, read-only panel timing | `c9da802a8dbf3753fa15b5cd903934712c3c80f6` | Awaiting downstream integration review; does not set modes |
 
@@ -29,9 +29,35 @@ lookups and interchange with legacy dictionary keys. A clean disposable Windows
 LF snapshot ran 343 Python tests with 26 platform skips and no failures. The
 first snapshot was refused by existing clean-source guards before testing;
 the rerun used a committed disposable snapshot without weakening those guards.
-Host native results must
-be recorded after the current downstream CI finishes. There is no measured
+Downstream run `43066219417` passed both host/native jobs on macOS 15.7.9 /
+24G830 with Apple Clang 17.0.0, including the 517-index/262144-lookup sanitizer
+test and actual kext/plugin builds and strict signature checks. Ubuntu ran
+343 tests with one skip and no failures. There is no measured
 desktop latency/FPS claim and no target GPU execution.
+
+## PR 7
+
+The writer registry and synchronization monitor share the upstream integer key
+for a 32-bit IOSurface ID and planes 0-255. Full-width string keys are retained
+for larger planes, with a distinct key type preventing numeric/string aliasing.
+The only integration conflict was adjacent sampler/surface header imports; both
+are retained. Existing synchronization, seed/backing guards, weak references
+and completion behavior are unchanged.
+
+The component files and helper are covered by `src/nmplugin`'s existing
+PolyForm Noncommercial 1.0.0 licence and required notice. The original PR's
+tests and `tools/iosurf/surface_sync_probe.m` have no separate notice and fall
+under the root MIT-or-GPL-2.0-only rule for other code. Existing licences and
+notices are preserved. No external binary or firmware is copied.
+
+The downstream native workflow executes the actual registry/monitor extraction
+test under ASan/UBSan: 77 boundary identities and 16384 concurrent cycles,
+including replacement, weak lifetime, large-plane identity and monitor release.
+It also compiles the optional isolated GPU probe without executing it. Screenshot,
+video, multi-window and real IOSurface/GPU acceptance remain pending on target;
+the hosted CPU doubles do not establish those behaviors.
+The clean Windows LF snapshot ran 343 tests with 26 platform skips and no
+failures. Current downstream native results remain pending for this revision.
 
 ## Rollback and publication
 
