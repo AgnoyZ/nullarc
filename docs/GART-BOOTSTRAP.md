@@ -40,6 +40,15 @@ Patch 0014 now gives `mesboot mes` its own explicit matching-layout and
 firmware-profile checks (see `MES-START.md`); this does not make legacy queue
 experiments a supported automatic continuation.
 
+The common service-open gate distinguishes these explicit commands from legacy
+experiments. Explicit `gart`, `mes`, `sched-query`, `compute-probe` and
+`shader-probe` use the driver's published MC/backing bases and retain their full
+selector-116 snapshot/range/readiness checks; a non-reference backing address
+alone is not a reason to reject them. Missing, malformed, unaligned or wrapping
+published geometry still fails. They refuse `PHX_LAYOUT_REFERENCE=1`. Legacy
+commands retain their reference-address equality gate and have not gained
+target-independent GART/queue support.
+
 1. Parse strict unsigned arguments before service lookup. Reject malformed,
    zero-size, unaligned/out-of-width spans and enabled `PTE_SYS`/`FAULT_DEFAULT`
    legacy overrides.

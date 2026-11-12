@@ -94,7 +94,9 @@ static kern_return_t checked_method(io_connect_t connection, uint32_t selector,
  * aperture are that machine's addresses, not this one's. PhxBringup publishes what it actually found
  * (phx-fb-mc-base, phx-fb-size, phx-fb-phys), so the layout is taken from there and this tool refuses when the two
  * disagree -- programming the reference machine's physical addresses on another machine is the failure this check
- * exists to prevent. PHX_LAYOUT_REFERENCE=1 keeps the compiled constants for a deliberate reference-machine run. */
+ * exists to prevent. Explicit bootstrap commands derive their addresses from the published layout and then
+ * validate selector 116. Legacy experiments keep the reference equality gate. PHX_LAYOUT_REFERENCE=1 is
+ * available only to those legacy experiments, never to the explicit bootstrap paths. */
 static int env_on(const char *n) { const char *v = getenv(n); return v && *v && *v != '0'; }
 
 static int prop_u64(io_registry_entry_t svc, CFStringRef key, uint64_t *out)
@@ -108,7 +110,7 @@ static int prop_u64(io_registry_entry_t svc, CFStringRef key, uint64_t *out)
 }
 
 /* 0 = the layout is settled and safe to program, -1 = it is not (the caller must stop). */
-static int layout_from_driver(io_registry_entry_t svc)
+static int layout_from_driver(io_registry_entry_t svc, int explicit_layout)
 {
    uint64_t mc = 0, size = 0, phys = 0, build = 0;
    (void)prop_u64(svc, CFSTR("phx-build"), &build);
@@ -116,11 +118,16 @@ static int layout_from_driver(io_registry_entry_t svc)
                          prop_u64(svc, CFSTR("phx-fb-size"), &size) &&
                          prop_u64(svc, CFSTR("phx-fb-phys"), &phys);
    if (env_on("PHX_LAYOUT_REFERENCE")) {
+      if (explicit_layout) {
+         fprintf(stderr, "mesboot: explicit bootstrap cannot use PHX_LAYOUT_REFERENCE; refusing\n");
+         return -1;
+      }
       fprintf(stderr, "mesboot: layout = the compiled reference-machine constants (VRAM MC 0x%llx, FB phys 0x%llx), "
               "PHX_LAYOUT_REFERENCE=1\n", (unsigned long long)vram_mc, (unsigned long long)fb_pa);
       return 0;
    }
-   if (!published || !mc || !phys || size < 0x8000000ull || (phys & 0xfffull)) {
+   if (!published || !mc || !phys || size < 0x8000000ull || (phys & 0xfffull) ||
+       mc > UINT64_MAX - size || phys > UINT64_MAX - size) {
       fprintf(stderr,
               "mesboot: PhxBringup build %llu did not publish a usable carve-out (mc 0x%llx, size 0x%llx, phys 0x%llx);"
               " refusing to program the reference machine's addresses. Fix the kext, or run on the reference machine "
@@ -128,7 +135,7 @@ static int layout_from_driver(io_registry_entry_t svc)
               (unsigned long long)size, (unsigned long long)phys);
       return -1;
    }
-   if (mc != vram_mc || phys != fb_pa) {
+   if (!explicit_layout && (mc != vram_mc || phys != fb_pa)) {
       fprintf(stderr,
               "mesboot: this machine's carve-out (mc 0x%llx, phys 0x%llx) is not the reference layout these GART and "
               "MES offsets were written for (mc 0x%llx, phys 0x%llx); refusing. PHX_LAYOUT_REFERENCE=1 overrides for a "
@@ -136,17 +143,21 @@ static int layout_from_driver(io_registry_entry_t svc)
               (unsigned long long)vram_mc, (unsigned long long)fb_pa);
       return -1;
    }
+   if (explicit_layout) {
+      vram_mc = mc;
+      fb_pa = phys;
+   }
    fprintf(stderr, "mesboot: layout from PhxBringup build %llu: VRAM MC 0x%llx, FB phys 0x%llx, carve-out 0x%llx\n",
            (unsigned long long)build, (unsigned long long)mc, (unsigned long long)phys, (unsigned long long)size);
    return 0;
 }
-static int open_kext(void)
+static int open_kext(int explicit_layout)
 {
    io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("PhxBringup"));
    if (!svc) { fprintf(stderr, "no PhxBringup\n"); return -1; }
    kern_return_t kr = IOServiceOpen(svc, mach_task_self(), UC_TYPE, &conn);
    int layout_ok = 1;
-   if (kr == 0) layout_ok = layout_from_driver(svc) == 0;
+   if (kr == 0) layout_ok = layout_from_driver(svc, explicit_layout) == 0;
    IOObjectRelease(svc);
    uint64_t hin[2] = {1, 0}, hout[4]; uint32_t hn = 4;
    if (kr == 0) kr = checked_scalar(conn, SEL_HELLO, hin, 2, hout, &hn);
@@ -257,7 +268,7 @@ static int gart(int argc, char **argv)
                                  gart_argument(argv[4]), gart_argument(argv[5])};
    if (!phxGartInputsValid(&layout) || env_on("PTE_SYS") || env_on("FAULT_DEFAULT"))
       gart_failure(64, "invalid GART arguments or incompatible legacy environment override");
-   if (open_kext()) return 1;
+   if (open_kext(1)) return 1;
    struct PhxBootMemory memory = {0};
    size_t snapshot_size = sizeof(memory);
    checked_method(conn, PHX_BOOT_MEMORY_SELECTOR, NULL, 0, NULL, 0, NULL, NULL, &memory, &snapshot_size);
@@ -353,7 +364,7 @@ static int mes_start(int argc, char **argv)
       if (fw->pipe != pipe || fw->file_index >= PHX_FW_FILE_COUNT || !fw->instruction_start || (fw->instruction_start & 3))
          mes_start_failure(64, "invalid generated firmware entrypoint");
    }
-   if (open_kext()) return 1;
+   if (open_kext(1)) return 1;
    struct PhxBootMemory memory = {0};
    size_t snapshot_size = sizeof(memory);
    checked_method(conn, PHX_BOOT_MEMORY_SELECTOR, NULL, 0, NULL, 0, NULL, NULL, &memory, &snapshot_size);
@@ -969,7 +980,7 @@ static int scheduler_query(int argc, char **argv)
    const char *overrides[] = {"PTE_SYS", "FAULT_DEFAULT", "MESBOOT_MC", "MESBOOT_CS", "MESBOOT_GFX", "PHX_LAYOUT_REFERENCE", "ADOPT", "ADOPT_GFX"};
    for (unsigned i = 0; i < sizeof(overrides) / sizeof(overrides[0]); ++i)
       if (env_on(overrides[i])) mes_start_failure(64, "sched-query cannot combine legacy experiment overrides");
-   if (open_kext()) return 1;
+   if (open_kext(1)) return 1;
    struct PhxBootMemory memory = {0};
    size_t size = sizeof(memory);
    checked_method(conn, PHX_BOOT_MEMORY_SELECTOR, NULL, 0, NULL, 0, NULL, NULL, &memory, &size);
@@ -1194,7 +1205,7 @@ int main(int argc, char **argv)
    if (argc >= 2 && !strcmp(argv[1], "mes")) return mes_start(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "gart")) return gart(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "all")) gart_failure(64, "legacy all cannot supply an explicit GART layout");
-   if (open_kext()) return 1;
+   if (open_kext(0)) return 1;
    if (argc < 2) { fprintf(stderr, "mesboot gart|mes|kiq|all\n"); return 2; }
    int all = !strcmp(argv[1], "all");
    if (getenv("MESBOOT_MC") && *getenv("MESBOOT_MC") == '1') use_mc = 1;

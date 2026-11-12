@@ -240,7 +240,7 @@ int main(int argc, char **argv) {
     }
     if (!strcmp(fault, "zero")) returned_word = 0;
     if (!strcmp(operation, "open")) {
-        int result = open_kext();
+        int result = open_kext(0);
         if (!strcmp(fault, "no-service")) { assert(result == -1 && !calls && !releases); return 1; }
         assert(releases == 1);
         if (!strcmp(fault, "open-failure")) { assert(result == -1 && !calls); return 1; }

@@ -79,11 +79,13 @@ class ReferenceScriptTests(unittest.TestCase):
         self.assertIn("PHX_LAYOUT_REFERENCE", overrides[0])
 
     def test_the_layout_gate_is_refused_where_the_layout_is_checked(self):
-        # open_kext() is the single place every subcommand reaches the kext through, so the gate belongs there.
+        # Both modes keep the gate in the common open path; only explicit commands may derive target addresses.
         tool = (ROOT / "tools/phxctl/mesboot.c").read_text(encoding="utf-8")
-        open_kext = tool.split("static int open_kext(void)", 1)[1].split("static uint32_t rd(", 1)[0]
-        self.assertIn("layout_from_driver(svc)", open_kext)
+        open_kext = tool.split("static int open_kext(int explicit_layout)", 1)[1].split("static uint32_t rd(", 1)[0]
+        self.assertIn("layout_from_driver(svc, explicit_layout)", open_kext)
         self.assertIn("IOServiceClose(conn); return -1;", open_kext)
+        self.assertEqual(tool.count("if (open_kext(1)) return 1;"), 3)
+        self.assertEqual(tool.count("if (open_kext(0)) return 1;"), 1)
 
 
 if __name__ == "__main__":
