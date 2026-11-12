@@ -5,7 +5,7 @@ from pathlib import Path
 import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from test_mes_start import MARKER, cases, expected_result, check_result
+from test_mes_start import MARKER, cases, expected_result, check_result, selection_fault
 
 
 class MesStartRunnerTests(unittest.TestCase):
@@ -15,8 +15,9 @@ class MesStartRunnerTests(unittest.TestCase):
         for name in names:
             status, counts = expected_result(name)
             self.assertEqual(status == 0, name in ("ok", "poll-delayed", "delay-interrupted"))
+            detail = selection_fault(name)
             result = subprocess.CompletedProcess([], status, MARKER if not status else "",
-                "fake-mes-start-summary " + json.dumps(counts))
+                (detail[1] + "\n" if detail else "") + "fake-mes-start-summary " + json.dumps(counts))
             self.assertEqual(counts, check_result(result, name))
         for i in range(1, 10): self.assertIn(f"write-{i}", names)
         for i in range(1, 26): self.assertIn(f"read-{i}", names)
@@ -43,6 +44,20 @@ class MesStartRunnerTests(unittest.TestCase):
             self.assertEqual(1000, counts["polls"])
             self.assertEqual(1001, counts["sleeps"])
             self.assertEqual(0, counts["closes"])
+
+    def test_immediate_and_later_selector_failures_stop_before_next_write(self):
+        for name, writes in (("selection-write-bad-2", 2), ("selection-zero-0", 2),
+                             ("selection-lost-0", 2), ("selection-write-bad-5", 5),
+                             ("selection-zero-1", 5), ("selection-lost-1", 5),
+                             ("selection-write-bad-8", 8)):
+            status, counts = expected_result(name)
+            self.assertEqual(75, status)
+            self.assertEqual(writes, counts["writes"])
+            self.assertEqual(0, counts["polls"])
+            self.assertEqual(0, counts["closes"])
+            with self.assertRaisesRegex(RuntimeError, "selection diagnostic"):
+                check_result(subprocess.CompletedProcess([], status, "",
+                    "fake-mes-start-summary " + json.dumps(counts)), name)
 
     def test_validator_rejects_success_on_failed_readback(self):
         status, counts = expected_result("bad-24")

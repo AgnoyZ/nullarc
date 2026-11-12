@@ -342,9 +342,9 @@ static int gart(int argc, char **argv)
           (unsigned long long)pages);
    return 0;
 }
-static void grbm_select(uint32_t me, uint32_t pipe, uint32_t queue, uint32_t vmid)
+static uint32_t grbm_select(uint32_t me, uint32_t pipe, uint32_t queue, uint32_t vmid)
 {
-   wr(SEG1(0x900), pipe | (me << 2) | (vmid << 4) | (queue << 8));
+   return wr(SEG1(0x900), pipe | (me << 2) | (vmid << 4) | (queue << 8));
 }
 static _Noreturn void mes_start_failure(int code, const char *message)
 {
@@ -380,16 +380,27 @@ static int mes_start(int argc, char **argv)
    if (rd(SEG1(0x900)) != 0) mes_start_failure(75, "GRBM selection is not idle");
    wr(SEG1(0x2807), initial | reset);
    for (unsigned pipe = 0; pipe < PHX_FW_MES_PIPE_COUNT; ++pipe) {
-      grbm_select(3, pipe, 0, 0);
-      if (rd(SEG1(0x900)) != (12u | pipe)) mes_start_failure(75, "MES pipe selection readback mismatch");
+      const uint32_t expected = 12u | pipe;
+      const uint32_t immediate = grbm_select(3, pipe, 0, 0);
+      const uint32_t observed = rd(SEG1(0x900));
+      if (immediate != expected || observed != expected) {
+         fprintf(stderr, "mesboot MES selection: pipe=%u expected=0x%08x write-readback=0x%08x subsequent-readback=0x%08x\n",
+                 pipe, expected, immediate, observed);
+         mes_start_failure(75, "MES pipe selection readback mismatch");
+      }
       const uint64_t pc = phxFirmwareMes[pipe].instruction_start >> 2;
       wr(SEG1(0x2800), (uint32_t)pc);
       wr(SEG1(0x289d), (uint32_t)(pc >> 32));
       if (rd(SEG1(0x2800)) != (uint32_t)pc || rd(SEG1(0x289d)) != (uint32_t)(pc >> 32))
          mes_start_failure(75, "MES instruction-start readback mismatch");
    }
-   grbm_select(0, 0, 0, 0);
-   if (rd(SEG1(0x900)) != 0) mes_start_failure(75, "GRBM idle selection readback mismatch");
+   const uint32_t idle_immediate = grbm_select(0, 0, 0, 0);
+   const uint32_t idle_observed = rd(SEG1(0x900));
+   if (idle_immediate || idle_observed) {
+      fprintf(stderr, "mesboot MES selection: idle expected=0x00000000 write-readback=0x%08x subsequent-readback=0x%08x\n",
+              idle_immediate, idle_observed);
+      mes_start_failure(75, "GRBM idle selection readback mismatch");
+   }
    wr(SEG1(0x2807), active);
    if (usleep(500) && errno != EINTR) mes_start_failure(74, "initial MES delay failed");
    unsigned sample;

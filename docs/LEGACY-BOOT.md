@@ -147,8 +147,22 @@ These results cover the source revision named there, with no target deployment.
 
 A later, separately authorized load-only target boot is recorded in
 [`validation/legacy-boot-load-only-20261112.json`](validation/legacy-boot-load-only-20261112.json).
-The candidate loaded, but the provider did not receive the profile: the EFI
-property path used a different root UID from the live ACPI root. Only that
-profile's path was corrected and read back; the corrected startup acceptance
-still awaits another manual boot. No GPU initialization or acceleration test
-was performed in this stage.
+The first candidate boot loaded the driver, but the provider did not receive
+the profile: the EFI property path used a different root UID from the live
+ACPI root. Only that profile's path was corrected. After the next manual boot,
+exact provider bytes, status zero, startup-enabled true, candidate identity and
+geometry all passed. Automatic initialization and display takeover remained
+blocked throughout these load-only probes.
+
+Subsequent, separately staged target tests are recorded in
+[`validation/legacy-boot-staged-target-20261112.json`](validation/legacy-boot-staged-target-20261112.json).
+The legacy TOC/TMR translation, seventeen firmware loads, RLC autoload,
+acknowledged IMU power request and GART readback/invalidation checks passed.
+MES stopped at the first pipe-selection readback, after reset and before any
+entrypoint or activation write. The immediate kernel write readback was not
+recorded; a later read-only selector query returned zero. Do not infer the
+failure-time value or write-only semantics from that later observation.
+There was no same-boot retry, work queue creation, shader dispatch, adoption,
+accelerator claim or display takeover. Acceleration, EDID physical dimensions
+and exclusive memory ownership remain unverified. See `MES-START.md` for the
+source investigation and bounded next-test scope.

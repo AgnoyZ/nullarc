@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-12",
+  "scope": "Separately authorized staged target initialization; terminal MES failure, no same-boot retry",
+  "hardware": "Radeon 780M, Ryzen 8845H",
+  "os": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "kernel_source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+  "candidate_kernel_binary_sha256": "37f1d88a00ee3f2c865db170510278c2f16cba2c044219b181c9e5d06f7eb629",
+  "explicit_layout_user_tool_source_commit": "010ffffdec7bc90e294e4ea18ab29e42e7fcf1e3",
+  "private_user_tool_binary_sha256": "58bce0beabcda960a883f5ee6acaf297ed293275ed4c865ddc2845f580d2a02c",
+  "phase_1_startup": {
+    "status": "passed",
+    "exact_profile_delivered_to_provider": true,
+    "legacy_profile_status": 0,
+    "legacy_profile_startup_enabled": true,
+    "candidate_identity_and_geometry_match": true
+  },
+  "phase_2_PSP": {
+    "status": "passed",
+    "status_destroy_create_acknowledged": true,
+    "TOC_staging_byte_readback_matches": true,
+    "legacy_raw_TOC_acknowledged": true,
+    "firmware_reported_TMR_required_bytes": 67108864,
+    "legacy_raw_TMR_acknowledged": true,
+    "command_readback_uses_required_size_and_derived_backing": true,
+    "stale_legacy_backing_words_forwarded": false
+  },
+  "phase_3_firmware": {
+    "status": "passed",
+    "immutable_official_lock_verified_snapshots": 9,
+    "acknowledged_load_types_in_order": [
+      2,
+      1,
+      4,
+      71,
+      72,
+      33,
+      34,
+      81,
+      82,
+      68,
+      69,
+      20,
+      21,
+      26,
+      48,
+      25,
+      8
+    ],
+    "RLC_autoload_acknowledged": true
+  },
+  "phase_4_power": {
+    "status": "passed",
+    "SMU_driver_interface": 8,
+    "EnableGfxImu_argument": 1,
+    "EnableGfxImu_acknowledged": true,
+    "CP_STAT_zero_observed": true,
+    "RLC_boot_complete_observed": true,
+    "DisallowGfxOff_executed": false
+  },
+  "phase_5_GART": {
+    "status": "passed_readback_and_invalidation_only",
+    "explicit_layout_and_exclusions_checked_privately": true,
+    "page_table_and_default_page_readback_matches": true,
+    "derived_address_register_readbacks_match": true,
+    "invalidation_acknowledged": true,
+    "GPU_translation_or_execution_proven": false
+  },
+  "phase_6_MES": {
+    "status": "stopped",
+    "exit_status": 75,
+    "diagnostic": "MES pipe selection readback mismatch; stopping (no rollback)",
+    "preceding_CP_and_doorbell_control_readbacks_match": true,
+    "reset_write_issued_before_failure": true,
+    "pipe_entrypoint_writes_reached": false,
+    "activation_write_reached": false,
+    "kernel_immediate_selector_readback_recorded": false,
+    "later_read_only_selector_query_was_zero": true,
+    "later_read_only_query_proves_failure_time_read_value": false,
+    "root_cause_established": false,
+    "same_boot_retry": false,
+    "operations_after_failure": "Read-only diagnostics and startup/guard verification only"
+  },
+  "guards": {
+    "automatic_GPU_initialization_blocked": true,
+    "experimental_display_not_armed": true,
+    "framebuffer": "IONDRVFramebuffer",
+    "pending_initialization": false,
+    "automatic_restart": false,
+    "EFI_unmounted": true,
+    "installed_kernel_binaries_changed_during_staged_tests": false,
+    "installed_accelerator_or_user_helpers_replaced": false
+  },
+  "limits": {
+    "scheduler_queue_created": false,
+    "work_queue_or_shader_dispatched": false,
+    "queue_adopted_or_accelerator_claimed": false,
+    "Metal_or_desktop_acceleration_verified": false,
+    "EDID_dimensions_fixed_or_verified": false,
+    "exclusive_memory_ownership_proven": false,
+    "private_EFI_layout_addresses_raw_logs_or_firmware_published": false,
+    "private_test_binary_uploaded": false
+  },
+  "next_test": {
+    "status": "planned_not_executed",
+    "requires_fresh_manual_boot_and_new_boot_pinned_plan": true,
+    "scope": "After checked PSP/firmware/power prerequisites, acknowledge DisallowGfxOff and test GRBM selection before GART or MES reset",
+    "message": "PPSMC_MSG_DisallowGfxOff (0x1a), argument zero",
+    "preserve_selector_readback_checks": true,
+    "first_error_is_terminal": true,
+    "selector_probe_success_is_not_GPU_execution_or_proof_of_GFXOFF_causality": true,
+    "reference": "linux-mes-selector-reference.json"
+  }
+}

@@ -26,6 +26,29 @@ def cases():
         yield f"vread-{i}"
         yield f"vread-bad-{i}"
     for i in (*range(3, 16), *range(17, 25)): yield f"bad-{i}"
+    for i in (2, 5, 8): yield f"selection-write-bad-{i}"
+    for pipe in (0, 1):
+        yield f"selection-zero-{pipe}"
+        yield f"selection-lost-{pipe}"
+
+
+def selection_fault(fault):
+    """Expected stop/readback evidence, using synthetic values only."""
+    for pipe, write, read in ((0, 2, 18), (1, 5, 21)):
+        expected = 12 | pipe
+        for name, immediate, subsequent in (
+            (f"selection-write-bad-{write}", expected ^ 1, expected),
+            (f"selection-zero-{pipe}", 0, 0),
+            (f"selection-lost-{pipe}", expected, 0),
+        ):
+            if fault == name:
+                detail = (f"mesboot MES selection: pipe={pipe} expected=0x{expected:08x} "
+                          f"write-readback=0x{immediate:08x} subsequent-readback=0x{subsequent:08x}")
+                return read, detail
+    if fault == "selection-write-bad-8":
+        return 24, ("mesboot MES selection: idle expected=0x00000000 "
+                    "write-readback=0x00000001 subsequent-readback=0x00000000")
+    return None
 
 
 def expected_result(fault):
@@ -52,6 +75,8 @@ def expected_result(fault):
         prefix = {"reads": "read", "vreads": "vread", "writes": "write"}[field]
         if fault in (f"{prefix}-{index}", f"{prefix}-short", f"{prefix}-long"): return 74, c
         if field == "reads":
+            selection = selection_fault(fault)
+            if selection and index == selection[0]: return 75, c
             if fault == f"bad-{index}": return 75, c
             if index == 2 and fault in ("cp-busy", "rlc-not-ready", "rlc-all-ones"): return 75, c
             if index == 5 and fault == "arg-mapping-mismatch": return 75, c
@@ -86,6 +111,9 @@ def check_result(result, fault):
     if observed != expected or any(type(v) is not int for v in observed.values()):
         raise RuntimeError(f"Incorrect MES start continuation/counts ({fault}): {observed}, expected {expected}")
     if (MARKER in result.stdout) != (status == 0): raise RuntimeError("Incorrect MES start success/limitation marker")
+    selection = selection_fault(fault)
+    if selection and selection[1] not in result.stderr:
+        raise RuntimeError(f"Missing or incorrect MES selection diagnostic ({fault})")
     return observed
 
 

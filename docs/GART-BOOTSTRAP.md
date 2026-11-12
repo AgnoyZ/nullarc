@@ -3,8 +3,8 @@
 Patch `0013-explicit-gart-bootstrap.patch` replaces the actual `mesboot gart`
 path's reference-machine physical/MC addresses with a kernel memory snapshot
 and explicit virtual/table/default-page arguments. It implements a candidate
-VMID-0 mapping of the beginning of VRAM, not a general GTT allocator. It has
-not executed on the target GPU.
+VMID-0 mapping of the beginning of VRAM, not a general GTT allocator. The later
+staged target result below covers readback and invalidation only.
 
 ## Kernel snapshot
 
@@ -134,3 +134,14 @@ connection; the fake close function incorrectly required a completed GART
 sequence. The harness now asserts that this early close happens exactly once
 with no snapshot, register or memory access. This fixes the test's model, not
 the tool's ABI behavior. The initial run is not a GART suite pass.
+
+## Later staged target observation, 2026-11-12
+
+With the installed PhxBringup candidate from `c5c22b4`, the separately compiled
+private userspace `mesboot` from `010ffff` passed the explicit GART path's
+page/default-page readbacks, derived-address readbacks and invalidation
+acknowledgement on the target. This is not evidence of translated GPU work.
+The following MES stage stopped at selection readback and was not retried.
+See `validation/legacy-boot-staged-target-20261112.json`. Raw logs and the
+operator-reviewed layout remain private; no kernel was rebuilt locally or
+replaced during these staged tests.

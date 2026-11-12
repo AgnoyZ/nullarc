@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "source_repository": "torvalds/linux",
+  "source_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+  "files": [
+    {
+      "path": "drivers/gpu/drm/amd/amdgpu/soc21.c",
+      "sha256": "8210b4fd7236f1629655ae2afe38ddcb15ddb1e7f42d25d0147bc42bedf3939d",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c",
+      "sha256": "6b3dc555a2587666b46cdade8141966f49eaca71b40ad53b0a45b8624e5aeec9",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/amdgpu/soc15_common.h",
+      "sha256": "2ee34db532a920980856dd390b2bb1a336791299cab7e9ab160c6cfec8ae27cd",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_device.c",
+      "sha256": "1533076e08cebbe7062799cc5077f03a1adf31fb61aebe42428b719eda52acd7",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_gfx.c",
+      "sha256": "a93489ebf2d1dabb09c2c97c805f30eb3f0f951a1b31f613b818ae5b42889858",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0.c",
+      "sha256": "b07a78a0c46519057b688d1aedcdcca0295496500dd00b77595729125503aab6",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_4_ppt.c",
+      "sha256": "f6025d618d556655795d440ae90d32018acdd10cc809045b0237b4aadfd33835",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/pm/swsmu/inc/pmfw_if/smu_v13_0_4_ppsmc.h",
+      "sha256": "6837e9a7974f26bb3c27ab009d4be4e815440f00f3d56cfdabf1a8b03e12b7d5",
+      "license_notice": "AMD MIT-style notice inspected"
+    }
+  ],
+  "findings": [
+    "soc21_grbm_select encodes PIPEID, MEID, VMID and QUEUEID in GRBM_GFX_CNTL and uses WREG32_SOC15.",
+    "gfx_v11_0_cp_gfx_switch_pipe reads GRBM_GFX_CNTL before replacing PIPEID; this does not support assuming the selector is write-only.",
+    "soc15_common.h routes ordinary register accesses through the RLCG proxy for SR-IOV VFs with supported access, otherwise through ordinary RREG32/WREG32. The VF-only shadow path is not a demonstrated requirement for this target.",
+    "EnableGfxImu argument 1 is GFXOFF_ENABLE, not a request to inhibit GFXOFF.",
+    "smu_v13_0_gfx_off_control includes MP1 13.0.4; the Phoenix message map and header identify DisallowGfxOff as 0x1a.",
+    "These sources establish encodings and a controlled diagnostic option, not the cause of the target selector mismatch."
+  ],
+  "implementation": "Independently written diagnostic checks and documentation; no full Linux bodies or headers copied.",
+  "target_DisallowGfxOff_executed": false,
+  "target_root_cause_established": false
+}

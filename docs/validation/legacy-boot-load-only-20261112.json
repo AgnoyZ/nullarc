@@ -36,9 +36,26 @@
     "load_only_guards_retained": true,
     "independent_read_only_remount_and_full_manifest_readback": "passed",
     "EFI_unmounted_after_verification": true,
-    "startup_acceptance": "pending_manual_reboot"
+    "startup_acceptance": "passed_after_next_manual_reboot"
+  },
+  "corrected_boot": {
+    "candidate_loaded_identity_matches": true,
+    "single_PhxBringup_service": true,
+    "expected_profile_present_on_GPU_provider": true,
+    "profile_exact_bytes_match": true,
+    "startup_status": 0,
+    "startup_enabled": true,
+    "observed_geometry_matches_private_profile": true,
+    "automatic_initialization_blocked": true,
+    "experimental_display_armed": false,
+    "firmware_framebuffer_present": true,
+    "experimental_framebuffer_present": false,
+    "pending_initialization": false,
+    "phase_1_acceptance": "passed",
+    "subsequent_staged_initialization_record": "legacy-boot-staged-target-20261112.json"
   },
   "limits": {
+    "scope": "The load-only probes in this record; later hardware writes are recorded separately",
     "GPU_commands_executed_by_probes": false,
     "TOC_TMR_firmware_queues_tested": false,
     "GPU_acceleration_verified": false,

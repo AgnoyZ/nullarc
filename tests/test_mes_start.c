@@ -79,7 +79,14 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
         assert(registers[0xa900] == 12 || registers[0xa900] == 13);
         pc_words[registers[0xa900] - 12][input[0] == 0xc89d] = (uint32_t)input[1];
     } else registers[input[0]] = (uint32_t)input[1];
-    output[0] = input[1]; return 0;
+    output[0] = input[1];
+    if (indexed("selection-write-bad", writes)) output[0] ^= 1;
+    if (input[0] == 0xa900 && (input[1] == 12 || input[1] == 13)) {
+        const unsigned pipe = (unsigned)input[1] - 12;
+        if (indexed("selection-zero", pipe) || indexed("selection-lost", pipe)) registers[0xa900] = 0;
+        if (indexed("selection-zero", pipe)) output[0] = 0;
+    }
+    return 0;
 }
 kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
     const uint64_t *input, uint32_t input_count, const void *input_data, size_t input_size,

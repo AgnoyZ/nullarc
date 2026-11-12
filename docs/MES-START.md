@@ -51,7 +51,8 @@ before service lookup. The command:
 4. Rejects any of the four active MES pipe bits, all-ones control reads, or a
    nonzero GRBM selection before the first register write.
 5. Sets pipe 0/1 reset bits while retaining the initial control value. Selects
-   each pipe, checks selection, writes its own shifted PC low/high words and
+   each pipe, checks both the kernel's immediate write readback and a subsequent
+   selector read, writes its own shifted PC low/high words and
    checks both readbacks. Checks restored idle selection before activation.
 6. Writes the two-pipe activation value, requests a 500-us initial delay and
    checks active/reset/halt fields for at most 1000 samples, requesting 1-ms
@@ -95,3 +96,42 @@ chained after this command. Patch 0015 adds a separately checked, explicitly
 relocated scheduler-only query path (`MES-QUEUE.md`), but does not resolve memory
 ownership or the legacy compute/gfx queue layout. No deployment or working-EFI
 change is performed.
+
+## Later target stop and selector diagnostics, 2026-11-12
+
+The separately authorized target test of userspace source `010ffff` reached
+MES reset, then stopped on the first pipe-selection readback. No instruction
+entrypoint, activation, scheduler queue or shader submission followed. The
+earlier command discarded the kernel's immediate selector write readback; a
+later read-only query returned zero, which does not establish the value at
+the failure boundary. The target boot is terminal for initialization and
+must not be retried. Sanitized evidence is in
+`validation/legacy-boot-staged-target-20261112.json`.
+
+The subsequent diagnostic change retains every existing readback guard and
+also checks the immediate kernel write readback at both pipe selections and
+the restored idle selection. On mismatch it reports expected, immediate and
+subsequent values before the existing terminal error. It adds no register
+writes, delays, reset, retry or hardware cleanup. Synthetic cases distinguish
+a selector that remains zero, one that appears correct immediately then reads
+zero, and a bad immediate reply despite a matching later read. Both pipes and
+idle restoration are checked before the next entrypoint/activation write.
+This change has not executed on the target.
+
+Pinned primary-source review is recorded in
+`validation/linux-mes-selector-reference.json`. `soc21_grbm_select` uses the
+same selector encoding. `gfx_v11_0_cp_gfx_switch_pipe` reads this register
+before modifying PIPEID; assuming a write-only selector and removing checks
+is therefore unjustified. The RLCG shadow path in `soc15_common.h` is conditional
+on SR-IOV VF access and does not establish a missing shadow protocol here.
+
+The existing acknowledged EnableGfxImu argument `1` permits GFXOFF. The same
+reviewed MP1 generation offers DisallowGfxOff (`0x1a`, zero argument). This is
+a hypothesis to test, not an established explanation. A next test requires
+a fresh operator-controlled boot, a new boot-pinned plan and repeated checked
+PSP/firmware/power prerequisites. It should acknowledge DisallowGfxOff and
+perform only selector writes/readbacks before GART or MES reset. Stop at the
+first error; restore idle only after successful selection checks. Do not
+unconditionally re-allow GFXOFF on partial failure. Such a test neither
+proves causality nor submits GPU work. No power-control message or selector
+write was sent during the current boot's follow-up investigation.
