@@ -240,7 +240,10 @@ static void lifetime(void) {
         assert(weak && atomic_load(&destructions) == before);
         queue.suspended = NO; waitGroup(group); [queue waitUntilAllOperationsAreFinished];
         uint64_t deadline = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) + 8ull * NSEC_PER_SEC;
-        while (weak) { assert(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) < deadline); usleep(1000); }
+        // Weak nil and the dealloc counter are separate observations; wait for both.
+        while (weak || atomic_load(&destructions) < before + 1) {
+            assert(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) < deadline); usleep(1000);
+        }
         assert(atomic_load(&destructions) == before + 1);
     }
 }

@@ -173,8 +173,11 @@ static void lifetime(void) {
     assert(weak && atomic_load(&destructions) == before);
     queue.suspended = NO; waitGroup(group); [queue waitUntilAllOperationsAreFinished];
     // NSOperationQueue may release completed operation objects after its wait.
+    // A weak load may return nil once deallocation starts, before our dealloc counter advances.
     uint64_t deadline = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) + 8ull * NSEC_PER_SEC;
-    while (weak) { assert(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) < deadline); usleep(1000); }
+    while (weak || atomic_load(&destructions) < before + 1) {
+        assert(clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) < deadline); usleep(1000);
+    }
     assert(atomic_load(&destructions) == before + 1);
 }
 static void stress(TestDevice *device) {
