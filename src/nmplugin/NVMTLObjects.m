@@ -2510,9 +2510,13 @@ static size_t nvmtl_fc_width(NSUInteger dataType)
 - (void)newFunctionWithName:(NSString *)name constantValues:(MTLFunctionConstantValues *)cv
           completionHandler:(void (^)(id<MTLFunction>, NSError *))handler {
     if (!handler) return;
-    NSError *err = nil;
-    id<MTLFunction> f = [self newFunctionWithName:name constantValues:cv error:&err];
-    handler(f, err);
+    NSString *nameSnapshot = [name copy];
+    MTLFunctionConstantValues *constantsSnapshot = [cv copy];
+    [nvmtl_pipeline_compile_queue() addOperationWithBlock:^{ @autoreleasepool {
+        NSError *err = nil;
+        id<MTLFunction> f = [self newFunctionWithName:nameSnapshot constantValues:constantsSnapshot error:&err];
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ handler(f, err); });
+    }}];
 }
 - (id<MTLFunction>)newFunctionWithDescriptor:(id)desc error:(NSError **)error {
     if (error) *error = nil;
@@ -2545,9 +2549,17 @@ static size_t nvmtl_fc_width(NSUInteger dataType)
 }
 - (void)newFunctionWithDescriptor:(id)desc completionHandler:(void (^)(id<MTLFunction>, NSError *))handler {
     if (!handler) return;
-    NSError *err = nil;
-    id<MTLFunction> f = [self newFunctionWithDescriptor:desc error:&err];
-    handler(f, err);
+    // Keep the synchronous method's invalid-object error path for non-copyable inputs.
+    id snapshot = [desc respondsToSelector:@selector(copyWithZone:)] ? [desc copy] : desc;
+    if ([snapshot isKindOfClass:[MTLFunctionDescriptor class]]) {
+        MTLFunctionDescriptor *functionDescriptor = snapshot;
+        functionDescriptor.constantValues = [functionDescriptor.constantValues copy];
+    }
+    [nvmtl_pipeline_compile_queue() addOperationWithBlock:^{ @autoreleasepool {
+        NSError *err = nil;
+        id<MTLFunction> f = [self newFunctionWithDescriptor:snapshot error:&err];
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ handler(f, err); });
+    }}];
 }
 - (NSArray<NSString *> *)externFunctionNames {
     NSSet<NSString *> *x = nvmtl_mtlb_extern_names(_raw);
