@@ -14,7 +14,7 @@ from firmware_profile import checked_header
 
 ROOT = Path(__file__).resolve().parents[1]
 
-EXPORT = ("src/phxbringup", "src/phxaccel", "src/nmplugin",
+EXPORT = ("src/phxbringup", "src/phxaccel", "src/nmplugin", "src/amd/phx_topology.h",
           "tools/phxctl/mesboot.c", "tools/phxctl/phxctl.c",
           "tools/phxctl/mes_v11_api_def.h", "tools/phxctl/csb_gfx11.h",
           "tools/phxctl/gfx11_shader_probe.h",

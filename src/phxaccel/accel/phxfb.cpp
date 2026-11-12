@@ -7,6 +7,7 @@
 #include <IOKit/IOLib.h>
 #include <IOKit/pci/IOPCIDevice.h>
 #include <IOKit/graphics/IOFramebuffer.h>
+#include <IOKit/graphics/IODisplay.h>
 #include <IOKit/IODeviceMemory.h>
 #include <IOKit/pwr_mgt/RootDomain.h>
 #include <IOKit/IOPlatformExpert.h>
@@ -55,6 +56,18 @@ SYSCTL_QUAD(_debug, OID_AUTO, phxfb_vbl_late_us_max, CTLFLAG_RW | CTLFLAG_LOCKED
 static struct sysctl_oid *const kFbOids[] = { &sysctl__debug_phxfb_alias, &sysctl__debug_phxfb_vbl_staged, &sysctl__debug_phxfb_vbl_n,
                                               &sysctl__debug_phxfb_vbl_late_us_sum, &sysctl__debug_phxfb_vbl_late_us_max };
 
+// The panel's backlight is the display block's PWM (DCN 3.1.4 PWRSEQ0, segment 2 base 0x34c0): ACPI's _BCM only asks the
+// GPU driver through ATIF (AFN7), and the firmware leaves the PWM on at full duty (period 4000, 12 bits). It is set as
+// Linux's panel_cntl does without DMUB: lock the group, write the active count, unlock, wait for the pending update.
+// tools/phxctl/phxbl does the same from user space. -phxbloff leaves the panel without a brightness control.
+enum : uint32_t { kBlCntl = 0x34c0 + 0x2f19, kBlPeriod = 0x34c0 + 0x2f1b, kBlLock = 0x34c0 + 0x2f1c };
+// The firmware runs both PWM generators, PWRSEQ0 and PWRSEQ1 (+0x6c), at full duty, and PWRSEQ0 alone left the panel's
+// brightness as it was (2026-10-25: eDP DPCD 0x721 says the panel follows its PWM pin): both get the level.
+static constexpr uint32_t kBlSeqs[] = { 0, 0x2f85 - 0x2f19 };
+static constexpr uint32_t kBlMax = 1024;   // the brightness parameter's range
+class PhxAMDFB;
+static IOService *phxBacklightCreate(PhxAMDFB *fb);
+
 // The class name carries "AMD": CoreDisplay tells the GPU vendor from the framebuffer's class name (Intel, AMD, NVDA,
 // AppleParavirt), and for any other name it turns IOPresentment off, which left the panel on the software compositor
 // with the Metal compositor up for the accelerator (GetGPUVendorForFramebufferService -> 1, 2026-10-20).
@@ -67,6 +80,8 @@ class PhxAMDFB : public IOFramebuffer {
     // whole desktop lagged, 2026-10-20). This view comes out write-back although it asks for write-combined (frames
     // copied with plain stores stayed in the CPU cache: stripes), so the display pipe writes it with non-temporal stores.
     IOMemoryMap *fAliasMap = nullptr;
+    IOMemoryMap *fMmio = nullptr;      // BAR5, for the backlight PWM
+    IOService *fBacklight = nullptr;   // the brightness parameter handler, named "backlight"
     unsigned fAliasTries = 0;    // pixel checks made against the carve-out; a mismatch is not retried forever
     unsigned fAliasWaits = 0;    // presents made before the carve-out was published: not verification failures
     // The retry budget and both acceptance rules live in PhxHardwarePolicy.hpp, so tests/test_hardware_policy.cpp
@@ -281,6 +296,76 @@ class PhxAMDFB : public IOFramebuffer {
     }
 
 public:
+    // the backlight as 0..kBlMax of full duty; false without a running PWM
+    bool backlightRead(uint32_t *level) {
+        if (!fMmio || !level) return false;
+        volatile uint32_t *r = (volatile uint32_t *)fMmio->getVirtualAddress();
+        const uint32_t pc = r[kBlPeriod], period = pc & 0xffff, bits = (pc >> 16) & 0xf, cntl = r[kBlCntl];
+        const uint64_t full = bits ? ((uint64_t)0x10000 * period) >> bits : 0;
+        if (!full || !(cntl >> 31)) return false;
+        const uint64_t l = (uint64_t)(cntl & 0xffff) * kBlMax / full;
+        *level = l > kBlMax ? kBlMax : (uint32_t)l;
+        return true;
+    }
+    // level 0 is dark, as on a MacBook: AppleBacklightDisplay puts the panel to sleep with brightness 0
+    bool backlightWrite(uint32_t level) {
+        if (!fMmio) return false;
+        volatile uint32_t *r = (volatile uint32_t *)fMmio->getVirtualAddress();
+        if (level > kBlMax) level = kBlMax;
+        uint64_t frac = (uint64_t)level * 0x10000 / kBlMax;   // 16.16
+        if (level && frac < 0x10000 / 100) frac = 0x10000 / 100;   // above dark, at least 1 % of full duty
+        bool any = false;
+        for (uint32_t q : kBlSeqs) {
+            const uint32_t pc = r[kBlPeriod + q], period = pc & 0xffff, bits = (pc >> 16) & 0xf;
+            if (!period || !bits || !(r[kBlCntl + q] >> 31)) continue;
+            const uint64_t duty = frac * period;
+            uint32_t cnt = (uint32_t)((duty >> bits) & 0xffff) + (uint32_t)((duty >> (bits - 1)) & 1);
+            if (cnt > 0xffff) cnt = 0xffff;
+            r[kBlLock + q] = r[kBlLock + q] | 0x80000000u | 1u;                 // IGNORE_MASTER_LOCK_EN, REG_LOCK
+            r[kBlCntl + q] = (r[kBlCntl + q] & ~0xffffu) | cnt;                 // BL_ACTIVE_INT_FRAC_CNT
+            r[kBlLock + q] = (r[kBlLock + q] | 0x80000000u) & ~1u;
+            for (int i = 0; i < 100 && (r[kBlLock + q] & 0x100); i++) IODelay(100);   // REG_UPDATE_PENDING
+            any = true;
+        }
+        return any;
+    }
+    // Display sleep left the backlight lit over a black or torn frame (2026-10-25). Besides brightness 0, a connection
+    // powered down goes dark and gets its level back on power-up; a brightness set while dark waits.
+    bool fBlDark = false;
+    uint32_t fBlSaved = kBlMax;
+    bool backlightSet(uint32_t level) {
+        if (fBlDark) { fBlSaved = level > kBlMax ? kBlMax : level; return true; }
+        return backlightWrite(level);
+    }
+    void displayPower(bool on) {
+        if (!fBacklight || on != fBlDark) return;
+        if (!on && !(backlightRead(&fBlSaved) && backlightWrite(0))) return;
+        fBlDark = !on;
+        if (on) backlightWrite(fBlSaved);
+        fBacklight->setProperty("PhxDark", fBlDark);
+        PFBLOG("backlight: display power %s, level %u", on ? "on" : "off", fBlSaved);
+    }
+    bool backlightDark() const { return fBlDark; }
+    // which calls reach the panel, newest first, as the registry property PhxTrace (the brightness slider moved and no
+    // brightness parameter arrived, 2026-10-25); the log does not reach the unified log
+    char fTrace[16][48] = {}; unsigned fTraceN = 0;
+    void trace(const char *what, uint32_t a, uint64_t v) {
+        char line[48]; snprintf(line, sizeof line, "%s %c%c%c%c=0x%llx", what, (char)(a >> 24), (char)(a >> 16), (char)(a >> 8), (char)a,
+                                (unsigned long long)v);
+        if (fTraceN && !strcmp(line, fTrace[(fTraceN - 1) % 16])) return;   // repeats of the last call
+        strlcpy(fTrace[fTraceN++ % 16], line, sizeof fTrace[0]);
+        char all[16 * 48 + 16] = ""; for (unsigned i = 0; i < 16 && i < fTraceN; i++) { strlcat(all, fTrace[(fTraceN - 1 - i) % 16], sizeof all); strlcat(all, "; ", sizeof all); }
+        setProperty("PhxTrace", all);
+    }
+    // the built-in panel is a TFT: AppleBacklightDisplay then drives it (brightness, dimming), as on a MacBook
+    IOReturn getAppleSense(IOIndex idx, UInt32 *senseType, UInt32 *primary, UInt32 *extended, UInt32 *displayType) override {
+        if (idx != 0 || !fBacklight) return kIOReturnUnsupported;
+        if (senseType) *senseType = 0;
+        if (primary) *primary = 0;
+        if (extended) *extended = 0;
+        if (displayType) *displayType = 2;   // kPanelTFTConnect (IOMacOSVideo.h, the NDRV headers)
+        return kIOReturnSuccess;
+    }
     bool start(IOService *provider) override;
     void stop(IOService *provider) override;
     IOReturn enableController() override { return kIOReturnSuccess; }
@@ -418,8 +503,10 @@ public:
         return kIOPMAckImplied;
     }
     IOReturn setAttribute(IOSelect attribute, uintptr_t value) override {
+        trace("attr", attribute, value);
         if (attribute == kIOWindowServerActiveAttribute) return kIOReturnSuccess;
         if (attribute == kIOPowerAttribute) {
+            displayPower(value != 0);
             if (value) { IOReturn r = IOFramebuffer::setAttribute(attribute, value); handleEvent(kIOFBNotifyDidPowerOn);
                          return r == kIOReturnUnsupported ? kIOReturnSuccess : r; }
             handleEvent(kIOFBNotifyWillPowerOff);
@@ -433,8 +520,12 @@ public:
         return IOFramebuffer::getAttribute(attribute, value);
     }
     IOReturn setAttributeForConnection(IOIndex idx, IOSelect attribute, uintptr_t value) override {
+        trace("conn", attribute, value);
         switch (attribute) {
-        case kConnectionPower: case kConnectionColorModesSupported: case kConnectionColorDepthsSupported:
+        case kConnectionPower:
+            displayPower(value != 0);
+            return kIOReturnSuccess;
+        case kConnectionColorModesSupported: case kConnectionColorDepthsSupported:
         case kConnectionControllerColorDepth: case kConnectionControllerDepthsSupported: case kConnectionColorMode:
         case kConnectionDisplayFlags: case kConnectionFlags:
             return kIOReturnSuccess;
@@ -538,6 +629,73 @@ public:
 
 OSDefineMetaClassAndStructors(PhxAMDFB, IOFramebuffer)
 
+// The panel's brightness as a display parameter. IOGraphics looks for parameter handlers under the framebuffer, and
+// takes a built-in TFT panel for a backlit one (AppleBacklightDisplay) only while a service named "backlight" exists.
+class PhxBacklight : public IODisplayParameterHandler {
+    OSDeclareDefaultStructors(PhxBacklight)
+    PhxAMDFB *fFB = nullptr;
+    uint32_t fLevel = kBlMax;
+public:
+    static PhxBacklight *withFramebuffer(PhxAMDFB *fb) {
+        PhxBacklight *b = new PhxBacklight;
+        if (b && !b->init()) OSSafeReleaseNULL(b);
+        if (b) { b->fFB = fb; fb->backlightRead(&b->fLevel); }
+        return b;
+    }
+    bool setDisplay(IODisplay *display) override {
+        if (!display) return true;
+        OSObject *p = display->copyProperty(gIODisplayParametersKey);
+        OSDictionary *cur = OSDynamicCast(OSDictionary, p);
+        OSDictionary *params = cur ? OSDictionary::withDictionary(cur) : OSDictionary::withCapacity(2);
+        OSSafeReleaseNULL(p);
+        if (!params) return false;
+        fFB->backlightRead(&fLevel);
+        IODisplay::addParameter(params, gIODisplayBrightnessKey, 0, kBlMax);
+        IODisplay::setParameter(params, gIODisplayBrightnessKey, (SInt32)fLevel);
+        // CoreBrightness sets the linear ones, as an Intel MacBook's framebuffer offers them: with "brightness" alone
+        // the slider moved and no parameter ever reached the panel (2026-10-25)
+        const OSSymbol *linear[] = { gIODisplayLinearBrightnessKey, gIODisplayUsableLinearBrightnessKey };
+        for (const OSSymbol *k : linear) { IODisplay::addParameter(params, k, 0, kBlMax); IODisplay::setParameter(params, k, (SInt32)fLevel); }
+        display->setProperty(gIODisplayParametersKey, params);
+        params->release();
+        PFBLOG("backlight: brightness parameter on %s, %u of %u", display->getName(), fLevel, kBlMax);
+        return true;
+    }
+    // the last parameter set, in the registry: PhxAMDFB's log does not reach the unified log
+    uint32_t fSets = 0;
+    bool doIntegerSet(OSDictionary *, const OSSymbol *paramName, UInt32 value) override {
+        setProperty("PhxLastParam", const_cast<OSSymbol *>(paramName)); setProperty("PhxLastValue", value, 32); setProperty("PhxSets", ++fSets, 32);
+        fFB->trace(paramName->getCStringNoCopy(), 0x20202020, value);
+        setProperty("PhxDark", fFB->backlightDark());
+        if (paramName != gIODisplayBrightnessKey && paramName != gIODisplayLinearBrightnessKey
+            && paramName != gIODisplayUsableLinearBrightnessKey) return false;
+        if (!fFB->backlightSet(value)) return false;
+        fLevel = value > kBlMax ? kBlMax : value;
+        return true;
+    }
+    bool doDataSet(const OSSymbol *, OSData *) override { return false; }
+    IOReturn setProperties(OSObject *properties) override {
+        OSDictionary *d = OSDynamicCast(OSDictionary, properties);
+        if (OSCollectionIterator *it = d ? OSCollectionIterator::withCollection(d) : nullptr) {
+            while (const OSSymbol *k = OSDynamicCast(OSSymbol, it->getNextObject())) fFB->trace(k->getCStringNoCopy(), 0x2a2a2a2a, 0);
+            it->release();
+        }
+        return kIOReturnUnsupported;
+    }
+    bool doUpdate() override { return true; }
+};
+OSDefineMetaClassAndStructors(PhxBacklight, IODisplayParameterHandler)
+
+static IOService *phxBacklightCreate(PhxAMDFB *fb)
+{
+    PhxBacklight *b = PhxBacklight::withFramebuffer(fb);
+    if (!b) return nullptr;
+    b->setName("backlight");
+    if (!b->attach(fb)) { b->release(); return nullptr; }
+    b->registerService();
+    return b;
+}
+
 // One boot per arming: `nvram phxfb-boot=1` lets the next start take the panel, and start removes the variable and
 // commits NVRAM at once, so a boot that panics after this point comes back on the firmware framebuffer without hands.
 static bool takeBootArming()
@@ -637,8 +795,18 @@ bool PhxAMDFB::start(IOService *provider)
     // callout dereferences it (IOFramebuffer::powerStateWillChangeTo, panic 2026-10-20)
     setProperty("IOFBDependentID", 0x50485846ull << 32 | 1, 64);   // 'PHXF'
     setProperty("IOFBDependentIndex", 0ull, 32);
+    // the backlight's handler comes first: IOGraphics checks for a "backlight" service once, when the framebuffer opens
+    fMmio = fPCI->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress5);
+    if (fMmio && fMmio->getLength() < (kBlLock + kBlSeqs[1] + 1) * 4) OSSafeReleaseNULL(fMmio);
+    uint32_t bl = 0;
+    if (PE_parse_boot_argn("-phxbloff", arg, sizeof arg)) PFBLOG("backlight: -phxbloff, no brightness control");
+    else if (!backlightRead(&bl)) PFBLOG("backlight: the PWM is not running (no MMIO view, or off), no brightness control");
+    else if (!(fBacklight = phxBacklightCreate(this))) PFBLOG("backlight: the handler would not attach");
+    else PFBLOG("backlight: PWM at %u of %u", bl, kBlMax);
     loadEdid();   // no callbacks can observe a partial snapshot; immutable for the framebuffer's lifetime
-    if (!IOFramebuffer::start(provider)) { OSSafeReleaseNULL(fSurfMap); return false; }
+    if (!IOFramebuffer::start(provider)) {
+        if (fBacklight) { fBacklight->detach(this); OSSafeReleaseNULL(fBacklight); }
+        OSSafeReleaseNULL(fMmio); OSSafeReleaseNULL(fSurfMap); return false; }
     fVa = IORangeAllocator::withRange(kVaSize - 1, PAGE_SIZE, 0, IORangeAllocator::kLocking);
     poolInit();
     setProperty("built-in", kOSBooleanTrue);
@@ -678,6 +846,8 @@ void PhxAMDFB::stop(IOService *provider)
     if (fVblTimer) { thread_call_cancel(fVblTimer); while (!thread_call_free(fVblTimer)) { thread_call_cancel(fVblTimer); IOSleep(5); } fVblTimer = nullptr; }
     if (gAliasSysctl) { for (auto *o : kFbOids) sysctl_unregister_oid(o); gAliasSysctl = false; }
     gPhxFrameAbs = 0;
+    if (fBacklight) { fBacklight->terminate(); OSSafeReleaseNULL(fBacklight); }
+    OSSafeReleaseNULL(fMmio);
     OSSafeReleaseNULL(fAliasMap);
     OSSafeReleaseNULL(fSurfMap);
     OSSafeReleaseNULL(fVa);

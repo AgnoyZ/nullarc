@@ -22,6 +22,11 @@ static void IOLockLock(IOLock *p) {
 }
 static void IOLockUnlock(IOLock *p) { assert(p && lockHeld); lockHeld = false; p->mutex.unlock(); }
 static void IODelay(unsigned);
+static int gHangMs = 3000;
+static uint64_t fakeNow = 10000000000ull;
+static uint64_t mach_absolute_time() { assert(lockHeld); return fakeNow; }
+static void nanoseconds_to_absolutetime(uint64_t ns, uint64_t *out) { assert(lockHeld); *out = ns; }
+static void IOLog(const char *, ...) {}
 #include "queue-retire-constants.inc"
 struct FakeMap {
     std::vector<uint64_t> words;
@@ -42,6 +47,8 @@ public:
     uint64_t gSeq{42}, fbMcBase{0x100000000ull};
     bool stopping{false}, bindRefused{false}, completeOnDelay{false};
     unsigned binds{0}, reaps{0}, flushes{0}, delays{0};
+    std::vector<uint32_t> killedVmids;
+    std::vector<bool> killedAll;
     PhxBringup() {
         vm[0].busy = true;
         auto &q = gq[0]; q.ready = true; q.ringOff = 0x4000; q.ringDw = 1024;
@@ -57,6 +64,11 @@ public:
     uint64_t gpuRetired() const;
     void ringPut(GpuQueue &, uint32_t, uint32_t);
     IOReturn gpuSubmit(uint32_t, bool, const uint64_t *, const uint32_t *, uint32_t, uint64_t *);
+    void hangCheck();
+    void killWaves(uint32_t vmid, bool all) {
+        assert(lockHeld && (all || (vmid >= 8 && vmid < 16)));
+        killedVmids.push_back(vmid); killedAll.push_back(all);
+    }
 };
 static PhxBringup *active = nullptr;
 static bool stopOnLock = false;
@@ -185,6 +197,7 @@ int main(int argc, char **argv) {
         if (expected == kIOReturnSuccess) {
             assert(seq == initialSeq + 1 && p.gSeq == seq && q.wptr == initialWptr + 12 && q.tail == initialTail + 1);
             assert(q.fseq[initialTail & 63] == seq && q.fend[initialTail & 63] == q.wptr);
+            assert(q.fvmid[initialTail & 63] == 8);
             assert(p.vm[0].lastSeq == seq && p.hwv[0].lastSeq == seq && p.binds == 1 && p.flushes == 2);
             const uint32_t expectedPacket[] = {0xc0023f00, 0x400000, 0, 4u | (1u << 23) | (8u << 24),
                 0xc0064900, 0x06603514, 0x40000000, 0x6100, 1, static_cast<uint32_t>(seq), static_cast<uint32_t>(seq >> 32), 0};
@@ -204,7 +217,48 @@ int main(int argc, char **argv) {
             else assert(!p.delays);
             assert(p.binds == (test == "submit-bind-refused" ? 1u : 0u));
         }
-    } else if (test == "concurrent-submit-retire") {
+    } else if (test.rfind("hang-", 0) == 0) {
+        if (test != "hang-idle") {
+            history(p, {42}, test == "hang-index-wrap" ? UINT32_MAX : 0);
+            fence = 41; q.lastDone = 41; q.lastProgress = fakeNow - 3000000000ull;
+            q.fvmid[q.head & 63] = 8;
+        }
+        if (test == "hang-grace") q.lastProgress = fakeNow - 2000000000ull;
+        if (test == "hang-escalation" || test == "hang-killed-all") q.killedSeq = 42;
+        if (test == "hang-killed-all") q.killedAll = true;
+        if (test == "hang-progress") q.lastDone = 40;
+        if (test == "hang-disabled") gHangMs = 0;
+        if (test == "hang-no-lock") p.gpuLock = nullptr;
+        if (test == "hang-stopping") p.stopping = true;
+        if (test == "hang-stop-after-lock") stopOnLock = true;
+        if (test == "hang-no-mmio") p.mmio = nullptr;
+        if (test == "hang-no-aperture") p.fbAper = nullptr;
+        if (test == "hang-invalid-history") q.tail = q.head + 64;
+        if (test == "hang-future-fence") fence = p.gSeq + 1;
+        if (test == "hang-invalid-vmid") q.fvmid[q.head & 63] = 7;
+        if (test == "hang-both-queues") {
+            secondQueue(p); history(p, {42}, 0, 1);
+            auto &other = p.gq[1]; p.memory.words[other.fenceOff / 8] = 41;
+            other.lastDone = 41; other.lastProgress = fakeNow - 3000000000ull; other.fvmid[0] = 9;
+        }
+        const auto memory = p.memory.words, bells = p.bells.words;
+        p.hangCheck();
+        assert(p.memory.words == memory && p.bells.words == bells && p.gSeq == 42);
+        assert(!p.binds && !p.reaps && !p.flushes);
+        if (test == "hang-first" || test == "hang-index-wrap") {
+            assert(p.killedVmids == std::vector<uint32_t>{8} && !p.killedAll[0]);
+            assert(q.killedSeq == 42 && q.lastProgress == fakeNow);
+        } else if (test == "hang-escalation") {
+            assert(p.killedVmids == std::vector<uint32_t>{0} && p.killedAll[0] && q.killedAll);
+        } else if (test == "hang-both-queues") {
+            assert((p.killedVmids == std::vector<uint32_t>{8, 9}));
+            assert(!p.killedAll[0] && !p.killedAll[1]);
+        } else {
+            assert(p.killedVmids.empty());
+            if (test == "hang-progress" || test == "hang-idle") assert(q.lastProgress == fakeNow);
+        }
+        assert(p.mutex.acquisitions == (test == "hang-disabled" || test == "hang-no-lock" ? 0u : 1u));
+    } else if (test == "concurrent-submit-retire" || test == "concurrent-submit-retire-hang") {
         std::atomic<bool> start{false};
         auto writer = [&]() {
             while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
@@ -220,6 +274,7 @@ int main(int argc, char **argv) {
             uint64_t previous = 0;
             for (unsigned i = 0; i < 2048; ++i) {
                 const uint64_t done = p.gpuRetired(); assert(done >= previous); previous = done;
+                if (test == "concurrent-submit-retire-hang") p.hangCheck();
                 std::this_thread::yield();
             }
         });
@@ -228,6 +283,7 @@ int main(int argc, char **argv) {
         assert(p.gSeq == 42 + 256 && p.gpuRetired() == p.gSeq && p.binds == 256 && p.flushes == 512);
         assert(p.vm[0].lastSeq == p.gSeq && p.hwv[0].lastSeq == p.gSeq && q.wptr == 12 * 256 && q.tail == 256);
         assert(p.mutex.acquisitions >= 256 * 2 + 2049 && !p.delays);
+        assert(p.killedVmids.empty());
     } else { std::cerr << "Unknown case: " << test << '\n'; return 2; }
     assert(!lockHeld);
     std::cout << "{\"case\":\"" << test << "\",\"passed\":true,\"hardware_executed\":false}\n";

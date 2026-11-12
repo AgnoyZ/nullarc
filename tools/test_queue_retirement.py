@@ -11,7 +11,7 @@ import subprocess
 from prepare_source import ROOT, prepare
 from test_vm_binding import extract_source as extract_vm
 
-METHODS = ('queueFence', 'queueProgress', 'gpuRetiredLocked', 'gpuRetired', 'ringPut', 'gpuSubmit')
+METHODS = ('queueFence', 'queueProgress', 'gpuRetiredLocked', 'gpuRetired', 'ringPut', 'gpuSubmit', 'hangCheck')
 CASES = (
     'read-empty', 'read-pending', 'read-complete', 'read-interleaved', 'read-other-pending',
     'read-high-word', 'read-index-wrap', 'read-no-lock', 'read-no-mmio', 'read-no-aperture',
@@ -31,6 +31,10 @@ CASES = (
     'submit-stop-after-lock', 'submit-invalid-context', 'submit-small-ring', 'submit-nonpower-ring',
     'submit-sequence-exhausted', 'submit-pointer-exhausted', 'submit-history-full', 'submit-ring-full',
     'submit-late-completion', 'submit-bind-refused', 'submit-retired-floor', 'concurrent-submit-retire',
+    'hang-idle', 'hang-first', 'hang-grace', 'hang-escalation', 'hang-killed-all',
+    'hang-progress', 'hang-disabled', 'hang-no-lock', 'hang-stopping', 'hang-stop-after-lock',
+    'hang-no-mmio', 'hang-no-aperture', 'hang-invalid-history', 'hang-future-fence',
+    'hang-index-wrap', 'hang-invalid-vmid', 'hang-both-queues', 'concurrent-submit-retire-hang',
 )
 
 
@@ -76,7 +80,7 @@ def exercise(out):
     result = {'source_provenance': provenance, 'actual_queue_retirement_method_sha256': hashes,
               'actual_queue_retirement_declarations_sha256': hashlib.sha256((constants + '\n' + declarations).encode()).hexdigest(),
               'cases': rows, 'hardware_executed': False, 'kernel_loaded': False,
-              'limitation': 'Actual submission, ring writer, queue-progress validator and locked/public retirement methods. Fake maps, IOKit locks, VM binding and device completion; CPU threads perform 256 submissions with serialized completion observations. ASan/UBSan is not a GPU coherency or exhaustive kernel-concurrency test; no real DMA or target work.'}
+              'limitation': 'Actual submission, ring writer, queue-progress validator, locked/public retirement and watchdog decision methods. Fake maps, IOKit locks, VM binding, clock, wave killing and device completion; CPU threads perform 256 submissions with serialized completion/watchdog observations. ASan/UBSan is not a GPU coherency or exhaustive kernel-concurrency test; no real DMA, wave killing or target work.'}
     (out / 'report.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result, indent=2), flush=True)
     return result

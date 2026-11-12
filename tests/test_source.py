@@ -45,6 +45,9 @@ class SourceTests(unittest.TestCase):
         policy = (ROOT / "src/PhxHardwarePolicy.hpp").read_bytes()
         for name in ("phxbringup", "phxaccel"):
             self.assertEqual(policy, (self.stage / "src" / name / "PhxHardwarePolicy.hpp").read_bytes())
+    def test_topology_dependency_is_in_exported_source(self):
+        self.assertEqual((ROOT / "src/amd/phx_topology.h").read_bytes(),
+                         (self.stage / "src/amd/phx_topology.h").read_bytes())
     def test_does_not_overwrite_source(self):
         with self.assertRaisesRegex(RuntimeError, "already exists"):
             prepare(self.stage)

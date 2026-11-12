@@ -19,6 +19,8 @@
 #include <libkern/OSAtomic.h>
 #include <pexpert/pexpert.h>
 #include <sys/sysctl.h>
+#include <kern/thread_call.h>
+#include <kern/clock.h>
 
 #include "PhxNativeABI.h"
 #include "PhxPspLayout.h"
@@ -31,7 +33,7 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
 #include "PhxHardwarePolicy.hpp"
 #include "PhxBoPolicy.hpp"
 
-#define PHX_KEXT_BUILD 33u
+#define PHX_KEXT_BUILD 34u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -53,6 +55,18 @@ SYSCTL_QUAD(_debug, OID_AUTO, phxbos_handles_high, CTLFLAG_RD | CTLFLAG_LOCKED, 
             "highest BO handle index handed out by any client (the limit is PHXN_MAX_BOS)");
 SYSCTL_QUAD(_debug, OID_AUTO, phxbos_handles_full, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gBosHandlesFull,
             "BO creates refused because the per-client handle table was full");
+// debug.phx_hang_ms: a queue holding work whose fence has not moved for this long gets the waves of its oldest
+// submission's VMID killed (Linux's gfx_v11_0_ring_soft_recovery), and every wave if it still stands half as long
+// again; 0 turns it off. One hung app (Geekbench's OpenCL Feature Matching, 2026-10-26) otherwise froze WindowServer
+// until its watchdog took the session down; a spinning wave killed this way by hand freed the queue in place.
+static int gHangMs = 3000;
+static volatile SInt32 gHangKills;
+SYSCTL_INT(_debug, OID_AUTO, phx_hang_ms, CTLFLAG_RW | CTLFLAG_LOCKED, &gHangMs, 0,
+           "ms without progress before a hung submission's waves are killed (0 off)");
+SYSCTL_INT(_debug, OID_AUTO, phx_hang_kills, CTLFLAG_RD | CTLFLAG_LOCKED, (int *)&gHangKills, 0,
+           "hung submissions whose waves were killed");
+// GC 11.0.1 registers (segment 0 base 0x1260, segment 1 base 0xa000)
+static constexpr uint32_t kRegSqCmd = 0x1260 + 0x111b, kRegRlcSafeMode = 0xa000 + 0x0980;
 static volatile UInt32 gSysctlUp;
 
 // psp_gfx_rb_frame (64 B) — the ring entry the PSP reads. Only 5 fields are set; the rest stay zero
@@ -151,6 +165,8 @@ public:
     IOReturn vmUnmap(uint32_t vmid, uint64_t va, uint64_t size);
     IOReturn gpuSubmit(uint32_t vmid, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seq);
     uint64_t gpuRetired() const;
+    const phx_topology *capturedTopology() const { return topology; }
+    IOReturn setPowerState(unsigned long ordinal, IOService *whichDevice) override;
 
 private:
     uint32_t rreg(uint32_t reg) const;
@@ -162,6 +178,8 @@ private:
     void readFbLayout();
     void clearRing();
 
+    const phx_topology *topology{nullptr};
+    bool isSleeping{false};
     IOPCIDevice *pci{nullptr};
     IOMemoryMap *mmio{nullptr};
     IOLock *smuLock{nullptr};
@@ -199,7 +217,10 @@ private:
         uint32_t ringOff, ringDw, wbOff, fenceOff;
         uint64_t dbByte, wptr, doneEnd, retiredSeq;
         uint64_t fseq[64], fend[64];
+        uint32_t fvmid[64];                     // the hardware VMID each outstanding submission runs under
         volatile uint32_t head, tail;
+        uint64_t lastDone, lastProgress;        // the hang watchdog's view: fence seen last, and when it last moved
+        uint64_t killedSeq; bool killedAll;
     };
     GpuQueue gq[2]{};
     uint64_t gSeq{0};
@@ -247,6 +268,11 @@ private:
     bool vmOwnershipKnown(uint32_t repairing) const;
     IOReturn vmIdleLocked(uint32_t handle, bool repair);
     void ringPut(GpuQueue &q, uint32_t idx, uint32_t value);
+    thread_call_t hangCall{nullptr};
+    volatile bool hangStop{false};
+    static void hangTick(thread_call_param_t self, thread_call_param_t);
+    void hangCheck();
+    void killWaves(uint32_t vmid, bool all);
     bool debug{false};
     bool smuUsed{false};
     volatile SInt32 sessionOpen{0};
@@ -277,6 +303,7 @@ private:
 
     IOReturn doHello(IOExternalMethodArguments *a);
     IOReturn doQueryInfo(IOExternalMethodArguments *a);
+    IOReturn doTopology(IOExternalMethodArguments *a);
     IOReturn doReadRegs(IOExternalMethodArguments *a);
     IOReturn doBoCreate(IOExternalMethodArguments *a);
     IOReturn doBoFree(IOExternalMethodArguments *a);
@@ -286,6 +313,7 @@ private:
     IOReturn doCtx(IOExternalMethodArguments *a);
     IOReturn doSubmit(IOExternalMethodArguments *a);
     IOReturn doWaitSeq(IOExternalMethodArguments *a);
+    IOReturn doSurfGpuMark(IOExternalMethodArguments *a);
     IOReturn doDbgSmu(IOExternalMethodArguments *a);
     IOReturn doDbgPspRing(IOExternalMethodArguments *a);
     IOReturn doDbgPspLayout(IOExternalMethodArguments *a);
@@ -353,6 +381,27 @@ bool PhxBringup::start(IOService *provider) {
     if (!pci)
         return false;
     pci->retain();
+    {
+        uint16_t v = pci->configRead16(0);
+        uint16_t d = pci->configRead16(2);
+        uint8_t rev = pci->configRead8(8);
+        uint16_t sv = pci->configRead16(0x2c);
+        uint16_t sd = pci->configRead16(0x2e);
+        topology = phx_find_topology(v, d, rev, sv, sd);
+        if (topology) {
+            setProperty("phx-topology-cu", topology->cu_active_number, 32);
+            setProperty("phx-topology-rb", topology->num_rb_pipes, 32);
+            IOLog("PhxBringup: topology matched: %u active CUs, %u RBs for device 0x%04x:0x%04x\n",
+                  topology->cu_active_number, topology->num_rb_pipes, v, d);
+        }
+    }
+    PMinit();
+    provider->joinPMtree(this);
+    static IOPMPowerState pmStates[2] = {
+        { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        { 1, IOPMDeviceUsable, IOPMPowerOn, IOPMPowerOn, 0, 0, 0, 0, 0, 0, 0, 0 }
+    };
+    registerPowerDriver(this, pmStates, 2);
     {   // the GPU must be a bus master before it can DMA to/from system memory (page tables, user BOs)
         uint16_t cmd = pci->configRead16(kIOPCIConfigCommand);
         setProperty("phx-pci-cmd-before", cmd, 16);
@@ -390,11 +439,23 @@ bool PhxBringup::start(IOService *provider) {
     setProperty("phx-fb-aper-len", fbAperLen, 64);
     IOLog("PhxBringup: service up (mmio %s, bar0 %s %llu MiB, debug %d)\n", mmio ? "mapped" : "unmapped",
           fbAper ? "mapped" : "unmapped", (unsigned long long)(fbAperLen >> 20), debug);
+    hangCall = thread_call_allocate(hangTick, this);
+    if (hangCall) {
+        uint64_t d;
+        clock_interval_to_deadline(500, kMillisecondScale, &d);
+        thread_call_enter_delayed(hangCall, d);
+    }
     registerService();
     return true;
 }
 
 void PhxBringup::stop(IOService *provider) {
+    if (hangCall) {
+        hangStop = true;   // a tick running now does not arm the next one
+        thread_call_cancel_wait(hangCall);
+        thread_call_free(hangCall);
+        hangCall = nullptr;
+    }
     if (gpuLock) IOLockLock(gpuLock);
     stopping = true;
     if (gpuLock) reapContextsLocked();
@@ -415,6 +476,8 @@ void PhxBringup::stop(IOService *provider) {
         sysctl_unregister_oid(&sysctl__debug_phxbos_flush_bytes);
         sysctl_unregister_oid(&sysctl__debug_phxbos_handles_high);
         sysctl_unregister_oid(&sysctl__debug_phxbos_handles_full);
+        sysctl_unregister_oid(&sysctl__debug_phx_hang_ms);
+        sysctl_unregister_oid(&sysctl__debug_phx_hang_kills);
         gSysctlUp = 0;
     }
     clearRing();
@@ -455,7 +518,19 @@ void PhxBringup::stop(IOService *provider) {
         IOLockFree(smuLock);
         smuLock = nullptr;
     }
+    PMstop();
     IOService::stop(provider);
+}
+
+IOReturn PhxBringup::setPowerState(unsigned long ordinal, IOService *whichDevice) {
+    if (ordinal == 0) {
+        IOLog("PhxBringup: powerStateWillChange to sleep (state 0)\n");
+        isSleeping = true;
+    } else {
+        IOLog("PhxBringup: powerStateDidChange from sleep (state 1)\n");
+        isSleeping = false;
+    }
+    return IOPMAckImplied;
 }
 
 uint32_t PhxBringup::rreg(uint32_t reg) const {
@@ -478,8 +553,19 @@ void PhxBringup::readFbLayout() {
     setProperty("phx-fb-phys", fbPhys, 64);
     // About This Mac / System Information name the GPU from the PCI device's "model" and size its memory from
     // "VRAM,totalMB"; without them the 780M read "Display, 15 MB" (the boot framebuffer)
-    static const char kModel[] = "AMD Radeon 780M";
-    if (OSData *m = OSData::withBytes(kModel, sizeof(kModel))) {
+    static const char kModel780[] = "AMD Radeon 780M";
+    static const char kModel760[] = "AMD Radeon 760M";
+    static const char kModel740[] = "AMD Radeon 740M";
+    const char *model = kModel780;
+    unsigned modelSize = sizeof(kModel780);
+    if (topology) {
+        if (topology->cu_active_number <= 4) {
+            model = kModel740; modelSize = sizeof(kModel740);
+        } else if (topology->cu_active_number <= 8) {
+            model = kModel760; modelSize = sizeof(kModel760);
+        }
+    }
+    if (OSData *m = OSData::withBytes(model, modelSize)) {
         pci->setProperty("model", m);
         m->release();
     }
@@ -1284,6 +1370,7 @@ IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, 
     q.wptr += k;
     q.fseq[q.tail & 63] = seq;
     q.fend[q.tail & 63] = q.wptr;
+    q.fvmid[q.tail & 63] = vmid;
     __asm__ __volatile__("" ::: "memory");
     q.tail = q.tail + 1;
     // BAR0 is write-combined: drain the WC buffers so the packets are in VRAM before the CP is told about them
@@ -1301,6 +1388,79 @@ IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, 
     IOLockUnlock(gpuLock);
     *seqOut = seq;
     return kIOReturnSuccess;
+}
+
+// Every 500 ms: a queue with unfinished work whose fence has not moved for debug.phx_hang_ms has the waves of its oldest
+// unfinished submission killed, the CP then finishes that submission as if it had ended and the queue moves on.
+void PhxBringup::hangTick(thread_call_param_t self, thread_call_param_t) {
+    PhxBringup *me = static_cast<PhxBringup *>(self);
+    me->hangCheck();
+    if (me->hangStop)
+        return;
+    uint64_t d;
+    clock_interval_to_deadline(500, kMillisecondScale, &d);
+    thread_call_enter_delayed(me->hangCall, d);
+}
+
+void PhxBringup::hangCheck() {
+    const int limitMs = gHangMs;
+    if (limitMs <= 0 || !gpuLock)
+        return;
+    IOLockLock(gpuLock);
+    if (stopping || !mmio || !fbAper) {
+        IOLockUnlock(gpuLock);
+        return;
+    }
+    uint64_t limit, now = mach_absolute_time();
+    nanoseconds_to_absolutetime(static_cast<uint64_t>(limitMs) * 1000000ull, &limit);
+    for (GpuQueue &q : gq) {
+        if (!q.ready)
+            continue;
+        uint64_t done = 0;
+        if (!queueProgress(q, &done)) continue;
+        const uint32_t count = q.tail - q.head;
+        uint32_t oldest = 0;
+        bool found = false;
+        for (uint32_t i = 0; i < count && !found; i++)
+            if (q.fseq[(q.head + i) & 63] > done) {
+                oldest = (q.head + i) & 63;
+                found = true;
+            }
+        if (!found || done != q.lastDone) {   // idle, or moving: the clock restarts
+            q.lastDone = done;
+            q.lastProgress = now;
+            continue;
+        }
+        if (now - q.lastProgress < limit)
+            continue;
+        if (q.fvmid[oldest] < kFirstUserVmid || q.fvmid[oldest] >= kFirstUserVmid + 8)
+            continue;
+        if (q.killedSeq != q.fseq[oldest]) {
+            killWaves(q.fvmid[oldest], false);
+            q.killedSeq = q.fseq[oldest];
+            q.killedAll = false;
+            q.lastProgress = now;
+            IOLog("PhxBringup: %s queue stuck %d ms at seq %llu: killed the waves of VMID %u\n", q.gfx ? "gfx" : "compute",
+                  limitMs, static_cast<unsigned long long>(q.fseq[oldest]), q.fvmid[oldest]);
+        } else if (!q.killedAll && now - q.lastProgress >= limit / 2) {
+            killWaves(0, true);
+            q.killedAll = true;
+            IOLog("PhxBringup: %s queue still stuck at seq %llu: killed every wave\n", q.gfx ? "gfx" : "compute",
+                  static_cast<unsigned long long>(q.fseq[oldest]));
+        }
+    }
+    IOLockUnlock(gpuLock);
+}
+
+// gfx_v11_0_ring_soft_recovery: SQ_CMD kill (CMD 3) broadcast (MODE 1), limited to one VMID unless `all`, inside RLC
+// safe mode
+void PhxBringup::killWaves(uint32_t vmid, bool all) {
+    wreg(kRegRlcSafeMode, 0x3);                        // CMD | MESSAGE 1: enter
+    for (int i = 0; i < 1000 && (rreg(kRegRlcSafeMode) & 1); i++)
+        IODelay(1);
+    wreg(kRegSqCmd, 0x13u | (all ? 0u : (0x80u | (vmid & 0xfu) << 28)));
+    wreg(kRegRlcSafeMode, 0x1);                        // CMD, MESSAGE 0: exit
+    OSIncrementAtomic(&gHangKills);
 }
 
 IOReturn PhxBringup::doorbellWrite(uint64_t byteOff, uint64_t value) {
@@ -1770,6 +1930,8 @@ IOReturn PhxBringup::newUserClient(task_t owningTask, void *securityID, UInt32 t
         sysctl_register_oid(&sysctl__debug_phxbos_flush_bytes);
         sysctl_register_oid(&sysctl__debug_phxbos_handles_high);
         sysctl_register_oid(&sysctl__debug_phxbos_handles_full);
+        sysctl_register_oid(&sysctl__debug_phx_hang_ms);
+        sysctl_register_oid(&sysctl__debug_phx_hang_kills);
     }
     if (type != PHXN_UC_TYPE)
         return kIOReturnBadArgument;
@@ -1887,6 +2049,10 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
                                                 IOExternalMethodDispatch *, OSObject *, void *) {
     if (selector == PHXN_SEL_WAITSEQ)
         return doWaitSeq(a);
+    if (selector == PHXN_SEL_TOPOLOGY)
+        return doTopology(a);
+    if (selector == PHXN_SEL_SURF_GPU_MARK)   // no client state: a ready mark must not wait behind a submission
+        return doSurfGpuMark(a);
 
     IOLockLock(lock);
     IOReturn r;
@@ -1974,6 +2140,16 @@ IOReturn IOAccelPhxNativeClient::doQueryInfo(IOExternalMethodArguments *a) {
     inf.max_bos = PHXN_MAX_BOS;
     inf.fence_slots = PHXN_FENCE_SLOTS;
     bcopy(&inf, a->structureOutput, sizeof(inf));
+    return kIOReturnSuccess;
+}
+
+IOReturn IOAccelPhxNativeClient::doTopology(IOExternalMethodArguments *a) {
+    if (!shape(a, 0, 0, 0, sizeof(phx_topology)))
+        return kIOReturnBadArgument;
+    const phx_topology *p = owner->capturedTopology();
+    if (!p)
+        return kIOReturnUnsupported;
+    bcopy(p, a->structureOutput, sizeof(*p));
     return kIOReturnSuccess;
 }
 
@@ -2416,6 +2592,14 @@ IOReturn IOAccelPhxNativeClient::doDbgSmu(IOExternalMethodArguments *a) {
     case PHX_PPSMC_AllowGfxOff:
     case PHX_PPSMC_DisallowGfxOff:
     case PHX_PPSMC_EnableGfxImu:
+    case PHX_PPSMC_GetGfxclkFrequency:
+    case PHX_PPSMC_GetFclkFrequency:
+    case PHX_PPSMC_SetHardMinGfxClk:
+    case PHX_PPSMC_SetSoftMaxGfxClk:
+    case PHX_PPSMC_SetHardMinFclkByFreq:
+    case PHX_PPSMC_SetSoftMaxFclkByFreq:
+    case PHX_PPSMC_SetHardMinSocclkByFreq:
+    case PHX_PPSMC_SetSoftMaxSocclkByFreq:
         break;
     default:
         return kIOReturnNotPermitted;
@@ -2654,6 +2838,45 @@ void IOAccelPhxNativeClient::flushBos() {
     OSAddAtomic64((SInt64)bytes, &gBosFlushBytes);
 }
 
+// WindowServer's composite marks for PhxAccel: the swap of a surface marked pending waits in NMXAccel until it is marked
+// ready (nvSurfWaitReady), so WindowServer need not wait for each composite itself (commitAndWaitUntilSubmitted held
+// its main thread ~1.7 ms a frame, 2026-10-26). They reached NMXAccel through NVIDIA's RM escape before; here the
+// accelerator's own entry (callPlatformFunction "nvSurfVram", NVRM_ESC_SURF_DIRTY with the GPU-mark plane bit) takes
+// them. The accelerator checks the caller is WindowServer.
+struct PhxSurfShareEsc {   // NVRMSurfShareEsc, src/phxaccel/nvrm_surfshare_abi.h (version 2)
+    uint32_t version, surfaceID, plane, hClient, hSrcClient, hSrcMemory, status, pad;
+    uint64_t size;
+};
+static_assert(sizeof(PhxSurfShareEsc) == 40, "NVRMSurfShareEsc layout");
+IOReturn IOAccelPhxNativeClient::doSurfGpuMark(IOExternalMethodArguments *a) {
+    if (!shape(a, 2, 1, 0, 0))
+        return kIOReturnBadArgument;
+    static IOService *accel;
+    static const OSSymbol *fn;
+    if (!accel) {
+        IOService *s = IOService::copyMatchingService(IOService::serviceMatching("NMXAccel"));
+        if (s && !OSCompareAndSwapPtr(nullptr, s, (void *volatile *)&accel))
+            s->release();
+        if (!accel)
+            return kIOReturnNotFound;
+    }
+    if (!fn) {
+        const OSSymbol *f = OSSymbol::withCStringNoCopy("nvSurfVram");
+        if (f && !OSCompareAndSwapPtr(nullptr, (void *)f, (void *volatile *)&fn))
+            f->release();
+        if (!fn)
+            return kIOReturnNoMemory;
+    }
+    PhxSurfShareEsc e{};
+    e.version = 2;
+    e.surfaceID = static_cast<uint32_t>(a->scalarInput[0]);
+    e.plane = 0x80000000u | (a->scalarInput[1] ? 1u : 0u);   // NVRM_SS_PLANE_GPU_MARK | pending
+    e.status = 0x80000002u;                                    // NVRM_SS_OFF unless the accelerator answers
+    const IOReturn r = accel->callPlatformFunction(fn, false, &e, task, reinterpret_cast<void *>(0xE3), nullptr);   // NVRM_ESC_SURF_DIRTY
+    a->scalarOutput[0] = r == kIOReturnSuccess ? e.status : 0x80000002u;
+    return kIOReturnSuccess;
+}
+
 IOReturn IOAccelPhxNativeClient::doWaitSeq(IOExternalMethodArguments *a) {
     if (!shape(a, 3, 3, 0, 0)) return kIOReturnBadArgument;
     IOLockLock(lock);
@@ -2671,8 +2894,16 @@ IOReturn IOAccelPhxNativeClient::doWaitSeq(IOExternalMethodArguments *a) {
         if (timeout > PHXN_WAIT_CAP_NS)
             timeout = PHXN_WAIT_CAP_NS;
         uint64_t retired = owner->gpuRetired();
-        for (uint64_t waited = 0; retired < target && waited < timeout; waited += 100000) {
-            IODelay(100);
+        for (uint64_t waited = 0; retired < target && waited < timeout; ) {
+            if (waited < 1000000ull) {
+                // Short wait (< 1 ms): fast poll with 50 us delay for low latency
+                IODelay(50);
+                waited += 50000ull;
+            } else {
+                // Extended wait (>= 1 ms): yield CPU to scheduler to avoid starving WindowServer & system threads
+                IOSleep(1);
+                waited += 1000000ull;
+            }
             retired = owner->gpuRetired();
         }
         if (retired >= target) {

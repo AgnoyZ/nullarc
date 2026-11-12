@@ -1,8 +1,12 @@
 # Downstream 780M work (branch `downstream/780m-tahoe`)
 
 This branch is the Radeon 780M / Phoenix (gfx1103, PCI `1002:1900`) research work applied on top of
-upstream `luuumi-dev/nullarc` at `cbb08dd` (2026-10-21). Upstream `main` is kept untouched in this fork so
-it can be re-synced; all downstream commits live only on this branch.
+upstream `luuumi-dev/nullarc`, originally based at `cbb08dd` (2026-10-21).
+On 2026-11-12, upstream `main` at `8aba872` was merged without rewriting
+downstream history, incorporating the 49 missing upstream commits. The fork's
+`main` was left untouched; all downstream commits remain on this branch.
+See [the synchronization record](docs/UPSTREAM-SYNC.md) for conflict choices,
+build-dependency updates and validation limits.
 
 It is a hardening/precision pass over the upstream bring-up and display paths, not a new driver and not a
 hardware-validated release. Local metadata, CPU fixtures, native compilation

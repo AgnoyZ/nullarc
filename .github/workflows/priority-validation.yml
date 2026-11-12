@@ -15,6 +15,10 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 -m unittest discover -s tests -v
+      - name: Exercise merged upstream topology definitions
+        run: |
+          make build/tests/test_phx_topology CXX=clang++ CXXFLAGS="-std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all"
+          build/tests/test_phx_topology
       - name: Execute visible-row and packed-copy policies with sanitizers
         run: |
           mkdir -p build
@@ -87,6 +91,30 @@ jobs:
         run: python3 tools/test_submit_begin.py --out build/submit-begin
       - name: Execute actual framebuffer mode and unsupported color callbacks
         run: python3 tools/test_hidpi.py
+      - name: Exercise merged upstream topology and deterministic wait model
+        run: |
+          make build/tests/test_phx_topology CXX=clang++ CXXFLAGS="-std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all"
+          build/tests/test_phx_topology
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil, subprocess, sys, tempfile
+          sys.path.insert(0, 'tools')
+          from pr_wait_seq_overlay import deterministic_wait
+          with tempfile.TemporaryDirectory(prefix='phx-sync-wait-') as temp:
+              root = Path(temp)
+              for name in ('tests/test_wait_seq.cpp', 'src/phxbringup/PhxNativeABI.h', 'src/amd/phx_topology.h'):
+                  target = root / name
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(name, target)
+              with deterministic_wait(root):
+                  binary = root / 'wait-model'
+                  subprocess.run(['xcrun', 'clang++', '-std=c++17', '-Wall', '-Wextra', '-Werror',
+                                  '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
+                                  str(root / 'tests/test_wait_seq.cpp'), '-o', str(binary)], check=True)
+                  for _ in range(20):
+                      subprocess.run([str(binary)], check=True)
+          print('20 deterministic upstream model runs passed; not the actual kernel wait method or GPU execution')
+          PY
       - name: Execute actual streaming and damage copies on host RAM
         run: python3 tools/test_present_copy.py --out build/present-copy
       - name: Execute adopted read-only panel timing with sanitizers

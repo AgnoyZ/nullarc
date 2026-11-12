@@ -1,7 +1,7 @@
 {
   "nullarc": {
     "url": "https://github.com/luuumi-dev/nullarc.git",
-    "commit": "b02ba29f5a3d98f56f25846545a3239c85fdc18c",
+    "commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
     "path": "."
   },
   "MacKernelSDK": {
@@ -33,7 +33,7 @@
   },
   "radv-phoenix": {
     "patch_directory": "mesa-patches-phoenix",
-    "patch_count": 6
+    "patch_count": 7
   },
   "LLVM": {
     "url": "https://github.com/llvm/llvm-project.git",
