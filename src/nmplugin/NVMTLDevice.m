@@ -24,6 +24,7 @@
 #include "nvmtl_capabilities.h"
 #include "nvmtl_log_failure.h"
 #include <sys/sysctl.h>
+static NSOperationQueue *nvmtl_pipeline_compile_queue(void);
 #ifndef NVMTL_RELEASE
 #define NVMTL_RELEASE 0
 #endif
@@ -1267,9 +1268,12 @@ static void nvmtl_stitch_dump(const char *what, NSString *dag, NSArray *fns, id 
 }
 
 - (void)newLibraryWithStitchedDescriptor:(id)desc completionHandler:(void (^)(id<MTLLibrary>, NSError *))handler {
-    NSError *e = nil;
-    id<MTLLibrary> lib = [self newLibraryWithStitchedDescriptor:desc error:&e];
-    if (handler) handler(lib, lib ? nil : e);
+    id snapshot = [desc copy];
+    [nvmtl_pipeline_compile_queue() addOperationWithBlock:^{ @autoreleasepool {
+        NSError *e = nil;
+        id<MTLLibrary> lib = [self newLibraryWithStitchedDescriptor:snapshot error:&e];
+        if (handler) dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ handler(lib, lib ? nil : e); });
+    }}];
 }
 - (id<MTLLibrary>)newLibraryWithStitchedDescriptorSPI:(id)desc error:(NSError **)err {
     nvlog("newLibraryWithStitchedDescriptorSPI: routed through the public stitcher bridge");
@@ -1326,8 +1330,11 @@ static void nvmtl_stitch_dump(const char *what, NSString *dag, NSArray *fns, id 
     return mine;
 }
 - (void)newLibraryWithSource:(NSString *)src options:(MTLCompileOptions *)opt completionHandler:(MTLNewLibraryCompletionHandler)h {
-    NSError *e = nil; id<MTLLibrary> lib = [self newLibraryWithSource:src options:opt error:&e];
-    if (h) dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ h(lib, e); });
+    NSString *source = [src copy]; MTLCompileOptions *options = [opt copy];
+    [nvmtl_pipeline_compile_queue() addOperationWithBlock:^{ @autoreleasepool {
+        NSError *e = nil; id<MTLLibrary> lib = [self newLibraryWithSource:source options:options error:&e];
+        if (h) dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{ h(lib, e); });
+    }}];
 }
 - (id)targetDeviceArchitecture {
     static id arch; static dispatch_once_t once;
@@ -1633,7 +1640,7 @@ void nvmtl_gl_tag_reflection(id refl, MTLRenderPipelineDescriptor *d);
     if (r && *r) nvmtl_gl_tag_reflection(*r, d);
     return ps;
 }
-// Asynchronous pipeline builds share a bounded pool. A serial queue made an app that creates its pipelines up front
+// Asynchronous library and pipeline builds share an active-concurrency-limited pool. A serial queue made an app that creates its pipelines up front
 // (games, a browser's GPU process) wait for them one after another on one core.
 // Width: one less than the physical cores (the performance cores on a CPU with two kinds), 1 to 8, and at most half
 // the memory in GB: translating a large kernel alone peaks near 300 MB. NVMTL_PIPELINE_THREADS sets it; 1 is the old
