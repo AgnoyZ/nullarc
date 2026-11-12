@@ -1,0 +1,136 @@
+{
+  "date": "2026-11-12",
+  "code_commit": "6258ccca768cf423107a8560a05ada350314199d",
+  "repository": "AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "evidence_class": "host-verified",
+  "workflow": {
+    "run_id": 43142206872,
+    "conclusion": "success",
+    "jobs": {
+      "host-contracts": "success",
+      "native-components": "success"
+    }
+  },
+  "windows_lf_checkout": {
+    "staged_tree_matches_code_commit": true,
+    "tests": 355,
+    "skipped": 27,
+    "failures": 0
+  },
+  "ubuntu_host": {
+    "tests": 355,
+    "skipped": 1,
+    "failures": 0,
+    "foundation_execution": false
+  },
+  "macos_host": {
+    "product_version": "15.7.9",
+    "build": "24G830",
+    "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
+    "async_library": {
+      "asan_ubsan": {
+        "sanitizer": "address,undefined",
+        "runs": [
+          {
+            "actual_methods": 2,
+            "actual_queue": true,
+            "width": 1,
+            "peak_active": 1,
+            "snapshot_and_return_before_build": true,
+            "callback_reentry": true,
+            "retained_owner": true,
+            "error_and_warning_propagation": true,
+            "stress_requests": 1600,
+            "hardware_executed": false
+          },
+          {
+            "actual_methods": 2,
+            "actual_queue": true,
+            "width": 2,
+            "peak_active": 2,
+            "snapshot_and_return_before_build": true,
+            "callback_reentry": true,
+            "retained_owner": true,
+            "error_and_warning_propagation": true,
+            "stress_requests": 1600,
+            "hardware_executed": false
+          }
+        ],
+        "actual_methods_sha256": "074ddfe5dea9ce594c367e4fa604e7c35ef9b88eddc5465c9baa37d40da967c6",
+        "actual_queue_sha256": "8fddf7c18511b7e93c876c5f5783435f3219eb14bd0d8dbd13ce1a1ce87f4723",
+        "inputs_sha256": {
+          "src/nmplugin/NVMTLDevice.m": "5d047bb4e221db3c2e0a8e30b877f5535795f57d99a5b95b4fec54ea43fc7f6d",
+          "tests/test_async_library.m": "0e060055ccf5afdaeebee5d8e846b92d82612d5b9aaa0992b0dd5b4f66e97995",
+          "tools/test_async_library.py": "1450db962937f923432db0b5d1cedf12676cec78dcf8f83fb176b4df1da5900e"
+        },
+        "limitations": "Actual API/queue bodies with real Foundation/Metal descriptors, synthetic synchronous compilation and logging; no Apple shader compiler, translator, target GPU, latency or FPS benchmark."
+      },
+      "tsan": {
+        "sanitizer": "thread",
+        "runs": [
+          {
+            "actual_methods": 2,
+            "actual_queue": true,
+            "width": 1,
+            "peak_active": 1,
+            "snapshot_and_return_before_build": true,
+            "callback_reentry": true,
+            "retained_owner": true,
+            "error_and_warning_propagation": true,
+            "stress_requests": 1600,
+            "hardware_executed": false
+          },
+          {
+            "actual_methods": 2,
+            "actual_queue": true,
+            "width": 2,
+            "peak_active": 2,
+            "snapshot_and_return_before_build": true,
+            "callback_reentry": true,
+            "retained_owner": true,
+            "error_and_warning_propagation": true,
+            "stress_requests": 1600,
+            "hardware_executed": false
+          }
+        ],
+        "actual_methods_sha256": "074ddfe5dea9ce594c367e4fa604e7c35ef9b88eddc5465c9baa37d40da967c6",
+        "actual_queue_sha256": "8fddf7c18511b7e93c876c5f5783435f3219eb14bd0d8dbd13ce1a1ce87f4723",
+        "inputs_sha256": {
+          "src/nmplugin/NVMTLDevice.m": "5d047bb4e221db3c2e0a8e30b877f5535795f57d99a5b95b4fec54ea43fc7f6d",
+          "tests/test_async_library.m": "0e060055ccf5afdaeebee5d8e846b92d82612d5b9aaa0992b0dd5b4f66e97995",
+          "tools/test_async_library.py": "1450db962937f923432db0b5d1cedf12676cec78dcf8f83fb176b4df1da5900e"
+        },
+        "limitations": "Actual API/queue bodies with real Foundation/Metal descriptors, synthetic synchronous compilation and logging; no Apple shader compiler, translator, target GPU, latency or FPS benchmark."
+      }
+    },
+    "existing_translation_and_cache_sanitizer_regressions": true,
+    "kext_compile_link_sign_strict_verify": [
+      "PhxBringup",
+      "PhxAccel"
+    ],
+    "metal_plugin_compile_link_sign_strict_verify": true,
+    "warnings_remain": true
+  },
+  "duplicate_full_stack_run": {
+    "run_id": 43142206754,
+    "conclusion": "cancelled",
+    "status": "completed"
+  },
+  "claims": {
+    "hardware_execution_established": false,
+    "target_os_build_verified": false,
+    "target_driver_deployed": false,
+    "target_frame_rate_improved": false,
+    "cold_start_latency_improved": false,
+    "real_compiler_executed_by_async_fixture": false,
+    "binary_uploaded": false
+  },
+  "limitations": [
+    "Actual two public async bodies and three existing queue helpers execute with real Foundation/Metal descriptors; synchronous compilation and logging are synthetic.",
+    "Suspended/gated operations prove queuing and active concurrency, not a timed speedup.",
+    "Queue width bounds active operations, not backlog, total compiler threads or process RSS.",
+    "Native copy semantics do not promise an independent deep copy of all nested objects.",
+    "No target shader correctness, deployment, Tahoe migration or stable FPS evidence."
+  ]
+}

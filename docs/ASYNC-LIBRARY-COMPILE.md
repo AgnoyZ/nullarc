@@ -66,6 +66,10 @@ ThreadSanitizer runs are required. Reports hash committed input and extracted
 method/helper bytes. Windows/Linux tests only verify extraction and refusal of
 unsupported native execution.
 
-Native CI is pending for this revision. Real source/stitching compilation,
+Focused run `43142206872` passed both sanitizers at widths one and two, the
+existing translation/cache regression checks, both kext builds and the actual
+Metal plugin build/sign checks. Source hashes and host details are recorded in
+`validation/async-library-20261112.md` and its JSON companion.
+Real source/stitching compilation,
 target output, launch time, memory and frame-time A/B remain separate acceptance
 work; a synthetic gated build returning early is not a measured speedup.
