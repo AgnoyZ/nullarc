@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include "nvmtl_cache_io.h"
+#include "nvmtl_translation_flight.h"
 extern char **environ;
 
 static NSData *nvmtl_cache_data(NSString *path, unsigned kind, size_t limit) {
@@ -870,23 +871,35 @@ NSData *nvmtl_compile_library_entry(NSData *air, NSString *ll, NSString *stage, 
         NSString *spvp = nvmtl_spvcache_path(air, stage);
         NSData *spvData = getenv("NVMTL_SPVCACHE_OFF") ? nil : nvmtl_cache_data(spvp, NVMTL_CACHE_SPIRV, 256u << 20);
         int hit = spvData.length >= 20 && *(const uint32_t *)spvData.bytes == 0x07230203u;
-        uint8_t *spv = NULL; size_t spvn = 0; char err[512] = { 0 };
         if (hit) { gSpvHit++; nvmtl_cache_touch(spvp.fileSystemRepresentation); }
         else {
             gSpvMiss++;
-            if (xlate(ll.UTF8String, stage.UTF8String, &spv, &spvn, err, sizeof err) != 0) {
-                nvlog("library: translate %s (%s) FAILED: %s", name.UTF8String, stage.UTF8String, err); if (error) *error = @(err); return nil;
+            NSData *key = getenv("NVMTL_TRANSLATE_COALESCE_OFF") ? nil : nvmtl_translation_key(air, ll, stage, gXlateTag);
+            NSString *why = nil;
+            spvData = nvmtl_translation_share(key, &why, ^NSData *(NSString **failure) {
+                uint8_t *spv = NULL; size_t spvn = 0; char err[512] = { 0 };
+                @try {
+                    if (xlate(ll.UTF8String, stage.UTF8String, &spv, &spvn, err, sizeof err) != 0) {
+                        *failure = @(err); return nil;
+                    }
+                    NSData *data = [NSData dataWithBytes:spv length:spvn];
+                    if (nvmtl_cache_save(spvp, NVMTL_CACHE_SPIRV, data)) {
+                        gSpvStored++;
+                        atomic_fetch_add_explicit(&gSpvAdded, (unsigned long long)data.length, memory_order_relaxed);
+                    } else if (spvp) {
+                        nvlog("spvcache: STORE FAILED %s (%zu bytes)", spvp.lastPathComponent.UTF8String, (size_t)data.length);
+                    }
+                    return data;
+                } @finally {
+                    if (spv && xlate_free) xlate_free(spv, spvn);
+                }
+            });
+            if (!spvData) {
+                nvlog("library: translate %s (%s) FAILED: %s", name.UTF8String, stage.UTF8String, why.UTF8String);
+                if (error) *error = why;
+                return nil;
             }
-            spvData = [NSData dataWithBytes:spv length:spvn];
-            { if (nvmtl_cache_save(spvp, NVMTL_CACHE_SPIRV, spvData)) {
-                  gSpvStored++;
-                  atomic_fetch_add_explicit(&gSpvAdded, (unsigned long long)spvData.length, memory_order_relaxed);
-              } else if (spvp) {
-                  nvlog("spvcache: STORE FAILED %s (%zu bytes)", spvp.lastPathComponent.UTF8String,
-                        (size_t)spvData.length);
-              } }
         }
-        if (spv && xlate_free) xlate_free(spv, spvn);
         { double ms = (clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) - t0) / 1e6;
           nvtrace("XLATE %s %s %zu B %.1f ms %s", name.UTF8String, stage.UTF8String, (size_t)spvData.length, ms, hit ? "hit" : "miss"); }
         nvlog("library: %s (%s) -> %zu bytes of SPIR-V (%s)", name.UTF8String, stage.UTF8String, (size_t)spvData.length, hit ? "cache hit" : "translated");
@@ -903,6 +916,12 @@ NSData *nvmtl_compile_library_entry(NSData *air, NSString *ll, NSString *stage, 
             } else nvlog("reflect %s FAILED: %s", name.UTF8String, je);
         }
     nvlog("library entry: spvcache %lu hit, %lu miss, %lu stored", gSpvHit, gSpvMiss, gSpvStored);
+    if (!hit) {
+        NVMTLTranslationFlightStats flightStats = nvmtl_translation_stats();
+        nvtrace("XLATE flight: %lu owners, %lu joins, %lu bypasses, %lu timeouts, %lu active (peak %lu)",
+                flightStats.owners, flightStats.joins, flightStats.bypasses, flightStats.timeouts,
+                (unsigned long)flightStats.active, (unsigned long)flightStats.peak);
+    }
     return spvData;
 }
 

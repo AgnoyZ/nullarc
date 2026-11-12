@@ -12,7 +12,9 @@ cache now evicts least-recently-used entries individually instead of discarding
 every entry at 4096. Limits are 4096 entries and 64 MiB of key/result/info payload.
 Objective-C object/dictionary overhead and concurrent in-flight translation are
 not included in that payload budget. Oversize entries bypass insertion without
-flushing existing entries. There is no single-flight translation promise.
+flushing existing entries. This address-lowering cache does not coalesce in-flight
+work. The separate base-library translation experiment now shares overlapping
+misses; see `TRANSLATION-SHARING.md` for its limits and validation scope.
 
 ## Disposable files
 
