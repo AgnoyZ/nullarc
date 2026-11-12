@@ -18,7 +18,8 @@ SOURCE_PATHS = ("src/phxbringup", "src/phxaccel", "src/amd/phx_topology.h",
                 "tools/package_kexts.py", "tools/verify_artifacts.py", "upstream.lock.json",
                 ".github/workflows/kext-artifacts.yml", "LICENSE", "LICENSES",
                 "THIRD_PARTY_NOTICES.md", "docs/KEXT-ARTIFACTS.md",
-                "docs/KEXT-PROVENANCE.md", "docs/KEXT-INSTALL-zh.md", "docs/kext-notices")
+                "docs/KEXT-PROVENANCE.md", "docs/KEXT-INSTALL-zh.md", "docs/kext-notices",
+                "docs/LEGACY-BOOT.md", "tools/phx_legacy_boot.py", "tools/phx_edid.py")
 
 
 def sha256(path):
@@ -95,6 +96,7 @@ def package(sdk, out, root=ROOT):
     shutil.copy2(sdk / "LICENSE.txt", stage / "MacKernelSDK-LICENSE.txt")
     shutil.copy2(root / "docs/KEXT-INSTALL-zh.md", stage / "INSTALL-zh.md")
     shutil.copy2(root / "docs/KEXT-PROVENANCE.md", stage / "KEXT-PROVENANCE.md")
+    shutil.copy2(root / "docs/LEGACY-BOOT.md", stage / "LEGACY-BOOT.md")
     (stage / "SOURCE").mkdir()
     source_archive(root, SOURCE_PATHS, stage / "SOURCE/nullarc-source.tar.gz", "nullarc/")
     source_archive(sdk, ("Headers", "Library/kmod", "LICENSE.txt", "README.md"),

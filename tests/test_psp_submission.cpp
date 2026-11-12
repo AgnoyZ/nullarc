@@ -3,6 +3,7 @@
 #include "PhxHardwarePolicy.hpp"
 #include "PhxPspLayout.h"
 #include "PhxBootMemory.h"
+#include "PhxLegacyBoot.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -12,7 +13,7 @@
 
 using IOReturn = int;
 enum { kIOReturnSuccess, kIOReturnNotReady, kIOReturnBadArgument, kIOReturnNoResources,
-       kIOReturnTimeout, kIOReturnError, kIOReturnExclusiveAccess };
+       kIOReturnTimeout, kIOReturnError, kIOReturnExclusiveAccess, kIOReturnUnsupported };
 static void IOLockLock(int *lock) { assert(*lock == 0); *lock = 1; }
 static void IOLockUnlock(int *lock) { assert(*lock == 1); *lock = 0; }
 static void IOSleep(unsigned);
@@ -40,7 +41,7 @@ public:
     uint32_t fenceCounter{0};
     bool pspSubmissionFaulted{false};
     PhxPspLayout pspLayout{PHX_PSP_LAYOUT_VERSION, 0, 0x9000, 0x3000, 0xC000, 0x1000, {0, 0}};
-    bool pspLayoutConfigured{true}, gpuActive{false};
+    bool pspLayoutConfigured{true}, gpuActive{false}, legacyBootEnabled{false}, debug{true};
     uint64_t tmrOff{0x9000}, tmrMc{0x100009000ull}, tmrSize{0};
     uint64_t fwBufOff{0xC000}, fwBufMc{0x10000C000ull}, fwBufSize{0x1000};
     bool tmrSetUp{false};
@@ -52,7 +53,7 @@ public:
 
     explicit PhxBringup(const char *test) : mode(test),
         memory(mode == "create-timeout" ? 0x6000000 :
-               mode.rfind("toc-", 0) == 0 || mode.rfind("tmr-", 0) == 0 || mode == "boot-sequence" ? 0x200000 : 0x10000),
+               mode.rfind("toc-", 0) == 0 || mode.rfind("tmr-", 0) == 0 || mode == "boot-sequence" || mode.rfind("legacy-", 0) == 0 ? 0x200000 : 0x10000),
         fbAperLen(memory.words.size() * 4) {
         if (memory.words.size() * 4 == 0x200000) {
             fbSize = fbAperLen; tmrOff = 0x100000; tmrMc = fbMcBase + tmrOff;
@@ -67,20 +68,25 @@ public:
     void hdpFlush() { assert(lock); ++flushes; }
     bool pspWaitTos(uint32_t timeout) const {
         assert(lock && timeout == 2000); ++waits;
-        return mode == "layout-create-success" || (mode == "create-timeout" && waits == 1);
+        return mode == "layout-create-success" || mode == "legacy-raw-sequence" || (mode == "create-timeout" && waits == 1);
     }
     void step() {
         assert(lock); ++sleeps;
         if (!armed) return;
-        if (mode == "timeout" || mode == "tmr-timeout" || mode == "toc-timeout") return;
+        if (mode == "timeout" || mode == "tmr-timeout" || mode == "toc-timeout" || mode == "legacy-raw-tmr-timeout" || mode == "legacy-raw-toc-timeout") return;
         memory.words[fenceOff / 4] = mode == "wrong-fence" ? fenceCounter - 1 : fenceCounter;
         memory.words[(cmdOff + PHX_PSP_GFX_RESP_OFFSET) / 4] =
-            mode == "psp-error" || mode == "tmr-error" || mode == "load-error" || mode == "toc-error" ? 0x100 : 0;
+            mode == "psp-error" || mode == "tmr-error" || mode == "load-error" || mode == "toc-error" || mode == "legacy-raw-tmr-error" || mode == "legacy-raw-toc-error" ? 0x100 : 0;
         memory.words[(cmdOff + PHX_PSP_GFX_RESP_OFFSET + 8) / 4] = 0x12345678;
         memory.words[(cmdOff + PHX_PSP_GFX_RESP_OFFSET + 12) / 4] = 0xABCDEF01;
         memory.words[(cmdOff + PHX_PSP_GFX_RESP_OFFSET + 16) / 4] =
-            mode == "toc-zero-size" ? 0 : mode == "toc-capacity" ? 0x4000 : mode == "toc-nonpage-size" ? 4097 : 4096;
+            mode == "toc-zero-size" || mode == "legacy-raw-toc-zero" ? 0 : mode == "toc-capacity" || mode == "legacy-raw-toc-capacity" ? 0x4000 : mode == "toc-nonpage-size" ? 4097 : 4096;
     }
+    bool debugEnabled() const { return debug; }
+    IOReturn configureLegacyBoot(const PhxLegacyBoot &);
+    IOReturn loadTocLocked(uint32_t, uint32_t, uint64_t[4]);
+    IOReturn setupTmrLocked(uint32_t, uint64_t[4]);
+    IOReturn pspRaw(uint32_t, const uint32_t[6], uint64_t[4]);
     void clearRing();
     bool gpuReady() const { assert(gpuMutex == 1); return gpuActive; }
     IOReturn configurePspLayout(const PhxPspLayout &, uint64_t[4]);
@@ -117,6 +123,8 @@ static void assert_fault_stays_terminal(PhxBringup &p) {
     assert(p.fwStage(0, &word, 4) == kIOReturnNotReady);
     assert(p.pspRing(1, 0, out) == kIOReturnNotReady);
     assert(p.pspRing(2, 0, out) == kIOReturnNotReady);
+    uint32_t raw[6]{};
+    assert(p.pspRaw(0x20, raw, out) == kIOReturnNotReady);
     p.clearRing();
     assert(p.pspSubmissionFaulted);
     assert(p.pspRing(1, 0, out) == kIOReturnNotReady);
@@ -130,7 +138,122 @@ int main(int argc, char **argv) {
     uint64_t out[4] = {99, 99, 99, 99};
     uint32_t words[15] = {0x10203040, 2, 3, 4};
     IOReturn result;
-    if (test.rfind("memory-", 0) == 0) {
+    if (test.rfind("legacy-config-", 0) == 0) {
+        PhxLegacyBoot profile{1, 1, p.fbMcBase, p.fbPhys, p.fbSize, p.fbAperLen,
+                              0x10000, 0x1000, p.pspLayout};
+        p.clearRing(); p.pspLayoutConfigured = false; p.pspLayout = {};
+        if (test == "legacy-config-version") profile.version = 2;
+        if (test == "legacy-config-flags") profile.flags = 3;
+        if (test == "legacy-config-mc") profile.mcBase += 4096;
+        if (test == "legacy-config-physical") profile.physicalBase += 4096;
+        if (test == "legacy-config-vram") profile.vramBytes += 4096;
+        if (test == "legacy-config-aperture") profile.apertureBytes += 4096;
+        if (test == "legacy-config-overlap") profile.psp.stagingOffset = 0;
+        if (test == "legacy-config-console-ring") profile.consoleOffset = 0;
+        if (test == "legacy-config-console-tmr") profile.consoleOffset = profile.psp.tmrOffset;
+        if (test == "legacy-config-console-stage") profile.consoleOffset = profile.psp.stagingOffset;
+        if (test == "legacy-config-console-empty") profile.consoleBytes = 0;
+        if (test == "legacy-config-console-outside") profile.consoleOffset = p.fbSize;
+        if (test == "legacy-config-console-overflow") profile.consoleOffset = UINT64_MAX - 4095;
+        if (test == "legacy-config-console-unaligned") ++profile.consoleBytes;
+        if (test == "legacy-config-tmr-alignment") profile.psp.tmrOffset += 4096;
+        if (test == "legacy-config-active-ring") p.ringMc = p.fbMcBase;
+        if (test == "legacy-config-active-gpu") p.gpuActive = true;
+        if (test == "legacy-config-active-tmr") p.tmrSetUp = true;
+        if (test == "legacy-config-active-stage") p.fwBufSize = 4096;
+        if (test == "legacy-config-faulted") p.pspSubmissionFaulted = true;
+        if (test == "legacy-config-debug-off") p.debug = false;
+        if (test == "legacy-config-no-lock") p.smuLock = nullptr;
+        const auto before = p.memory.words;
+        result = p.configureLegacyBoot(profile);
+        const bool accepted = test == "legacy-config-success" || test == "legacy-config-strict-reset" ||
+                              test == "legacy-config-invalid-preserves";
+        assert(p.pspLayoutConfigured == accepted && p.legacyBootEnabled == accepted);
+        if (accepted) {
+            assert(result == kIOReturnSuccess && !memcmp(&p.pspLayout, &profile.psp, sizeof(p.pspLayout)));
+            p.clearRing(); assert(p.legacyBootEnabled && p.pspLayoutConfigured);
+            if (test == "legacy-config-strict-reset") {
+                assert(p.configurePspLayout(profile.psp, out) == kIOReturnSuccess && !p.legacyBootEnabled);
+            } else if (test == "legacy-config-invalid-preserves") {
+                ++profile.version;
+                assert(p.configureLegacyBoot(profile) == kIOReturnBadArgument && p.legacyBootEnabled);
+                assert(!memcmp(&p.pspLayout, &profile.psp, sizeof(p.pspLayout)));
+            }
+        } else {
+            const bool notReady = test == "legacy-config-faulted" || test == "legacy-config-debug-off" || test == "legacy-config-no-lock";
+            const bool activeState = test.rfind("legacy-config-active-", 0) == 0;
+            assert(result == (notReady ? kIOReturnNotReady : activeState ? kIOReturnExclusiveAccess : kIOReturnBadArgument));
+            assert(!p.pspLayout.version);
+        }
+        assert(p.memory.words == before && !p.reads && !p.writes && !p.lock && !p.gpuMutex);
+    } else if (test.rfind("legacy-raw-", 0) == 0) {
+        p.legacyBootEnabled = test != "legacy-raw-default";
+        uint32_t toc[6] = {uint32_t(p.fwBufMc), uint32_t(p.fwBufMc >> 32), 4, 0, 0, 0};
+        uint32_t tmr[6] = {uint32_t(p.tmrMc), uint32_t(p.tmrMc >> 32), uint32_t(p.pspLayout.tmrCapacity),
+                           2, 0xDEADBEEF, 0xBAD}; // synthetic stale physical address; must never reach firmware
+        if (test == "legacy-raw-sequence") {
+            PhxLegacyBoot profile{1, 1, p.fbMcBase, p.fbPhys, p.fbSize, p.fbAperLen,
+                                  0x10000, 0x1000, p.pspLayout};
+            p.clearRing(); p.legacyBootEnabled = false; p.pspLayoutConfigured = false;
+            assert(p.configureLegacyBoot(profile) == kIOReturnSuccess);
+            assert(p.pspRing(2, 0, out) == kIOReturnSuccess);
+            assert(p.pspRing(1, profile.psp.ringOffset, out) == kIOReturnSuccess);
+            assert(p.fwStage(0, words, 4) == kIOReturnSuccess);
+            assert(p.pspRaw(0x20, toc, out) == kIOReturnSuccess && p.tocTmrSize == 4096);
+            assert(p.pspRaw(5, tmr, out) == kIOReturnSuccess && p.tmrSetUp && p.tmrSize == 4096);
+            const auto offset = (p.cmdOff + PHX_PSP_GFX_CMD_UNION_OFFSET) / 4;
+            assert(p.memory.words[offset] == uint32_t(p.tmrMc));
+            assert(p.memory.words[offset + 1] == uint32_t(p.tmrMc >> 32));
+            assert(p.memory.words[offset + 2] == 4096 && p.memory.words[offset + 3] == 2);
+            assert(p.memory.words[offset + 4] == uint32_t(p.fbPhys + p.tmrOff));
+            assert(p.memory.words[offset + 5] == uint32_t((p.fbPhys + p.tmrOff) >> 32));
+            assert(p.loadIpFw(4, 0, 4, out) == kIOReturnSuccess);
+            assert(p.pspCtl(2, 0, out) == kIOReturnSuccess && p.fenceCounter == 4 && p.writes == 10);
+        } else if (test == "legacy-raw-default") {
+            p.tocTmrSize = 0;
+            assert(p.pspRaw(0x20, toc, out) == kIOReturnSuccess && !p.tocTmrSize);
+            assert(p.pspRaw(5, tmr, out) == kIOReturnSuccess && !p.tmrSetUp);
+            assert(p.loadIpFw(4, 0, 4, out) == kIOReturnNotReady);
+        } else {
+            if (test == "legacy-raw-no-ring") p.ringMc = 0;
+            if (test == "legacy-raw-no-layout") p.pspLayoutConfigured = false;
+            if (test == "legacy-raw-no-toc") p.tocTmrSize = 0;
+            if (test == "legacy-raw-faulted") p.pspSubmissionFaulted = true;
+            if (test == "legacy-raw-toc-underflow") --toc[0];
+            if (test == "legacy-raw-toc-overflow") toc[1] += 1;
+            if (test == "legacy-raw-toc-unaligned") toc[0] += 4;
+            if (test == "legacy-raw-toc-overrun") toc[2] = uint32_t(p.fwBufSize + 1);
+            if (test == "legacy-raw-toc-reserved") toc[5] = 1;
+            if (test == "legacy-raw-tmr-mc") ++tmr[0];
+            if (test == "legacy-raw-tmr-capacity") --tmr[2];
+            if (test == "legacy-raw-tmr-flags") tmr[3] = 0;
+            if (test == "legacy-raw-tmr-repeat") p.tmrSetUp = true;
+            const auto before = p.memory.words;
+            bool isToc = test.rfind("legacy-raw-toc-", 0) == 0;
+            uint32_t command = test == "legacy-raw-other" ? 0x99 : isToc ? 0x20 : 5;
+            result = p.pspRaw(command, test == "legacy-raw-null-words" ? nullptr : isToc ? toc : tmr,
+                              test == "legacy-raw-null-output" ? nullptr : out);
+            const bool timeout = test == "legacy-raw-toc-timeout" || test == "legacy-raw-tmr-timeout";
+            const bool error = test == "legacy-raw-toc-error" || test == "legacy-raw-tmr-error" || test == "legacy-raw-toc-zero";
+            if (timeout || error) {
+                assert(result == (timeout ? kIOReturnTimeout : kIOReturnError));
+                assert_fault_stays_terminal(p);
+            } else if (test == "legacy-raw-toc-capacity") {
+                assert(result == kIOReturnSuccess && p.tocTmrSize == 0x4000 && !out[3]);
+                const auto afterToc = p.memory.words;
+                assert(p.pspRaw(5, tmr, out) == kIOReturnBadArgument && !p.tmrSetUp);
+                assert(p.writes == 1 && p.memory.words == afterToc);
+            } else {
+                const bool notReady = test == "legacy-raw-no-ring" || test == "legacy-raw-no-layout" ||
+                                      test == "legacy-raw-no-toc" || test == "legacy-raw-faulted";
+                assert(result == (notReady ? kIOReturnNotReady : test == "legacy-raw-other" ? kIOReturnUnsupported :
+                                  test == "legacy-raw-tmr-repeat" ? kIOReturnExclusiveAccess : kIOReturnBadArgument));
+                assert(p.memory.words == before && !p.reads && !p.writes);
+                if (test != "legacy-raw-tmr-repeat") assert(!p.tmrSetUp);
+            }
+        }
+        assert(!p.lock && !p.gpuMutex);
+    } else if (test.rfind("memory-", 0) == 0) {
         p.tmrSetUp = true; p.tmrSize = 8192;
         if (test == "memory-no-layout") p.pspLayoutConfigured = false;
         if (test == "memory-no-lock") p.smuLock = nullptr;

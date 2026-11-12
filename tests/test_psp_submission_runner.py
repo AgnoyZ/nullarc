@@ -56,7 +56,10 @@ class PSPSubmissionRunnerTests(unittest.TestCase):
             self.assertFalse(out.exists())
 
     def test_ci_runs_completion_staging_and_lifetime_cases(self):
-        self.assertEqual(76, len(set(CASES)))
+        self.assertEqual(125, len(set(CASES)))
+        for case in ("legacy-config-success", "legacy-config-debug-off", "legacy-config-invalid-preserves",
+                     "legacy-raw-sequence", "legacy-raw-default", "legacy-raw-toc-timeout", "legacy-raw-tmr-timeout"):
+            self.assertIn(case, CASES)
         for case in ("memory-snapshot", "memory-no-layout", "memory-no-lock", "memory-null-output",
                      "memory-active", "memory-faulted", "memory-cleared"):
             self.assertIn(case, CASES)

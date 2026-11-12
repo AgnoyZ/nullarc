@@ -73,3 +73,14 @@ Source=phx-edid、Status=valid，并私下比对显示节点的原始字节。
 及对应辅助内核集合；若改过插件/运行库/启动脚本也一起恢复。恢复测试配置中
 原有的 EDID 注入设置，只移除本次新增属性和参数，保留之后的其它独立改动。
 仅恢复 EFI 不能撤销 macOS 内的 PhxAccel 更新。恢复后手动重启并复核原有桌面。
+
+## 新版 PhxBringup 与旧启动工具
+
+仅替换 kext 时，旧 `bringup5.sh` 缺少显式 PSP 布局配置，raw TOC/TMR
+请求也不会建立新版固件加载所需的就绪状态。兼容修订增加了默认关闭的
+`phx-legacy-boot` 配置入口：校验本机显存布局，并把这两个旧请求转入受检查流程。
+**单独替换修订版 kext 仍不等于启用兼容模式。**
+
+详见 [LEGACY-BOOT.md](LEGACY-BOOT.md)。离线工具只生成局部 DeviceProperties
+片段，不能替换完整 `config.plist`。本机内存布局和片段必须留在忽略的 `build/`
+目录，不要提交或上传。该修订尚未经过目标 GPU 验证；不自动部署到工作 EFI。

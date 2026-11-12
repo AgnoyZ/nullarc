@@ -21,7 +21,7 @@ EXPORT = ("src/phxbringup", "src/phxaccel", "src/nmplugin", "src/amd/phx_topolog
           "LICENSE", "LICENSES", "THIRD_PARTY_NOTICES.md")
 
 # Canonical downstream headers at src/; the component directories carry the copies the build uses.
-HEADERS = ("PhxHardwarePolicy.hpp", "PhxPspLayout.h", "PhxBootMemory.h",
+HEADERS = ("PhxHardwarePolicy.hpp", "PhxPspLayout.h", "PhxBootMemory.h", "PhxLegacyBoot.h",
            "PhxGartLayout.h", "PhxMesQueueLayout.h", "PhxFirmwareProfile.h")
 
 def git(path, *args):
@@ -89,6 +89,7 @@ def prepare(destination, root=ROOT):
               "policy_sha256": hashlib.sha256((root / "src/PhxHardwarePolicy.hpp").read_bytes()).hexdigest(),
               "psp_layout_sha256": hashlib.sha256((root / "src/PhxPspLayout.h").read_bytes()).hexdigest(),
               "firmware_profile_sha256": hashlib.sha256(firmware_profile).hexdigest(),
+              "legacy_boot_sha256": hashlib.sha256((root / "src/PhxLegacyBoot.h").read_bytes()).hexdigest(),
               "boot_memory_sha256": hashlib.sha256((root / "src/PhxBootMemory.h").read_bytes()).hexdigest(),
               "gart_layout_sha256": hashlib.sha256((root / "src/PhxGartLayout.h").read_bytes()).hexdigest(),
               "mes_queue_layout_sha256": hashlib.sha256((root / "src/PhxMesQueueLayout.h").read_bytes()).hexdigest(),

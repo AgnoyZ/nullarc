@@ -25,7 +25,9 @@
 #include "PhxNativeABI.h"
 #include "PhxPspLayout.h"
 #include "PhxBootMemory.h"
+#include "PhxLegacyBoot.h"
 static_assert(sizeof(PhxPspLayout) == 64, "PSP layout wire size");
+static_assert(sizeof(PhxLegacyBoot) == 128, "legacy boot profile wire size");
 static_assert(PHX_PSP_LAYOUT_RING_BYTES == PHX_PSP_FENCE_REL + 0x1000, "PSP layout ring span");
 static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX_PSP_CMD_BUF_SIZE,
               "TOC size response stays within command storage");
@@ -177,6 +179,9 @@ private:
     void hdpFlush() const;
     void readFbLayout();
     void clearRing();
+    IOReturn configureLegacyBoot(const PhxLegacyBoot &profile);
+    IOReturn loadTocLocked(uint32_t fwBufOffset, uint32_t size, uint64_t out[4]);
+    IOReturn setupTmrLocked(uint32_t size, uint64_t out[4]);
 
     const phx_topology *topology{nullptr};
     bool isSleeping{false};
@@ -202,6 +207,7 @@ private:
     bool pspSubmissionFaulted{false}; // sticky for this driver instance; no automatic recovery
     PhxPspLayout pspLayout{};
     bool pspLayoutConfigured{false};
+    bool legacyBootEnabled{false};
     // Firmware bring-up regions (set when the ring is created): TMR the PSP copies firmware into, and fw_buf
     // where the CPU stages ucode for LOAD_IP_FW. Offsets are VRAM byte offsets, Mc the matching MC addresses.
     uint64_t tmrOff{0}, tmrMc{0}, tmrSize{0};
@@ -437,6 +443,20 @@ bool PhxBringup::start(IOService *provider) {
     setProperty("phx-debug", debug);
     setProperty("phx-fb-aper-phys", fbAperPhys, 64);
     setProperty("phx-fb-aper-len", fbAperLen, 64);
+    // Optional offline-reviewed profile; never supply implicit reference-machine addresses.
+    if (OSObject *property = pci->getProperty(PHX_LEGACY_BOOT_PROPERTY)) {
+        OSData *data = OSDynamicCast(OSData, property);
+        IOReturn status = kIOReturnBadArgument;
+        if (data && data->getLength() == sizeof(PhxLegacyBoot)) {
+            PhxLegacyBoot profile{};
+            bcopy(data->getBytesNoCopy(), &profile, sizeof(profile));
+            status = configureLegacyBoot(profile);
+        }
+        setProperty("phx-legacy-boot-status", static_cast<uint32_t>(status), 32);
+        IOLog("PhxBringup: explicit legacy boot profile %s (0x%x)\n",
+              status == kIOReturnSuccess ? "accepted; ownership unverified" : "rejected", status);
+    }
+    setProperty("phx-legacy-boot-startup-enabled", legacyBootEnabled);
     IOLog("PhxBringup: service up (mmio %s, bar0 %s %llu MiB, debug %d)\n", mmio ? "mapped" : "unmapped",
           fbAper ? "mapped" : "unmapped", (unsigned long long)(fbAperLen >> 20), debug);
     hangCall = thread_call_allocate(hangTick, this);
@@ -1532,7 +1552,30 @@ IOReturn PhxBringup::configurePspLayout(const PhxPspLayout &layout, uint64_t out
     } else {
         pspLayout = layout;
         pspLayoutConfigured = true;
+        legacyBootEnabled = false; // explicit selector 114 returns to the strict managed workflow
         out[0] = fbMcBase; out[1] = fbPhys; out[2] = fbSize; out[3] = fbAperLen;
+    }
+    IOLockUnlock(smuLock);
+    IOLockUnlock(gpuLock);
+    return r;
+}
+
+// Startup-only opt-in for old tools. No hardware writes or memory ownership claim.
+IOReturn PhxBringup::configureLegacyBoot(const PhxLegacyBoot &profile) {
+    if (!debugEnabled() || !mmio || !fbAper || !smuLock || !gpuLock) return kIOReturnNotReady;
+    IOLockLock(gpuLock);
+    IOLockLock(smuLock);
+    IOReturn r = kIOReturnSuccess;
+    if (pspSubmissionFaulted) {
+        r = kIOReturnNotReady;
+    } else if (ringMc || tmrSetUp || fwBufSize || gpuReady()) {
+        r = kIOReturnExclusiveAccess;
+    } else if (!phxLegacyBootValid(&profile, fbMcBase, fbPhys, fbSize, fbAperLen)) {
+        r = kIOReturnBadArgument;
+    } else {
+        pspLayout = profile.psp;
+        pspLayoutConfigured = true;
+        legacyBootEnabled = true;
     }
     IOLockUnlock(smuLock);
     IOLockUnlock(gpuLock);
@@ -1766,6 +1809,13 @@ IOReturn PhxBringup::loadToc(uint32_t fwBufOffset, uint32_t size, uint64_t out[4
     for (unsigned i = 0; i < 4; ++i) out[i] = 0;
     if (!mmio || !fbAper || !smuLock) return kIOReturnNotReady;
     IOLockLock(smuLock);
+    IOReturn r = loadTocLocked(fwBufOffset, size, out);
+    IOLockUnlock(smuLock);
+    return r;
+}
+
+// Caller holds smuLock, including when translating legacy raw LOAD_TOC.
+IOReturn PhxBringup::loadTocLocked(uint32_t fwBufOffset, uint32_t size, uint64_t out[4]) {
     IOReturn r;
     if (!ringMc || !pspLayoutConfigured || pspSubmissionFaulted) {
         r = kIOReturnNotReady;
@@ -1796,7 +1846,6 @@ IOReturn PhxBringup::loadToc(uint32_t fwBufOffset, uint32_t size, uint64_t out[4
             }
         }
     }
-    IOLockUnlock(smuLock);
     return r;
 }
 
@@ -1824,36 +1873,16 @@ IOReturn PhxBringup::loadIpFw(uint32_t fwType, uint32_t fwBufOffset, uint32_t si
 
 // Selector 106: op 1 = SETUP_TMR (driver-managed TMR, Phoenix psp_13_0_4 is not in psp_skip_tmr), op 2 = AUTOLOAD_RLC.
 IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
-    if (!mmio || !fbAper)
+    if (!out) return kIOReturnBadArgument;
+    for (unsigned i = 0; i < 4; ++i) out[i] = 0;
+    if (!mmio || !fbAper || !smuLock)
         return kIOReturnNotReady;
     IOLockLock(smuLock);
     IOReturn r;
     if (!ringMc || pspSubmissionFaulted) {
         r = kIOReturnNotReady;
     } else if (op == 1) {
-        if (tmrSetUp) {
-            IOLockUnlock(smuLock);
-            return kIOReturnExclusiveAccess;
-        }
-        uint32_t size = arg;
-        if (!tocTmrSize) {
-            IOLockUnlock(smuLock);
-            return kIOReturnNotReady;
-        }
-        if (!pspLayoutConfigured || size != tocTmrSize ||
-            !phxPspTmrFits(&pspLayout, fbMcBase, fbPhys, size)) {
-            IOLockUnlock(smuLock);
-            return kIOReturnBadArgument;
-        }
-        // psp_gfx_cmd_setup_tmr (Linux psp_prep_tmr_cmd_buf): buf_phy_addr = TMR MC address, buf_size,
-        // bitfield(virt_phy_addr=1 => 0x2), system_phy_addr = the REAL system-physical address of the TMR
-        // (amdgpu_gmc_vram_pa = mc - vram_start + vram_base_offset = fbPhys + tmrOff on this UMA part).
-        uint64_t tmrPa = fbPhys + tmrOff;
-        uint32_t u[6] = {static_cast<uint32_t>(tmrMc), static_cast<uint32_t>(tmrMc >> 32), size, 0x2u,
-                         static_cast<uint32_t>(tmrPa), static_cast<uint32_t>(tmrPa >> 32)};
-        r = pspRunCmd(PHX_PSP_GFX_CMD_SETUP_TMR, u, 6, out);
-        tmrSetUp = r == kIOReturnSuccess;
-        tmrSize = tmrSetUp ? size : 0;
+        r = setupTmrLocked(arg, out);
     } else if (op == 2) {
         r = tmrSetUp ? pspRunCmd(PHX_PSP_GFX_CMD_AUTOLOAD_RLC, nullptr, 0, out) : kIOReturnNotReady;
     } else {
@@ -1863,13 +1892,60 @@ IOReturn PhxBringup::pspCtl(uint32_t op, uint32_t arg, uint64_t out[4]) {
     return r;
 }
 
+// Caller holds smuLock. Keep TOC size, layout and completion checks common to both interfaces.
+IOReturn PhxBringup::setupTmrLocked(uint32_t size, uint64_t out[4]) {
+    if (!ringMc || pspSubmissionFaulted || !tocTmrSize) return kIOReturnNotReady;
+    if (tmrSetUp) return kIOReturnExclusiveAccess;
+    if (!pspLayoutConfigured || size != tocTmrSize ||
+        !phxPspLayoutValid(&pspLayout, fbMcBase, fbPhys, fbSize, fbAperLen) ||
+        !phxPspTmrFits(&pspLayout, fbMcBase, fbPhys, size) ||
+        tmrOff != pspLayout.tmrOffset || tmrMc != fbMcBase + tmrOff)
+        return kIOReturnBadArgument;
+    // UMA backing address, never BAR0's physical base or an old script's reference-machine value.
+    const uint64_t tmrPa = fbPhys + tmrOff;
+    uint32_t u[6] = {static_cast<uint32_t>(tmrMc), static_cast<uint32_t>(tmrMc >> 32), size, 0x2u,
+                     static_cast<uint32_t>(tmrPa), static_cast<uint32_t>(tmrPa >> 32)};
+    IOReturn r = pspRunCmd(PHX_PSP_GFX_CMD_SETUP_TMR, u, 6, out);
+    tmrSetUp = r == kIOReturnSuccess;
+    tmrSize = tmrSetUp ? size : 0;
+    return r;
+}
+
 // Selector 107: submit an arbitrary GPCOM command with six caller-supplied union dwords. For bring-up
 // experiments (SETUP_TMR / LOAD_TOC parameter sweeps) without rebuilding the kext.
 IOReturn PhxBringup::pspRaw(uint32_t cmdId, const uint32_t words[6], uint64_t out[4]) {
-    if (!mmio || !fbAper)
+    if (!out) return kIOReturnBadArgument;
+    for (unsigned i = 0; i < 4; ++i) out[i] = 0;
+    if (!words) return kIOReturnBadArgument;
+    if (!mmio || !fbAper || !smuLock)
         return kIOReturnNotReady;
     IOLockLock(smuLock);
-    IOReturn r = ringMc ? pspRunCmd(cmdId, words, 6, out) : kIOReturnNotReady;
+    IOReturn r = kIOReturnNotReady;
+    if (ringMc && !pspSubmissionFaulted) {
+        if (!legacyBootEnabled) {
+            r = pspRunCmd(cmdId, words, 6, out); // unchanged research interface, no managed readiness
+        } else if (!pspLayoutConfigured) {
+            r = kIOReturnNotReady;
+        } else if (cmdId == PHX_PSP_LOAD_TOC_COMMAND) {
+            const uint64_t mc = static_cast<uint64_t>(words[1]) << 32 | words[0];
+            if (words[3] || words[4] || words[5] || mc < fwBufMc || mc - fwBufMc > UINT32_MAX) {
+                r = kIOReturnBadArgument;
+            } else {
+                r = loadTocLocked(static_cast<uint32_t>(mc - fwBufMc), words[2], out);
+            }
+        } else if (cmdId == PHX_PSP_GFX_CMD_SETUP_TMR) {
+            const uint64_t mc = static_cast<uint64_t>(words[1]) << 32 | words[0];
+            // Old scripts pass reserved capacity, not TOC-required size. Bind it exactly to the profile.
+            // words[4:5] are deliberately ignored; setupTmrLocked derives the real backing address.
+            if (mc != tmrMc || words[2] != pspLayout.tmrCapacity || words[3] != 0x2u) {
+                r = kIOReturnBadArgument;
+            } else {
+                r = setupTmrLocked(tocTmrSize, out);
+            }
+        } else {
+            r = kIOReturnUnsupported; // no raw escape around managed state in compatibility mode
+        }
+    }
     IOLockUnlock(smuLock);
     return r;
 }

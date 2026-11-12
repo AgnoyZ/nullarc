@@ -60,7 +60,7 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(data, (self.stage / "src/phxbringup/PhxFirmwareProfile.h").read_bytes())
         self.assertEqual(hashlib.sha256(data).hexdigest(), self.provenance["firmware_profile_sha256"])
     def test_bootstrap_memory_headers_are_staged_and_hashed(self):
-        for name, key in (("PhxBootMemory.h", "boot_memory_sha256"), ("PhxGartLayout.h", "gart_layout_sha256"),
+        for name, key in (("PhxBootMemory.h", "boot_memory_sha256"), ("PhxLegacyBoot.h", "legacy_boot_sha256"), ("PhxGartLayout.h", "gart_layout_sha256"),
                           ("PhxMesQueueLayout.h", "mes_queue_layout_sha256")):
             data = (ROOT / "src" / name).read_bytes()
             self.assertEqual(data, (self.stage / "src/phxbringup" / name).read_bytes())
@@ -161,9 +161,9 @@ class SourceTests(unittest.TestCase):
         self.assertLess(toc.index("pspRunCmd("), toc.index("PHX_PSP_TOC_SIZE_RESPONSE_REL"))
         self.assertIn("if (r == kIOReturnSuccess)", toc)
         self.assertIn("phxPspTmrFits(&pspLayout", toc)
-        tmr = self.bringup.split("IOReturn PhxBringup::pspCtl(")[1].split("IOReturn PhxBringup::pspRaw(")[0]
+        tmr = self.bringup.split("IOReturn PhxBringup::setupTmrLocked(")[1].split("IOReturn PhxBringup::pspRaw(")[0]
         self.assertIn("size != tocTmrSize", tmr)
-        self.assertIn("if (!tocTmrSize)", tmr)
+        self.assertIn("!tocTmrSize", tmr)
         self.assertIn("if (tmrSetUp)", tmr)
         load = self.bringup.split("IOReturn PhxBringup::loadIpFw(")[1].split("IOReturn PhxBringup::pspCtl(")[0]
         self.assertIn("!ringMc || pspSubmissionFaulted || !tmrSetUp", load)
@@ -171,6 +171,34 @@ class SourceTests(unittest.TestCase):
         self.assertIn("!privileged", handler)
         self.assertIn("!owner->debugEnabled()", handler)
         self.assertIn("a->scalarInput[1] > UINT32_MAX", handler)
+
+    def test_legacy_profile_is_explicit_startup_metadata_before_publication(self):
+        start = self.bringup.split("bool PhxBringup::start(")[1].split("void PhxBringup::stop(")[0]
+        self.assertIn("pci->getProperty(PHX_LEGACY_BOOT_PROPERTY)", start)
+        self.assertIn("data->getLength() == sizeof(PhxLegacyBoot)", start)
+        self.assertLess(start.index("readFbLayout()"), start.index("configureLegacyBoot(profile)"))
+        self.assertLess(start.index("configureLegacyBoot(profile)"), start.index("registerService()"))
+        body = self.bringup.split("IOReturn PhxBringup::configureLegacyBoot(")[1].split("IOReturn PhxBringup::pspRing(")[0]
+        for check in ("!debugEnabled()", "phxLegacyBootValid", "pspSubmissionFaulted",
+                      "ringMc || tmrSetUp || fwBufSize || gpuReady()"):
+            self.assertIn(check, body)
+        for write in ("wreg(", "getVirtualAddress(", "pspRunCmd("):
+            self.assertNotIn(write, body)
+        self.assertLess(body.index("IOLockLock(gpuLock)"), body.index("IOLockLock(smuLock)"))
+        self.assertIn("bool legacyBootEnabled{false}", self.bringup)
+        self.assertNotIn("phx-legacy-boot", (self.stage / "src/phxbringup/Info.plist").read_text())
+
+    def test_legacy_raw_translation_uses_the_same_lock_and_checked_helpers(self):
+        raw = self.bringup.split("IOReturn PhxBringup::pspRaw(")[1].split("uint32_t PhxBringup::smuPoll(")[0]
+        for check in ("!legacyBootEnabled", "loadTocLocked(", "setupTmrLocked(tocTmrSize, out)",
+                      "words[2] != pspLayout.tmrCapacity", "mc != tmrMc", "kIOReturnUnsupported"):
+            self.assertIn(check, raw)
+        self.assertEqual(raw.count("IOLockLock(smuLock)"), 1)
+        self.assertEqual(raw.count("IOLockUnlock(smuLock)"), 1)
+        tmr = self.bringup.split("IOReturn PhxBringup::setupTmrLocked(")[1].split("IOReturn PhxBringup::pspRaw(")[0]
+        self.assertIn("fbPhys + tmrOff", tmr)
+        self.assertNotIn("words[4]", tmr)
+        self.assertIn("tmrSetUp = r == kIOReturnSuccess", tmr)
     def test_plugin_uses_only_its_own_radv(self):
         text = (self.stage / "src/nmplugin/nvmtl_vk.c").read_text(encoding="utf-8")
         self.assertTrue('phxRuntimeLibraryPath' in text, 'Plugin-relative path helper is not wired')

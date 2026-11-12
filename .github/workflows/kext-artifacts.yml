@@ -21,10 +21,13 @@ jobs:
           sw_vers
           uname -m
           xcrun clang --version
-      - name: Test package exclusions and EDID preparation
+      - name: Test package exclusions and offline property preparation
         run: |
           python3 -m unittest discover -s tests -p 'test_kext_package.py' -v
           python3 -m unittest discover -s tests -p 'test_edid_tools.py' -v
+          python3 -m unittest discover -s tests -p 'test_legacy_boot_tools.py' -v
+      - name: Exercise strict and legacy PSP paths on CPU
+        run: python3 tools/test_psp_submission.py --out build/psp-tests
       - name: Exercise actual framebuffer callbacks on CPU
         run: |
           python3 tools/test_edid.py

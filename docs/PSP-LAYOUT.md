@@ -2,7 +2,8 @@
 
 Patch `0009-explicit-psp-layout.patch` removes the managed kernel PSP path's
 implicit TMR and firmware-buffer offsets. A driver instance starts without a
-configured layout. Creating a PSP ring requires an explicit versioned descriptor;
+configured layout unless an explicit validated legacy startup profile is supplied
+(see `LEGACY-BOOT.md`). Creating a PSP ring requires an explicit versioned descriptor;
 the ring offset in the create request must match it. No target profile or default
 addresses are supplied by this project.
 
@@ -69,7 +70,10 @@ Transport failure or a short/long reply is terminal. The supplied memory ranges
 must ultimately come from a reviewed allocation/reservation mechanism, which is
 not implemented yet. No example target addresses are provided as defaults.
 
-Older scripts that directly create a ring or omit a TMR size now fail. An older
+Older scripts that directly create a ring or omit a TMR size fail by default.
+`LEGACY-BOOT.md` describes an optional geometry-bound startup profile and checked
+translation of legacy raw TOC/TMR commands. It supplies no implicit addresses or
+memory reservation and is not enabled merely by installing the new kext. An older
 kernel without selector 114 also rejects the new configuration request. Existing
 RADV selectors and structure sizes are unchanged. The raw-debug command paths
 remain research interfaces outside this managed layout contract; they are not
