@@ -72,6 +72,23 @@ and actual wait timeout/cap behavior. These initial runs are not complete
 native-component or full-build passes. Production sources are not changed
 by this test compatibility follow-up.
 
+Corrected source/test revision: `33dd6ed639381f3c14de23ce0984d00e24addfeb`.
+Its production sources are identical to merge commit `e5bef3c`.
+
+| Check | Run | Observed result |
+| --- | --- | --- |
+| Linux priority contracts | [43163907787](https://github.com/AgnoyZ/nullarc/actions/runs/43163907787) | Success; full Python suite 376 tests, 375 passed and 1 skipped; sanitizer-backed actual-method checks |
+| Intel macOS priority components | [43163907787](https://github.com/AgnoyZ/nullarc/actions/runs/43163907787) | Success; both actual kernel components and the Metal plugin compile/sign; topology and 20 deterministic wait-model runs pass |
+| Native EDID at identical production source `e5bef3c` | [43163472573](https://github.com/AgnoyZ/nullarc/actions/runs/43163472573) | Success; 225 actual callback/cache cases and actual PhxAccel compile/sign |
+| Native HiDPI at identical production source `e5bef3c` | [43163472599](https://github.com/AgnoyZ/nullarc/actions/runs/43163472599) | Success |
+| Broad workflow source tests | [43163907840](https://github.com/AgnoyZ/nullarc/actions/runs/43163907840) | Success, including 86 queue/watchdog and 112 context/cleanup/wait actual-body cases |
+| Broad workflow macOS stack build | [43163907840](https://github.com/AgnoyZ/nullarc/actions/runs/43163907840) | Pending at record time; complete LLVM/Mesa/translator build success is not claimed |
+
+These results establish host contracts, sanitizer checks and component native
+builds. They do not establish kernel loadability, target GPU execution,
+backlight behavior or hardware hang recovery. The follow-up that records this
+table changes documentation only; the tested production code remains intact.
+
 No driver, OpenCore configuration, ACPI table or helper is installed by the
 merge. Newly imported upstream tools may have deployment side effects if run
 manually; synchronization does not execute them. Target display, sleep/wake,
