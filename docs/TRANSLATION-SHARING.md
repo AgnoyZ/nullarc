@@ -69,8 +69,10 @@ deadline whose timeout leaves the original owner intact; and 1600 actual-entry
 requests across 16 workers. Test normal deadlines are 10 seconds; no test
 substitutes a completion result or a GPU write.
 
-Native CI results must be recorded after the run finishes. A synthetic
-32-to-one translator-call count is not a cold-start speedup or FPS ratio.
+Focused run `43130840259` passed the actual-entry/header fixture with
+ASan/UBSan and ThreadSanitizer and compiled/signed the actual plugin. The
+results and limits are in `validation/translation-sharing-20261112.md`.
+A synthetic 32-to-one translator-call count is not a cold-start speedup or FPS ratio.
 Remaining target acceptance: active driver revision and actual OS/build,
 unchanged shader output, cold/warm workload latency and frame-time evidence,
 bounded memory, and sharing-on/off A/B with the same physical raster and

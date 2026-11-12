@@ -1,0 +1,90 @@
+{
+  "date": "2026-11-12",
+  "code_commit": "c640196ec14cd23f274d900b707a45c8fe861f8d",
+  "repository": "AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "evidence_class": "host-verified",
+  "workflow": {
+    "run_id": 43130840259,
+    "conclusion": "success",
+    "jobs": {
+      "host-contracts": "success",
+      "native-components": "success"
+    }
+  },
+  "windows_lf_checkout": {
+    "code_commit": "c640196ec14cd23f274d900b707a45c8fe861f8d",
+    "tests": 349,
+    "skipped": 27,
+    "failures": 0
+  },
+  "ubuntu_host": {
+    "tests": 349,
+    "skipped": 1,
+    "failures": 0,
+    "foundation_sharing_execution": false
+  },
+  "macos_host": {
+    "product_version": "15.7.9",
+    "build": "24G830",
+    "compiler": "Apple Clang 17.0.0",
+    "translation_sharing": {
+      "asan_ubsan": {
+        "actual_entry": true,
+        "same_shader_requests": 32,
+        "same_shader_translations": 1,
+        "success_failure_exception_batches": 4,
+        "stress_requests": 1600,
+        "hardware_executed": false,
+        "inputs_sha256": {
+          "src/nmplugin/NVMTLLibraryLoad.m": "4e975eb19e7a3154a791923e095e8365d4668805a57d28c54cdd90572a972072",
+          "src/nmplugin/nvmtl_translation_flight.h": "f07767a361fcde02d6df496b08a9a204d2d94e1aca22050ad58ef7a14d9270ee",
+          "tests/test_translation_flight.m": "6d236279739a730dc7708f6cf5eeb9bdc5e44b327b1865abfefad727016f73f0",
+          "tools/test_translation_flight.py": "bd43cda24e3ad48c8c4ed2aa58c6f1fcbb39d549c4118b5ed288afe56c1ccbe5"
+        },
+        "actual_entry_sha256": "e40e407e3d5b7155f51d7eb26c7258f0cfca677f214effead19c17633843e5c4",
+        "sanitizer": "address,undefined",
+        "limitations": "Actual sharing and base-entry control flow with fake translator, disk cache and logging. No real AIR/SPIR-V validation, shader execution, target GPU/FPS or cold-start latency measurement."
+      },
+      "tsan": {
+        "actual_entry": true,
+        "same_shader_requests": 32,
+        "same_shader_translations": 1,
+        "success_failure_exception_batches": 4,
+        "stress_requests": 1600,
+        "hardware_executed": false,
+        "inputs_sha256": {
+          "src/nmplugin/NVMTLLibraryLoad.m": "4e975eb19e7a3154a791923e095e8365d4668805a57d28c54cdd90572a972072",
+          "src/nmplugin/nvmtl_translation_flight.h": "f07767a361fcde02d6df496b08a9a204d2d94e1aca22050ad58ef7a14d9270ee",
+          "tests/test_translation_flight.m": "6d236279739a730dc7708f6cf5eeb9bdc5e44b327b1865abfefad727016f73f0",
+          "tools/test_translation_flight.py": "bd43cda24e3ad48c8c4ed2aa58c6f1fcbb39d549c4118b5ed288afe56c1ccbe5"
+        },
+        "actual_entry_sha256": "e40e407e3d5b7155f51d7eb26c7258f0cfca677f214effead19c17633843e5c4",
+        "sanitizer": "thread",
+        "limitations": "Actual sharing and base-entry control flow with fake translator, disk cache and logging. No real AIR/SPIR-V validation, shader execution, target GPU/FPS or cold-start latency measurement."
+      }
+    },
+    "kext_compile_link_sign_strict_verify": [
+      "PhxBringup",
+      "PhxAccel"
+    ],
+    "metal_plugin_compile_link_sign_strict_verify": true,
+    "warnings_remain": true
+  },
+  "cancelled_duplicate_full_stack_run": 43130840264,
+  "claims": {
+    "hardware_execution_established": false,
+    "target_os_build_verified": false,
+    "target_driver_deployed": false,
+    "target_frame_rate_improved": false,
+    "cold_start_latency_improved": false,
+    "real_translator_executed_by_sharing_fixture": false,
+    "binary_uploaded": false
+  },
+  "limitations": [
+    "The translator, disk cache and logging are fakes; the actual entry/helper execute.",
+    "The 32-to-one call count is synthetic behavior, not a timed speedup or FPS ratio.",
+    "Registry saturation is simulated; test timeout is 50 ms, production timeout 30 s.",
+    "No shader correctness, target deployment, Tahoe migration or stable FPS evidence."
+  ]
+}
