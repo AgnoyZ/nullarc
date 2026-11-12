@@ -75,9 +75,13 @@ sw_vers -buildVersion
 
 从目标机当前 PhxAMDFB 会话的探针读取 `vendor_id` / `product_id`，从
 `PhxFBWidth` / `PhxFBHeight` 读取物理尺寸。不要使用 PCI GPU ID `1002:1900`，
-不要猜显示器 ID。此路径没有 DDC/EDID 读取，IOGraphics 可能给出
+不要猜显示器 ID。未配置有效 EDID 数据源时，IOGraphics 仍可能给出
 `0x756e6b6e`（`unkn`）/ `0x717` 等通用 ID；它们可匹配多台显示器，必须先确认
 覆盖范围，不应在有相同 ID 的其他显示器时使用同一个覆盖文件。
+
+2026-11-12 新增的缓存 EDID 回调可接受 GPU 上的真实 EDID 属性，详见 `EDID.md`。
+它不执行 AMD AUX 硬件读取，也不证明 HiDPI 已生效。启用该路径后显示器 ID 可能改变，
+应重新运行探针并核对既有覆盖文件，不能继续套用缺少 EDID 时的通用 ID。
 
 以下 ID **仅为语法示例**，必须换成探针的实际结果：
 

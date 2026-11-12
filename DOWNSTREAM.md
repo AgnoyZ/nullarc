@@ -16,6 +16,11 @@ validation evidence and research documents that used to live in `AgnoyZ/radeon-7
 
 ## What the branch adds
 
+- Validated supplied-panel EDID caching and native IOGraphics DDC callbacks in
+  PhxAMDFB, with an offline property-fragment tool and fail-closed bounds checks.
+  AMD AUX/I2C acquisition and target display acceptance remain separate;
+  see `docs/EDID.md`.
+
 - Shared, testable policy and layout headers used by the patched sources:
   `src/phxbringup/{PhxHardwarePolicy.hpp, PhxPspLayout.h, PhxBootMemory.h, PhxGartLayout.h,
   PhxMesQueueLayout.h, PhxFirmwareProfile.h}`,

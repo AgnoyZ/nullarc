@@ -23,6 +23,7 @@
 #include <libkern/version.h>
 #include "PhxHardwarePolicy.hpp"
 #include "PhxHiDPI.hpp"
+#include "PhxEDID.hpp"
 #include "phx_panel_timing.h"
 
 void phxAgdcInstall();   // phxagdc.cpp: the AppleGraphicsDeviceControl that reports this panel (debug.phxagdc)
@@ -82,6 +83,7 @@ class PhxAMDFB : public IOFramebuffer {
     IOPhysicalAddress fBase = 0;
     uint32_t fWidth = 0, fHeight = 0, fRowBytes = 0;
     bool fHiDPI = false;   // phxfbhires=1: native 2x only; CoreDisplay owns the logical desktop
+    phx::EdidCache fEdid;   // supplied panel data; frozen before IOFramebuffer::start, never read over AMD AUX
     static constexpr uint64_t kFrameNs = 16666667ull;   // 60 Hz, when the refresh cannot be measured
     uint64_t fFrameNs = kFrameNs;
     uint32_t fRefreshMilliHz = 60000, fHTotal = 0, fVTotal = 0;
@@ -339,6 +341,49 @@ public:
         return kIOReturnSuccess;
     }
     IOItemCount getConnectionCount() override { return 1; }
+    // Native IOGraphics EDID delivery, following NullMoth's cached-block interface. The source is local to this
+    // GPU, not NVKMS: a verified bootloader/firmware property. Missing/invalid input never becomes a synthetic EDID.
+    void loadEdid() {
+        fEdid.clear();
+        setProperty("PhxFBEDIDValid", kOSBooleanFalse);
+        setProperty("PhxFBEDIDBytes", 0ull, 32);
+        setProperty("PhxFBEDIDSource", "none");
+        setProperty("PhxFBEDIDStatus", "missing");
+        const char *keys[] = { "phx-edid", "AAPL00,override-no-connect", "IODisplayEDID" };
+        for (const char *key : keys) {
+            OSObject *property = fPCI->copyProperty(key);
+            if (!property) continue;
+            OSData *data = OSDynamicCast(OSData, property);
+            const bool valid = data && fEdid.adopt((const uint8_t *)data->getBytesNoCopy(), data->getLength(), fWidth, fHeight);
+            property->release();
+            setProperty("PhxFBEDIDSource", key);
+            if (!valid) {
+                setProperty("PhxFBEDIDStatus", "invalid");
+                PFBLOG("EDID: rejected %s; retaining no-EDID behavior", key);
+                return;   // an invalid explicit source must not silently select a lower-priority property
+            }
+            if (!setProperty("IODisplayEDID", fEdid.data(), (unsigned)fEdid.size())) {
+                fEdid.clear();
+                setProperty("PhxFBEDIDStatus", "publish-failed");
+                PFBLOG("EDID: property publication failed; retaining no-EDID behavior");
+                return;
+            }
+            setProperty("PhxFBEDIDBytes", (unsigned long long)fEdid.size(), 32);
+            setProperty("PhxFBEDIDValid", kOSBooleanTrue);
+            setProperty("PhxFBEDIDStatus", "valid");
+            PFBLOG("EDID: cached %u bytes from %s (supplied data, no AUX transaction)", (unsigned)fEdid.size(), key);
+            return;
+        }
+    }
+    bool hasDDCConnect(IOIndex idx) override { return idx == 0 && !fStopping && fEdid.ready(); }
+    IOReturn getDDCBlock(IOIndex idx, UInt32 blockNumber, IOSelect blockType, IOOptionBits options,
+                        UInt8 *data, IOByteCount *length) override {
+        if (idx != 0 || !data || !length || !blockNumber) return kIOReturnBadArgument;
+        if (blockType != kIODDCBlockTypeEDID || options != 0 || fStopping || !fEdid.ready()) return kIOReturnUnsupported;
+        if (!fEdid.copyBlock(blockNumber, data, *length)) return kIOReturnBadArgument;
+        *length = phx::kEdidBlockBytes;
+        return kIOReturnSuccess;
+    }
     IOReturn registerForInterruptType(IOSelect type, IOFBInterruptProc proc, OSObject *target, void *ref, void **iref) override {
         if (type == kIOFBVBLInterruptType) {
             for (Irq &q : fVbl) if (!q.proc) {
@@ -398,6 +443,11 @@ public:
     IOReturn getAttributeForConnection(IOIndex idx, IOSelect attr, uintptr_t *value) override {
         if (idx != 0 || !value) return kIOReturnBadArgument;
         switch (attr) {
+        case kConnectionSupportsHLDDCSense:
+            *value = hasDDCConnect(idx) ? 1 : 0;
+            return *value ? kIOReturnSuccess : kIOReturnUnsupported;
+        case kConnectionSupportsLLDDCSense: case kConnectionSupportsAppleSense:
+            *value = 0; return kIOReturnUnsupported;
         case kConnectionEnable: case kConnectionCheckEnable: *value = 1; return kIOReturnSuccess;
         case kConnectionFlags: *value = kIOConnectionBuiltIn; return kIOReturnSuccess;
         case kConnectionColorModesSupported: case kConnectionColorMode: *value = 0x00000001; return kIOReturnSuccess;
@@ -586,6 +636,7 @@ bool PhxAMDFB::start(IOService *provider)
     // callout dereferences it (IOFramebuffer::powerStateWillChangeTo, panic 2026-10-20)
     setProperty("IOFBDependentID", 0x50485846ull << 32 | 1, 64);   // 'PHXF'
     setProperty("IOFBDependentIndex", 0ull, 32);
+    loadEdid();   // no callbacks can observe a partial snapshot; immutable for the framebuffer's lifetime
     if (!IOFramebuffer::start(provider)) { OSSafeReleaseNULL(fSurfMap); return false; }
     fVa = IORangeAllocator::withRange(kVaSize - 1, PAGE_SIZE, 0, IORangeAllocator::kLocking);
     poolInit();

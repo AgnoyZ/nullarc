@@ -1,0 +1,49 @@
+name: Native supplied-panel EDID validation
+on:
+  push:
+    branches: [downstream/780m-tahoe]
+    paths: ['src/phxaccel/PhxEDID.hpp', 'src/phxaccel/accel/phxfb.cpp', 'tools/phx_edid.py', 'tools/test_edid.py', 'tests/test_edid*', '.github/workflows/edid-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-edid:
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Record source and native compiler host
+        run: |
+          git rev-parse HEAD
+          sw_vers
+          uname -m
+          xcrun clang --version
+      - name: Validate synthetic EDID tools and source contracts
+        run: python3 -m unittest discover -s tests -p 'test_edid_tools.py' -v
+      - name: Exercise actual EDID callbacks with ASan and UBSan
+        run: python3 tools/test_edid.py
+      - name: Recheck existing actual mode, timing and color callbacks
+        run: python3 tools/test_hidpi.py
+      - name: Checkout pinned MacKernelSDK
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: acidanthera/MacKernelSDK
+          ref: 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          path: build-sdk
+          persist-credentials: false
+      - name: Compile and verify actual PhxAccel including native EDID callbacks
+        run: |
+          bash src/phxaccel/build.sh ./build-sdk
+          codesign --verify --strict src/phxaccel/build/PhxAccel.kext
+          python3 - <<'PY'
+          import json, sys
+          sys.path.insert(0, 'tools')
+          from verify_artifacts import inspect_kext
+          print('EDID_KEXT_REPORT=' + json.dumps(inspect_kext('src/phxaccel/build/PhxAccel.kext', 'com.luuumi.PhxAccel')))
+          PY
+      - name: Confirm tracked sources unchanged
+        run: git diff --exit-code HEAD -- src tools tests
+      - name: State acceptance and publication limits
+        run: echo 'Supplied EDID cache and actual callback CPU checks plus native compilation/signing only. No AMD AUX, target kernel load, display acceptance, installation or binary upload.'
