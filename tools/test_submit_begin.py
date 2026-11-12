@@ -43,7 +43,7 @@ def exercise(out):
                     '-fno-sanitize-recover=all', '-I' + str(out), str(harness), '-o', str(binary)],
                    check=True, timeout=120)
     result = json.loads(subprocess.check_output([str(binary)], text=True, timeout=30))
-    if result != {'cases': 33, 'hardware_executed': False}:
+    if result != {'cases': 35, 'hardware_executed': False}:
         raise RuntimeError('Unexpected submit report')
     result['actual_bodies_sha256'] = hashlib.sha256(extracted.encode()).hexdigest()
     result['inputs_sha256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in (source, harness)}

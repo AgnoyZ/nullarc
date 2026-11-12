@@ -7,8 +7,8 @@
 typedef void *VkCommandBuffer; typedef void *VkFence; typedef void *VkQueryPool; typedef int VkResult;
 enum { VK_SUCCESS = 0, VK_ERROR_DEVICE_LOST = -4, VK_STRUCTURE_TYPE_FENCE_CREATE_INFO = 1,
        VK_STRUCTURE_TYPE_MEMORY_BARRIER = 2, VK_STRUCTURE_TYPE_SUBMIT_INFO = 3,
-       VK_ACCESS_TRANSFER_WRITE_BIT = 1, VK_ACCESS_MEMORY_READ_BIT = 2, VK_ACCESS_MEMORY_WRITE_BIT = 4,
-       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT = 1, VK_PIPELINE_STAGE_TRANSFER_BIT = 2, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT = 4 };
+       VK_ACCESS_TRANSFER_WRITE_BIT = 1, VK_ACCESS_MEMORY_READ_BIT = 2, VK_ACCESS_MEMORY_WRITE_BIT = 4, VK_ACCESS_HOST_READ_BIT = 8,
+       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT = 1, VK_PIPELINE_STAGE_TRANSFER_BIT = 2, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT = 4, VK_PIPELINE_STAGE_HOST_BIT = 8 };
 #ifndef CLOCK_UPTIME_RAW
 #define CLOCK_UPTIME_RAW 9
 #endif
@@ -25,7 +25,7 @@ static pthread_mutex_t nvmtl_submit_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int g_state, g_perf_kind; static void *g_dev, *g_queue;
 static unsigned g_cmd_submitted, g_pre_fail; static nvmtl_prologue *g_pre_cur;
 static void (*nvmtl_pre_submit_hook)(void); static void (*nvmtl_pre_release_hook)(void *);
-static int pro, pre_mode, reset_enabled, flush_error, reset_error, main_error, pre_error, fence_error, queue_error, lose_in_hook;
+static int pro, pre_mode, reset_enabled, flush_error, reset_error, main_error, pre_error, fence_error, queue_error, lose_in_hook, rp_light;
 static unsigned submits, fences, destroyed, main_retired, pre_retired, released, barriers, controls, tests;
 static VkCommandBuffer submitted[3]; static unsigned submitted_count;
 static uint64_t ticks;
@@ -42,6 +42,7 @@ static test_clock nvmtl_clock_snapshot(void) { return (test_clock){1}; }
 static uint64_t clock_gettime_nsec_np(int clock) { (void)clock; return ++ticks; }
 static uint64_t nvmtl_perf_now(void) { return ++ticks; }
 static int nvmtl_prologue_on(void) { return pro; }
+static int nvmtl_rp_light(void) { return rp_light; }
 static int nvmtl_keep_on(void) { return 1; }
 static uint32_t nvmtl_wit_record(nvk_cmdbuf *c) { (void)c; return 17; }
 static void nvmtl_wit_control(uint32_t wseq) { assert(wseq == 17); controls++; }
@@ -53,8 +54,15 @@ static VkResult pvkCreateFence(void *dev, const VkFenceCreateInfo *info, void *a
 static void pvkDestroyFence(void *dev, VkFence fence, void *alloc) { (void)dev; (void)alloc; assert(fence == (void *)4 && !submits); destroyed++; }
 static void pvkCmdWriteTimestamp(VkCommandBuffer cb, unsigned stage, VkQueryPool pool, unsigned index) { (void)cb; (void)stage; (void)pool; (void)index; }
 static void pvkCmdPipelineBarrier(VkCommandBuffer cb, unsigned src, unsigned dst, unsigned flags, unsigned count, const VkMemoryBarrier *mb, unsigned nb, const void *buf, unsigned ni, const void *img) {
-    (void)src; (void)dst; (void)flags; (void)nb; (void)buf; (void)ni; (void)img;
-    assert(cb == (void *)2 && count == 1 && mb->src == VK_ACCESS_TRANSFER_WRITE_BIT); barriers++;
+    assert(!flags && !nb && !buf && !ni && !img && count == 1);
+    if (cb == (void *)1) {
+        assert(src == VK_PIPELINE_STAGE_ALL_COMMANDS_BIT && dst == (VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT));
+        assert(mb->src == VK_ACCESS_MEMORY_WRITE_BIT && mb->dst == (VK_ACCESS_HOST_READ_BIT | VK_ACCESS_MEMORY_READ_BIT));
+    } else {
+        assert(cb == (void *)2 && src == VK_PIPELINE_STAGE_TRANSFER_BIT && dst == VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+        assert(mb->src == VK_ACCESS_TRANSFER_WRITE_BIT && mb->dst == (VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT));
+    }
+    barriers++;
 }
 static VkResult pvkQueueSubmit(void *queue, unsigned n, const VkSubmitInfo *si, VkFence fence) {
     (void)queue; assert(n == 1 && fence == (void *)4); submits++; submitted_count = si->commandBufferCount;
@@ -72,7 +80,7 @@ static nvk_cmdbuf c; static nvmtl_inflight f; static nvmtl_prologue outer;
 static void setup(void) {
     memset(&c, 0, sizeof c); memset(&f, 0, sizeof f); memset(&outer, 0, sizeof outer);
     c.cb = (void *)1; c.timing_pool = (void *)6; g_state = 1; g_perf_kind = 8; g_pre_cur = &outer;
-    pro = 1; pre_mode = reset_enabled = flush_error = reset_error = main_error = pre_error = fence_error = queue_error = lose_in_hook = 0;
+    pro = rp_light = 1; pre_mode = reset_enabled = flush_error = reset_error = main_error = pre_error = fence_error = queue_error = lose_in_hook = 0;
     submits = fences = destroyed = main_retired = pre_retired = released = barriers = controls = g_cmd_submitted = g_pre_fail = 0; submitted_count = 0;
     nvmtl_pre_submit_hook = hook; nvmtl_pre_release_hook = release_hold;
 }
@@ -99,6 +107,7 @@ int main(void) {
             unsigned idx = 0; if (reset) assert(submitted[idx++] == (void *)3);
             if (mode == 2) assert(submitted[idx++] == (void *)2); assert(submitted[idx] == (void *)1);
             assert(pre_retired == (mode == 1) && released == (mode == 1) && controls == 1);
+            assert(barriers == 1u + (mode == 2));
             setup(); reset_enabled = reset; pre_mode = mode; queue_error = VK_ERROR_DEVICE_LOST;
             assert(run(&c) == -2 && g_state == -1 && submits == 1 && !main_retired && !destroyed && !f.fence);
             assert(pre_retired == (mode == 1) && released == (mode == 1));
@@ -116,6 +125,8 @@ int main(void) {
     }
     setup(); pro = 0; assert(run(&c) == 0 && submits == 1 && submitted_count == 1);
     setup(); nvmtl_pre_submit_hook = NULL; assert(run(&c) == 0 && submits == 1);
-    assert(tests == 33);
+    setup(); rp_light = 0; assert(run(&c) == 0 && submits == 1 && !barriers);
+    setup(); c.in_rp = 1; assert(run(&c) == 0 && submits == 1 && !barriers);
+    assert(tests == 35);
     printf("{\"cases\": %u, \"hardware_executed\": false}\n", tests);
 }

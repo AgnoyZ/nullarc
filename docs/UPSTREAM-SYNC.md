@@ -62,6 +62,16 @@ The only imported patch-byte cleanup removes an extra blank line at EOF from
 Phoenix patch 0007 so `git diff --check` passes. The locked native RADV build
 reads the original upstream patch bytes at `8aba872`; its hunks are unchanged.
 
+At merge source `e5bef3c`, the focused native EDID workflow
+`43163472573` passed. Priority run `43163472649` and broad run `43163472552`
+initially failed because the old host doubles lacked the newly merged
+render-pass-light barrier, watchdog cancellation, power-management teardown
+and adaptive wait APIs. The test doubles are updated to assert those paths:
+35 actual submit-begin cases, watchdog cancellation before stop/quarantine,
+and actual wait timeout/cap behavior. These initial runs are not complete
+native-component or full-build passes. Production sources are not changed
+by this test compatibility follow-up.
+
 No driver, OpenCore configuration, ACPI table or helper is installed by the
 merge. Newly imported upstream tools may have deployment side effects if run
 manually; synchronization does not execute them. Target display, sleep/wake,

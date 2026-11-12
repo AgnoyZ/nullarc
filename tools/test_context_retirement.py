@@ -28,6 +28,7 @@ CASES = (
     'atomic-quarantine-retry', 'client-close-pending', 'client-close-complete', 'client-destructor-pending',
     'client-close-then-free', 'client-repeat-close', 'client-no-vmid', 'client-memory-after-close',
     'wait-after-close', 'close-during-wait', 'stop-active', 'stop-pending', 'stop-faulted', 'stop-orphan',
+    'wait-adaptive-timeout', 'wait-cap-timeout',
     'stop-cold', 'stop-repeat', 'host-pins-preserved', 'mixed-buffer-release', 'empty-buffer-container',
     'alloc-stopping-after-lock', 'unbound-peer-invalid-hardware', 'client-pending-bo-close',
 ) + tuple(f'clear-{kind}-{fault}' for kind in ('root', 'used', 'cached') for fault in BACKING_FAULTS) + (

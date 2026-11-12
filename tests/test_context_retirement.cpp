@@ -20,7 +20,7 @@ static constexpr unsigned kIOMemoryMapperNone = 0x800;
 enum { kIOReturnSuccess, kIOReturnNotReady, kIOReturnBadArgument, kIOReturnNotFound };
 static std::vector<std::string> events;
 static std::set<void *> allocations;
-static unsigned frees = 0, lineFlushes = 0, delays = 0, casCalls = 0, lockFrees = 0;
+static unsigned frees = 0, lineFlushes = 0, delays = 0, sleeps = 0, casCalls = 0, lockFrees = 0;
 static bool failCasOnce = false;
 static void IOFree(void *p, size_t) { assert(allocations.erase(p) == 1); ++frees; events.push_back("free-storage"); std::free(p); }
 static bool OSCompareAndSwapPtr(void *old, void *value, void *volatile *where) {
@@ -35,11 +35,20 @@ static void IOLockUnlock(int *p) { assert(p && *p); *p = 0; }
 static void IOLockFree(int *p) { assert(p && !*p); ++lockFrees; }
 static void IOLog(const char *, ...) {}
 static void IODelay(unsigned);
+static void IOSleep(unsigned ms) { assert(ms == 1); ++sleeps; }
 static void flushLine(void *) { if (!lineFlushes) events.push_back("flush-pages"); ++lineFlushes; }
 static unsigned gSysctlUp = 0;
 static int sysctl__debug_phxbos_flush = 0, sysctl__debug_phxbos_flush_bytes = 0;
 static int sysctl__debug_phxbos_handles_high = 0, sysctl__debug_phxbos_handles_full = 0;
+static int sysctl__debug_phx_hang_ms = 0, sysctl__debug_phx_hang_kills = 0;
 static void sysctl_unregister_oid(int *) {}
+struct FakeThreadCall { bool cancelled{false}, freed{false}; };
+static void thread_call_cancel_wait(FakeThreadCall *call) {
+    assert(call && !call->cancelled && !call->freed); call->cancelled = true; events.push_back("cancel-watchdog");
+}
+static void thread_call_free(FakeThreadCall *call) {
+    assert(call && call->cancelled && !call->freed); call->freed = true; events.push_back("free-watchdog");
+}
 struct IOMemoryDescriptor {
     unsigned retains{0}, releases{0}, completes{0};
     void retain() { ++retains; }
@@ -66,7 +75,11 @@ struct IOBufferMemoryDescriptor : IOMemoryDescriptor {
         assert(off == 0 && out && options == kIOMemoryMapperNone); *out = segmentLength; return physical;
     }
 };
-struct IOService { unsigned retains{0}, stops{0}; void retain() { ++retains; } void stop(IOService *) { ++stops; } };
+struct IOService {
+    unsigned retains{0}, stops{0}, powerStops{0};
+    void retain() { ++retains; } void stop(IOService *) { ++stops; }
+    void PMstop() { ++powerStops; events.push_back("power-stop"); }
+};
 struct IOUserClient { unsigned terminated{0}, baseFreed{0}; void terminate() { ++terminated; } void free() { ++baseFreed; } };
 struct FakeMap : IOMemoryDescriptor {
     std::vector<uint64_t> words = std::vector<uint64_t>(256, 0);
@@ -87,6 +100,7 @@ public:
     HwVmid hwv[kNumUserVmids]{};
     GpuQueue gq[2]{};
     bool stopping{false}, stopQuarantined{false};
+    FakeThreadCall timer; FakeThreadCall *hangCall{nullptr}; bool hangStop{false};
     PhxRetiredBuffers *quarantinedBuffers{nullptr};
     uint64_t gSeq{10}, ringMc{0}; bool tmrSetUp{false};
     int mutex{0}, smuMutex{0}; int *gpuLock{&mutex}, *smuLock{&smuMutex};
@@ -167,7 +181,7 @@ static void IODelay(unsigned us) {
     ++delays;
     if (us == 1) assert(active->mutex);
     else {
-        assert(us == 100);
+        assert(us == 50);
         if (closeOnDelay) {
             auto *c = closeOnDelay; closeOnDelay = nullptr;
             active->aperture.words[0x100 / 8] = 5;
@@ -279,6 +293,7 @@ int main(int argc, char **argv) {
         reclaimed(p, normal, host, true, used);
         p.reapContexts(); reclaimed(p, normal, host, true, used);
     } else if (test.rfind("shutdown-", 0) == 0) {
+        p.hangCall = &p.timer;
         p.gq[0].ready = false; p.vm[0].busy = false; p.vm[0].hw = 0; p.hwv[0] = PhxBringup::HwVmid{};
         IOBufferMemoryDescriptor system; p.sysBuf = &system;
         const bool noLock = test.rfind("shutdown-no-lock-", 0) == 0;
@@ -293,13 +308,16 @@ int main(int argc, char **argv) {
         else if (test == "shutdown-no-lock-ledger" || test == "shutdown-no-lock-repeat") p.quarantinedBuffers = buffers;
         else assert(cold && "Unknown shutdown scenario");
         p.stop(nullptr);
+        assert(p.hangStop && !p.hangCall && p.timer.cancelled && p.timer.freed);
         assert(p.stopping && p.stops == 1 && !normal.releases && !host.completes && !host.releases && !frees && !lineFlushes);
         if (cold) {
+            assert(p.powerStops == 1);
             assert(!p.stopQuarantined && !p.retains && p.clears == 1 && lockFrees == 1);
             assert(!p.gpuLock && !p.smuLock && !p.mmio && !p.fbAper && !p.doorbellMap && !p.pci && !p.sysBuf);
             assert(p.root.releases == 1 && p.child.releases == 1 && system.releases == 1);
             assert(p.registers.releases == 1 && p.aperture.releases == 1 && p.bells.releases == 1 && p.pciObject.releases == 1);
         } else {
+            assert(!p.powerStops);
             assert(p.stopQuarantined && p.retains == 1 && !p.clears && !lockFrees);
             assert((p.gpuLock == nullptr) == noLock && p.smuLock && p.mmio && p.fbAper && p.doorbellMap && p.pci && p.sysBuf);
             assert(!p.root.releases && !p.child.releases && !system.releases);
@@ -311,6 +329,13 @@ int main(int argc, char **argv) {
                 assert(!p.root.releases && !p.child.releases && !system.releases && p.mmio && p.smuLock);
             }
         }
+    } else if (test == "wait-adaptive-timeout" || test == "wait-cap-timeout") {
+        IOAccelPhxNativeClient c(p, buffers); IOExternalMethodArguments args;
+        args.scalarInput[1] = test == "wait-adaptive-timeout" ? 3000000ull : UINT64_MAX;
+        assert(c.doWaitSeq(&args) == kIOReturnSuccess);
+        assert(args.scalarOutput[0] == 1 && args.scalarOutput[1] == 4 && args.scalarOutput[2] == 5);
+        assert(delays == 20 && sleeps == (test == "wait-adaptive-timeout" ? 2u : (PHXN_WAIT_CAP_NS - 1000000ull) / 1000000ull));
+        assert(!c.flushCalls && !normal.releases && !host.releases);
     } else if (clientCase) {
         IOAccelPhxNativeClient c(p, buffers);
         if (test == "client-pending-bo-close") { c.bos[1].pendingFree = true; c.bos[2].pendingFree = true; }
@@ -349,11 +374,13 @@ int main(int argc, char **argv) {
         assert(c.closed && c.mutex == 0 && p.mutex == 0 && p.sessionReleases == 1);
         if (test != "client-no-vmid") assert(!c.bos && !c.bufferStorage && !c.vmid);
     } else if (test.rfind("stop-", 0) == 0) {
+        p.hangCall = &p.timer;
         if (test != "stop-cold") p.deferClient(1, 5, buffers);
         else { p.gq[0].ready = false; p.vm[0].busy = false; p.vm[0].hw = 0; p.hwv[0] = PhxBringup::HwVmid{}; }
         if (test == "stop-faulted") { p.aperture.words[0x100 / 8] = 5; p.timeout = true; }
         if (test == "stop-orphan") p.quarantinedBuffers = buffers;
         p.stop(nullptr);
+        assert(p.hangStop && !p.hangCall && p.timer.cancelled && p.timer.freed);
         if (test == "stop-cold") {
             assert(!p.stopQuarantined && p.clears == 1 && !p.gpuLock && p.root.releases == 1);
         } else {
