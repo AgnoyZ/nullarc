@@ -1,0 +1,74 @@
+{
+  "date": "2026-11-12",
+  "code_commit": "37cbf4a46074ab138146831150841f7256862947",
+  "repository": "AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "evidence_class": "host-verified",
+  "workflow": {
+    "run_id": 43126365088,
+    "conclusion": "success",
+    "jobs": {
+      "host-contracts": "success",
+      "native-components": "success"
+    }
+  },
+  "windows_lf_snapshot": {
+    "tests": 347,
+    "skipped": 27,
+    "failures": 0
+  },
+  "ubuntu_host": {
+    "tests": 347,
+    "skipped": 1,
+    "failures": 0,
+    "copy_execution": {
+      "full_cases": 24194,
+      "damage_cases": 896,
+      "sanitizer": "address,undefined"
+    }
+  },
+  "macos_host": {
+    "product_version": "15.7.9",
+    "build": "24G830",
+    "compiler": "Apple Clang 17.0.0",
+    "actual_copy_report": {
+      "full_cases": 24194,
+      "damage_cases": 896,
+      "packed_2560x1600_sse_calls": 1,
+      "previous_row_sse_calls": 1600,
+      "hardware_executed": false,
+      "source_sha256": {
+        "src/phxaccel/accel/nvrm-accel.cpp": "b4c5034df0c07cf684901dfe7cbf77ce10ac74090cbe7696ce442b9f6cacd93b",
+        "src/phxaccel/PhxCopyPath.hpp": "ef6b73ca47d4bb8d6307cacdc705a900933e877382b2ffe02796482b6155f001",
+        "tests/test_present_copy.cpp": "ff3c9dd6fa15e5e33a0adc3dccebc356796579c86f9e8e91fecbf92f9a0fca5b",
+        "tools/test_present_copy.py": "d40e877bd509c7691a445d795a35b9192b3a62fde6d4e8aa8dcb7d66f42c2209"
+      },
+      "actual_methods_sha256": "cd85c010b3a29618a3d5d23ca4c2afffb3c8e921fd0808bee18c3b900a4a57fb",
+      "sanitizer": "address,undefined",
+      "limitation": "Actual scalar/movnti/SSE copy on ordinary host RAM with fake allocation/atomics. Sentinels check stores made by inline assembly, which sanitizers do not instrument. No kernel FPU/preemption, WC/BAR mapping, display timing or target FPS evidence."
+    },
+    "kext_compile_link_sign_strict_verify": [
+      "PhxBringup",
+      "PhxAccel"
+    ],
+    "metal_plugin_compile_link_sign_strict_verify": true,
+    "warnings_remain": true
+  },
+  "cancelled_duplicate_full_stack_run": 43126364974,
+  "claims": {
+    "hardware_execution_established": false,
+    "target_os_build_verified": false,
+    "target_driver_deployed": false,
+    "target_frame_rate_improved": false,
+    "kernel_fpu_preemption_verified": false,
+    "memory_sanitizer_executed": false,
+    "binary_uploaded": false
+  },
+  "limitations": [
+    "Ordinary host RAM only; no WC/BAR throughput measurement.",
+    "Inline assembly stores are checked with sentinels, not sanitizer instrumentation.",
+    "Allocation/atomics are fakes; no kernel concurrency or FPU/preemption validation.",
+    "The previous-row count 1600 is the source-derived baseline, not a timed benchmark.",
+    "No active target deployment, Tahoe migration or stable FPS evidence."
+  ]
+}

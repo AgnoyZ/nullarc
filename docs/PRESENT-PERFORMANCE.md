@@ -58,9 +58,9 @@ Native kext compilation is a separate focused CI step, not target execution.
 size overflow, selection and fallback boundaries. Windows only runs Python
 extraction/refusal checks; native cases are explicitly skipped there.
 
-CI results will be recorded in `validation/present-copy-20261112.md` after the
-corresponding code run completes. Never substitute operation counts for a
-target frame-rate claim.
+Focused run `43126365088` passed on Linux and Intel macOS; results and limits
+are recorded in `validation/present-copy-20261112.md`. Never substitute
+operation counts for a target frame-rate claim.
 
 ## Target measurement needed next
 
