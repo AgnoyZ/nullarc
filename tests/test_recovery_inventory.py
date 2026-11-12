@@ -13,6 +13,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from target_inventory import CAPTURE_MARKER, COMMANDS, InventoryError, import_capture
+from target_preflight import evaluate
 from test_target_inventory import fixture_device
 
 
@@ -66,6 +67,10 @@ class RecoveryImportTests(unittest.TestCase):
             self.assertTrue(result['system']['requested_system_family_matches'])
             self.assertFalse(result['safe_to_initialize'])
             self.assertFalse(result['native_capture_source_verified'])
+            self.assertIs(result['hardware_executed'], False)
+            preflight = evaluate(result)
+            self.assertTrue(preflight['native_probe_check_allowed'])
+            self.assertFalse(preflight['native_probe_run_allowed'])
 
     def test_missing_extra_and_failed_entries_refuse_partial_report(self):
         for fault in ('marker', 'missing', 'extra', 'status', 'architecture', 'platform', 'gitignore', 'pci', 'numeric'):

@@ -130,7 +130,7 @@ def make_report(outputs, architecture):
     except OSError:
         raise InventoryError("Could not identify the collector source revision") from None
     return {"schema_version": 1, "collector_sha256": collector_hash, "system": system, "pci": registry,
-              "safe_to_initialize": False, "gpu_work_submitted": False,
+              "safe_to_initialize": False, "gpu_work_submitted": False, "hardware_executed": False,
               "privacy": "Local-only metadata; review before sharing. Raw registry/stdout/stderr are not saved.",
               "limitations": ["Registry identity and assigned ranges are not independent PCI configuration-space verification.",
                               "Assigned PCI ranges do not establish usable VRAM, firmware/console reservations or exclusive ownership.",

@@ -17,6 +17,20 @@ candidate, nonempty assigned-address metadata, and no positive execution claims
 in the source inventory. Missing, ambiguous, altered or unsafe metadata blocks
 even that check.
 
+Both live collection and Recovery import explicitly set `hardware_executed`
+to false, alongside the other non-execution flags. Before the 2026-11-12 local
+check, the collector omitted this field and its own output failed the preflight's
+strict false-only gate. The collector/importer integration tests now pass their
+actual reports into the preflight. Missing, true or non-boolean flags still
+block the check; the preflight policy has not been relaxed.
+
+Local validation on 2026-11-12 used Python 3.13.18: 20 inventory/preflight and
+16 Recovery tests passed. A fresh live capture on macOS 26.7.2 / 25G332,
+Darwin 25.6.0 x86_64 with one registry candidate passed the check-only gate;
+`native_probe_run_allowed` remained false. This records the observed local OS,
+not independent hardware identity, source-to-installed-driver provenance or
+GPU execution by this branch.
+
 This is a policy gate, not hardware proof. Assigned PCI ranges are not an
 independent configuration-space read and do not prove VRAM, firmware residency,
 UMA reservations, queue ownership or display state. The report always sets

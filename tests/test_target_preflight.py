@@ -67,6 +67,16 @@ class TargetPreflightTests(unittest.TestCase):
         value = inventory(safe_to_initialize=True)
         self.assertFalse(evaluate(value)["native_probe_check_allowed"])
 
+    def test_missing_or_non_false_execution_flag_still_blocks_check(self):
+        for key in ("safe_to_initialize", "gpu_work_submitted", "hardware_executed"):
+            for flag in (None, True, 0, "false"):
+                with self.subTest(key=key, flag=flag):
+                    value = inventory(**{key: flag})
+                    self.assertFalse(evaluate(value)["native_probe_check_allowed"])
+            value = inventory()
+            del value[key]
+            self.assertFalse(evaluate(value)["native_probe_check_allowed"])
+
     def test_read_and_output_are_bounded_and_private(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

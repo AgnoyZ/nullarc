@@ -11,6 +11,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from target_inventory import COMMANDS, InventoryError, capture, pci_inventory, reported_ranges, system_inventory
+from target_preflight import evaluate
 
 
 def fixture_device(device=0x1900):
@@ -103,6 +104,10 @@ class TargetInventoryTests(unittest.TestCase):
             self.assertEqual(["inventory.json"], sorted(p.name for p in out.iterdir()))
             self.assertFalse(result["safe_to_initialize"])
             self.assertFalse(result["gpu_work_submitted"])
+            self.assertIs(result["hardware_executed"], False)
+            preflight = evaluate(result)
+            self.assertTrue(preflight["native_probe_check_allowed"])
+            self.assertFalse(preflight["native_probe_run_allowed"])
             self.assertNotIn("PRIVATE", (out / "inventory.json").read_text())
             with self.assertRaises(InventoryError):
                 capture(out)
