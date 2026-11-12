@@ -84,3 +84,10 @@ Source=phx-edid、Status=valid，并私下比对显示节点的原始字节。
 详见 [LEGACY-BOOT.md](LEGACY-BOOT.md)。离线工具只生成局部 DeviceProperties
 片段，不能替换完整 `config.plist`。本机内存布局和片段必须留在忽略的 `build/`
 目录，不要提交或上传。该修订尚未经过目标 GPU 验证；不自动部署到工作 EFI。
+
+启动后先核对 GPU 的 PCI provider 上有完全一致的 128 字节 Data，且服务的
+`phx-legacy-boot-status=0`、`phx-legacy-boot-startup-enabled=true`。
+状态属性缺失时先排查注入，不能当作布局被拒绝；配置文件和 EFI 属性块中有数据
+也不代表 macOS 已把它交给 GPU。核对本机 ACPI 根节点 `_UID` 和全部 PCI 路径，
+不要沿用示例的 `PciRoot(0x0)`。未通过前保留自动初始化保护，不运行旧 full.sh。
+该属性只在驱动启动时读取，修正路径后须由操作者再次手动重启并复核。

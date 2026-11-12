@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-12",
+  "source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+  "scope": "Separately authorized target driver-load and startup-profile routing test",
+  "os": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "candidate_binary_sha256": "37f1d88a00ee3f2c865db170510278c2f16cba2c044219b181c9e5d06f7eb629",
+  "observed_boot": {
+    "new_boot_observed": true,
+    "candidate_loaded_identity_matches": true,
+    "single_PhxBringup_service": true,
+    "debug_enabled": true,
+    "observed_geometry_matches_private_profile": true,
+    "expected_profile_present_in_EFI_properties_blob": true,
+    "expected_profile_present_on_GPU_provider": false,
+    "startup_status_property_present": false,
+    "startup_enabled": false,
+    "configured_root_UID_differs_from_live_ACPI_root": true,
+    "firmware_framebuffer_present": true,
+    "experimental_framebuffer_present": false,
+    "automatic_initialization_blocked": true,
+    "experimental_display_armed": false,
+    "pending_initialization": false,
+    "phase_1_acceptance": "failed_property_delivery"
+  },
+  "routing_correction": {
+    "changed_property": "phx-legacy-boot",
+    "only_its_PCI_path_changed": true,
+    "profile_bytes_unchanged": 128,
+    "driver_binaries_unchanged": true,
+    "other_EFI_files_unchanged": true,
+    "original_and_previous_test_configs_retained": true,
+    "load_only_guards_retained": true,
+    "independent_read_only_remount_and_full_manifest_readback": "passed",
+    "EFI_unmounted_after_verification": true,
+    "startup_acceptance": "pending_manual_reboot"
+  },
+  "limits": {
+    "GPU_commands_executed_by_probes": false,
+    "TOC_TMR_firmware_queues_tested": false,
+    "GPU_acceleration_verified": false,
+    "EDID_dimensions_verified": false,
+    "memory_ownership_proven": false,
+    "automatic_restart": false,
+    "private_config_profile_addresses_and_raw_logs_published": false
+  }
+}

@@ -53,6 +53,17 @@ and returns to the managed workflow; the startup diagnostic remains historical.
 Clearing/destroying the ring retains the profile and compatibility choice but
 does not clear the existing terminal PSP fault latch.
 
+Before issuing any GPU commands, verify the exact Data bytes on the GPU's live
+PCI provider, status zero, and startup-enabled true. An absent status is different
+from a nonzero rejection status: first check property delivery and the actual
+provider. A property in the EFI device-properties blob or a correct on-disk
+config does not prove that macOS attached it to that provider. Verify every PCI
+path hop and the live ACPI root `_UID`; do not assume `PciRoot(0x0)` from an
+existing example or an older EDID entry. Keep automatic initialization blocked
+while these checks fail. The startup property is read only during driver start,
+so correcting its routing requires another operator-controlled boot before
+acceptance can be retested.
+
 ## Translation rules
 
 - Raw LOAD_TOC (`0x20`) must point into the configured staging area, with zero
@@ -133,3 +144,11 @@ downloaded kexts passed strict signature verification and all 24 inner package
 checksums matched. The sanitized record is
 [`validation/legacy-boot-20261112.json`](validation/legacy-boot-20261112.json).
 These results cover the source revision named there, with no target deployment.
+
+A later, separately authorized load-only target boot is recorded in
+[`validation/legacy-boot-load-only-20261112.json`](validation/legacy-boot-load-only-20261112.json).
+The candidate loaded, but the provider did not receive the profile: the EFI
+property path used a different root UID from the live ACPI root. Only that
+profile's path was corrected and read back; the corrected startup acceptance
+still awaits another manual boot. No GPU initialization or acceleration test
+was performed in this stage.
