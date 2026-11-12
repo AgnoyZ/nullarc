@@ -1,0 +1,159 @@
+{
+  "date": "2026-11-12",
+  "code_commit": "99e647e01cbaa05a6f2efd3c0533d1378cca582e",
+  "repository": "AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "evidence_class": "host-verified",
+  "workflow": {
+    "run_id": 43144322860,
+    "conclusion": "success",
+    "jobs": {
+      "native-components": "success",
+      "host-contracts": "success"
+    }
+  },
+  "windows_lf_checkout": {
+    "staged_tree_matches_code_commit": true,
+    "tests": 358,
+    "skipped": 27,
+    "failures": 0
+  },
+  "ubuntu_host": {
+    "tests": 358,
+    "skipped": 1,
+    "failures": 0,
+    "foundation_execution": false
+  },
+  "macos_host": {
+    "product_version": "15.7.9",
+    "build": "24G830",
+    "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
+    "async_function": {
+      "asan_ubsan": {
+        "sanitizer": "address,undefined",
+        "runs": [
+          {
+            "actual_methods": 2,
+            "actual_queue": true,
+            "width": 1,
+            "peak_active": 1,
+            "snapshot_and_return_before_build": true,
+            "callback_reentry": true,
+            "retained_owner": true,
+            "error_and_warning_propagation": true,
+            "nil_handler_skips_work": true,
+            "native_descriptor_subclass": true,
+            "stress_requests": 1600,
+            "hardware_executed": false
+          },
+          {
+            "actual_methods": 2,
+            "actual_queue": true,
+            "width": 2,
+            "peak_active": 2,
+            "snapshot_and_return_before_build": true,
+            "callback_reentry": true,
+            "retained_owner": true,
+            "error_and_warning_propagation": true,
+            "nil_handler_skips_work": true,
+            "native_descriptor_subclass": true,
+            "stress_requests": 1600,
+            "hardware_executed": false
+          }
+        ],
+        "actual_methods_sha256": "c0adfc00703c86ea7416da84f32b00ae3f0d2950555368c322d601e3d2daae75",
+        "actual_queue_sha256": "8fddf7c18511b7e93c876c5f5783435f3219eb14bd0d8dbd13ce1a1ce87f4723",
+        "inputs_sha256": {
+          "src/nmplugin/NVMTLObjects.m": "798bf7888020e3cebe9e37377b705cb5bcfcf23b96b2184b6a0b6afcde813065",
+          "src/nmplugin/NVMTLDevice.m": "5d047bb4e221db3c2e0a8e30b877f5535795f57d99a5b95b4fec54ea43fc7f6d",
+          "tests/test_async_function.m": "63a6ac47a77434a202898cde3be8bdce22eb89747893747524c92d054cb61875",
+          "tools/test_async_function.py": "34ad9141c8a06f11769046c3b47646b09edaacdde1530849ad9f9614e8e00904",
+          "tools/test_async_library.py": "1450db962937f923432db0b5d1cedf12676cec78dcf8f83fb176b4df1da5900e"
+        },
+        "limitations": "Actual async API/queue bodies with real Foundation/Metal constants and descriptors; synchronous function creation and logging are synthetic. No translator, GPU execution, target latency or FPS benchmark."
+      },
+      "tsan": {
+        "sanitizer": "thread",
+        "runs": [
+          {
+            "actual_methods": 2,
+            "actual_queue": true,
+            "width": 1,
+            "peak_active": 1,
+            "snapshot_and_return_before_build": true,
+            "callback_reentry": true,
+            "retained_owner": true,
+            "error_and_warning_propagation": true,
+            "nil_handler_skips_work": true,
+            "native_descriptor_subclass": true,
+            "stress_requests": 1600,
+            "hardware_executed": false
+          },
+          {
+            "actual_methods": 2,
+            "actual_queue": true,
+            "width": 2,
+            "peak_active": 2,
+            "snapshot_and_return_before_build": true,
+            "callback_reentry": true,
+            "retained_owner": true,
+            "error_and_warning_propagation": true,
+            "nil_handler_skips_work": true,
+            "native_descriptor_subclass": true,
+            "stress_requests": 1600,
+            "hardware_executed": false
+          }
+        ],
+        "actual_methods_sha256": "c0adfc00703c86ea7416da84f32b00ae3f0d2950555368c322d601e3d2daae75",
+        "actual_queue_sha256": "8fddf7c18511b7e93c876c5f5783435f3219eb14bd0d8dbd13ce1a1ce87f4723",
+        "inputs_sha256": {
+          "src/nmplugin/NVMTLObjects.m": "798bf7888020e3cebe9e37377b705cb5bcfcf23b96b2184b6a0b6afcde813065",
+          "src/nmplugin/NVMTLDevice.m": "5d047bb4e221db3c2e0a8e30b877f5535795f57d99a5b95b4fec54ea43fc7f6d",
+          "tests/test_async_function.m": "63a6ac47a77434a202898cde3be8bdce22eb89747893747524c92d054cb61875",
+          "tools/test_async_function.py": "34ad9141c8a06f11769046c3b47646b09edaacdde1530849ad9f9614e8e00904",
+          "tools/test_async_library.py": "1450db962937f923432db0b5d1cedf12676cec78dcf8f83fb176b4df1da5900e"
+        },
+        "limitations": "Actual async API/queue bodies with real Foundation/Metal constants and descriptors; synchronous function creation and logging are synthetic. No translator, GPU execution, target latency or FPS benchmark."
+      }
+    },
+    "existing_async_library_translation_and_cache_sanitizer_regressions": true,
+    "kext_compile_link_sign_strict_verify": [
+      "PhxBringup",
+      "PhxAccel"
+    ],
+    "metal_plugin_compile_link_sign_strict_verify": true,
+    "warnings_remain": true
+  },
+  "initial_failed_run": {
+    "run_id": 43143909880,
+    "conclusion": "failure",
+    "status": "completed",
+    "reason": "Fixture assigned inherited factory superclass return type to subclass pointer under -Werror; corrected to native subclass new. No async function execution passed in that run."
+  },
+  "superseded_full_stack_run": {
+    "run_id": 43143909698,
+    "conclusion": "cancelled",
+    "status": "completed"
+  },
+  "duplicate_full_stack_run": {
+    "run_id": 43144322679,
+    "conclusion": "cancelled",
+    "status": "completed"
+  },
+  "claims": {
+    "hardware_execution_established": false,
+    "target_os_build_verified": false,
+    "target_driver_deployed": false,
+    "target_frame_rate_improved": false,
+    "cold_start_latency_improved": false,
+    "real_compiler_executed_by_async_fixture": false,
+    "binary_uploaded": false
+  },
+  "limitations": [
+    "Actual two async method and three shared queue helper bodies execute with real Metal constants/descriptors; synchronous function creation and logging are synthetic.",
+    "Suspended/gated operations prove queuing and active concurrency, not a timed speedup.",
+    "Queue width bounds active operations, not backlog, total compiler threads or process RSS.",
+    "Native copy behavior is not a deep-copy guarantee for arbitrary nested objects or foreign descriptors.",
+    "No target shader correctness, deployment, Tahoe migration or stable FPS evidence."
+  ]
+}

@@ -25,9 +25,9 @@ copy of arbitrary nested objects/foreign descriptor implementations.
 The existing synchronous `id` descriptor entry point accepts invalid objects and
 returns errors. Non-copyable objects are retained and passed through to that
 path; the wrapper does not introduce an unconditional `copy` exception for them.
-Valid native descriptors get snapshots. Invalid named-function inputs and other
-exceptions retain the synchronous implementation's contract; there is no new
-exception-to-NSError conversion.
+Valid native descriptors get snapshots. Invalid named-function inputs are
+passed to the same synchronous implementation. Exceptions from copying or
+queued work are not converted into a new NSError contract.
 
 Both results and errors (including a warning accompanying a result) reach the
 handler unchanged. Callbacks dispatch to the user-initiated global queue,
@@ -62,7 +62,7 @@ On macOS, the fixture uses real Foundation, `MTLFunctionConstantValues`,
 `MTLFunctionDescriptor` and `MTLIntersectionFunctionDescriptor`. It substitutes
 synchronous function creation and logging, without creating a Metal device or
 executing translation. Tests cover suspended/gated compilation, mutable names,
-indexed/named constant reset, descriptor replacement/options/specialized names,
+indexed/named constant modification/reset, descriptor replacement/options/specialized names,
 subclass preservation, nil/invalid inputs, nil-handler no-work behavior,
 success/failure/warning propagation, callbacks outside the pool, nested waits,
 owner retention/release, and 1600 mixed requests from 16 callers at each of
@@ -72,7 +72,10 @@ Windows/Linux verify extraction and unsupported-native-execution refusal only.
 Initial focused run `43143909880` passed the Ubuntu host checks but rejected
 the fixture's subclass factory return type under `-Werror`. The fixture now
 constructs the native subclass directly with `new`; warning checks remain
-enabled. Native execution results will be recorded after a successful rerun;
-none are claimed here yet.
+enabled. Corrected focused run `43144322860` passed both sanitizer variants at
+widths one and two, existing async library/translation/cache regressions, both
+kext builds and actual Metal plugin build/sign verification. Committed-source
+and extracted-body hashes and actual host details are recorded in
+`validation/async-function-20261112.md` and its JSON companion.
 Target acceptance still requires real function/shader output, caller latency,
 memory and frame-time A/B. Host scheduling tests cannot establish stable FPS.
