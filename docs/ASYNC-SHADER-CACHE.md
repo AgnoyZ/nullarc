@@ -64,8 +64,12 @@ the entry/byte bounds including the active writer, mutate accepted inputs, injec
 switches, and run 1600 requests on 16 workers. Separate ASan/UBSan and TSan runs
 are required; a Windows/Linux source test is not Foundation execution.
 
-Native results are recorded separately after CI completes. Real translator/shader
-correctness, target OS build, cold/warm launch latency, queue pressure, memory and
-frame-time distribution still need target A/B evidence before any speedup claim.
+Focused run `43139325816` passed both sanitizers, the sharing regression fixture
+in synchronous rollback mode, both kexts and the actual Metal plugin build/sign
+checks. Input hashes and host details are in
+`validation/async-shader-cache-20261112.md` and its JSON companion.
+Real translator/shader correctness, target OS build, cold/warm launch latency,
+queue pressure, memory and frame-time distribution still need target A/B
+evidence before any speedup claim.
 Keep workloads and all other knobs fixed. Rollback is the async-off switch and
 an application restart, or a normal reviewed revert; no EFI deployment is implied.

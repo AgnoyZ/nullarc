@@ -1,0 +1,103 @@
+{
+  "date": "2026-11-12",
+  "code_commit": "59e4e568253f2dad99bffa515623c6607fbdb26d",
+  "repository": "AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "evidence_class": "host-verified",
+  "workflow": {
+    "run_id": 43139325816,
+    "conclusion": "success",
+    "jobs": {
+      "native-components": "success",
+      "host-contracts": "success"
+    }
+  },
+  "windows_lf_checkout": {
+    "staged_tree_matches_code_commit": true,
+    "tests": 352,
+    "skipped": 27,
+    "failures": 0
+  },
+  "ubuntu_host": {
+    "tests": 352,
+    "skipped": 1,
+    "failures": 0,
+    "foundation_execution": false
+  },
+  "macos_host": {
+    "product_version": "15.7.9",
+    "build": "24G830",
+    "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
+    "async_cache": {
+      "asan_ubsan": {
+        "actual_entry": true,
+        "actual_cache_io": true,
+        "returned_before_fsync": true,
+        "pending_reuse_requests": 100,
+        "entry_limit": 32,
+        "payload_limit_bytes": 33554432,
+        "failure_retry_and_exception": true,
+        "stress_requests": 1600,
+        "hardware_executed": false,
+        "inputs_sha256": {
+          "src/nmplugin/NVMTLLibraryLoad.m": "1eff0f8d470fb9cdd4e4ec74a10ea0613dcce7a89ddba33107b7fb8cc1721854",
+          "src/nmplugin/nvmtl_async_cache.h": "522685b019fa6c87ebb7a9504ffe8257f5f2855b044f87c4f82631a54dcf8133",
+          "src/nmplugin/nvmtl_cache_io.h": "bc1a38559ff56b4460d700aca0a8a418c029808c07296b431868c164ee16dfb0",
+          "src/nmplugin/nvmtl_translation_flight.h": "f07767a361fcde02d6df496b08a9a204d2d94e1aca22050ad58ef7a14d9270ee",
+          "tests/test_async_cache.m": "bc0689a3b4d4dc362a50940bd6a82db8ff8a58b7f0d219b18efc74c97518ae1f",
+          "tools/test_translation_flight.py": "c9e9edc5d0d79815def1a9784eba6c4e54bccfdf04ed6f9dbba022932ee3857e",
+          "tools/test_async_cache.py": "db5ccd5a00719d780d3c99361e0cd3ab9b315b0af69d274cbebbd5543922ab9b"
+        },
+        "actual_body_sha256": "78f18ef8a089d282a724e4ed80495e29dc7ebf91f787773cae8fbed47b8eb683",
+        "sanitizer": "address,undefined",
+        "limitations": "Real atomic host-file I/O and actual base-entry/writer control flow with synthetic translator output; no real shader execution, target GPU, FPS or latency measurement."
+      },
+      "tsan": {
+        "actual_entry": true,
+        "actual_cache_io": true,
+        "returned_before_fsync": true,
+        "pending_reuse_requests": 100,
+        "entry_limit": 32,
+        "payload_limit_bytes": 33554432,
+        "failure_retry_and_exception": true,
+        "stress_requests": 1600,
+        "hardware_executed": false,
+        "inputs_sha256": {
+          "src/nmplugin/NVMTLLibraryLoad.m": "1eff0f8d470fb9cdd4e4ec74a10ea0613dcce7a89ddba33107b7fb8cc1721854",
+          "src/nmplugin/nvmtl_async_cache.h": "522685b019fa6c87ebb7a9504ffe8257f5f2855b044f87c4f82631a54dcf8133",
+          "src/nmplugin/nvmtl_cache_io.h": "bc1a38559ff56b4460d700aca0a8a418c029808c07296b431868c164ee16dfb0",
+          "src/nmplugin/nvmtl_translation_flight.h": "f07767a361fcde02d6df496b08a9a204d2d94e1aca22050ad58ef7a14d9270ee",
+          "tests/test_async_cache.m": "bc0689a3b4d4dc362a50940bd6a82db8ff8a58b7f0d219b18efc74c97518ae1f",
+          "tools/test_translation_flight.py": "c9e9edc5d0d79815def1a9784eba6c4e54bccfdf04ed6f9dbba022932ee3857e",
+          "tools/test_async_cache.py": "db5ccd5a00719d780d3c99361e0cd3ab9b315b0af69d274cbebbd5543922ab9b"
+        },
+        "actual_body_sha256": "78f18ef8a089d282a724e4ed80495e29dc7ebf91f787773cae8fbed47b8eb683",
+        "sanitizer": "thread",
+        "limitations": "Real atomic host-file I/O and actual base-entry/writer control flow with synthetic translator output; no real shader execution, target GPU, FPS or latency measurement."
+      }
+    },
+    "synchronous_rollback_translation_sharing_asan_ubsan_tsan": true,
+    "kext_compile_link_sign_strict_verify": [
+      "PhxBringup",
+      "PhxAccel"
+    ],
+    "metal_plugin_compile_link_sign_strict_verify": true,
+    "warnings_remain": true
+  },
+  "cancelled_duplicate_full_stack_run": 43139325721,
+  "claims": {
+    "hardware_execution_established": false,
+    "target_os_build_verified": false,
+    "target_driver_deployed": false,
+    "target_frame_rate_improved": false,
+    "cold_start_latency_improved": false,
+    "real_translator_executed_by_async_fixture": false,
+    "binary_uploaded": false
+  },
+  "limitations": [
+    "The actual entry/save wrapper, bounded helper and atomic host-file I/O execute; translator output and logging are synthetic.",
+    "Returning while fsync is gated is a control-flow result, not a latency benchmark.",
+    "32 MiB bounds tracked queued/active payload, not process RSS or caller-held results.",
+    "No process-exit drain/durability guarantee, target shader correctness, deployment, Tahoe migration or stable FPS evidence."
+  ]
+}
