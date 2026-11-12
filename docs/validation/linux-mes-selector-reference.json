@@ -53,6 +53,7 @@
     "These sources establish encodings and a controlled diagnostic option, not the cause of the target selector mismatch."
   ],
   "implementation": "Independently written diagnostic checks and documentation; no full Linux bodies or headers copied.",
-  "target_DisallowGfxOff_executed": false,
+  "target_DisallowGfxOff_executed": true,
+  "later_target_record": "mes-selector-target-20261112.json",
   "target_root_cause_established": false
 }

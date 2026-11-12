@@ -166,3 +166,12 @@ There was no same-boot retry, work queue creation, shader dispatch, adoption,
 accelerator claim or display takeover. Acceleration, EDID physical dimensions
 and exclusive memory ownership remain unverified. See `MES-START.md` for the
 source investigation and bounded next-test scope.
+
+The next manual boot repeated the PSP/firmware/power prerequisites successfully,
+then the independent selector-only probe received DisallowGfxOff acknowledgement
+but still read zero immediately and subsequently for the first `0x0c` selection.
+It stopped before GART or MES reset; see
+[`validation/mes-selector-target-20261112.json`](validation/mes-selector-target-20261112.json).
+The next diagnostic must capture the target IP mapping on a fresh pristine
+boot, without repeating initialization. The prepared private capture prototype
+is host-tested only; acceleration and display dimensions remain unresolved.

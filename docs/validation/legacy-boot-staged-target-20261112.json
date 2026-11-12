@@ -105,7 +105,8 @@
     "private_test_binary_uploaded": false
   },
   "next_test": {
-    "status": "planned_not_executed",
+    "status": "executed_on_separate_fresh_boot_and_stopped_at_first_selector",
+    "result_record": "mes-selector-target-20261112.json",
     "requires_fresh_manual_boot_and_new_boot_pinned_plan": true,
     "scope": "After checked PSP/firmware/power prerequisites, acknowledge DisallowGfxOff and test GRBM selection before GART or MES reset",
     "message": "PPSMC_MSG_DisallowGfxOff (0x1a), argument zero",

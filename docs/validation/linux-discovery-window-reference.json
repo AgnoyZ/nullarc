@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "source_repository": "torvalds/linux",
+  "source_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+  "files": [
+    {
+      "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c",
+      "sha256": "fc38d8b22667c1154c8d3a30a74763d5a15b17276a0b9faf014eb16587af36ad",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.h",
+      "sha256": "5db7653163840c2391e65fccc53c1b6b38a23579f4c06f542bf0b0a4b4cab136",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_device.c",
+      "sha256": "1533076e08cebbe7062799cc5077f03a1adf31fb61aebe42428b719eda52acd7",
+      "license_notice": "AMD MIT-style notice inspected"
+    },
+    {
+      "path": "drivers/gpu/drm/amd/include/discovery.h",
+      "sha256": "bd64513b3397e3b2633a0a3e45e95a546b26dd5789f30d1a902a8b415528c8d3",
+      "license_notice": "AMD MIT-style notice inspected"
+    }
+  ],
+  "checked_facts": {
+    "discovery_TMR_offset_from_VRAM_end_bytes": 65536,
+    "default_capture_bytes": 10240,
+    "binary_signature": 673256455,
+    "RCC_CONFIG_MEMSIZE_unit_bytes": 1048576,
+    "memory_window_read_sequence": "Write MM_INDEX with low offset and memory bit; write MM_INDEX_HI with offset >> 31; read MM_DATA. No MM_DATA write.",
+    "initialization_status_gate": "C2PMSG_33 bit 31, reject all ones",
+    "checksum": "16-bit byte sum from binary offset 10 to binary_size"
+  },
+  "private_prototype": {
+    "status": "prepared_offline_not_executed_on_target",
+    "transport_source_commit": "853d43c1ab5d25e75b84ad1acabb5022d4445d11",
+    "capture_source_sha256": "c4701a4f5a0ccc311357b7021bec963426016f130a8d94a6c549243e51d8df09",
+    "fixture_sha256": "bcbaf6cdb92c308724e05f2cd4b03762913847d5769358de2c076eca841e9212",
+    "native_binary_sha256": "7e415d3d2b323c79451f64fde3f3dde8a72d445983f5aa8bedbad8d1682f80c2",
+    "native_IOKit_linked": true,
+    "ASan_UBSan_cases_passed": 58,
+    "native_binary_installed_or_uploaded": false,
+    "kernel_built_or_installed_locally": false,
+    "fresh_boot_wrapper_current_stopped_boot_gate": "passed_without_GPU_access",
+    "startup_gate": "Kernel snapshot must be configured only: no PSP ring, TMR, queue or fault. Require firmware ready and matching memory-size register before memory-window writes.",
+    "write_allowlist": "MM_INDEX and MM_INDEX_HI only; no VRAM data, power, GART, MES, queue or display writes",
+    "failure_behavior": "Terminal; no automatic retry or register restoration",
+    "output": "Private exclusive .partial file; binary-envelope checks required, IP tables still need offline validation",
+    "unsupported_case_behavior": "No guessed address/scratch/system-memory fallback",
+    "hardware_tested": false
+  },
+  "implementation": "Private independently written userspace wrapper using the existing nullarc transport; source and fixtures retained locally. No Linux bodies or whole headers copied into the prototype. This is not a shipped driver feature or a hardware result."
+}

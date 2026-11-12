@@ -140,4 +140,45 @@ perform only selector writes/readbacks before GART or MES reset. Stop at the
 first error; restore idle only after successful selection checks. Do not
 unconditionally re-allow GFXOFF on partial failure. Such a test neither
 proves causality nor submits GPU work. No power-control message or selector
-write was sent during the current boot's follow-up investigation.
+write was sent during the original stopped boot's follow-up investigation.
+
+## Separate fresh-boot selector probe, 2026-11-12
+
+On the next operator-controlled boot, startup acceptance and the separately
+checked PSP/TOC/TMR, seventeen firmware loads, RLC autoload and GFX power
+prerequisites passed again. The boot-pinned private selector probe then
+received a successful DisallowGfxOff (`0x1a`, argument zero) acknowledgement.
+CP/RLC readiness and idle selection were observed before the first selector
+write. Expected `0x0c`, the kernel's immediate readback was zero and a second
+read was also zero. The probe stopped there: it never selected pipe 1, restored
+idle, initialized GART, reset/activated MES or created/submitted a queue. No
+further GPU register writes or same-boot retries followed. See
+`validation/mes-selector-target-20261112.json`.
+
+An acknowledged inhibition message alone did not fix selection. This does not
+independently verify the hardware exited GFXOFF or eliminate all power/access
+conditions. The mismatch was observed before any GART/MES reset in this boot;
+the probe does not establish a complete hardware reset across reboot. Root
+cause and write-only semantics remain unestablished, so the readback checks
+stay intact.
+
+The remaining GC segment bases still originate from the reference machine,
+not independently captured target IP discovery. No PhxProbe service or already
+published discovery data was found, and the default discovery tail lies outside
+the direct VRAM aperture. Do not scan guessed MMIO bases or initialize another
+stage to work around this missing evidence.
+
+A private userspace capture prototype is prepared for a **fresh pristine boot
+before any PSP/firmware/power initialization**. It uses the existing checked
+transport in one connection and gates on configured-only kernel metadata,
+firmware initialization status and matching memory size. The bounded memory
+read changes only MM_INDEX/MM_INDEX_HI address selectors; it is not literally
+zero-register-write diagnosis. It never writes MM_DATA or any power, GART,
+MES, queue or display register. It accepts no arbitrary memory address, uses
+no guessed fallback, stops on the first error and retains a private exclusive
+partial file. Binary-envelope validation is not IP-table validation or a
+hardware-ownership proof. The current initialized boot is rejected. Native
+compilation and 58 ASan/UBSan fault cases passed; no target capture has run.
+Source facts and prototype hashes are in
+`validation/linux-discovery-window-reference.json`. No kext installation,
+kernel build, public diagnostic binary or raw discovery dump is added.

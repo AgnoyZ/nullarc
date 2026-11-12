@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-12",
+  "scope": "New manual boot; repeated checked PSP/firmware/power prerequisites, then one-shot GFXOFF-inhibited selector-only probe before GART/MES reset",
+  "hardware": "Radeon 780M, Ryzen 8845H",
+  "os": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "deployed_kernel_source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+  "deployed_kernel_binary_sha256": "37f1d88a00ee3f2c865db170510278c2f16cba2c044219b181c9e5d06f7eb629",
+  "repository_at_test": "853d43c1ab5d25e75b84ad1acabb5022d4445d11",
+  "prerequisites": {
+    "fresh_boot_observed": true,
+    "candidate_identity_profile_geometry_and_guards_match": true,
+    "installed_stack_hashes_match": true,
+    "immutable_official_lock_verified_firmware_snapshots": 9,
+    "PSP_TOC_TMR_and_command_readbacks": "passed",
+    "firmware_loads_acknowledged": 17,
+    "RLC_autoload_acknowledged": true,
+    "SMU_driver_interface": 8,
+    "EnableGfxImu_argument": 1,
+    "EnableGfxImu_acknowledged": true,
+    "CP_and_RLC_boot_readiness_observed": true
+  },
+  "selector_probe": {
+    "private_probe_sha256": "fe1ed3f1654a8eb71baae7b7fa7f63fb2d5d0b44498de40e81faaee65675a724",
+    "offline_cases_previously_passed": 16,
+    "new_boot_pinned_plan_hash_checked": true,
+    "DisallowGfxOff_message": 26,
+    "DisallowGfxOff_argument": 0,
+    "DisallowGfxOff_acknowledged": true,
+    "GFXOFF_hardware_exit_independently_verified": false,
+    "readiness_and_idle_observed_before_selector_write": true,
+    "first_pipe_expected": 12,
+    "kernel_immediate_write_readback": 0,
+    "subsequent_readback": 0,
+    "selector_writes_issued": 1,
+    "pipe_1_selection_reached": false,
+    "idle_restoration_reached": false,
+    "status": "stopped",
+    "same_boot_retry": false
+  },
+  "interpretation": {
+    "simple_acknowledged_GFXOFF_inhibition_fixed_selection": false,
+    "all_power_related_causes_eliminated": false,
+    "mismatch_observed_before_GART_or_MES_reset_this_boot": true,
+    "root_cause_established": false,
+    "register_segment_bases_independently_verified_on_target": false,
+    "write_only_selector_semantics_established": false
+  },
+  "guards_and_limits": {
+    "automatic_GPU_initialization_blocked": true,
+    "experimental_display_not_armed": true,
+    "framebuffer": "IONDRVFramebuffer",
+    "pending_initialization": false,
+    "GART_or_MES_reset_executed_this_boot": false,
+    "queue_creation_shader_submission_adoption_or_claim_executed": false,
+    "writes_after_selector_failure": false,
+    "automatic_restart": false,
+    "kernel_or_installed_helpers_replaced": false,
+    "private_raw_logs_layout_addresses_EFI_or_firmware_published": false,
+    "GPU_Metal_or_desktop_acceleration_verified": false,
+    "EDID_dimensions_fixed_or_verified": false
+  },
+  "next_diagnostic": {
+    "status": "private_prototype_prepared_offline_not_executed",
+    "requires_fresh_pristine_manual_boot": true,
+    "repeat_PSP_firmware_or_power_initialization_permitted": false,
+    "purpose": "Capture target IP discovery before further register-mapping assumptions or initialization changes",
+    "existing_PhxProbe_service_or_published_discovery_found": false,
+    "default_discovery_tail_within_existing_direct_aperture": false,
+    "memory_window_address_selector_writes_required": true,
+    "VRAM_data_writes_or_GPU_initialization_permitted": false,
+    "reference": "linux-discovery-window-reference.json"
+  }
+}
