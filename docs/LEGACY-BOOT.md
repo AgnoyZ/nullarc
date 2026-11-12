@@ -125,3 +125,11 @@ shared C++ validator and tests offline-output confinement.
 The manual two-kext artifact workflow runs these checks before native Intel
 compilation and packaging. A passing test/build is not evidence of a working
 GPU, accelerated desktop, correct EDID dimensions or a safe memory reservation.
+
+For source `c5c22b420aa8990eff90df4cbddd29815793ecf6`, all 394 Python checks,
+125 actual PSP-method cases, 73 queue-adoption cases and 114 firmware-sequence
+cases passed locally. Manual Intel artifact run `43188218248` succeeded; both
+downloaded kexts passed strict signature verification and all 24 inner package
+checksums matched. The sanitized record is
+[`validation/legacy-boot-20261112.json`](validation/legacy-boot-20261112.json).
+These results cover the source revision named there, with no target deployment.

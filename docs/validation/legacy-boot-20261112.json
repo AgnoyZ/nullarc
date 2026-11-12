@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-12",
+  "source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+  "scope": "Explicit legacy PSP startup profile and checked raw TOC/TMR translation; no deployment",
+  "local_tests": {
+    "python": "3.12.16",
+    "unittest_cases": 394,
+    "unittest_result": "success",
+    "psp_actual_method_cases": 125,
+    "psp_result": "success",
+    "psp_actual_method_sha256": {
+      "clearRing": "30d24399149a620e41fe64bcd5f2309ac2e490b93ebadf9ab2cba98f34b56487",
+      "bootMemory": "bcd13501ce6c85594766311a94d32f086e82313c3eaba907913055d59e33604e",
+      "configurePspLayout": "15f5309fa1ca7ae5cf69f651f4c72e0432454caaa67c8a6162d6b8a013ecb3b9",
+      "configureLegacyBoot": "cb4974424bf1e9bc8cb1c6f2616637604f74cc2ea823fc435e146f552f5fca34",
+      "pspRing": "0be3124eb67de1efcfac3e1d6b3dea24278917a25ea9336fb206904a59a04aa0",
+      "pspRunCmd": "0b317aa91bbc403f523b9c9fde990d91cec18dcbe180f8098fbc5b5f7bbe249e",
+      "fwStage": "cafeb4a92699f6eb328953f4bb865b5efb10a44ef3bb69e9ba424a09a58c264c",
+      "loadToc": "a0ecba9d8bff6cbd06ce1add3a7ff1e41139cf3658c06bb031bbdd0d2e18b4ee",
+      "loadTocLocked": "e16a61cd1fbaf33b5d02cf97c2fb95c5bf4f6a0642dce9763d3a2189c2b6a6a8",
+      "loadIpFw": "6437c8e7592f9a91b4a019102f2fa121eb0721a5f2ef020ecfb07086020a5206",
+      "pspCtl": "31bd20c1c2b67fe229e99f6d0d1f0954e67c0cfa5c65f774cb21258dc0317409",
+      "setupTmrLocked": "a57cac1662fb96ef422a48cf9ef215d08bfdac9a7869d749951118ebccf91a36",
+      "pspRaw": "491f05d78661fb12347a3f04a6c736ed3f10669815ec5338b1a2d2707a396cb9"
+    },
+    "queue_adoption_cases": 73,
+    "queue_adoption_result": "success",
+    "firmware_sequence_cases": 114,
+    "firmware_sequence_result": "success",
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "environment_note": "System Python 3.9.6 failed one pre-existing Path.write_text(newline=...) test; all 394 passed with Python 3.12.16."
+  },
+  "ci": {
+    "repository": "AgnoyZ/nullarc",
+    "workflow": ".github/workflows/kext-artifacts.yml",
+    "run_id": 43188218248,
+    "job_id": 131080666047,
+    "runner": "macos-15-intel",
+    "result": "success",
+    "compiler": "Apple clang version 17.0.0 (clang-1700.0.13.5)",
+    "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "broader_source_workflow_run_id": 43188214080,
+    "broader_source_tests_job_result": "success"
+  },
+  "artifact": {
+    "name": "experimental-kexts-c5c22b420aa8990eff90df4cbddd29815793ecf6",
+    "archive_sha256": "6618591e03396263ea89c1c8c3feece67b57966e323dea09c59a5d63bb14992e",
+    "inner_checksums_verified": 24,
+    "binary_sha256": {
+      "PhxBringup": "37f1d88a00ee3f2c865db170510278c2f16cba2c044219b181c9e5d06f7eb629",
+      "PhxAccel": "4db98733b4dc9098d69938e511a57dc07266d0f6f722fb3c8bf119edc6ef6465"
+    },
+    "codesign_verify_strict_passed_on_ci_and_download": true
+  },
+  "limits": {
+    "hardware_executed": false,
+    "gpu_acceleration_verified": false,
+    "memory_reserved": false,
+    "installed": false,
+    "automatic_restart": false,
+    "full_stack_validation_claimed": false,
+    "requires_explicit_legacy_profile": true,
+    "default_addresses_supplied": false
+  }
+}
