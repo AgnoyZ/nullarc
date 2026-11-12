@@ -116,7 +116,13 @@ writes, delays, reset, retry or hardware cleanup. Synthetic cases distinguish
 a selector that remains zero, one that appears correct immediately then reads
 zero, and a bad immediate reply despite a matching later read. Both pipes and
 idle restoration are checked before the next entrypoint/activation write.
-This change has not executed on the target.
+This change has not executed on the target. Source `280b2b2` passed all 396
+Python checks, 226 actual-CLI MES cases in both metadata variants and the
+52 transport / 20 completion / 16 submission cases under ASan/UBSan. Its
+private Intel userspace diagnostic compiled and linked to native IOKit, but
+was not installed or executed against hardware. No kernel was built locally.
+See `validation/mes-selector-diagnostic-20261112.json`; these host results
+do not establish a target fix or full-stack native CI completion.
 
 Pinned primary-source review is recorded in
 `validation/linux-mes-selector-reference.json`. `soc21_grbm_select` uses the

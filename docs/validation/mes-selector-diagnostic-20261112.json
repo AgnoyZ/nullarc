@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-12",
+  "source_commit": "280b2b2a5641e8af545d0c97f8d12698a7240ae8",
+  "scope": "Host validation of immediate MES selector readback checks; no target execution of this revision",
+  "source_sha256": {
+    "tools/phxctl/mesboot.c": "d734d4d7d07c745cb4b26a7b5954d522facfd08645a3f3fbb193c3b5b2ed4917",
+    "tools/test_mes_start.py": "ee8f6092218f40d103d2a3949434798eb4109d10fe1807bb47f2d2f0b6327f0a",
+    "tests/test_mes_start.c": "91f892daf0fca7ef75d6a7922fbbfa883c9a55332a6ba3b619e2c72aa3981642",
+    "tests/test_mes_start_runner.py": "1511e32111ba906d0a6122bf40e7dde9494e0f93a76b5bcb36551f990eacf94f"
+  },
+  "tests": {
+    "python_unittest": {
+      "passed": 396
+    },
+    "actual_MES_CLI_ASan_UBSan": {
+      "passed": 226,
+      "variants": [
+        "audited",
+        "synthetic-distinct-entrypoints"
+      ],
+      "new_failure_modes": "Both pipe selectors stay zero, lose selection after immediate success, or return a bad immediate value; idle immediate mismatch also gates activation"
+    },
+    "actual_transport_ASan_UBSan": {
+      "fault_injection_cases_passed": 52,
+      "completion_path_cases_passed": 20,
+      "submission_boundary_cases_passed": 16
+    }
+  },
+  "native_userspace_compile": {
+    "passed": true,
+    "architecture": "x86_64",
+    "native_IOKit_linked": true,
+    "binary_sha256": "15e16ffd5231a6a169b66b530cdad7235e1d9adf40c195b91571d5bc2ccb055c",
+    "hardware_executed": false,
+    "installed": false,
+    "uploaded": false
+  },
+  "limits": {
+    "kernel_built_locally": false,
+    "kernel_or_installed_tools_replaced": false,
+    "target_executed_this_revision": false,
+    "selector_root_cause_established": false,
+    "GPU_or_desktop_acceleration_verified": false,
+    "full_stack_native_CI_success_claimed": false
+  }
+}
