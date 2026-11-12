@@ -2,6 +2,11 @@
 
 These artifacts are research builds for noncommercial development, NOT a complete or hardware-validated driver distribution.
 
+2026-11-12: the owner requested a manual two-kext download workflow;
+see [KEXT-ARTIFACTS.md](KEXT-ARTIFACTS.md) for its limited publication scope,
+sources/notices and operator-reviewed upgrade procedure. It is not a full
+release or an installer. Full-stack binary publication remains blocked.
+
 - PhxBringup and PhxAccel are patched builds of the pinned nullarc source, not a new from-scratch implementation.
 - The kernel and framebuffer paths require Darwin 25, PCI 1002:1900, and explicit `phx780m=1` opt-in. Existing kill switches are retained. This flag alone does NOT initialize the GPU or enable Metal.
 - Do not load/install them yet: the firmware layout, panel, runtime ABI and full userspace stack still require machine-specific review.
@@ -27,7 +32,7 @@ PhxAccel/NullMoth-derived components are PolyForm Noncommercial 1.0.0.
 
 Required Notice: Copyright (c) 2026 NullMoth Systems (https://nullmothsystems.com)
 
-PhxBringup is offered upstream under MIT or GPL-2.0-only (subject to per-file notices). Its ABI header identifies BSD-3-Clause/Cobalt64 provenance while the upstream summary labels that contribution MIT. This discrepancy is an open audit item; do not relicense or publicly redistribute the builds until resolved.
+PhxBringup is offered upstream under MIT or GPL-2.0-only (subject to per-file notices). Its ABI header identifies BSD-3-Clause/Cobalt64 provenance while the upstream summary labels that contribution MIT. Preserve both attributions; the limited two-kext review in KEXT-PROVENANCE.md records the discrepancy and packages supplemental notices without relicensing. This does not clear full-stack releases.
 MacKernelSDK is an external pinned build dependency with APSL/per-file terms, not bundled here. No Apple OS binaries or hardware firmware are included.
 Vulkan-Headers is pinned at `6802bb4733b63ed5efd3adb308a6c885ef180ea1`; its Apache-2.0/MIT notices are included under DEPENDENCY-LICENSES. NVMTLDriver.bundle is also NullMoth-derived and subject to PolyForm Noncommercial terms. The plugin's embedded conversion-shader data is upstream source content, not an Apple OS executable.
 The separately built libnvmtl_translate.dylib is LGPL-3.0-or-later, not PolyForm. Its exact source archive accompanies local artifacts under SOURCE, with NOTICE/LICENSE/COPYING under DEPENDENCY-LICENSES. No claim is made that these steps alone resolve every dependency's redistribution requirements; public binary publication remains blocked.

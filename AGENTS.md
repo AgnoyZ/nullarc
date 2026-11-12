@@ -11,5 +11,5 @@
 - Keep experiments isolated, change one variable per test, and document rollback.
 - After every coherent change: update relevant docs, run available checks and `git diff --check`, review privacy and the staged diff, commit, push, and verify the remote SHA.
 - A local commit alone is not synchronized. Report push failures honestly. Never force-push, change visibility, rewrite history or overwrite unrelated work without explicit permission.
-- Public CI must not upload experimental binaries until the upstream license/provenance audit is resolved and publication is explicitly approved. Keep raw logs and local caches ignored.
+- Full-stack public binary uploads remain blocked pending the upstream license/provenance audit. On 2026-11-12 the owner explicitly requested uploads of the two kexts: the manual `kext-artifacts.yml` workflow is a limited exception under `docs/KEXT-PROVENANCE.md`, with licences, corresponding sources and checksums. Do not extend it to firmware, plugins, runtime libraries, personal EFI or raw diagnostics. Keep raw logs and local caches ignored.
 - Do not use Hindsight. Do not spawn subagents unless the user explicitly requests them.

@@ -1,0 +1,59 @@
+name: Build downloadable experimental kexts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kext-artifacts-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  kexts:
+    if: github.repository == 'AgnoyZ/nullarc' && github.ref == 'refs/heads/downstream/780m-tahoe'
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Record source and native compiler
+        run: |
+          git rev-parse HEAD
+          sw_vers
+          uname -m
+          xcrun clang --version
+      - name: Test package exclusions and EDID preparation
+        run: |
+          python3 -m unittest discover -s tests -p 'test_kext_package.py' -v
+          python3 -m unittest discover -s tests -p 'test_edid_tools.py' -v
+      - name: Exercise actual framebuffer callbacks on CPU
+        run: |
+          python3 tools/test_edid.py
+          python3 tools/test_hidpi.py
+      - name: Checkout pinned MacKernelSDK
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: acidanthera/MacKernelSDK
+          ref: 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          path: build-sdk
+          persist-credentials: false
+      - name: Compile and sign both kexts
+        run: |
+          bash src/phxbringup/build.sh ./build-sdk
+          codesign --force --sign - src/phxbringup/build/PhxBringup.kext
+          codesign --verify --strict src/phxbringup/build/PhxBringup.kext
+          bash src/phxaccel/build.sh ./build-sdk
+          codesign --verify --strict src/phxaccel/build/PhxAccel.kext
+          git diff --exit-code HEAD -- src
+      - name: Package only reviewed kexts, corresponding sources and notices
+        run: python3 tools/package_kexts.py --sdk build-sdk --out build/kext-upload
+      - name: Upload manual experimental kext package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: experimental-kexts-${{ github.sha }}
+          path: build/kext-upload/upload/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Explain acceptance limits
+        run: |
+          echo 'Two ad-hoc signed x86_64 kexts only. No installer, firmware, Metal plugin, EFI or private EDID.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No target loading, GPU execution, refresh-rate acceptance or automatic deployment.' >> "$GITHUB_STEP_SUMMARY"
