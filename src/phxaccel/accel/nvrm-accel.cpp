@@ -1085,7 +1085,9 @@ static SInt64 nvIopCopyDamage(unsigned head, const volatile unsigned int *src, u
             uint32_t diff = force ? 1u : 0u;
             for (unsigned i = 0; i < n; i++) {
                 px[i] = l10r ? phx780m::narrowWord(sp[first + i]) : sp[first + i];
-                diff |= px[i] ^ hp[first + i];
+                // An invalid/new shadow is uninitialized. A forced frame writes every group; it must not
+                // read the old shadow just to OR a comparison into an already nonzero diff.
+                if (!force) diff |= px[i] ^ hp[first + i];
             }
             if (!diff) continue;
             unsigned i = 0;
@@ -1173,6 +1175,12 @@ static void nvIopCopyFull(const volatile unsigned int *src, unsigned spr, volati
     // so tests/test_copy_path.cpp can assert them (docs/analysis.md §1.3).
     const bool wide = phx780m::wideEligible((uintptr_t)src, (uintptr_t)d, spr, dpr);
     const bool sse = phx780m::sseEligible(gIopSse != 0, (uintptr_t)src, (uintptr_t)d, spr, dpr);
+    const uint64_t packed = phx780m::packedSseBytes(sse, words, h, spr, dpr);
+    if (packed) {
+        nvIopRowSSE((const void *)src, (void *)(uintptr_t)d, (unsigned long)packed, l10r);
+        __asm__ __volatile__("sfence" ::: "memory");
+        return;
+    }
     for (unsigned y = 0; y < h; y++) {
         const volatile unsigned int *sp = src + (unsigned long)y * spr;
         volatile unsigned int *dp = d + (unsigned long)y * dpr;
@@ -1311,9 +1319,11 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
     IOReturn ret = a->askFramebufferForScanout(&q, fb);
     if (ret != kIOReturnSuccess || !q.kva || q.pitch < 4 || !q.height) NVIOP_FAIL(kIOReturnNotReady, "framebuffer would not describe its scanout (0x%x kva %p pitch %u)", (unsigned)ret, q.kva, q.pitch);
     if (w != q.width || h != q.height) NVIOP_FAIL(kIOReturnBadArgument, "source %ux%u is not the scanout's %ux%u", w, h, q.width, q.height);
+    if (!phx780m::visibleRowFits(w, pitch) || !phx780m::visibleRowFits(w, q.pitch))
+        NVIOP_FAIL(kIOReturnBadArgument, "visible width %u does not fit word-aligned source/destination pitches %u/%u", w, pitch, q.pitch);
 
     nvAccelIopHome(fb, head);
-    const unsigned words = (((pitch < q.pitch) ? pitch : q.pitch) & ~3u) / 4;
+    const unsigned words = w;   // row padding is not part of the displayed frame
     const unsigned spr = pitch / 4, dpr = q.pitch / 4;
     volatile unsigned int *d = (volatile unsigned int *)q.kva;
     if (gIopBench) {   // one read-only pass over the source first: tells a slow read side from a slow write side

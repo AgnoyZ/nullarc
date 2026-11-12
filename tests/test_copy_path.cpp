@@ -52,6 +52,18 @@ void selection_tests() {
 }
 
 void row_split_tests() {
+    assert(phx780m::visibleRowFits(2560, 10240));
+    assert(phx780m::visibleRowFits(2560, 10496));
+    assert(!phx780m::visibleRowFits(2560, 10236));
+    assert(!phx780m::visibleRowFits(2560, 10241));
+    assert(!phx780m::visibleRowFits(0, 10240));
+    assert(phx780m::packedSseBytes(true, 2560, 1600, 2560, 2560) == 16384000u);
+    assert(!phx780m::packedSseBytes(false, 2560, 1600, 2560, 2560));
+    assert(!phx780m::packedSseBytes(true, 2560, 1600, 2624, 2560));
+    assert(!phx780m::packedSseBytes(true, 2560, 1600, 2560, 2624));
+    assert(!phx780m::packedSseBytes(true, 1, 1, 1, 1));
+    assert(!phx780m::packedSseBytes(true, 16, 0, 16, 16));
+    assert(!phx780m::packedSseBytes(true, ~0u, ~0u, ~0u, ~0u));
     // The SSE routine takes whole 64-byte steps and hands the rest on; a short row never uses it.
     for (unsigned words = 0; words <= 80; ++words) {
         for (bool sse : {false, true}) {

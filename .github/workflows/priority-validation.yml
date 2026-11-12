@@ -2,7 +2,7 @@ name: Priority improvement validation
 on:
   push:
     branches: [downstream/780m-tahoe]
-    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'Makefile', 'tests/test_nmplugin*', 'tests/surface_key*', 'tests/descriptor_mask/**', 'tools/iosurf/surface_sync_probe.m', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', '.github/workflows/priority-validation.yml']
+    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'Makefile', 'tests/test_nmplugin*', 'tests/surface_key*', 'tests/descriptor_mask/**', 'tools/iosurf/surface_sync_probe.m', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', 'tools/test_present_copy.py', 'tests/test_present_copy*', 'tests/test_copy_path.cpp', '.github/workflows/priority-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,6 +15,11 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 -m unittest discover -s tests -v
+      - name: Execute visible-row and packed-copy policies with sanitizers
+        run: |
+          mkdir -p build
+          clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Isrc/phxaccel tests/test_copy_path.cpp -o build/copy-policy
+          build/copy-policy
       - run: python3 tools/test_bo_create.py --out build/bo-create
       - run: python3 tools/test_metal_capabilities.py --out build/metal-capabilities
       - run: python3 tools/test_shader_cache.py --out build/shader-cache
@@ -66,6 +71,8 @@ jobs:
         run: python3 tools/test_submit_begin.py --out build/submit-begin
       - name: Execute actual framebuffer mode and unsupported color callbacks
         run: python3 tools/test_hidpi.py
+      - name: Execute actual streaming and damage copies on host RAM
+        run: python3 tools/test_present_copy.py --out build/present-copy
       - name: Execute adopted read-only panel timing with sanitizers
         run: >-
           make test-panel-timing CXX=clang++

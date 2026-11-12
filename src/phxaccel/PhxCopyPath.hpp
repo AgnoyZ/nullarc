@@ -22,6 +22,21 @@ constexpr bool sseEligible(bool enabled, uintptr_t source, uintptr_t dest, unsig
                            unsigned dest_stride) {
     return enabled && (((source | dest) & 15u) == 0u) && ((source_stride & 3u) == 0u) && ((dest_stride & 3u) == 0u);
 }
+// A stride describes storage, not visible pixels. Reject a short or non-word-aligned row instead of copying
+// its padding (or silently truncating a visible row). The display pipe copies exactly its validated width.
+constexpr bool visibleRowFits(unsigned words, unsigned strideBytes) {
+    return words != 0u && (strideBytes & 3u) == 0u && words <= strideBytes / 4u;
+}
+// Tightly packed frames can enter the existing streaming routine once for the whole frame: no row padding
+// to cross, and only one XMM save/restore instead of one per row. Keep all existing SSE/alignment gates and
+// require a whole number of 64-byte blocks. Zero means retain the row/tail loops; no new SSE default.
+constexpr uint64_t packedSseBytes(bool sse, unsigned words, unsigned rows, unsigned sourceStride,
+                                 unsigned destStride) {
+    return sse && words && rows && sourceStride == words && destStride == words &&
+           static_cast<uint64_t>(words) * rows <= (~uint64_t(0)) / 4u &&
+           ((static_cast<uint64_t>(words) * rows) & 15u) == 0u
+        ? static_cast<uint64_t>(words) * rows * 4u : 0u;
+}
 // How many words of a row the SSE routine takes, in 16-word (64-byte) steps. The rest of the row falls to the
 // pair and then the dword path; a row shorter than one step never uses SSE at all.
 constexpr unsigned sseWords(unsigned words, bool sse) {
