@@ -362,7 +362,8 @@ public:
                 PFBLOG("EDID: rejected %s; retaining no-EDID behavior", key);
                 return;   // an invalid explicit source must not silently select a lower-priority property
             }
-            if (!setProperty("IODisplayEDID", fEdid.data(), (unsigned)fEdid.size())) {
+            // The legacy IOKit raw-data overload copies bytes but declares its input as void *, not const void *.
+            if (!setProperty("IODisplayEDID", const_cast<uint8_t *>(fEdid.data()), (unsigned)fEdid.size())) {
                 fEdid.clear();
                 setProperty("PhxFBEDIDStatus", "publish-failed");
                 PFBLOG("EDID: property publication failed; retaining no-EDID behavior");

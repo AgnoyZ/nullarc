@@ -110,6 +110,13 @@ guards/length and shutdown refusal. This is CPU evidence, not a kernel-load
 or physical display test. The focused native workflow is
 `.github/workflows/edid-validation.yml` on `macos-15-intel`.
 
+The initial native run `43161244093` passed the synthetic tool/callback checks
+but failed the real kext compilation: the pinned SDK's raw-data `setProperty`
+overload takes `void *`, while the cache exposes `const uint8_t *`. The call now
+uses an explicit const cast for that copying API, and the IOKit double takes
+the exact non-const signature so it no longer hides the mismatch. Corrected
+native results are recorded separately; the first run is not a build pass.
+
 For a separately approved target test, preserve a working EFI, identified
 driver/kernel-collection backups and recovery path. Deploy only a reviewed
 candidate through the existing separate EFI procedure; add the verified

@@ -58,7 +58,7 @@ struct IOFramebuffer {
     bool setProperty(const char *key, const char *value) { strings[key] = value; return true; }
     bool setProperty(const char *key, unsigned long long value, unsigned) { numbers[key] = value; return true; }
     bool setProperty(const char *key, const OSBoolean *value) { numbers[key] = value->value; return true; }
-    bool setProperty(const char *key, const void *data, unsigned size) {
+    bool setProperty(const char *key, void *data, unsigned size) {
         assert(std::string(key) == "IODisplayEDID");
         if (failPublication) return false;
         const auto *p = static_cast<const uint8_t *>(data);
