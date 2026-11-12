@@ -18,8 +18,10 @@ Callers must not mutate translation inputs concurrently, as for the existing
 translator API. The key helper does not truncate multi-gigabyte inputs to a
 32-bit CommonCrypto length.
 
-One owner runs the existing translator and synchronous disk-cache publication;
-attached callers receive the immutable result or the same failure text. The
+One owner runs the existing translator and requests disk-cache publication;
+the subsequent isolated `ASYNC-SHADER-CACHE.md` change moves that publication
+to a bounded background writer by default (with a synchronous rollback switch).
+Attached callers receive the immutable result or the same failure text. The
 registry monitor protects only admission, result publication and statistics;
 translation, disk I/O and waiting never hold it. Different keys remain parallel.
 Returned translator buffers are freed in `@finally`, including failed or
@@ -47,14 +49,17 @@ timeouts, active entries and peak entries; these do not establish GPU execution.
 Peak applies to tracked entries, not total translator concurrency after bypass.
 Distinct inputs, saturation, recursion and timeout may still translate in
 parallel. Function-constant/link/reflection/address-lowering caches, background
-prewarming, cache-file formats and asynchronous disk I/O are unchanged.
+prewarming and cache-file formats are unchanged. Asynchronous base-cache I/O is
+tracked separately in `ASYNC-SHADER-CACHE.md`.
 
 ## Verification and acceptance
 
 `python3 tools/test_translation_flight.py --out build/translation-flight`
 extracts the actual current base-translation function and compiles it with the
 real sharing header on macOS. The translator, disk-cache access and logging are
-fakes. The runner rejects missing/duplicate definitions and records input and
+fakes; this fixture forces the synchronous rollback path to isolate sharing.
+The async fixture separately executes actual file I/O. The runner rejects
+missing/duplicate definitions and records input and
 actual-entry hashes. `--sanitizer thread` selects ThreadSanitizer separately
 from the default ASan/UBSan run. Native execution is not a Windows/Linux pass.
 

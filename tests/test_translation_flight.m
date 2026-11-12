@@ -13,6 +13,7 @@
 static _Atomic int64_t testWaitNs = 10ll * NSEC_PER_SEC;
 #define NVMTL_TRANSLATION_WAIT_NS atomic_load(&testWaitNs)
 #include "nvmtl_translation_flight.h"
+#include "nvmtl_async_cache.h"
 
 static _Atomic unsigned translations, freedOutputs, storedOutputs;
 static _Atomic int translatorMode, holdTranslator;
@@ -219,6 +220,8 @@ static void stress(void) {
     assert(nvmtl_translation_stats().active == 0 && nvmtl_translation_stats().peak <= NVMTL_TRANSLATION_FLIGHT_LIMIT);
 }
 int main(void) { @autoreleasepool {
+    // Keep this fixture focused on sharing; the async fixture tests real I/O.
+    setenv("NVMTL_SPVCACHE_ASYNC_OFF", "1", 1);
     unsetenv("NVMTL_TRANSLATE_COALESCE_OFF"); unsetenv("NVMTL_REFLECT"); unsetenv("NVMTL_SPVCACHE_OFF");
     identityTests(); sameShaderBatch(0); sameShaderBatch(1); sameShaderBatch(2);
     differentKeysParallel(); bypassTests(); timeoutAndMutableKey(); stress();

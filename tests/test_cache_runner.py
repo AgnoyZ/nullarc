@@ -21,9 +21,10 @@ class CacheSourceTests(unittest.TestCase):
         source = (ROOT / 'src/nmplugin/NVMTLLibraryLoad.m').read_text(encoding='utf-8')
         for kind in ('SPIRV', 'INDEX', 'LIBKEY'):
             lines = [line for line in source.splitlines() if 'NVMTL_CACHE_' + kind in line]
-            self.assertEqual(len(lines), 2, kind)
-            self.assertEqual(sum('nvmtl_cache_data(' in line for line in lines), 1)
-            self.assertEqual(sum('nvmtl_cache_save(' in line for line in lines), 1)
+            self.assertEqual(len(lines), 3 if kind == 'SPIRV' else 2, kind)
+            self.assertEqual(sum('nvmtl_cache_data(' in line for line in lines), 2 if kind == 'SPIRV' else 1)
+            writer = 'nvmtl_cache_save_spirv(' if kind == 'SPIRV' else 'nvmtl_cache_save('
+            self.assertEqual(sum(writer in line for line in lines), 1)
         self.assertIn('nvmtl_index_from_record(lib, rec,', source)
         self.assertIn('!memcmp(r.edge, edge, sizeof edge)', source)
         self.assertIn('spvData.length >= 20', source)

@@ -1,6 +1,8 @@
 # Downstream shader-cache experiment
 
 Scope: host cache correctness, not shader execution or a measured speedup.
+Base SPIR-V persistence now uses a bounded background queue; see
+`ASYNC-SHADER-CACHE.md` for pending-result reuse, limits and synchronous rollback.
 Original downstream helpers; no NullMoth reference code is copied. The existing
 `src/nmplugin` PolyForm Noncommercial licence remains applicable.
 

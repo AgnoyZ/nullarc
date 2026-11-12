@@ -24,6 +24,13 @@ def extract_entry(source):
     return entry + '\n'
 
 
+def extract_save(source):
+    matches = re.findall(r'^static void nvmtl_cache_save_spirv\(.*?^}', source, re.M | re.S)
+    if len(matches) != 1 or 'nvmtl_async_cache_enqueue(' not in matches[0] or 'nvmtl_cache_save(' not in matches[0]:
+        raise RuntimeError('Expected one actual bounded/synchronous cache save wrapper')
+    return matches[0] + '\n'
+
+
 def exercise(out, sanitizer='address,undefined'):
     compiler = shutil.which('clang')
     if platform.system() != 'Darwin' or not compiler:
@@ -34,7 +41,7 @@ def exercise(out, sanitizer='address,undefined'):
     source = ROOT / 'src/nmplugin/NVMTLLibraryLoad.m'
     entry = extract_entry(source.read_text(encoding='utf-8'))
     out.mkdir(parents=True)
-    (out / 'translation_entry.inc').write_text(entry, encoding='utf-8')
+    (out / 'translation_entry.inc').write_text(extract_save(source.read_text(encoding='utf-8')) + entry, encoding='utf-8')
     binary = out / 'translation-flight-test'
     subprocess.run([compiler, '-std=gnu11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
                     '-Wno-deprecated-declarations', '-fobjc-arc', '-fblocks', '-pthread',
@@ -48,7 +55,7 @@ def exercise(out, sanitizer='address,undefined'):
             result.get('same_shader_requests') != 32 or result.get('same_shader_translations') != 1 or
             result.get('stress_requests') != 1600):
         raise RuntimeError('Unexpected translation-sharing report')
-    paths = [source, ROOT / 'src/nmplugin/nvmtl_translation_flight.h',
+    paths = [source, ROOT / 'src/nmplugin/nvmtl_translation_flight.h', ROOT / 'src/nmplugin/nvmtl_async_cache.h',
              ROOT / 'tests/test_translation_flight.m', Path(__file__)]
     result['inputs_sha256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     result['actual_entry_sha256'] = hashlib.sha256(entry.encode()).hexdigest()

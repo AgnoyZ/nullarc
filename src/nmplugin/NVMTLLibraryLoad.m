@@ -19,6 +19,7 @@
 #include <time.h>
 #include "nvmtl_cache_io.h"
 #include "nvmtl_translation_flight.h"
+#include "nvmtl_async_cache.h"
 extern char **environ;
 
 static NSData *nvmtl_cache_data(NSString *path, unsigned kind, size_t limit) {
@@ -864,6 +865,22 @@ NSArray<NSString *> *nvmtl_externs_of_airs(NSDictionary<NSString *, NSString *> 
     }
 }
 
+static void nvmtl_cache_save_spirv(NSData *key, NSString *path, unsigned kind, NSData *data) {
+    if (!path || !data) return;
+    BOOL (^store)(NSString *, unsigned, NSData *) = ^BOOL(NSString *file, unsigned format, NSData *payload) {
+        if (nvmtl_cache_save(file, format, payload)) {
+            gSpvStored++;
+            atomic_fetch_add_explicit(&gSpvAdded, (unsigned long long)payload.length, memory_order_relaxed);
+            return YES;
+        }
+        nvlog("spvcache: STORE FAILED %s (%zu bytes)", file.lastPathComponent.UTF8String, (size_t)payload.length);
+        return NO;
+    };
+    if (getenv("NVMTL_SPVCACHE_ASYNC_OFF")) store(path, kind, data);
+    else if (!nvmtl_async_cache_enqueue(key, path, kind, data, store))
+        nvtrace("spvcache: persistence skipped (queue limit or unavailable identity)");
+}
+
 NSData *nvmtl_compile_library_entry(NSData *air, NSString *ll, NSString *stage, NSString *name, NSString **error) {
     if (!air || !ll || !stage || !nvmtl_xlate_ready()) { if(error)*error=@"missing entry or translator"; return nil; }
     if (air.length >= 20 && *(const uint32_t *)air.bytes == 0x07230203u) return air;
@@ -874,21 +891,23 @@ NSData *nvmtl_compile_library_entry(NSData *air, NSString *ll, NSString *stage, 
         if (hit) { gSpvHit++; nvmtl_cache_touch(spvp.fileSystemRepresentation); }
         else {
             gSpvMiss++;
-            NSData *key = getenv("NVMTL_TRANSLATE_COALESCE_OFF") ? nil : nvmtl_translation_key(air, ll, stage, gXlateTag);
+            NSData *key = nvmtl_translation_key(air, ll, stage, gXlateTag);
             NSString *why = nil;
             spvData = nvmtl_translation_share(key, &why, ^NSData *(NSString **failure) {
+                if (!getenv("NVMTL_SPVCACHE_OFF") && !getenv("NVMTL_SPVCACHE_ASYNC_OFF")) {
+                    NSData *pending = nvmtl_async_cache_lookup(key);
+                    if (pending) return pending;
+                    // A writer may have retired since the first disk miss.
+                    NSData *saved = nvmtl_cache_data(spvp, NVMTL_CACHE_SPIRV, 256u << 20);
+                    if (saved.length >= 20 && *(const uint32_t *)saved.bytes == 0x07230203u) return saved;
+                }
                 uint8_t *spv = NULL; size_t spvn = 0; char err[512] = { 0 };
                 @try {
                     if (xlate(ll.UTF8String, stage.UTF8String, &spv, &spvn, err, sizeof err) != 0) {
                         *failure = @(err); return nil;
                     }
                     NSData *data = [NSData dataWithBytes:spv length:spvn];
-                    if (nvmtl_cache_save(spvp, NVMTL_CACHE_SPIRV, data)) {
-                        gSpvStored++;
-                        atomic_fetch_add_explicit(&gSpvAdded, (unsigned long long)data.length, memory_order_relaxed);
-                    } else if (spvp) {
-                        nvlog("spvcache: STORE FAILED %s (%zu bytes)", spvp.lastPathComponent.UTF8String, (size_t)data.length);
-                    }
+                    nvmtl_cache_save_spirv(key, spvp, NVMTL_CACHE_SPIRV, data);
                     return data;
                 } @finally {
                     if (spv && xlate_free) xlate_free(spv, spvn);
@@ -921,6 +940,10 @@ NSData *nvmtl_compile_library_entry(NSData *air, NSString *ll, NSString *stage, 
         nvtrace("XLATE flight: %lu owners, %lu joins, %lu bypasses, %lu timeouts, %lu active (peak %lu)",
                 flightStats.owners, flightStats.joins, flightStats.bypasses, flightStats.timeouts,
                 (unsigned long)flightStats.active, (unsigned long)flightStats.peak);
+        NVMTLAsyncCacheStats cacheStats = nvmtl_async_cache_stats();
+        nvtrace("XLATE writer: %lu queued, %lu reused, %lu skipped, %lu stored, %lu failed, %lu exceptional, %lu pending, %lu bytes",
+                cacheStats.accepted, cacheStats.reused, cacheStats.skipped, cacheStats.completed,
+                cacheStats.failed, cacheStats.exceptions, (unsigned long)cacheStats.pending, (unsigned long)cacheStats.bytes);
     }
     return spvData;
 }
