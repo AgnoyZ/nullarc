@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from prepare_source import prepare
 from test_bo_retirement import extract_source
-from test_ib_debug import CASES, check_regression, check_result, exercise, expected_result, write_extracted
+from test_ib_debug import CASES, check_regression, check_result, exercise, expected_result, sanitizer_environment, write_extracted
 
 
 class IbDebugRunnerTests(unittest.TestCase):
@@ -75,8 +75,20 @@ class IbDebugRunnerTests(unittest.TestCase):
         self.assertFalse(report['raw_sanitizer_output_logged'])
         self.assertNotIn('PRIVATE', json.dumps(report))
         for code, stdout, stderr in ((0, '', 'AddressSanitizer: heap-buffer-overflow'), (-11, '', ''),
-            (1, '', 'assertion failed'), (1, 'false success', 'AddressSanitizer: heap-buffer-overflow')):
+            (1, '', 'assertion failed'), (1, '', 'AddressSanitizer: detect_leaks is not supported on this platform.'),
+            (1, 'false success', 'AddressSanitizer: heap-buffer-overflow')):
             with self.assertRaises(RuntimeError): check_regression(subprocess.CompletedProcess([], code, stdout, stderr))
+
+    def test_platform_leak_detection_does_not_disable_bounds_or_failure_checks(self):
+        with mock.patch.dict('os.environ', {'ASAN_OPTIONS': 'halt_on_error=0', 'UBSAN_OPTIONS': 'halt_on_error=0'}):
+            for system, leaks in (('Darwin', '0'), ('Linux', '1')):
+                with self.subTest(system=system):
+                    environment = sanitizer_environment(system)
+                    self.assertIn('detect_leaks=' + leaks, environment['ASAN_OPTIONS'])
+                    self.assertIn('halt_on_error=1', environment['ASAN_OPTIONS'])
+                    self.assertIn('halt_on_error=1', environment['UBSAN_OPTIONS'])
+                    self.assertNotIn('suppressions=', environment['ASAN_OPTIONS'])
+        with self.assertRaises(RuntimeError): sanitizer_environment('Windows')
 
     def test_windows_cannot_claim_cpp_or_hardware_execution(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch('test_ib_debug.platform.system', return_value='Windows'):

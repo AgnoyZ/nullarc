@@ -51,6 +51,14 @@ tree, compiles that previous actual method and requires a captured
 tests bind that previous method hash to audited code `4d71c0c`. The expected
 sanitizer output stays captured; no raw sanitizer dump is published.
 
+On Darwin the runner explicitly uses `detect_leaks=0`: Apple's local ASan
+runtime rejects `detect_leaks=1` at startup, before executing the fixture.
+Linux retains `detect_leaks=1`. Address/undefined-behavior instrumentation,
+halt-on-error, the required old-code heap-buffer-overflow diagnostic and all
+corrected-code assertions remain enabled. The report records
+`leak_detection_enabled`; a sanitizer startup error never counts as reproducing
+the old overread. This test makes no leak-detection claim on Darwin.
+
 The corrected method then runs 56 scenarios in low and canonical upper VA
 layouts, 112 total. They cover 1..16-word and larger boundary prefixes,
 short/96-word/oversized logging caps, nonzero BO mapping offsets, two and 64

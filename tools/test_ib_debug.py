@@ -56,9 +56,21 @@ def write_extracted(out, source):
     return hashes
 
 
+def sanitizer_environment(system):
+    if system not in ('Linux', 'Darwin'):
+        raise RuntimeError('Unsupported IB sanitizer host')
+    environment = os.environ.copy()
+    # Apple's ASan aborts at startup when leak detection is requested.
+    leaks = int(system == 'Linux')
+    environment['ASAN_OPTIONS'] = f'halt_on_error=1:abort_on_error=0:symbolize=0:detect_leaks={leaks}'
+    environment['UBSAN_OPTIONS'] = 'halt_on_error=1:print_stacktrace=0'
+    return environment
+
+
 def exercise(out):
     compiler = shutil.which('clang++')
-    if platform.system() not in ('Linux', 'Darwin') or not compiler:
+    system = platform.system()
+    if system not in ('Linux', 'Darwin') or not compiler:
         raise RuntimeError('IB debug tests require POSIX Clang++; not target GPU execution')
     out = Path(out).resolve()
     if out.exists(): raise RuntimeError('IB debug output exists; choose a fresh directory')
@@ -86,9 +98,7 @@ def exercise(out):
         subprocess.run(flags + ['-I' + str(out / variant), str(ROOT / 'tests/test_ib_debug.cpp'), '-o', str(binary)],
                        check=True, timeout=120)
         binaries[variant] = binary
-    environment = os.environ.copy()
-    environment['ASAN_OPTIONS'] = 'halt_on_error=1:abort_on_error=0:symbolize=0:detect_leaks=1'
-    environment['UBSAN_OPTIONS'] = 'halt_on_error=1:print_stacktrace=0'
+    environment = sanitizer_environment(system)
     regression = check_regression(subprocess.run([str(binaries['previous']), 'low', 'cross-1'],
         capture_output=True, text=True, timeout=15, env=environment))
     rows = []
@@ -101,6 +111,7 @@ def exercise(out):
               'actual_ib_debug_source_sha256': hashlib.sha256(source.encode()).hexdigest(),
               'previous_doSubmit_sha256': old_hashes['IOAccelPhxNativeClient::doSubmit'],
               'regression_reproduced': regression, 'cases': rows, 'hardware_executed': False, 'kernel_loaded': False,
+              'leak_detection_enabled': system == 'Linux',
               'limitation': 'Actual doSubmit, coverage and client lifecycle methods; fake CPU BOs, metadata, logging and downstream submission. Previous actual method reproduces a heap overread; current diagnostic never claims complete GPU-side BO/IB validation or GPU execution.'}
     (out / 'report.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result, indent=2), flush=True)
