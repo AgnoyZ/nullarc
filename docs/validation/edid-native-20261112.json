@@ -1,0 +1,74 @@
+{
+  "date": "2026-11-12",
+  "timezone": "Asia/Shanghai",
+  "source_commit": "0cd76fbc9434e8f990005580ce1be9361f9973d1",
+  "branch": "downstream/780m-tahoe",
+  "reference": {
+    "repository": "nullmoth/nvidia-macos-driver",
+    "commit": "7412cdde81447f78da0ebb64216dc258d8beaedb",
+    "hardware_transport_copied": false,
+    "licence": "PolyForm Noncommercial 1.0.0"
+  },
+  "focused_native": {
+    "run": 43161573108,
+    "conclusion": "success",
+    "runner": "macos-15-intel",
+    "os_version": "15.7.9",
+    "os_build": "24G830",
+    "architecture": "x86_64",
+    "compiler": "Apple Clang 17.0.0 (clang-1700.0.13.5)",
+    "mackernelsdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "python_tests": 11,
+    "python_skips": 0,
+    "actual_edid_cases": 225,
+    "asan": true,
+    "ubsan": true,
+    "actual_methods_sha256": "a44a4190bccf316a99bf4e5a0aabe7ffd9e8176a8fa5c9771092e1416933b9e1",
+    "mode_timing_color_regression_passed": true,
+    "kext": {
+      "identifier": "com.luuumi.PhxAccel",
+      "architecture": "x86_64",
+      "macho_type": 11,
+      "executable_bytes": 341920,
+      "executable_sha256": "bb0455768b02b692334a82a0349b16b37d86d37e2359a6f9ca06047f49ea9c72",
+      "ad_hoc_signing_and_strict_verification": true,
+      "sdk_deployment_linker_warnings": 2,
+      "loaded": false,
+      "uploaded": false
+    }
+  },
+  "other_completed_ci": [
+    {"run": 43161573182, "workflow": "hidpi-validation.yml", "conclusion": "success"},
+    {"run": 43161573102, "workflow": "priority-validation.yml", "conclusion": "success"}
+  ],
+  "broader_build_snapshot": {
+    "run": 43161573238,
+    "checked_at_utc": "2026-11-12T05:34:00Z",
+    "source_tests": "success",
+    "macos_kexts": "in_progress",
+    "complete_workflow_pass_claimed": false
+  },
+  "windows_python": {
+    "tests": 371,
+    "passed": 343,
+    "skipped": 28,
+    "failures": 0,
+    "errors": 0,
+    "native_compilation": false,
+    "clean_lf_checkout": true
+  },
+  "prior_attempts": [
+    {"run": 43161244093, "conclusion": "failure", "reason": "Native SDK setProperty raw-data signature mismatch"},
+    {"run": 43161244115, "conclusion": "failure", "reason": "Same native SDK signature mismatch"},
+    {"host": "Windows disposable clone", "tests": 289, "setup_errors": 13, "skipped": 28, "conclusion": "failure", "reason": "Inherited autocrlf changed git archive header bytes; corrected only in disposable clone"}
+  ],
+  "hardware_edid_read": false,
+  "hardware_executed": false,
+  "target_display_verified": false,
+  "kernel_loaded": false,
+  "installed": false,
+  "efi_modified": false,
+  "nvram_modified": false,
+  "binaries_uploaded": false,
+  "raw_panel_data_included": false
+}

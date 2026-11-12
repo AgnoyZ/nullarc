@@ -2,8 +2,9 @@
 
 2026-11-12: `PhxAMDFB` now implements `hasDDCConnect()`, `getDDCBlock()` and
 the high-level DDC-sense query for a validated, boot-time EDID snapshot.
-This is a candidate implementation; native CI and target acceptance are
-recorded separately. No driver is installed by this change.
+This is a candidate implementation. The [native host/build record](validation/edid-native-20261112.md)
+reports the corrected CI pass; target acceptance remains pending. No driver
+is installed by this change.
 
 ## What is implemented
 
@@ -115,7 +116,9 @@ but failed the real kext compilation: the pinned SDK's raw-data `setProperty`
 overload takes `void *`, while the cache exposes `const uint8_t *`. The call now
 uses an explicit const cast for that copying API, and the IOKit double takes
 the exact non-const signature so it no longer hides the mismatch. Corrected
-native results are recorded separately; the first run is not a build pass.
+native run `43161573108` passed all 225 actual-callback cases and the real
+kext build/signature checks. See the linked validation record; the first run
+is not a build pass.
 
 For a separately approved target test, preserve a working EFI, identified
 driver/kernel-collection backups and recovery path. Deploy only a reviewed
