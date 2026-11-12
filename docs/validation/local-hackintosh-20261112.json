@@ -1,0 +1,820 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-12",
+  "starting_downstream_commit": "ba5ac9d1fe4bb239db7538aa6c82ae0a378b5145",
+  "validated_tools_and_fixtures_commit": "15b684def735ea70cf1a9247dbb12954075f859b",
+  "upstream_main_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+  "common_ancestor": "cbb08ddf517c009255a74ad0fbc2cd7e0d6fa339",
+  "initial_unique_commits": {
+    "upstream": 49,
+    "downstream": 89
+  },
+  "source_trees": {
+    "phxbringup": "cbe3d5821af030066b19cbc2b860809b91b93e44",
+    "phxaccel": "37778384feba2d69e82d46e2f1667ae4a68ac92e",
+    "nmplugin": "375e5d4a00adfbc960afd59245d37165879eca1c"
+  },
+  "production_sources_unchanged_from_start": true,
+  "source_kext_build": 33,
+  "runtime": {
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "darwin_release": "25.6.0",
+    "architecture": "x86_64",
+    "clang": "21.0.0 (clang-2100.1.1.101)",
+    "macos_sdk": "26.5",
+    "python": "3.13.18"
+  },
+  "installed_stack": {
+    "registry_candidate_count": 1,
+    "registry_pci_id": "1002:1900",
+    "identity_source": "IORegistry; not independent physical identity",
+    "service_classes_present": [
+      "PhxBringup",
+      "PhxAMDFB",
+      "NMXAccel"
+    ],
+    "bringup_build": 34,
+    "native_abi_reported": "1.12",
+    "source_revision_verified": false
+  },
+  "build_dependencies": [
+    {
+      "component": "MacKernelSDK",
+      "pin": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "licenses": [
+        "LICENSE.txt"
+      ]
+    },
+    {
+      "component": "Vulkan-Headers",
+      "pin": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+      "licenses": [
+        "LICENSE.md"
+      ]
+    }
+  ],
+  "native_builds": [
+    {
+      "component": "PhxBringup",
+      "source_commit": "ba5ac9d1fe4bb239db7538aa6c82ae0a378b5145",
+      "exit": 0,
+      "strict_signature_verified": true,
+      "seconds": 1.48,
+      "compiler_warning_lines": 3,
+      "executable_sha256": "19d8ccacee3afb3fd57f1a08146060dabe4e50cbfd75895910c2b851e9156df3"
+    },
+    {
+      "component": "PhxAccel",
+      "source_commit": "ba5ac9d1fe4bb239db7538aa6c82ae0a378b5145",
+      "exit": 0,
+      "strict_signature_verified": true,
+      "seconds": 4.5,
+      "compiler_warning_lines": 0,
+      "executable_sha256": "a7f3ff1cada7d08c9b8e94099cba039f0953df49acc788d3a0e26e91ab0d0680"
+    },
+    {
+      "component": "NVMTLDriver.bundle",
+      "source_commit": "ba5ac9d1fe4bb239db7538aa6c82ae0a378b5145",
+      "exit": 0,
+      "report": {
+        "architecture": "x86_64",
+        "macho_type": 8,
+        "sha256": "d4d317ebad62d7d343032887e74913b3ce3173ebb26671fc391da62c06de5368",
+        "bytes": 1563136,
+        "bundle_identifier": "org.agnoyz.radeon780m.NVMTLDriver",
+        "info_plist_sha256": "cfbcaed846d3fb58764bc484a8766e2b3b1fe14c74d0d75f227a92757a84e883",
+        "entrypoint_exports_verified": true,
+        "source_entrypoint": "src/nmplugin/NVMTLDevice.m",
+        "runtime_loaded": false,
+        "missing_runtime_dependencies": [
+          "Mesa RADV Darwin ICD",
+          "AIR-to-SPIR-V translator",
+          "translator runtime dependencies",
+          "GPU firmware and bring-up"
+        ]
+      },
+      "compiler_warning_lines": 336,
+      "strict_signature_verified": true,
+      "runtime_loaded": false
+    }
+  ],
+  "claims": {
+    "metadata_read_on_local_hackintosh": true,
+    "candidate_driver_installed": false,
+    "gpu_work_submitted_by_validation": true,
+    "candidate_gpu_execution_verified": false,
+    "candidate_performance_measured": false,
+    "efi_or_security_changed": false,
+    "public_binaries_uploaded": false,
+    "installed_stack_compute_correctness_verified": true
+  },
+  "initial_failures": [
+    {
+      "check": "unittest",
+      "python": "3.9.6",
+      "tests_run": 358,
+      "errors": 1,
+      "cause": "Path.write_text(newline=...) unavailable; project requires Python >= 3.10"
+    },
+    {
+      "check": "async-library TSan lifetime fixture",
+      "cause": "Weak owner observed nil before exact destructor-count assertion passed; corrected both async fixtures"
+    },
+    {
+      "check": "host harness preparation",
+      "refused_entries": 19,
+      "cause": "Uncommitted fixture changes; strict clean-source guard retained; rerun separately on committed source"
+    },
+    {
+      "check": "IB historical regression sanitizer startup",
+      "cause": "Apple ASan rejected detect_leaks=1 before executing the fixture",
+      "fixed_in": "15b684def735ea70cf1a9247dbb12954075f859b",
+      "darwin_leak_detection_claimed": false
+    }
+  ],
+  "blocked_checks": [
+    {
+      "check": "display baseline",
+      "exit": 5,
+      "first_missing_oid": "debug.nvaccel_iop_damage",
+      "baseline_produced": false
+    },
+    {
+      "check": "Metal compiler lookup",
+      "exit": 72,
+      "metal_tool_found": false,
+      "full_AIR_chain_tested": false
+    },
+    {
+      "check": "candidate GPU A/B",
+      "reason": "Installed build 34 differs from source build 33; installed source SHA unknown. Recovery artifacts reviewed but no recovery boot tested. Existing-stack compute smoke is not candidate acceptance."
+    }
+  ],
+  "native_fixtures": [
+    {
+      "name": "translation-flight-asan-ubsan",
+      "exit": 0,
+      "report_sha256": "b1db197d76f66fc15ecd50a84fd2639922a2c7f8de66b75de46c653b4999feb4",
+      "inputs_sha256": {
+        "src/nmplugin/NVMTLLibraryLoad.m": "1eff0f8d470fb9cdd4e4ec74a10ea0613dcce7a89ddba33107b7fb8cc1721854",
+        "src/nmplugin/nvmtl_translation_flight.h": "f07767a361fcde02d6df496b08a9a204d2d94e1aca22050ad58ef7a14d9270ee",
+        "src/nmplugin/nvmtl_async_cache.h": "522685b019fa6c87ebb7a9504ffe8257f5f2855b044f87c4f82631a54dcf8133",
+        "tests/test_translation_flight.m": "c082485cb02ea52947d01d61eb048fdab852b3df06c33370ba8c3c38d942ec82",
+        "tools/test_translation_flight.py": "c9e9edc5d0d79815def1a9784eba6c4e54bccfdf04ed6f9dbba022932ee3857e"
+      },
+      "sanitizer": "address,undefined",
+      "input_hashes_verified_against_validated_commit": true,
+      "runner_python": "3.9.6"
+    },
+    {
+      "name": "translation-flight-tsan",
+      "exit": 0,
+      "report_sha256": "9e93d8cd57d334b2cd35f44e6b099f300cc8ca4447e4cfc58a9b75e52dce6337",
+      "inputs_sha256": {
+        "src/nmplugin/NVMTLLibraryLoad.m": "1eff0f8d470fb9cdd4e4ec74a10ea0613dcce7a89ddba33107b7fb8cc1721854",
+        "src/nmplugin/nvmtl_translation_flight.h": "f07767a361fcde02d6df496b08a9a204d2d94e1aca22050ad58ef7a14d9270ee",
+        "src/nmplugin/nvmtl_async_cache.h": "522685b019fa6c87ebb7a9504ffe8257f5f2855b044f87c4f82631a54dcf8133",
+        "tests/test_translation_flight.m": "c082485cb02ea52947d01d61eb048fdab852b3df06c33370ba8c3c38d942ec82",
+        "tools/test_translation_flight.py": "c9e9edc5d0d79815def1a9784eba6c4e54bccfdf04ed6f9dbba022932ee3857e"
+      },
+      "sanitizer": "thread",
+      "input_hashes_verified_against_validated_commit": true,
+      "runner_python": "3.9.6"
+    },
+    {
+      "name": "async-cache-asan-ubsan",
+      "exit": 0,
+      "report_sha256": "0609a364b829864c2d1bf660e9fea1b42e905d578ad1e0d9b761319b5ce96b6e",
+      "inputs_sha256": {
+        "src/nmplugin/NVMTLLibraryLoad.m": "1eff0f8d470fb9cdd4e4ec74a10ea0613dcce7a89ddba33107b7fb8cc1721854",
+        "src/nmplugin/nvmtl_async_cache.h": "522685b019fa6c87ebb7a9504ffe8257f5f2855b044f87c4f82631a54dcf8133",
+        "src/nmplugin/nvmtl_cache_io.h": "bc1a38559ff56b4460d700aca0a8a418c029808c07296b431868c164ee16dfb0",
+        "src/nmplugin/nvmtl_translation_flight.h": "f07767a361fcde02d6df496b08a9a204d2d94e1aca22050ad58ef7a14d9270ee",
+        "tests/test_async_cache.m": "bc0689a3b4d4dc362a50940bd6a82db8ff8a58b7f0d219b18efc74c97518ae1f",
+        "tools/test_translation_flight.py": "c9e9edc5d0d79815def1a9784eba6c4e54bccfdf04ed6f9dbba022932ee3857e",
+        "tools/test_async_cache.py": "db5ccd5a00719d780d3c99361e0cd3ab9b315b0af69d274cbebbd5543922ab9b"
+      },
+      "sanitizer": "address,undefined",
+      "input_hashes_verified_against_validated_commit": true,
+      "runner_python": "3.9.6"
+    },
+    {
+      "name": "async-cache-tsan",
+      "exit": 0,
+      "report_sha256": "3fe3b2edef305bc3901c61a2c956909ec4d6634fa24c22b9bf15b439a22af23b",
+      "inputs_sha256": {
+        "src/nmplugin/NVMTLLibraryLoad.m": "1eff0f8d470fb9cdd4e4ec74a10ea0613dcce7a89ddba33107b7fb8cc1721854",
+        "src/nmplugin/nvmtl_async_cache.h": "522685b019fa6c87ebb7a9504ffe8257f5f2855b044f87c4f82631a54dcf8133",
+        "src/nmplugin/nvmtl_cache_io.h": "bc1a38559ff56b4460d700aca0a8a418c029808c07296b431868c164ee16dfb0",
+        "src/nmplugin/nvmtl_translation_flight.h": "f07767a361fcde02d6df496b08a9a204d2d94e1aca22050ad58ef7a14d9270ee",
+        "tests/test_async_cache.m": "bc0689a3b4d4dc362a50940bd6a82db8ff8a58b7f0d219b18efc74c97518ae1f",
+        "tools/test_translation_flight.py": "c9e9edc5d0d79815def1a9784eba6c4e54bccfdf04ed6f9dbba022932ee3857e",
+        "tools/test_async_cache.py": "db5ccd5a00719d780d3c99361e0cd3ab9b315b0af69d274cbebbd5543922ab9b"
+      },
+      "sanitizer": "thread",
+      "input_hashes_verified_against_validated_commit": true,
+      "runner_python": "3.9.6"
+    },
+    {
+      "name": "corrected-async-library-asan-ubsan",
+      "exit": 0,
+      "report_sha256": "fd2570ff86ebe992d31000311c5e8d4b8d7ffc3050906f8b879ca27e83bae2e0",
+      "inputs_sha256": {
+        "src/nmplugin/NVMTLDevice.m": "5d047bb4e221db3c2e0a8e30b877f5535795f57d99a5b95b4fec54ea43fc7f6d",
+        "tests/test_async_library.m": "523aa4b5432a49c8d03f24ad357e19fba64ad12e49c9370f01b0702ce4cb2e99",
+        "tools/test_async_library.py": "1450db962937f923432db0b5d1cedf12676cec78dcf8f83fb176b4df1da5900e"
+      },
+      "sanitizer": "address,undefined",
+      "input_hashes_verified_against_validated_commit": true,
+      "runner_python": "3.13.18"
+    },
+    {
+      "name": "corrected-async-library-tsan",
+      "exit": 0,
+      "report_sha256": "2c95d58255a72a3db4ba107f68aded78b76c56c3a3d093649ee4a2bbeda84bfe",
+      "inputs_sha256": {
+        "src/nmplugin/NVMTLDevice.m": "5d047bb4e221db3c2e0a8e30b877f5535795f57d99a5b95b4fec54ea43fc7f6d",
+        "tests/test_async_library.m": "523aa4b5432a49c8d03f24ad357e19fba64ad12e49c9370f01b0702ce4cb2e99",
+        "tools/test_async_library.py": "1450db962937f923432db0b5d1cedf12676cec78dcf8f83fb176b4df1da5900e"
+      },
+      "sanitizer": "thread",
+      "input_hashes_verified_against_validated_commit": true,
+      "runner_python": "3.13.18"
+    },
+    {
+      "name": "corrected-async-function-asan-ubsan",
+      "exit": 0,
+      "report_sha256": "6b028eccd794b6a2c85e117255c5409cde7eb1c1500a27ab0dbbfb5f49123bc1",
+      "inputs_sha256": {
+        "src/nmplugin/NVMTLObjects.m": "798bf7888020e3cebe9e37377b705cb5bcfcf23b96b2184b6a0b6afcde813065",
+        "src/nmplugin/NVMTLDevice.m": "5d047bb4e221db3c2e0a8e30b877f5535795f57d99a5b95b4fec54ea43fc7f6d",
+        "tests/test_async_function.m": "6d5996af34ef617080e0ea03759f76f4a327874a6e21ef85ce0536d658b02ffe",
+        "tools/test_async_function.py": "34ad9141c8a06f11769046c3b47646b09edaacdde1530849ad9f9614e8e00904",
+        "tools/test_async_library.py": "1450db962937f923432db0b5d1cedf12676cec78dcf8f83fb176b4df1da5900e"
+      },
+      "sanitizer": "address,undefined",
+      "input_hashes_verified_against_validated_commit": true,
+      "runner_python": "3.13.18"
+    },
+    {
+      "name": "corrected-async-function-tsan",
+      "exit": 0,
+      "report_sha256": "ffc965653d907d514f21f3f6de9cb5ffa2b283ff511f9f35629980259eb45e3d",
+      "inputs_sha256": {
+        "src/nmplugin/NVMTLObjects.m": "798bf7888020e3cebe9e37377b705cb5bcfcf23b96b2184b6a0b6afcde813065",
+        "src/nmplugin/NVMTLDevice.m": "5d047bb4e221db3c2e0a8e30b877f5535795f57d99a5b95b4fec54ea43fc7f6d",
+        "tests/test_async_function.m": "6d5996af34ef617080e0ea03759f76f4a327874a6e21ef85ce0536d658b02ffe",
+        "tools/test_async_function.py": "34ad9141c8a06f11769046c3b47646b09edaacdde1530849ad9f9614e8e00904",
+        "tools/test_async_library.py": "1450db962937f923432db0b5d1cedf12676cec78dcf8f83fb176b4df1da5900e"
+      },
+      "sanitizer": "thread",
+      "input_hashes_verified_against_validated_commit": true,
+      "runner_python": "3.13.18"
+    }
+  ],
+  "corrected_fixture_repeats": [
+    {
+      "name": "corrected-async-library-asan-ubsan",
+      "exit": 0,
+      "initial_processes": 2,
+      "additional_processes": 10,
+      "additional_repeats_per_width": 5,
+      "widths": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "corrected-async-library-tsan",
+      "exit": 0,
+      "initial_processes": 2,
+      "additional_processes": 10,
+      "additional_repeats_per_width": 5,
+      "widths": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "corrected-async-function-asan-ubsan",
+      "exit": 0,
+      "initial_processes": 2,
+      "additional_processes": 10,
+      "additional_repeats_per_width": 5,
+      "widths": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "corrected-async-function-tsan",
+      "exit": 0,
+      "initial_processes": 2,
+      "additional_processes": 10,
+      "additional_repeats_per_width": 5,
+      "widths": [
+        1,
+        2
+      ]
+    }
+  ],
+  "make_tests": [
+    {
+      "name": "upstream",
+      "source_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "exit": 0,
+      "seconds": 17.26,
+      "firmware_fixture_cases": "skipped: no tests/fixtures/phoenix files; synthetic extractor checks ran",
+      "hardware_executed": false
+    },
+    {
+      "name": "downstream",
+      "source_commit": "d5dd49b5bb00dd0a022b0c177e6434f64051c09c",
+      "exit": 0,
+      "seconds": 18.41,
+      "firmware_fixture_cases": "skipped: no tests/fixtures/phoenix files; synthetic extractor checks ran",
+      "hardware_executed": false
+    }
+  ],
+  "final_unittest": {
+    "name": "unittest-360",
+    "exit": 0,
+    "seconds": 104.27,
+    "source_commit": "15b684def735ea70cf1a9247dbb12954075f859b",
+    "python": "3.13.18",
+    "tests_run": 360,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0
+  },
+  "policy_checks": [
+    {
+      "name": "hardware_policy",
+      "exit": 0
+    },
+    {
+      "name": "present_pacing",
+      "exit": 0
+    },
+    {
+      "name": "copy_path",
+      "exit": 0
+    },
+    {
+      "name": "counter-contract",
+      "exit": 0
+    },
+    {
+      "name": "surface-probe-compile-only",
+      "exit": 0
+    }
+  ],
+  "non_submitting_installed_stack_checks": [
+    {
+      "name": "native-shader-probe",
+      "argument": "--check",
+      "exit": 0,
+      "gpu_work_submitted_by_probe": false,
+      "candidate_driver_installed": false
+    },
+    {
+      "name": "metal-smoke",
+      "argument": "--list",
+      "exit": 0,
+      "gpu_work_submitted_by_probe": false,
+      "candidate_driver_installed": false
+    }
+  ],
+  "validated_tree": "7097f78e9257af72dc07f542db90d94bfee9e9ea",
+  "equivalent_local_snapshot": {
+    "snapshot_commit": "d55b6115e593dd4255825e7ceef04cd1c1fd0b4a",
+    "snapshot_tree": "7097f78e9257af72dc07f542db90d94bfee9e9ea",
+    "production_sources_unchanged": true,
+    "published": false,
+    "note": "Exact tree match to the canonical published validation commit."
+  },
+  "host_harnesses": [
+    {
+      "name": "bo_create",
+      "exit": 0,
+      "seconds": 1.16,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "d7f64699c7b162fb2c8fb8c2d5127ed0d32ae39c96a723dc4f207e942f40f8f6",
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "bo_retirement",
+      "exit": 0,
+      "seconds": 37.19,
+      "execution": "clean commit 6e75d6f",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "7245b10c57a1238c7b47121bbcc44c310b7d03100e56c01b3862f2be215add71",
+      "case_count": 82,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "bringup_transport",
+      "exit": 0,
+      "seconds": 30.82,
+      "execution": "clean commit 6e75d6f",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "0408429d536329b99c6d991e84a59d0b11a7a4cf5fb3889cefb13586c6ffee53",
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "compute_probe",
+      "exit": 0,
+      "seconds": 232.78,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "e6cccd1c11735b89777b4ff56cf50c090347878437874683435ea3a47ee33807",
+      "case_count": 558,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "context_retirement",
+      "exit": 0,
+      "seconds": 45.35,
+      "execution": "clean commit 6e75d6f",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "5415e537c566676dc3105f866b636470e6d8370357aed7faf703068667205c15",
+      "case_count": 110,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "descriptor-mask",
+      "exit": 0,
+      "seconds": 1.11,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "firmware_control",
+      "exit": 0,
+      "seconds": 24.72,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "89d50cce2dfdd1a9f6e68db6e638f74f46e24c208394fae011006b51032afcbc",
+      "case_count": 60,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "firmware_sequence",
+      "exit": 0,
+      "seconds": 80.37,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "fa3ef56a7064ccf51f09c77346ed1e148a948d209e532d23a4ec6baa48047e06",
+      "case_count": 114,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "gart_bootstrap",
+      "exit": 0,
+      "seconds": 124.85,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "d2a3347697ca619a642ca7a9edd1a5246961a06402b5a6fa1d914d00703d0787",
+      "case_count": 319,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "gfx_power",
+      "exit": 0,
+      "seconds": 115.28,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "5db068e78b20506be13126569c2a93a417d09691d0f30424756adbb8ff332703",
+      "case_count": 158,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "hidpi",
+      "exit": 0,
+      "seconds": 0.58,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "ib_debug",
+      "exit": 0,
+      "seconds": 56.67,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "3c155e198aab1f708c9d1f36d82ef772bc55a13fbb233183dccbd21d23064e58",
+      "case_count": 112,
+      "leak_detection_enabled": false,
+      "regression_reproduced": {
+        "actual_previous_method_executed": true,
+        "sanitizer": "AddressSanitizer: heap-buffer-overflow",
+        "case": "cross-1",
+        "raw_sanitizer_output_logged": false,
+        "hardware_executed": false
+      },
+      "actual_method_sha256": {
+        "PhxBringup::vmOwnershipKnown": "d5c2867b667e3bc9844458541d5ffd77cf8e83cbaf85e215be7ff7accc90df19",
+        "PhxBringup::vmIdleLocked": "b94ec0829b3fe61a2eac702fafb003d81dc467ddd2b41786ec56a5647888c574",
+        "PhxBringup::vmCanReclaim": "545ee0068278bf5a09563a7bff8ae84d69e640baf6efa4374573a64704160ea6",
+        "PhxBringup::vmMap": "6c808ae34bf8674a569971d8cd85480d38b84c7f52eeee016520f52814470b81",
+        "PhxBringup::vmUnmap": "2bf543bf0649393018883a439be516dd2f3bf7779e90d1d8fdcd40d2f2ca5763",
+        "PhxBringup::vmFlushTlb": "40d70769b97576458945687d7e90e507c763463b189273fa4beaca6756e8f35a",
+        "PhxBringup::vmBindingValid": "400d3a49e4390464eee26a0ed12056727a25dda1d43e95cfad72500159f68db8",
+        "PhxBringup::gpuRetired": "0d11aedb825931619bc44061d4f933aef790bb3a8260eafaa25683deb0ca2454",
+        "PhxBringup::gpuRetiredLocked": "58da68caa2c1a6dd80ecea7fc711acf49ac9f64633edda8a56dd189c525642b3",
+        "PhxBringup::queueProgress": "e6d15c1e7ee7ddadf47250fae11e033665c1c0c3204bc347eabc57b444703cf0",
+        "PhxBringup::queueFence": "db49ddab2aea924457bf8ac424ea1a8105a65d379dd4c29ef06864d9946d9531",
+        "IOAccelPhxNativeClient::hasPending": "5e59559ba66204d1e3695a4f387da6b63bf9de991bd95a119af818793a3d6909",
+        "IOAccelPhxNativeClient::reapPending": "aa6601776a485e31ec27eecf470df6c598d9bb47a78049cb1b925ad6c8c433f8",
+        "IOAccelPhxNativeClient::doBoFree": "7a15757987d4fd85cc61da4ae0c3c178f3314e03d32be7063b4c5a0f7fde5be1",
+        "IOAccelPhxNativeClient::boRelease": "78f3071531a831d11f3937e4bf032037f4bbb994ed59e091e14cd773ae987f1c",
+        "IOAccelPhxNativeClient::findBo": "72d67309b8c14b6b9b96fec0e651575b209588589e2c0c3b2e7793c612025a36",
+        "IOAccelPhxNativeClient::doGemVa": "6178d2e8a7202ac626911fe27400e3a6027775326ca3dca5ddd6e886576fe260",
+        "IOAccelPhxNativeClient::ibCovered": "4fada3d8d3519e236827f6cad99fc55e5839472a8732a7def29a9e73500d6163",
+        "IOAccelPhxNativeClient::doSubmit": "290992585b746d4ccebe5441f0ecf8772f57f6eb20d73bc262906d6bdc3051cc",
+        "shape": "c3cc9acc338149e1cf07824c3549c314e0de887789a343fdfb753923b3bf6256",
+        "vaCanonical": "a17f76104e6a857509181e6778d65fb8fd7795769dd555d9b7f698af4e5fa846"
+      },
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "mes_queue",
+      "exit": 0,
+      "seconds": 152.17,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "91ba58c945106dcfb099ccf75e95d6628794c8b42a746cef2db4415f2512fbb9",
+      "case_count": 366,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "mes_start",
+      "exit": 0,
+      "seconds": 83.37,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "1dc7c186a493d5dcf01f65155f0da3ffef9d0454c173127b058b07a49e1c244e",
+      "case_count": 212,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "metal_capabilities",
+      "exit": 0,
+      "seconds": 4.57,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "a3f27824005d00c5dde8fa1fe7fdbcb0d0ccb0a6660a3243abf53fe5621df9e9",
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "native_shader_probe",
+      "exit": 0,
+      "seconds": 789.58,
+      "outer_timeout_seconds": 900,
+      "inner_case_timeouts_unchanged": true,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "1ceb221abd2997a9d8ec0b82b6b6d89b8a9d783081962d55f338e47dab196cb7",
+      "case_count": 1970,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "page_tables",
+      "exit": 0,
+      "seconds": 48.49,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "f60f93637269608eaa9d62d63b3ceb12c815a98585dbeb3df6e7041c28e0b508",
+      "case_count": 98,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "present_copy",
+      "exit": 0,
+      "seconds": 5.19,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "a91cba93901f2a81757c098579660c02578584382c7e29a6c1bbe8ba0577e96b",
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "psp_submission",
+      "exit": 0,
+      "seconds": 36.99,
+      "execution": "clean commit 6e75d6f",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "cc6ff0af42e43f81149e8ecbd41eb3aba8bde43bc40026281079f2181fafef5c",
+      "case_count": 76,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "queue_adoption",
+      "exit": 0,
+      "seconds": 30.18,
+      "execution": "clean commit 6e75d6f",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "5d9a2f137cbc5abfb2df4692d255758d75112bdd15b2c61d7744cc779b422993",
+      "case_count": 73,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "queue_retirement",
+      "exit": 0,
+      "seconds": 32.76,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "6fbfca0eb29347a0c252747a0ef0a050f8c2ec128557b0d18be7fe8e40a53291",
+      "case_count": 68,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "sampler-key",
+      "exit": 0,
+      "seconds": 3.18,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "shader_cache",
+      "exit": 0,
+      "seconds": 2.5,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "20b8679e58bb4964ace41391c7df6746d5da3afd0c3e0f6bc55c3278aa491738",
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "shader_probe",
+      "exit": 0,
+      "seconds": 768.3,
+      "outer_timeout_seconds": 900,
+      "inner_case_timeouts_unchanged": true,
+      "execution": "committed snapshot matching validated tree",
+      "private_report_sha256": "7adf1d072d9eb372b565386138c687d9feeb4b8c89e637d9eeca3e8cbd1ca838",
+      "case_count": 1830,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "submit_begin",
+      "exit": 0,
+      "seconds": 0.54,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "5b45b24d904f5e360cd8051efebf9b9571082d218d42963bfb681a4d4e0f2635",
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "surface-key",
+      "exit": 0,
+      "seconds": 2.11,
+      "execution": "local working-source fixture",
+      "production_sources_match_validated_commit": true,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "vm_binding",
+      "exit": 0,
+      "seconds": 25.6,
+      "execution": "clean commit 6e75d6f",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "683710e1e8f4ad864ba3526d8b37a381b105851a4696270d7a741923b7e341f1",
+      "case_count": 71,
+      "gpu_work_submitted": false
+    },
+    {
+      "name": "vm_walk_cleanup",
+      "exit": 0,
+      "seconds": 25.49,
+      "execution": "clean commit 6e75d6f",
+      "production_sources_match_validated_commit": true,
+      "private_report_sha256": "9bdf3a01be51a72c32607f773fa81ab1de0df1008db09b241b37d13030d02316",
+      "case_count": 55,
+      "gpu_work_submitted": false
+    }
+  ],
+  "whole_group_timeout_attempts": [
+    {
+      "name": "shader_probe",
+      "exit": 124,
+      "seconds": 240.01
+    },
+    {
+      "name": "native_shader_probe",
+      "exit": 124,
+      "seconds": 240.02
+    }
+  ],
+  "shader_group_retries": [
+    {
+      "name": "shader_probe",
+      "exit": 0,
+      "seconds": 768.3,
+      "outer_timeout_seconds": 900,
+      "inner_case_timeouts_unchanged": true
+    },
+    {
+      "name": "native_shader_probe",
+      "exit": 0,
+      "seconds": 789.58,
+      "outer_timeout_seconds": 900,
+      "inner_case_timeouts_unchanged": true
+    }
+  ],
+  "tooling_fixes": [
+    "d5dd49b5bb00dd0a022b0c177e6434f64051c09c",
+    "6e75d6ff0de2d78a5471550faab37d47426b9531",
+    "15b684def735ea70cf1a9247dbb12954075f859b"
+  ],
+  "tooling_inputs_sha256": {
+    "tools/target_inventory.py": "5cd21c5e23d2b0ee2a88169b3b7091defc5319a97144777236701d8524c93b76",
+    "tests/test_target_inventory.py": "d51afdf0f9ad2eac296f5bb39b0b5b03af7a09dd510e362704263208b0e1ebb3",
+    "tests/test_recovery_inventory.py": "a5934c4c5a6f9cc8209486ee38cb4420fb93d4f224bfd31162c136eca218b911",
+    "tests/test_target_preflight.py": "de7f53c2aa1e16ea3c1d73694c4b9b17e033c0aa4a6fbdeda866046b0d541589",
+    "tests/test_async_library.m": "523aa4b5432a49c8d03f24ad357e19fba64ad12e49c9370f01b0702ce4cb2e99",
+    "tests/test_async_function.m": "6d5996af34ef617080e0ea03759f76f4a327874a6e21ef85ce0536d658b02ffe",
+    "tools/test_ib_debug.py": "f917ea850784a61a41b271c7636fb610843b32f328eb9aebe8aa54caaace5d46",
+    "tests/test_ib_debug_runner.py": "2b14d059e313eebc1037387b2095c767cee04218cf372965bed07293b25cf083",
+    "tools/metal_smoke.m": "2f93cf5879426c24ecd1450d606e17fc6fbc4971b5f4623dc9057115c270af4a",
+    "src/PhxComputeProbe.h": "93ca684be41732ddb675206a1b77db4127587a55d0e3693c92b29d5f259e7ff8"
+  },
+  "documentation_checks": {
+    "support_status_tests": 8,
+    "failures": 0,
+    "replay_shell_syntax_passed": true
+  },
+  "installed_stack_gpu_baseline": {
+    "date": "2026-11-12T04:25:24.133783+00:00",
+    "command": "metal-smoke (no arguments)",
+    "exit": 0,
+    "seconds": 2.372,
+    "outer_timeout": false,
+    "outer_timeout_seconds": 240,
+    "per_command_timeout_seconds": 30,
+    "installed_bringup_build": 34,
+    "installed_source_sha_known": false,
+    "candidate_source_kext_build": 33,
+    "source_commit": "15b684def735ea70cf1a9247dbb12954075f859b",
+    "probe_source_sha256": "2f93cf5879426c24ecd1450d606e17fc6fbc4971b5f4623dc9057115c270af4a",
+    "probe_binary_sha256": "01d4ba66fd8d2d5810bb8c098838480020cd4749dc4f52a6f64cc8f58821b41e",
+    "private_stdout_sha256": "31aa687d0cca3b323c805a88be1482cd16b43a46cac98cc886a443d376fefb49",
+    "private_stderr_sha256": "8f23138e9a1c5b98ed7def07a0ec41796c3d7f5a39cdd0aed9f4bcab9800a2d7",
+    "passing_cases": [
+      {
+        "uint32_results": 1,
+        "output_offset_bytes": 0
+      },
+      {
+        "uint32_results": 63,
+        "output_offset_bytes": 256
+      },
+      {
+        "uint32_results": 64,
+        "output_offset_bytes": 0
+      },
+      {
+        "uint32_results": 257,
+        "output_offset_bytes": 256
+      },
+      {
+        "uint32_results": 4097,
+        "output_offset_bytes": 0
+      },
+      {
+        "uint32_results": 65537,
+        "output_offset_bytes": 256
+      }
+    ],
+    "all_six_passed": true,
+    "shader_compile_failed": false,
+    "kernel_function_missing": false,
+    "command_timeout": false,
+    "command_failed": false,
+    "output_mismatch": false,
+    "no_deployment": true,
+    "no_reboot_or_security_changes": true,
+    "execution_scope": "Existing installed build 34; installed source SHA unknown",
+    "exact_output_unchanged_input_and_guards_verified": true,
+    "cpu_or_default_device_fallback": false,
+    "post_run_os_device_and_abi_checks_passed": true,
+    "candidate_acceptance": false,
+    "performance_benchmark": false
+  },
+  "recovery_review": {
+    "prior_update_backup_complete": true,
+    "prior_update_reboot_verified_marker": true,
+    "rollback_script_present": true,
+    "backup_bringup_plist": true,
+    "backup_bringup_executable": true,
+    "backup_accel_plist": true,
+    "backup_auxkc": true,
+    "separate_efi_git_repository_present": true,
+    "separate_efi_config_readable": true,
+    "recovery_boot_or_rollback_executed_this_session": false,
+    "actual_recovery_boot_tested_this_session": false,
+    "no_rollback_script_executed": true,
+    "note": "Read-only inspection of existing recovery and complete prior-update backups. Existing rollback script includes internal EFI writes and will not be run. No boot recovery test was performed."
+  },
+  "privacy": "Selected metadata and hashes only; raw inventory, ranges, logs, binaries and caches remain ignored locally.",
+  "limits": [
+    "No candidate deployment; six bounded Metal GPU cases passed only on the existing installed stack.",
+    "Installed build 34 is not source build 33 and its source SHA is unknown.",
+    "Existing recovery artifacts were inspected read-only; no recovery boot or rollback was tested.",
+    "The repository full Metal/AIR compiler/runtime chain and target performance A/B remain unverified.",
+    "No sustained stability, rendering, WindowServer, video or sleep/wake acceptance.",
+    "Firmware-file make cases were skipped; no firmware fixtures were downloaded.",
+    "No Darwin leak-detection pass is claimed."
+  ]
+}

@@ -5,7 +5,10 @@ upstream `luuumi-dev/nullarc` at `cbb08dd` (2026-10-21). Upstream `main` is kept
 it can be re-synced; all downstream commits live only on this branch.
 
 It is a hardening/precision pass over the upstream bring-up and display paths, not a new driver and not a
-hardware-validated release. Nothing here has been executed on the target laptop.
+hardware-validated release. Local metadata, CPU fixtures, native compilation
+and a six-case Metal compute pass on the existing build-34 stack
+are now recorded in [the 2026-11-12 local validation](docs/validation/local-hackintosh-20261112.md).
+No downstream driver build was deployed or GPU-tested by that validation.
 
 Since 2026-11-02 this fork is the only working repository: the staging/build/test tooling, CI workflow,
 validation evidence and research documents that used to live in `AgnoyZ/radeon-780m-tahoe` moved here
@@ -82,7 +85,10 @@ and [host validation evidence](docs/validation/priority-host-20261112.md). It ad
 arithmetic/provenance, dependency-gated optional Metal claims, bounded shader-cache eviction
 and checked cache files, refusal of a submission whose upload prologue failed, and explicit
 unsupported hardware gamma/CLUT responses. These are host-tested correctness changes;
-GPU execution, display behavior, kernel-map pressure and the installed Tahoe build remain unverified.
+GPU execution of this branch, display behavior and kernel-map pressure remain
+unverified. The separate local validation observes macOS 26.7.2 / 25G332 but also
+records the loaded build-34 versus source build-33 mismatch; it does not establish
+an installed downstream revision or external-disk migration.
 
 - The kernel components start only with `phx780m=1`, on Darwin 25 and PCI `1002:1900`. Without the boot
   argument they decline to start.

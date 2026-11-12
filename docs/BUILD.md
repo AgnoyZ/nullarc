@@ -36,6 +36,59 @@ clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -Isrc test
 build/test-policy
 ```
 
+## Local Hackintosh checks for later commits
+
+The [2026-11-12 local record](validation/local-hackintosh-20261112.md) separates
+CPU/source checks from the installed driver's identity and GPU acceptance.
+The local system Python is 3.9.6; use a supported interpreter rather than
+changing tests to accept it. This machine already has a uv-managed Python
+3.13.18; another Python 3.10+ interpreter can be used instead.
+
+From a clean, committed checkout, a minimal source/scheduling rerun is:
+
+```sh
+set -eu
+PYTHON="$(uv python find 3.13)"
+"$PYTHON" -c 'import sys; assert sys.version_info >= (3, 10)'
+test -z "$(git status --porcelain --untracked-files=no)"
+REV="$(git rev-parse --short=12 HEAD)"
+OUT="build/local-check-$REV"
+test ! -e "$OUT"
+mkdir -p build
+mkdir -m 700 "$OUT"
+"$PYTHON" -m unittest discover -s tests -v
+make test CXX=clang++ CXXFLAGS='-std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer'
+for name in translation_flight async_cache async_library async_function; do
+    "$PYTHON" "tools/test_$name.py" --out "$OUT/$name-asan-ubsan"
+    "$PYTHON" "tools/test_$name.py" --sanitizer thread --out "$OUT/$name-tsan"
+done
+"$PYTHON" tools/target_inventory.py --out "$OUT/inventory"
+"$PYTHON" tools/target_preflight.py "$OUT/inventory/inventory.json" --out "$OUT/preflight"
+git diff --check
+```
+
+Use fresh output for retries and retain failures. The full host-method matrix
+and native component recipes remain in the build/priority workflows; the
+minimal commands above do not replace them. Record exact source pins, OS build,
+compiler, skipped cases and installed-driver provenance for each run.
+
+Inventory/preflight and CPU fixtures do not authorize driver installation or
+GPU submission. Check the private gate report and reviewed recovery procedure
+before any manual target probe. Do not run CI's non-target refusal expectations
+or relocated-plugin no-device tests against an active target stack and then
+disable their safeguards to get a pass. Missing display counters block the
+baseline rather than becoming zeros. The command-line Metal compiler must
+also pass its own preflight before claiming the full AIR/compiler chain.
+
+For an explicitly authorized GPU session, first record the loaded kext/plugin
+revision and compare it with the candidate's build provenance. Confirm recovery
+before running the freshly built `metal-smoke --list`, then `metal-smoke`
+without arguments. Preserve its exit code and all six output/input/guard
+results; stop at the first failure or timeout. The probe permits 30 seconds per
+command. A pass against an older or unidentified installed stack is a baseline
+for that stack only, as in the build-34 record above. Candidate acceptance still
+requires a separately reviewed manual deployment of the identified revision.
+
 ## Native macOS: actual kernel binaries
 Requires an Intel Mac with Xcode Command Line Tools, pinned MacKernelSDK, Vulkan-Headers, Mesa/Cobalt and LLVM 21.1.8 sources, CMake, Rust 1.90.0, glslangValidator >= 12.2, pkg-config and the hash-locked translator source archive. This is a build host; it need not contain a 780M. Building on a hosted Mac does not test the target laptop.
 

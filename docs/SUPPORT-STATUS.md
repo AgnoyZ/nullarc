@@ -2,19 +2,27 @@
 
 One table, kept current, for the question "does this work on my machine?". It exists because the honest answer
 differs per area, and because `README.md`'s status table describes **upstream's reference machine**, not this
-branch: this fork has no recorded target-laptop validation. The owner's report
-of a sluggish Hackintosh does not identify its active driver revision or OS build.
+branch: this fork has no recorded GPU execution of its downstream candidate.
+The [2026-11-12 local check](validation/local-hackintosh-20261112.md) observed
+macOS 26.7.2 / 25G332, Darwin 25.6.0 x86_64 and one registry 780M candidate.
+The loaded bring-up reports build 34 while this branch defines build 33;
+its installed source SHA is unknown. The installed stack passed six bounded
+Metal compute correctness cases. This does not identify or accept a running
+downstream driver; see the local record for the GPU evidence and limits.
 
 **No row below is `target-verified`.** The target is a ThinkBook with a Radeon 780M (Phoenix, gfx1103, PCI
-`1002:1900`), planned for macOS Tahoe on an external disk. Migration and the actual target OS build remain
-unverified; until the phase-1 capture (`docs/analysis.md` §7) has run there, every claim in this repository is host-side.
+`1002:1900`), planned for macOS Tahoe on an external disk. The local OS build is
+now observed. Existing EFI/recovery artifacts were reviewed read-only, but a
+recovery boot, the external-disk migration and candidate driver execution remain
+unverified. The phase-1 attempt refused a missing counter;
+no display baseline or target performance claim was produced.
 
 ## Evidence classes
 
 | class | means | is not |
 | --- | --- | --- |
 | `target-verified` | observed on the target laptop, with a record in `docs/validation/` | — (none yet) |
-| `host-verified` | compiled, linked, signed or executed on a non-target host in CI | that anything loads or draws |
+| `host-verified` | compiled, linked, signed or exercised in CPU fixtures, in CI or on the local Hackintosh | that the downstream driver loads or draws |
 | `policy-asserted` | a decision rule is asserted by a C++/Python test that runs on every push | that the rule meets real hardware |
 | `not implemented` | the driver does not attempt it | "broken"; it is out of scope, deliberately |
 | `unknown` | this repository cannot decide it, and says so instead of guessing | a soft yes |
