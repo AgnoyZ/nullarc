@@ -119,7 +119,7 @@ static void snapshots(TestLibrary *library) {
     MTLFunctionDescriptor *desc = descriptor(@"before", 11);
     // Retain the originally assigned object as well as the one exposed by the descriptor.
     MTLFunctionConstantValues *descriptorValues = desc.constantValues;
-    MTLIntersectionFunctionDescriptor *intersection = [MTLIntersectionFunctionDescriptor functionDescriptor];
+    MTLIntersectionFunctionDescriptor *intersection = [MTLIntersectionFunctionDescriptor new];
     intersection.name = @"before"; intersection.constantValues = constants(13);
     MTLFunctionConstantValues *intersectionValues = intersection.constantValues;
     dispatch_group_t group = dispatch_group_create();
@@ -136,7 +136,13 @@ static void snapshots(TestLibrary *library) {
         verifyCallback(f, e, @"intersection:before:i3=13,nnamed=14", NO); dispatch_group_leave(group);
     }];
     assert(atomic_load(&calls) == 0 && atomic_load(&completions) == 0);
-    [name setString:@"after"]; [values reset]; [descriptorValues reset]; [intersectionValues reset];
+    [name setString:@"after"];
+    for (MTLFunctionConstantValues *original in @[values, descriptorValues, intersectionValues]) {
+        int replacement = 99;
+        [original setConstantValue:&replacement type:MTLDataTypeInt atIndex:3];
+        [original setConstantValue:&replacement type:MTLDataTypeInt withName:@"named"];
+        [original reset];
+    }
     desc.name = @"after"; desc.specializedName = @"after"; desc.constantValues = constants(99); desc.options = 0;
     intersection.name = @"after"; intersection.constantValues = constants(99);
     queue.suspended = NO; waitGroup(group); [queue waitUntilAllOperationsAreFinished];

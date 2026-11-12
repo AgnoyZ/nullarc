@@ -69,6 +69,10 @@ owner retention/release, and 1600 mixed requests from 16 callers at each of
 widths one and two. ASan/UBSan and TSan run separately.
 
 Windows/Linux verify extraction and unsupported-native-execution refusal only.
-Native CI results will be recorded after execution; none are claimed here yet.
+Initial focused run `43143909880` passed the Ubuntu host checks but rejected
+the fixture's subclass factory return type under `-Werror`. The fixture now
+constructs the native subclass directly with `new`; warning checks remain
+enabled. Native execution results will be recorded after a successful rerun;
+none are claimed here yet.
 Target acceptance still requires real function/shader output, caller latency,
 memory and frame-time A/B. Host scheduling tests cannot establish stable FPS.
