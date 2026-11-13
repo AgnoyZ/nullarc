@@ -149,3 +149,43 @@ helper file observations. No native target binary was built locally or run,
 and no target service, installed startup, GPU workload, arming or reboot was
 used for this audit. Native delivery, target reads and the actual allocation
 root cause remain unresolved.
+
+## Retained helper identity follow-up, 2026-11-14
+
+The private installed initializer copy is byte-identical to
+`tools/phxctl/full.sh` at historical commit
+`3f9a957b6f9abb8406d7ee3828551414e6a0143d`, Git blob
+`5b660391e9a9765bdcaa36438667eb3c0aaaf9ad`. Both the local blob identity and
+the remote file at that exact commit were independently checked. This supplies
+matching historical source for the initializer. It does not establish how or
+when that file was installed, which helper binary was built with it, or which
+bytes executed during the failed boot.
+
+A bounded read-only search inspected 16 named file candidates (seven retained
+initializer source copies, seven guarded test fakes and two retained
+compile-only binaries), the named regular members of 14 explicitly enumerated
+archives, and ten initializer-history commits. No installed mesboot byte match
+was found in that scope. Eleven external-dependency source archives and named
+excluded directories were skipped; 18 nested archive members were not
+recursively unpacked. This is a scoped negative result, not proof that no
+matching package exists. Fifteen retained JSON records for each helper contain
+its current hash; those are historical file observations, not build manifests
+or execution attestations.
+
+Static disassembly of the retained installed mesboot copy provides evidence
+stronger than string absence for two specific paths: `_rd` initializes a read
+output, calls `IOConnectCallMethod`, then returns the output without checking
+the transport result or reply size; `_wr` calls `IOConnectCallScalarMethod`
+without checking its transport result or reply count. The claim command prints
+the returned status and then continues command dispatch without an immediate
+status-dependent refusal. These are static control-flow observations only;
+the binary was not executed, and its exact corresponding source/build remains
+unestablished. They do not prove that a transport failure occurred or caused
+the build-36 allocation refusals. The current source's checked transport and
+explicit-layout protections must remain intact.
+
+The [follow-up record](validation/allocation-helper-provenance-20261114.json)
+keeps these evidence levels separate. No production source changed and the nine
+recorded source hashes from the 504-test run still match; that suite was not
+rerun for this documentation-only follow-up. Exact binary provenance, native
+delivery, passive target evidence and independent recovery remain open gates.

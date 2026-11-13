@@ -1,0 +1,76 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "initializer-historical-source-matched; mesboot-build-origin-and-target-cause-unresolved",
+  "reviewed_HEAD": "475448cc9f98a38925f0275fd93a3a072706d296",
+  "documentation": "docs/ALLOCATION-STARTUP-AUDIT.md",
+  "initializer_identity": {
+    "historical_commit": "3f9a957b6f9abb8406d7ee3828551414e6a0143d",
+    "path": "tools/phxctl/full.sh",
+    "git_blob": "5b660391e9a9765bdcaa36438667eb3c0aaaf9ad",
+    "retained_installed_copy_equals_local_git_bytes": true,
+    "remote_contents_at_exact_commit_independently_verified": true,
+    "installation_history_proven": false,
+    "associated_mesboot_build_proven": false
+  },
+  "bounded_retained_identity_scan": {
+    "root_scope": "retained repository build tree and local initializer Git history",
+    "files_seen": 23778,
+    "named_file_candidates": 16,
+    "candidate_classes": {
+      "retained_initializer_source_copies": 7,
+      "guarded_test_fakes": 7,
+      "retained_compile_only_binaries": 2
+    },
+    "explicitly_enumerated_archives": 14,
+    "matching_named_regular_archive_members": 0,
+    "archive_inspection_scope": "named regular members at each explicitly enumerated archive level",
+    "nested_archive_members_not_recursively_unpacked": 18,
+    "external_dependency_source_archives_skipped": 11,
+    "excluded_directory_count": 31,
+    "initializer_history_commits": 10,
+    "exact_initializer_history_matches": 1,
+    "installed_mesboot_byte_matches_in_scan": 0,
+    "inspection_errors": 0,
+    "global_absence_or_binary_origin_proven": false
+  },
+  "historical_hash_records": {
+    "retained_initializer_JSON_records": 15,
+    "retained_mesboot_JSON_records": 15,
+    "matching_historical_file_observations": true,
+    "trusted_binary_build_manifest_found": false,
+    "failed_boot_execution_identity_proven": false
+  },
+  "retained_installed_mesboot_static_disassembly": {
+    "read_only_host_analysis_tool": true,
+    "binary_executed": false,
+    "rd_returns_initialized_output_without_transport_result_or_reply_size_check": true,
+    "wr_has_no_transport_result_or_reply_count_check": true,
+    "claim_prints_status_then_continues_dispatch_without_immediate_status_refusal": true,
+    "transport_failure_during_target_execution_demonstrated": false,
+    "exact_corresponding_source_or_build_proven": false
+  },
+  "verification": {
+    "previous_full_test_source_commit": "de9051fa75385ef285654645999c8686b334b7a7",
+    "previous_full_python_tests_passed": 504,
+    "nine_recorded_source_hashes_still_match": true,
+    "full_suite_rerun_for_documentation_only_followup": false,
+    "production_source_changed": false
+  },
+  "limits": {
+    "raw_paths_hashes_copies_and_disassembly_kept_private": true,
+    "installed_monitor_read_or_executed_in_this_followup": false,
+    "installed_helpers_executed_or_modified": false,
+    "native_target_build_or_manual_workflow_dispatch": false,
+    "target_service_open_or_GPU_work": false,
+    "deployment_arming_or_reboot": false,
+    "live_EFI_or_security_change": false,
+    "actual_reboot_resume_verified": false,
+    "allocation_root_cause_confirmed": false
+  },
+  "next_required": [
+    "establish exact mesboot build/source association from a trusted retained manifest or package, if available",
+    "review replacement initialization against the preserved explicit-layout and checked-transport contracts without deploying it",
+    "retain native-delivery, passive-read, independent-recovery and fresh target-authorization gates"
+  ]
+}
