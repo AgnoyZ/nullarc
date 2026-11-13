@@ -4,8 +4,11 @@ Source candidate, 2026-11-13. Subsequently staged to the actual target EFI
 under administrator authorization and verified loaded as build 35. The first
 startup initialization did not complete; the owner reports a manual restart
 after observing it stuck. The next boot disabled initialization through the
-existing protection. Hardware acceptance remains failed/pending; see the
-[postboot checkpoint](validation/native-submit-build35-postboot-20261113.json).
+existing protection. See the [initial postboot checkpoint](validation/native-submit-build35-postboot-20261113.json).
+The subsequently owner-authorized retry completed the legacy startup checks
+and published NMXAccel. That later initialization result is recorded in
+[the retry outcome](validation/native-submit-build35-retry-postboot-20261113.json);
+it does not accept native Metal workloads or desktop acceleration.
 
 The failed desktop boot logged `VK_ERROR_DEVICE_LOST`, but the pinned RADV
 queue layer can convert several distinct failures to that result. Known native
@@ -234,3 +237,42 @@ for a wedged kernel or bus. The owner should allow six to eight minutes after
 restart before judging this attempt. Reboot completion, initialization,
 acceleration and any automatic protective recovery are still unverified at
 this scheduled-reboot checkpoint. See [the retry record](validation/native-submit-build35-retry-20261113.json).
+
+## Retry outcome: startup initialization completed
+
+The requested normal reboot led to a new boot at 15:30:38 local time on
+2026-11-13. The startup log records initialization starting at 15:30:41 and
+finishing at 15:30:50. Its compute and graphics scratch/test-buffer values
+match the expected sentinels; both queue-adoption calls and the accelerator
+claim report zero return codes. These are the existing legacy startup
+checks, not an independent native-submit or Metal regression suite.
+
+Readback verified loaded build 35 against the pinned candidate identity and
+confirmed PhxAccel loaded and NMXAccel present. The stop, M2 and pending
+markers are absent. IONDRVFramebuffer remains present, PhxAMDFB absent, and
+the framebuffer NVRAM arming absent. The display sysctls are now registered
+and report zero, unlike the unregistered OIDs in the protective boot.
+No initialization or shutdown process was observed at the first readback.
+
+The kernel query through 15:34:10 returned 196 records matching the bounded
+driver/GPU/panic/watchdog predicate. All parsed into the current boot and
+timezone-aware window. No first-native-submit refusal or selected driver
+queue-stuck/fault message was observed. The readable report inventory found
+no matching new WindowServer, panic, kernel, watchdog or shutdown report.
+These are bounded observations; missing logs or reports do not prove the
+absence of a fault or establish native submission correctness.
+
+Of 55 installed entries, 53 matched the retry baseline. The application
+allowlist changed from the built-in-tools policy to the existing non-M2
+application policy, and the firmware-address log was refreshed by startup.
+Installed kext, userspace, firmware and startup-helper bytes were unchanged.
+The read-only investigation did not replay initialization, submit additional
+GPU work, change switches, deploy a driver or reboot.
+
+The outcome establishes completion of this boot's existing initialization
+sequence and restoration of its accelerator service. It does not explain
+the preceding stuck attempt, validate automatic recovery from a hang,
+retest the six earlier Metal compute cases, resolve the original native
+submission failure, enable desktop takeover or correct physical display
+size. Keep M2 off while diagnosing the failed native/display path. Earlier
+checkpoints retain their original observations.

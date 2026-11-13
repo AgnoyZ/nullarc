@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "timezone": "UTC+08:00",
+  "candidate_source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+  "retry_preparation_checkpoint": "native-submit-build35-retry-20261113.json",
+  "scope": "Read-only verification of the owner-authorized initialization retry; no additional GPU workload or desktop takeover",
+  "target": {
+    "hardware": "Radeon 780M, Ryzen 8845H",
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "boot_and_startup": {
+    "new_boot_compared_with_rearm_verified": true,
+    "boot_started_local": "2026-11-13T15:30:38+08:00",
+    "startup_started_local": "2026-11-13T15:30:41+08:00",
+    "startup_done_local": "2026-11-13T15:30:50+08:00",
+    "legacy_compute_scratch_and_testbuffer_reported_expected_values": true,
+    "legacy_graphics_scratch_and_testbuffer_reported_expected_values": true,
+    "compute_queue_adoption_reported_return_zero": true,
+    "graphics_queue_adoption_reported_return_zero": true,
+    "accelerator_claim_reported_return_zero": true,
+    "startup_completion_observed": true,
+    "current_result_establishes_previous_stuck_attempt_cause": false,
+    "automatic_GPU_hang_recovery_exercised_or_verified": false
+  },
+  "runtime_readback": {
+    "PhxBringup_build": 35,
+    "loaded_binary_identity_matches_pinned_candidate": true,
+    "PhxAccel_kext_loaded": true,
+    "NMXAccel_service_count": 1,
+    "PhxAMDFB_service_count": 0,
+    "IONDRVFramebuffer_service_count": 1,
+    "stop_marker_present": false,
+    "M2_marker_present": false,
+    "initialization_pending_marker_present": false,
+    "framebuffer_NVRAM_arming_present": false,
+    "accelerator_display_sysctls_registered": true,
+    "display_sysctl_values": {
+      "debug.nvaccelfb": 0,
+      "debug.nvaccel_iop": 0,
+      "debug.nvaccel_iop_ok": 0
+    },
+    "initialization_or_shutdown_process_observed_at_first_readback": false
+  },
+  "kernel_observation": {
+    "window_start_local": "2026-11-13T15:30:38+08:00",
+    "window_end_exclusive_local": "2026-11-13T15:34:10+08:00",
+    "predicate_scope": "Kernel process and driver, GPU, panic or watchdog message terms",
+    "command_completed_without_timeout": true,
+    "raw_returned_records": 196,
+    "same_boot_time_filtered_records": 196,
+    "out_of_window_records_excluded": 0,
+    "other_boot_records_excluded": 0,
+    "timestamp_parse_failures": 0,
+    "first_native_submit_refusals_observed": 0,
+    "selected_driver_queue_stuck_or_GPU_fault_messages_observed": 0,
+    "absence_of_message_excludes_failure": false
+  },
+  "report_inventory": {
+    "scope": "Readable system and user diagnostic-report directories and panic-report directory; matching WindowServer, panic, kernel, watchdog, shutdown or restart names",
+    "matching_reports_since_current_boot": 0,
+    "inventory_errors": 0,
+    "missing_report_proves_absence_of_fault": false
+  },
+  "installed_stack_readback": {
+    "baseline_entries": 55,
+    "entries_matched": 53,
+    "unreadable_entries": 0,
+    "changed_runtime_outputs": [
+      "application allowlist: existing non-M2 application policy",
+      "firmware-address log: refreshed startup responses"
+    ],
+    "installed_driver_userspace_firmware_and_helper_bytes_unchanged": true
+  },
+  "preservation_and_acceptance": {
+    "agent_replayed_initialization_in_current_boot": false,
+    "agent_submitted_additional_GPU_work": false,
+    "agent_changed_driver_userspace_startup_switch_EFI_NVRAM_or_security": false,
+    "agent_created_watchdog_or_rebooted_during_postboot_inspection": false,
+    "legacy_startup_sequence_completed_and_accelerator_service_restored": true,
+    "new_native_submit_or_Metal_regression_suite_run": false,
+    "prior_six_Metal_cases_reaccepted_for_this_boot": false,
+    "original_native_refusal_or_desktop_failure_resolved": false,
+    "desktop_acceleration_accepted": false,
+    "physical_display_size_corrected": false,
+    "raw_UUIDs_logs_addresses_personal_configs_or_diagnostics_published": false,
+    "next_step": "Keep M2 off; use this successful initialization checkpoint while preparing a bounded native-submission diagnostic, preserving uncertain in-flight resources and existing recovery policy"
+  }
+}
