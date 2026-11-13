@@ -9,6 +9,9 @@ The subsequently owner-authorized retry completed the legacy startup checks
 and published NMXAccel. That later initialization result is recorded in
 [the retry outcome](validation/native-submit-build35-retry-postboot-20261113.json);
 it does not accept native Metal workloads or desktop acceleration.
+The later [bounded Metal validation](validation/native-submit-build35-metal-20261113.json)
+passed all six real compute cases on that same initialized build-35 mixed
+stack. Desktop takeover remains a separate, unaccepted path.
 
 The failed desktop boot logged `VK_ERROR_DEVICE_LOST`, but the pinned RADV
 queue layer can convert several distinct failures to that result. Known native
@@ -276,3 +279,37 @@ retest the six earlier Metal compute cases, resolve the original native
 submission failure, enable desktop takeover or correct physical display
 size. Keep M2 off while diagnosing the failed native/display path. Earlier
 checkpoints retain their original observations.
+
+## Same-boot bounded Metal validation
+
+After the owner continued the Metal-before-M2 plan, the previously reviewed
+probe executable, MSL source and shared readback checker were rehashed and
+matched to their earlier private plan. No kext, plugin or runtime was built
+or installed. The preflight verified build 35 and candidate binary identity,
+NMXAccel, firmware desktop, no stop/pending/M2 markers, and no NVRAM arming.
+It pinned 55 installed entries and 15 files behind the active plugin/runtime
+symlinks. The same files and boot were verified after execution.
+
+The unique registry-PCI-matched `1002:1900` device passed one real Metal
+compute invocation at 15:50 local time. Cases of 1, 63, 64, 257, 4,097 and
+65,537 elements all produced exact results, retained their inputs and
+preserved output guards, including alternating 0-/256-byte output offsets.
+Outputs had been poisoned before dispatch. The runtime separately reported
+native ABI 1.12 and kext build 35. There is no CPU/default-GPU fallback in
+this probe. Its source, checker and executable hashes are in
+[the compute record](validation/native-submit-build35-metal-20261113.json).
+
+The per-command completion bound was 30 seconds and the outer process bound
+210 seconds, with no retry or automatic restart. It exited zero without a
+timeout; its 0.793-second process time is not a benchmark. The process
+deadline would not prove a hung GPU had stopped or that uncertain resources
+could safely be reclaimed. Existing kernel retirement guards were unchanged.
+
+The bounded same-boot kernel query returned no matching native-refusal,
+bring-up or GPU-fault records. No refusal code was recovered; absence of a
+message is not evidence that every native path is correct. This pass accepts
+only these bounded compute cases on the identified mixed stack, not complete
+userspace source provenance, desktop rendering, video, sleep, sustained
+stability or performance. It does not explain the earlier WindowServer
+failure. M2 remained off throughout this compute session; its separate
+startup test still needs switch backup, capture and existing recovery policy.
