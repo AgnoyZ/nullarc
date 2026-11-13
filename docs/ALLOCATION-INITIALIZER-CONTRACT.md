@@ -116,3 +116,20 @@ focused file using Python unittest discovery; do not execute installed or
 reference startup scripts. These offline results cannot identify which bytes
 ran at the old failure, distinguish pending/invalid, or assign raw-2 to the
 host preparation stage.
+
+## Local verification, 2026-11-14
+
+Source commit `da0e89ed312bc969db537e958a326a87b8ae01a8` passed all **513
+Python tests** in 246.315 seconds, with no skipped tests. The checkout was
+clean before and after the run, HEAD was unchanged, and all sixteen recorded
+input hashes still matched. The focused file separately passed ten test
+methods, including its nine new full-entrypoint/composition methods.
+
+The source commit's remote ref, commit/tree/parent and all five changed files
+were independently verified after exact-object REST fast-forward with
+`force=false`. Automatic full-stack run `43496254644` is
+`completed/cancelled`, not a build pass. The
+[validation record](validation/allocation-initializer-contract-20261114.json)
+separates actual userspace entrypoint/gate tests, static kernel review and
+unproven target/recovery claims. No native target binary, installed startup,
+target service, GPU workload, arming or reboot was used for this review.

@@ -1,0 +1,98 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "current-entrypoint-compatibility-and-stage-failure-characterized; complete-initializer-and-independent-recovery-unresolved",
+  "source_commit": "da0e89ed312bc969db537e958a326a87b8ae01a8",
+  "documentation": "docs/ALLOCATION-INITIALIZER-CONTRACT.md",
+  "focused_tests": {
+    "new_test_methods": 9,
+    "retained_function_gate_test_methods": 1,
+    "all_focused_methods_passed": 10,
+    "direct_fake_IOKit_entrypoint_processes": 13,
+    "actual_shell_gate_compositions": 4,
+    "retained_function_gate_internal_cases": 12
+  },
+  "actual_current_entrypoint_with_fake_IOKit": {
+    "full_current_mesboot_C_main_included": true,
+    "fake_headers_and_transport_only": true,
+    "ASan_and_UBSan_enabled": true,
+    "native_IOKit_or_CoreFoundation_framework_link": false,
+    "relocated_claim_and_kiqsched_exit_1_before_claim_snapshot_or_register_memory_activity": true,
+    "missing_layout_prevents_claim": true,
+    "explicit_gart_and_mes_reach_snapshot_then_injected_transport_exit_74": true,
+    "explicit_bootstrap_success_fabricated": false,
+    "bare_gart_and_mes_exit_64_before_lookup": true,
+    "claim_transport_failure_exits_74_before_success_output": true,
+    "HELLO_status_count_and_ABI_failure_precede_claim": true,
+    "reference_positive_claim_is_fake_only": true,
+    "separate_processes_do_not_share_prior_explicit_layout_globals": true
+  },
+  "actual_existing_stage_gate_with_test_fixtures": {
+    "claim_stage_statuses_1_and_74_retained": true,
+    "failure_returns_gate_77_and_skips_later_sentinel": true,
+    "release_file_fake_runs_after_failed_stage": true,
+    "positive_control_runs_later_file_sentinel": true,
+    "blocked_claim_uses_explicit_fixture_FIFO": true,
+    "release_and_later_sentinel_absent_while_claim_waits": true,
+    "release_and_later_sentinel_present_after_unblock": true,
+    "independent_recovery_proven": false,
+    "handled_failure_marker_removal_is_not_single_use_grant_consumption": true,
+    "GPU_or_kernel_hang_demonstrated": false
+  },
+  "kernel_claim_review": {
+    "static_source_only": true,
+    "existing_PCI_and_gpuReady_guard_preserved": true,
+    "kernel_claim_exercised": false,
+    "display_queue_readiness_proven": false
+  },
+  "full_python_tests": {
+    "count": 513,
+    "reported_seconds": 246.315,
+    "passed": true,
+    "skipped": 0,
+    "clean_committed_checkout_before_and_after": true,
+    "HEAD_unchanged": true,
+    "recorded_input_hashes_unchanged": true
+  },
+  "source_hashes_at_full_test": {
+    "tools/phxctl/mesboot.c": "d734d4d7d07c745cb4b26a7b5954d522facfd08645a3f3fbb193c3b5b2ed4917",
+    "tools/phx_boot_gate.sh": "4369068b8936b46eaf1d04260d382ed1e8b10196b752de84b014402de3db80d5",
+    "src/phxbringup/PhxBringup.cpp": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8",
+    "tests/test_mes_entrypoint.c": "6cb4dc7f821a7dd9acf2a7630fee97886ce5cf567d916855039fca3fc77bc628",
+    "tests/test_mes_layout_gate.py": "de2fc80a11320472087bf414be6a5ae6d6ca2a83d74115f6c1f64e8d170d207a",
+    "tests/fake_iokit/IOKit/IOKitLib.h": "a6f9052a984e53eea8a14d530d1b5d2b5e0fcdd797cd132243b75d69684a329a",
+    "tests/fake_iokit/CoreFoundation/CFBase.h": "ff4bc7074a22571f67d550e3ce5a4eeceaccdf231d4f22af88f3ea34b74f84d5",
+    "tests/fake_iokit/CoreFoundation/CFString.h": "6c9529fc4cba84c798fb6e32e6100a4b07418c745252123f72da1e3a4cd45a96",
+    "tests/fake_iokit/CoreFoundation/CFNumber.h": "b11d42bc07d00539bcdd85a81f8648df950b52e7dfb79d98cb5e3160af933c04",
+    "tools/phxctl/gfx11_shader_probe.h": "eb149f8747332471f8f9c92754c43f51bc209c439fbd297b2404eb232dbba5a1",
+    "tools/phxctl/mes_v11_api_def.h": "7b1b1e895e0faba305f1832bb815c617b51cbbdc6701dea4aa2084b52806b71a",
+    "src/phxbringup/PhxMesQueueLayout.h": "328db142647bb14f26273ed1644b33927ed2ddf6838990d51f1596edf1cd5cea",
+    "src/phxbringup/PhxGartLayout.h": "ccdea678e69dfb4968bdb3d948a77fe24a8933eba75f165321f8056117f15804",
+    "src/phxbringup/PhxBootMemory.h": "8b10ca43114c17e7baf70d6984391685ea3d4a4a2a01a6f70fc3964cb2c63349",
+    "src/phxbringup/PhxPspLayout.h": "7b66a4c0fd509621148d3afe9bf2b98be5f59c66d6c933b6d0120a38fec5779e",
+    "src/phxbringup/PhxFirmwareProfile.h": "bfd1e4f49dfbc5990531a842a660a65a2804b00d8806112f4c3e992fa0062e0d"
+  },
+  "source_remote_verification": {
+    "ref_commit_tree_parent_and_five_files_independently_verified": true,
+    "exact_existing_commit_preserved": true,
+    "REST_fast_forward_force_false": true,
+    "automatic_fullstack_run": 43496254644,
+    "automatic_fullstack_final": "completed/cancelled; not a build pass"
+  },
+  "limits": {
+    "production_mesboot_gate_kernel_or_AGDC_changed": false,
+    "production_VM_guards_budgets_pin_cleanup_or_return_codes_changed": false,
+    "installed_helpers_or_monitor_executed_or_changed": false,
+    "target_service_open_or_GPU_execution": false,
+    "deployment_arming_or_reboot": false,
+    "native_target_build_or_manual_workflow_dispatch": false,
+    "observer_baseline_admission_or_full_startup_integration_verified": false,
+    "allocation_root_cause_confirmed": false,
+    "actual_reboot_session_resume_verified": false
+  },
+  "next_required": [
+    "review explicit queue initialization/adoption and claim prerequisites without weakening existing layout or kernel readiness gates",
+    "review a separate recovery owner and durable single-attempt admission before any complete startup candidate",
+    "retain native-delivery, Phase A passive-read, independent-recovery and fresh target-authorization gates"
+  ]
+}
