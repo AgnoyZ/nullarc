@@ -52,8 +52,12 @@
   "hosted_native_validation": {
     "status": "pending",
     "runner": "macos-15-intel",
-    "workflow": ".github/workflows/build.yml",
-    "artifact_retention_requested": false
+    "workflow": ".github/workflows/radv-artifacts.yml",
+    "artifact_retention_requested": false,
+    "package_creation_requested": false,
+    "broader_source_run_id": 43426508041,
+    "broader_source_job_passed": true,
+    "broader_native_run_required_for_this_diagnostic": false
   },
   "target_state_readback": {
     "later_boot_than_historical_fallback": true,
@@ -74,5 +78,18 @@
     "A native NoMemory still does not identify the exact internal kernel branch.",
     "The diagnostic does not cover failures confined to userspace VA reservation or host malloc.",
     "No allocation-cause fix or desktop acceleration acceptance is claimed."
-  ]
+  ],
+  "source_commit": "6b8d9a806265dc5e185bdaecb37049f89a467bab",
+  "source_validation": {
+    "local_python": "3.12",
+    "local_tests": 414,
+    "local_passed": true,
+    "hosted_source_job": 131889108944,
+    "hosted_source_job_passed": true
+  },
+  "historical_timeline": {
+    "first_command_buffer_refusal_local": "2026-11-13 18:37:20.689257 +0800",
+    "same_process_non_nil_texture_object_reported_later": true,
+    "fresh_native_allocation_after_refusal_proven": false
+  }
 }

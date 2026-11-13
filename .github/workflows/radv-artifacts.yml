@@ -1,6 +1,11 @@
 name: Build downloadable experimental RADV only
 on:
   workflow_dispatch:
+    inputs:
+      retain_artifacts:
+        description: 'Retain the reviewed seven-day RADV-only package; false validates without uploading'
+        type: boolean
+        default: true
 permissions:
   contents: read
 concurrency:
@@ -41,8 +46,10 @@ jobs:
       - name: Compile, sign and verify RADV and four no-device refusals
         run: python3 tools/build_radv.py --mesa build/inputs/radv/mesa --cobalt build/inputs/radv/cobalt --vulkan-headers build-vulkan-headers --out build/radv-native --artifacts build/radv-artifacts
       - name: Package only reviewed RADV, corresponding sources and notices
+        if: ${{ inputs.retain_artifacts }}
         run: python3 tools/package_radv.py --mesa build/inputs/radv/mesa --cobalt build/inputs/radv/cobalt --vulkan-headers build-vulkan-headers --artifacts build/radv-artifacts --out build/radv-upload
       - name: Upload manual RADV candidate package
+        if: ${{ inputs.retain_artifacts }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: experimental-radv-${{ github.sha }}
@@ -53,3 +60,6 @@ jobs:
         run: |
           echo 'One ad-hoc signed x86_64 RADV library, corresponding sources, provenance, notices and hashes.' >> "$GITHUB_STEP_SUMMARY"
           echo 'No installation, initialization, GPU execution, desktop takeover or reboot. A constructor cleanup fix does not resolve the original stream-creation failure.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Confirm compile-only retention policy
+        if: ${{ !inputs.retain_artifacts }}
+        run: echo 'Compile/test-only run. Package creation and artifact upload were skipped.' >> "$GITHUB_STEP_SUMMARY"

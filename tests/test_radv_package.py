@@ -231,6 +231,11 @@ class ArchiveSafetyTests(unittest.TestCase):
         self.assertNotIn("src/phxaccel", pr.SOURCE_PATHS)
         self.assertNotIn("src/nmplugin", pr.SOURCE_PATHS)
         self.assertIn("github.event.repository.private", (ROOT / ".github/workflows/build.yml").read_text())
+        self.assertIn("retain_artifacts:", workflow)
+        self.assertIn("type: boolean", workflow)
+        self.assertIn("default: true", workflow)
+        self.assertEqual(2, workflow.count("if: ${{ inputs.retain_artifacts }}"))
+        self.assertIn("if: ${{ !inputs.retain_artifacts }}", workflow)
 
 
 if __name__ == "__main__":

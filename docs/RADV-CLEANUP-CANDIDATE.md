@@ -394,6 +394,13 @@ query contains the transport's original allocation refusal. No new hardware
 attempt was made. The privileged retry therefore establishes access to the
 stored logs, not an allocation root cause.
 
+The earliest saved command-buffer refusal is at 18:37:20.689257 UTC+08:00,
+well before the three archived CoreDisplay aborts. The same WindowServer
+process reports a non-nil 16384-by-1 texture object at 18:37:20.689593. This
+is evidence of selective failure reporting, not proof of a fresh native BO
+allocation after the refusal. It does not establish global exhaustion or a
+particular pool limit.
+
 Source review identifies three independent losses of diagnostic information:
 
 - `acd_kr_to_errno` maps both `NoMemory` and `NoResources` to `-ENOMEM`.
@@ -429,10 +436,14 @@ CPU-only fault injection executes the actual patched transport with explicit
 IOKit/logging doubles: 54 cases cover original return/output behavior,
 direct/proxy selectors, five operation classes, four refusal codes, successes,
 malformed and unrelated calls, privacy, saturation, and 1200 concurrent calls.
-ASan/UBSan validation passed locally. The existing source build workflow on
-`macos-15-intel` compiles the real RADV with Apple logging and runs the existing
-four no-device refusals. Artifact retention remains disabled. Hosted validation
-is pending at this source checkpoint.
+ASan/UBSan validation passed locally. All 414 source tests passed with Python
+3.12, and the hosted source-test job passed. The existing manual RADV workflow
+now accepts `retain_artifacts=false` to compile the real RADV with Apple logging
+and run the four no-device refusals while skipping package creation and artifact
+upload. Its default remains true for the separately authorized seven-day package;
+the full-stack publication block is unchanged. The broader source build includes
+an expensive LLVM rebuild, so the scoped RADV job is the native acceptance check
+for this diagnostic. Hosted native validation is pending at this checkpoint.
 
 Limits: the patch has not been installed or executed by WindowServer. Real
 unified-log persistence and the underlying allocation cause remain unverified.
@@ -446,3 +457,11 @@ check at 20:29 UTC+08:00 found a later boot (19:13:32), still with build 35,
 PhxAMDFB absent, firmware framebuffer present, all display gates and frame count
 zero, M2 markers/NVRAM absent, and unchanged candidate/plugin hashes. It is not
 the historical 18:38 boot and its counters were not used as failed-boot evidence.
+
+For a later separately planned reproduction, retrieve the exact boot/process
+window with a unified-log predicate matching the `radv-native-alloc:` prefix,
+and preserve the raw capture only under ignored `build/`. The wire selectors
+are 3/21 for direct create/import and 15/16 through the proxy; CPU-map records
+use the non-selector sentinel. A saturated operation's later failures are
+intentionally omitted. Correlate the first record with the plugin refusal,
+not just with the later CoreDisplay assertion.

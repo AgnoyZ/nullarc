@@ -77,6 +77,13 @@ bytes are compared verbatim. It checks x86_64 Mach-O type 6, required exports,
 relocatable dylib identity, system-only dependencies and strict ad-hoc signature verification
 before and after staging. It rejects extra artifact files and symlinks.
 
+The manual workflow's `retain_artifacts` input defaults to true, preserving the
+reviewed seven-day RADV-only publication. Explicit false selects compile/test
+validation and skips both package creation and upload. It still checks the
+strict packaging policy on CPU and compiles/signs/tests the actual RADV. The
+diagnostic investigation uses this false setting; no additional binary
+publication or installation is implied.
+
 The only runtime file is `libvulkan_radeon.dylib`. The package also carries
 the build report and relocatable ICD JSON as metadata, complete Mesa and
 Vulkan-Headers source archives, limited Cobalt/Phoenix/project source archives,
