@@ -11,7 +11,9 @@ and published NMXAccel. That later initialization result is recorded in
 it does not accept native Metal workloads or desktop acceleration.
 The later [bounded Metal validation](validation/native-submit-build35-metal-20261113.json)
 passed all six real compute cases on that same initialized build-35 mixed
-stack. Desktop takeover remains a separate, unaccepted path.
+stack. A separately recorded [single-boot desktop test](validation/native-submit-build35-m2-once-20261113.json)
+is now armed with a normal reboot scheduled; its postboot result is pending.
+Desktop takeover remains unaccepted.
 
 The failed desktop boot logged `VK_ERROR_DEVICE_LOST`, but the pinned RADV
 queue layer can convert several distinct failures to that result. Known native
@@ -312,4 +314,41 @@ only these bounded compute cases on the identified mixed stack, not complete
 userspace source provenance, desktop rendering, video, sleep, sustained
 stability or performance. It does not explain the earlier WindowServer
 failure. M2 remained off throughout this compute session; its separate
-startup test still needs switch backup, capture and existing recovery policy.
+startup test is prepared separately in the following checkpoint.
+
+## Single-boot desktop takeover scheduled
+
+After the bounded Metal pass, the owner continued the conditional desktop
+test. A separately pinned local controller rechecked the same boot and build,
+all 55 installed entries and 15 active plugin/runtime entries, the firmware
+framebuffer, zero display gates and absent stop/pending/M2/NVRAM arming.
+It saved the switch baseline before the administrator-authorized write.
+
+Only `phxfb-boot=1` and the existing forced-commit trigger were written.
+The persistent M2 marker remains absent. The reviewed framebuffer source
+consumes and commits this variable before takeover and declines takeover if
+removal is refused; matching success/failure/commit strings were found in the
+installed PhxAccel. These checks are not proof of actual consumption on the
+next boot, which must still be read back. The unchanged startup helper decides
+its display path from actual PhxAMDFB presence and rearms subsequent boots
+only while the persistent M2 marker exists. No live takeover or initialization
+was executed by this controller.
+
+Independent readback verified the single-boot arming, absent persistent M2,
+stop and pending markers, the original firmware desktop and zero display
+gates, unchanged installed/runtime entries, and the scheduled process by PID,
+start time and exact command. A normal reboot was scheduled at approximately
+16:07 local time on 2026-11-13, three minutes after preparation. The cancel
+entrypoint is restricted to that same preparation boot and recorded process
+identity. Drivers, userspace, startup helpers, EFI and security were not changed.
+
+A pinned read-only collector is prepared to separate preparation, intermediate
+failed-test and current/fallback boots, including native refusal messages,
+WindowServer/panic report inventory, protection markers and two frame-counter
+samples. It does not replay initialization or submit new GPU work. Observe
+the next boot for six to eight minutes, then inspect it before any further
+test. Existing protection is retained, but an external bootable recovery
+medium is unverified and a wedged kernel or bus may prevent automatic recovery.
+This is an arming checkpoint, not desktop validation; reboot completion,
+arming consumption, actual takeover, WindowServer frame progress and the
+original failure cause are all pending. See [the one-shot record](validation/native-submit-build35-m2-once-20261113.json).

@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "timezone": "UTC+08:00",
+  "candidate_PhxBringup_source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+  "preceding_compute_checkpoint": "native-submit-build35-metal-20261113.json",
+  "authorization": "Owner continued the Metal-first, conditional single-boot desktop-takeover test after all six compute cases passed",
+  "scope": "Set only phxfb-boot=1 with the existing forced-commit trigger, keep persistent M2 marker absent, then schedule one normal reboot",
+  "preparation": {
+    "loaded_build": 35,
+    "candidate_identity_verified": true,
+    "six_real_Metal_cases_passed_on_same_boot": true,
+    "switch_state_backed_up_before_write": true,
+    "NVRAM_arming_stop_M2_and_pending_markers_initially_absent": true,
+    "installed_stack_entries_matched": 55,
+    "active_plugin_runtime_entries_matched": 15,
+    "one_shot_source_and_installed_consume_commit_strings_reviewed": true,
+    "source_review_is_not_proof_of_hardware_consumption": true,
+    "cancel_entrypoint_pinned_to_same_boot_PID_start_time_and_exact_command": true,
+    "boot_separated_read_only_postboot_collector_prepared": true
+  },
+  "applied": {
+    "macOS_administrator_authorization_completed": true,
+    "armed_local": "2026-11-13T16:04:12.688085+08:00",
+    "one_shot_phxfb_boot_value_independently_verified": "1",
+    "persistent_M2_marker_absent": true,
+    "stop_and_pending_markers_absent": true,
+    "scheduled_delay_minutes": 3,
+    "expected_restart_approximately_local": "2026-11-13T16:07:13.862002+08:00",
+    "scheduled_reboot_PID_start_time_and_exact_command_independently_verified": true,
+    "same_running_boot_after_arming_verified": true,
+    "IONDRVFramebuffer_and_NMXAccel_present_PhxAMDFB_absent": true,
+    "current_display_sysctls_registered_zero": true,
+    "installed_stack_entries_independently_verified_unchanged": 55,
+    "active_plugin_runtime_entries_independently_verified_unchanged": 15,
+    "GPU_initialization_or_desktop_takeover_executed_in_current_boot": false,
+    "driver_userspace_firmware_startup_helpers_EFI_partitions_BIOS_or_security_changed": false,
+    "existing_recovery_policy_modified": false
+  },
+  "pending_and_limits": {
+    "status": "One-shot desktop takeover armed and normal reboot scheduled; postboot result not yet observed",
+    "reboot_completion_verified": false,
+    "NVRAM_arming_consumption_after_boot_verified": false,
+    "PhxAMDFB_takeover_and_WindowServer_frame_progress_verified": false,
+    "original_WindowServer_failure_cause_resolved": false,
+    "automatic_recovery_from_unresponsive_kernel_or_bus_guaranteed": false,
+    "external_bootable_recovery_medium_verified": false,
+    "persistent_M2_automatically_enabled": false,
+    "suggested_observation_minutes_after_restart": [
+      6,
+      8
+    ],
+    "desktop_acceleration_accepted": false,
+    "physical_display_size_corrected": false,
+    "raw_logs_UUIDs_addresses_personal_configs_or_helpers_published": false,
+    "next_step": "Collect services, arming consumption, markers, frame-counter progression and boot-separated kernel/WindowServer reports read-only; no automatic GPU retry on failure"
+  }
+}
