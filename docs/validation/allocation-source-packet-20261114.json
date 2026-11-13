@@ -1,0 +1,79 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "source-packet-exported-and-offline-verified; native-delivery-unavailable",
+  "source_commit": "c94d628804bfd78c9a1c52ba423209070752a5fa",
+  "reviewed_snapshot_source": "1c17a1712cb3a64db31148cb33d0c2c9741e7e5d",
+  "documentation": "docs/ALLOCATION-SOURCE-PACKET.md",
+  "focused_source_packet_tests": 16,
+  "full_python_tests": {
+    "count": 498,
+    "reported_seconds": 221.703,
+    "passed": true,
+    "clean_committed_checkout_before_and_after": true,
+    "recorded_input_hashes_unchanged": true,
+    "HEAD_unchanged": true
+  },
+  "actual_committed_export": {
+    "source_files": 41,
+    "archive_sha256": "70e0e1850fa6e49fed9cc5e82968ed26d11c5e2f4686c00c0d09552746825ffc",
+    "all_archive_files_match_manifest_and_committed_Git_blobs": true,
+    "archive_modes_verified": true,
+    "private_output_permissions_verified": true,
+    "CPU_test_source_extracted_from_this_archive": true,
+    "target_binary_included": false,
+    "external_MacKernelSDK_sources_or_libraries_included": false
+  },
+  "exported_source_test": {
+    "actual_snapshot_cases": 30,
+    "fake_reader_cases": 17,
+    "passed": true,
+    "hardware_executed": false,
+    "kernel_loaded": false,
+    "inputs_sha256": {
+      "src/phxbringup/PhxBringup.cpp": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8",
+      "src/phxbringup/PhxAllocationDiagnostic.hpp": "7c220396a14748936b88330c6bd371e51b66181911b146e495883f2de836e63b",
+      "src/phxbringup/PhxAllocationSnapshot.h": "e5c863996e2373f5f3d2c87e5cc963bd5c60770c59478d3c120264508a640c01",
+      "src/phxbringup/PhxNativeABI.h": "05c1feb4a825e6bf8b3212a2b46275430bf51c03a36753509594c66e5bbeaef6",
+      "tests/test_allocation_snapshot.cpp": "c63e2d40df973ddb16b7fa53089a5b6347838126a923a761e5b56f09e6fc905e",
+      "tests/test_allocation_snapshot_reader.cpp": "97e6c8e6fe2a219e51491ba44638cd21022607aa419ff79f260249f1c9a3db56",
+      "tests/fake_native_iokit/IOKit/IOKitLib.h": "e62a62f5a1ee5b73acd830e1ed8be762e1ce1f1ab3397cda821a44825e9a38e6",
+      "tools/allocation_snapshot.cpp": "5e07e32ea833e55f78a9704cf5c63b20099844856b6bb387c1a40d0bdd2f771d",
+      "tools/test_allocation_snapshot.py": "136ead7cf1a29c7aa4612ec52c95523c31d74a92e10f5e773a0fd62f28102ae2"
+    },
+    "scope": "Actual dispatcher, snapshot checks, service wrappers and history header; fake locks, privilege/lifecycle flags and non-snapshot handlers. No real concurrency, kernel load, GPU access, persistence over reboot or display acceptance."
+  },
+  "source_hashes_at_full_test": {
+    "tools/allocation_source_packet.py": "cb0949377e91ac0fb9c48ae5f7e53ad9a7e5eaa6048edddd99888fc0a698cc2a",
+    "tests/test_allocation_source_packet.py": "ca0245c32b71089b7483c976d6599fdb9180253f0e87cde551879b1d59306989",
+    "tools/allocation_snapshot.cpp": "5e07e32ea833e55f78a9704cf5c63b20099844856b6bb387c1a40d0bdd2f771d",
+    "src/phxbringup/PhxBringup.cpp": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8",
+    "src/phxbringup/PhxAllocationDiagnostic.hpp": "7c220396a14748936b88330c6bd371e51b66181911b146e495883f2de836e63b",
+    "src/phxbringup/PhxAllocationSnapshot.h": "e5c863996e2373f5f3d2c87e5cc963bd5c60770c59478d3c120264508a640c01"
+  },
+  "validation_limits": {
+    "new_source_packet_has_no_native_binary_provenance": true,
+    "native_driver_built_locally": false,
+    "manual_workflow_dispatched": false,
+    "binary_transferred_or_uploaded": false,
+    "installer_or_startup_integration_added": false,
+    "target_service_opened": false,
+    "target_install_load_or_GPU_work": false,
+    "arming_or_reboot": false,
+    "licence_or_publication_scope_expanded": false,
+    "allocation_root_cause_confirmed": false
+  },
+  "still_required": [
+    "retained reviewed native kernel and standalone reader with trusted build and controlled delivery evidence",
+    "usable separately verified recovery route and fresh live preflight",
+    "fresh exact target install/load/passive-read scope",
+    "ordered startup integration with independently operating recovery before a later one-use display attempt"
+  ],
+  "source_remote_verification": {
+    "ref_commit_tree_parent_and_all_four_files_independently_verified": true,
+    "exact_existing_commit_preserved": true,
+    "REST_fast_forward_force_false": true,
+    "automatic_fullstack_run": 43486892369,
+    "automatic_fullstack_final": "completed/cancelled; not a build pass"
+  }
+}

@@ -78,3 +78,22 @@ signatures and trusted build-origin evidence; verify corresponding notices and
 sources; and complete the recovery and live-preflight gates. A source packet
 alone cannot authorize a build, transfer, installation, load, passive read,
 startup change, GPU attempt or reboot.
+
+## Local source verification, 2026-11-14
+
+Source commit `c94d628804bfd78c9a1c52ba423209070752a5fa` passed all **498
+Python tests** in 221.703 seconds, including 16 source-packet tests. Recorded
+input hashes and HEAD were unchanged, and the checkout was clean before and
+after the run. A real committed export contained 41 source/notice files; an
+independent read-back verified all Git blob identities, manifest hashes,
+archive modes and private output permissions. Source archive SHA-256:
+`70e0e1850fa6e49fed9cc5e82968ed26d11c5e2f4686c00c0d09552746825ffc`.
+
+The archive's extracted source passed **30 snapshot cases and 17 fake reader
+scenarios**, using the actual snapshot methods and reader with CPU/API fakes.
+This establishes the tested in-tree handoff closure, not external SDK/native
+linkability, target reads, real concurrency or hardware correctness. The
+source commit's remote ref/tree/parent and all four changed files were
+independently verified. Automatic full-stack run `43486892369` was cancelled
+and is not a build pass. The [validation record](validation/allocation-source-packet-20261114.json)
+retains these limits; native delivery and the target execution gates remain open.
