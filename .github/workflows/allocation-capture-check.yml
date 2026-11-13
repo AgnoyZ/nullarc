@@ -17,7 +17,9 @@ jobs:
           persist-credentials: false
       - name: Exercise collector with fake identity commands and a fake reader only
         run: python3 -m unittest discover -s tests -p test_allocation_capture.py -v
+      - name: Exercise independent observer on temporary files and fake collectors
+        run: python3 -m unittest discover -s tests -p test_allocation_observer.py -v
       - name: Verify source and execution scope
         run: |
           git diff --exit-code HEAD -- src tools tests
-          echo 'Fake processes and private temporary files only; no service open, GPU work, installation or artifacts.'
+          echo 'Fake processes and temporary directory events only; no target service open, GPU work, installation or artifacts.'

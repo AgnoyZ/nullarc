@@ -5,6 +5,11 @@ The build-36 failed boot produced verified RADV refusals but no candidate kernel
 records. A software snapshot taken after automatic recovery would describe the
 new boot, not the failed one. The allocation root cause remains unconfirmed.
 
+The separate [independent observer candidate](ALLOCATION-OBSERVER-CANDIDATE.md)
+adds bounded report-file notification handling in a peer process. The capture
+helper itself retains its one-attempt contract, and the existing monitor is
+unchanged.
+
 ## Existing monitor and proposed integration points
 
 The reference `tools/phxctl/phxboot.sh` has three relevant control points:
