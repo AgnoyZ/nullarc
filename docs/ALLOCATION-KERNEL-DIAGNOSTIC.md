@@ -2,9 +2,11 @@
 
 This source-only candidate follows the failed build-35 desktop attempt recorded
 in [the RADV result](RADV-CLEANUP-CANDIDATE.md#diagnostic-desktop-refusal-captured-and-firmware-fallback-restored-2026-11-13).
-It is diagnostic instrumentation, not an allocation or desktop repair. It has
-not been installed or run on the target. The installed kernel remains build 35.
-The previous one-shot authorization is spent.
+It is diagnostic instrumentation, not an allocation or desktop repair. Build 36
+has now been staged to the target EFI under fresh owner authorization, as
+recorded below, but has not yet been proven loaded or run. The running kernel
+remains build 35 pending the first restart. The previous one-shot authorization
+is spent; the new authorization is recorded separately.
 
 ## Observation contract
 
@@ -145,17 +147,49 @@ PhxBringup is a proposed replacement: the native ABI header and PhxAccel source
 tree are unchanged from the installed build-35 source, and the packaged
 PhxAccel is not proposed for installation. The plan first requires a verified
 build-36 firmware boot, then at most one fresh M2 collection with the existing
-fallback. New installation, restarts and M2 execution still require explicit
-authorization. No driver replacement, GPU call, M2 arming or restart scheduling
-was performed during package preparation.
+fallback. Package preparation alone did not authorize installation, restarts or
+M2 execution. No driver replacement, GPU call, M2 arming or restart scheduling
+was performed during that preparation phase.
+
+## Owner-authorized staging; first firmware boot pending
+
+On 2026-11-13 the owner explicitly authorized replacement of PhxBringup only,
+a first normal restart with M2 off to verify build 36, and one later M2
+reproduction after that readiness check. The two normal restarts retain the
+three-minute delay and existing failure fallback; no automatic second M2
+attempt is authorized.
+
+Fresh live preflight passed. The new staging helper also passed six isolated
+file-operation checks: successful replacement, staging collision, candidate
+byte mismatch, staging signature failure, active signature failure, and a
+failed stage-to-active rename. The failure cases preserved the old active
+bundle and unrelated test files. These are file-safety checks, not GPU tests.
+
+At 23:06:54 +0800 the exact packaged build-36 PhxBringup was staged on the
+identity-checked EFI. The complete 334-file current backup was verified; build
+35 was retained on the EFI, all 331 unrelated EFI files and the OpenCore config
+were unchanged, and the partition was unmounted. Independent live readback at
+23:07:20 +0800 verified the candidate, retained build 35, complete resulting
+EFI manifest, and unchanged runtime, startup and recovery inputs. No PhxAccel,
+auxiliary kernel collection, runtime, plugin, firmware or startup helper was
+replaced. The running kernel was still build 35, M2 remained off and no GPU
+command or initializer was replayed.
+
+The first firmware-framebuffer restart is the next authorized phase. Candidate
+loading, its exact loaded image, completed startup and preserved runtime/recovery
+state must be verified before preparing the fresh one-shot M2 executor. The
+later M2 phase remains authorized but is not armed or automatically scheduled
+by staging. Neither a successful copy nor the existing software fallback proves
+that build 36 will boot or recover from a kernel or bus hang.
 
 ## Next evidence required
 
-A future, separately authorized collection needs candidate/source identity,
+The newly authorized collection still needs candidate/source identity,
 the precise failing boot and process/image correlation, and a bounded capture
 of both `PhxAlloc: v1` and the installed RADV's native diagnostics, preserving
-the existing fallback. A fresh deployment/recovery plan must precede any
-installation or new M2 attempt. This source change does not authorize one.
+the existing fallback. The prepared deployment/recovery plan and first
+firmware-boot readiness checks precede any new M2 attempt. Source changes alone
+do not authorize execution.
 
 Validated-but-incomplete sequences alone cannot distinguish ordinary in-flight
 work from a hang. Repeated bounded observations and progress evidence would be
