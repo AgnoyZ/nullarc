@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "subject": "Uninstalled pre-fallback allocation capture source candidate",
+  "source_commit": "e2cb77bc7b1d0ff058744e1b7a1746da32e2a45e",
+  "source_parent": "9d0883f6eb6e0c416ab3833cf260b1b0c7b0ad6d",
+  "snapshot_candidate_build": 37,
+  "driver_abi_reader_and_existing_boot_sources_unchanged": true,
+  "source_inputs_sha256": {
+    "tools/allocation_capture.py": "5388b0c1a4f91c315451628ed44257907f56e30e7ccf5afc088bd97922c5d328",
+    "tests/test_allocation_capture.py": "92e913f366ddce2b03590d52bbe21cdfa18e560bf5b2aa7bac5af816406db731",
+    ".github/workflows/allocation-capture-check.yml": "a528940282fab927a578c1fd8b4690e663e2b1c2c3f28fade2b955e445d9583f"
+  },
+  "local": {
+    "focused_fake_process_tests": 21,
+    "focused_result": "success",
+    "clean_committed_python_tests": 442,
+    "clean_committed_python_seconds": 177.915,
+    "clean_committed_result": "success",
+    "source_inputs_unchanged_during_tests": true,
+    "checkout_clean_before_and_after": true,
+    "initial_uncommitted_attempt": {
+      "reported_tests": 357,
+      "fixture_group_errors": 13,
+      "all_errors_were_existing_dirty_source_guard": true,
+      "result": "not a pass",
+      "guard_preserved": true
+    }
+  },
+  "hosted": {
+    "workflow": ".github/workflows/allocation-capture-check.yml",
+    "run_id": 43470322660,
+    "attempt": 1,
+    "head_sha": "e2cb77bc7b1d0ff058744e1b7a1746da32e2a45e",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "job_id": 132040203328,
+        "host": "macos-15-intel",
+        "fake_process_tests": 21,
+        "seconds": 20.872,
+        "source_integrity": "success",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 132040203851,
+        "host": "ubuntu-24.04",
+        "fake_process_tests": 21,
+        "seconds": 6.224,
+        "source_integrity": "success",
+        "conclusion": "success"
+      }
+    ],
+    "artifact_count": 0,
+    "native_driver_compilation": false,
+    "native_service_opened": false,
+    "automatic_full_stack_run": {
+      "run_id": 43470223092,
+      "conclusion": "cancelled",
+      "counts_as_build_pass": false
+    }
+  },
+  "synchronization": {
+    "method": "exact existing Git objects through REST, guarded fast-forward, force=false",
+    "remote_source_ref_tree_parent_verified": true,
+    "five_source_commit_files_independently_downloaded_and_byte_matched": true
+  },
+  "execution_boundary": {
+    "installed_monitor_unchanged": true,
+    "collector_installed_or_enabled": false,
+    "candidate_kext_installed_or_loaded": false,
+    "target_snapshot_reader_executed": false,
+    "target_gpu_work": false,
+    "arming_or_reboot": false,
+    "old_M2_and_reboot_grants_consumed": true,
+    "new_target_execution_authorized_by_source_work": false,
+    "allocation_root_cause_confirmed": false
+  },
+  "limits": [
+    "Fake metadata commands and reader only; no real failed-boot capture or automatic integration.",
+    "Five seconds bounds child-process waits, not total wall time or uninterruptible kernel/filesystem operations.",
+    "Future fallback must continue independently even if this helper blocks or dies.",
+    "Mach-O UUID comparison requires independently reviewed provenance and is not cryptographic image verification.",
+    "A category with four baseline records can gain refusals without gaining detailed records.",
+    "Saturated counters provide only lower bounds; occurrences are not unique external calls or RADV samples.",
+    "Trusted installation paths and fresh target authorization remain separate requirements."
+  ]
+}

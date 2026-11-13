@@ -131,8 +131,24 @@ on hosted Ubuntu and `macos-15-intel`, without native compilation or artifacts.
 The local focused suite passed 21 tests on 2026-11-14. An initial full-suite
 invocation reached 357 tests but 13 fixture groups refused the uncommitted
 checkout at their existing source-preparation guard. That is not a full-suite
-pass. The guard remains intact; a clean committed replay and hosted results
-are recorded separately after synchronization.
+pass. The guard remains intact.
+
+Source commit **`e2cb77bc7b1d0ff058744e1b7a1746da32e2a45e`** then passed all
+**442 Python tests** in a clean committed checkout. The collector, tests and
+workflow input hashes were unchanged throughout that replay, and the checkout
+remained clean. The installed monitor's privately retained hash also remained
+unchanged. No source-preparation check was weakened.
+
+Manual run **`43470322660`, attempt 1**, passed all **21 fake-process tests on
+each platform**: Intel macOS job `132040203328` and Ubuntu job `132040203851`.
+Both source-integrity steps passed. The workflow opened no native service,
+compiled no native driver and uploaded zero artifacts. The automatic full-stack
+run `43470223092` for this source commit was cancelled; it is not a build pass.
+The five source-commit files were independently downloaded through GitHub's
+blob API and matched local bytes, with the remote ref/tree/parent verified.
+
+The [machine-readable validation record](validation/allocation-capture-20261114.json)
+records source identity, input hashes, counts, job IDs and evidence limits.
 
 This candidate changes no driver, ABI, reader, installed monitor, runtime,
 EFI or recovery settings. It has not been installed, enabled or run against a
