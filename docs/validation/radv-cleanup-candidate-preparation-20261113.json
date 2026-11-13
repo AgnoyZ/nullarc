@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "timezone": "UTC+08:00",
+  "preceding_checkpoint": "native-submit-build35-m2-postboot-20261113.json",
+  "scope": "Verify source continuity, actual candidate artifact availability and a private runtime baseline backup; no installed-stack change or GPU work",
+  "successful_native_build": {
+    "run_id": 43370193766,
+    "source_commit": "4f35a609331752d5e2dcac24f8b878d32aa6f309",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "source_tests_and_native_job_conclusion": "success",
+    "retention_step": "skipped",
+    "fresh_artifact_API_total_count": 0,
+    "downloadable_RADV_candidate_available": false,
+    "candidate_binary_hash_signature_or_runtime_validated": false,
+    "CI_build_success_is_not_a_retained_installation_package": true
+  },
+  "source_review": {
+    "reviewed_commit": "4f35a609331752d5e2dcac24f8b878d32aa6f309",
+    "current_recipe_ABI_test_header_probe_and_patch_files_match_successful_source": {
+      "tools/build_radv.py": "22b891b29a8fe7f78bac1d766ae8230f7dd577840e47f934c8c510d194dfc88a",
+      "tools/prepare_radv.py": "e71b09e7ac65c0f24d501bd490e91c6782735d381e5415e65103073475579f78",
+      "tools/fetch_radv.py": "1ccf4f7293c036ef7e0e16fd0160eddcb82ca697e9e1d06b7878c6e542d23a28",
+      "tests/test_radv_abi.c": "89cefd9d78f444482eb0bed55be60c9782bcaaa649b567161a08c258d98c6c33",
+      "tools/radv_no_device.c": "68cee9f28ad2d501fae2adeccac19ddb6beaf4ae791523d33418f13d5054bd87",
+      "src/phxbringup/PhxNativeABI.h": "05c1feb4a825e6bf8b3212a2b46275430bf51c03a36753509594c66e5bbeaef6",
+      "patches/radv/0001-native-phoenix-only.patch": "0e91433a8c44dfd2aaf0ca3db1b994427f946daafee053ef75d12241381dedff",
+      "patches/radv/0002-initialize-command-buffer-cleanup-before-stream.patch": "eec0d1b61a3bc189f808f737a97c8912d46ed67f46f2f60b7f262c785b53b109"
+    },
+    "RADV_relevant_lock_sections_equal_to_successful_source": [
+      "nullarc",
+      "Vulkan-Headers",
+      "Mesa",
+      "Cobalt64",
+      "radv-phoenix",
+      "radv-patches"
+    ],
+    "complete_installed_userspace_source_provenance_established": false,
+    "new_source_build_can_be_claimed_to_differ_from_installed_library_only_by_cleanup_patch": false
+  },
+  "baseline_and_backup": {
+    "checked_local": "2026-11-13T16:28:15.005843+08:00",
+    "loaded_build": 35,
+    "candidate_kext_identity_verified": true,
+    "firmware_desktop_and_NMXAccel_present": true,
+    "PhxAMDFB_absent": true,
+    "M2_NVRAM_stop_and_pending_absent": true,
+    "installed_entries_matched": 55,
+    "active_plugin_runtime_entries_matched": 15,
+    "standalone_runtime_entries_privately_backed_up": 6,
+    "backup_file_bytes_and_symlink_targets_verified": true,
+    "original_owner_group_and_mode_recorded_separately": true,
+    "backup_is_a_tested_deployment_or_recovery_mechanism": false
+  },
+  "publication_scope": {
+    "existing_two_kext_exception_covers_RADV": false,
+    "full_stack_publication_guard_changed": false,
+    "two_kext_workflow_changed": false,
+    "new_build_or_upload_dispatched": false,
+    "separate_RADV_public_retention_authorization_obtained": false,
+    "RADV_component_source_and_notice_review_complete_for_public_package": false,
+    "proposed_retention_days": 7,
+    "proposed_runner": "macos-15-intel",
+    "proposed_runtime_binary_allowlist": [
+      "libvulkan_radeon.dylib"
+    ],
+    "proposed_supporting_contents": [
+      "build report",
+      "checksums",
+      "source provenance",
+      "applicable notices",
+      "corresponding pinned source, patches and build inputs"
+    ],
+    "proposed_exclusions": [
+      "kexts",
+      "Metal plugin",
+      "translator",
+      "LLVM",
+      "Vulkan loader",
+      "AMD firmware",
+      "EFI",
+      "personal configuration",
+      "raw diagnostics",
+      "installation scripts"
+    ],
+    "public_artifact_is_a_private_transfer_to_this_laptop": false,
+    "candidate_packaging_workflow_already_implemented": false
+  },
+  "preservation_and_next_step": {
+    "local_kext_plugin_or_runtime_build_performed": false,
+    "candidate_downloaded_installed_or_executed": false,
+    "GPU_work_or_initialization_replayed": false,
+    "M2_NVRAM_EFI_drivers_libraries_security_or_startup_helpers_changed": false,
+    "reboot_scheduled": false,
+    "hosted_no_device_probe_executed_on_target": false,
+    "desktop_acceleration_or_original_stream_failure_resolved": false,
+    "physical_display_size_corrected": false,
+    "raw_private_paths_logs_UUIDs_backups_or_binaries_published": false,
+    "next_step": "Obtain a separate explicit decision for RADV-only public artifact retention. Complete the component source/notice review before implementing and dispatching a narrowly scoped package; then verify an actual binary before planning any installation or target test."
+  }
+}

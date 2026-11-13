@@ -409,3 +409,13 @@ accepted for this new boot. Preserve this initialized firmware desktop and
 keep M2 off while separately reviewing the provenance-checked RADV cleanup
 candidate and the earlier fallible stream-creation path. The physical-size
 issue remains unresolved. See [the postboot record](validation/native-submit-build35-m2-postboot-20261113.json).
+
+## RADV candidate availability follow-up
+
+The subsequent read-only preparation verified that the successful cleanup
+build retained zero artifacts; no new RADV binary is available from that run.
+The current RADV recipes, relevant pins and native ABI match the successful
+source, and the existing runtime has a verified private baseline backup.
+No library was installed or tested. Runtime-library retention is outside
+the existing two-kext publication exception and needs a separate scope
+decision and component review. See [the candidate preparation](RADV-CLEANUP-CANDIDATE.md).
