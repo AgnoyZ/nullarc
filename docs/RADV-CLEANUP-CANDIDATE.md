@@ -278,6 +278,38 @@ pointer. A future read-only postboot collector is prepared, but neither its
 file hashes nor its alias checks certify which library WindowServer mapped.
 M2 remains off and no reboot is scheduled at this preparation checkpoint.
 
+## Authorized single-boot M2 arming, 2026-11-13
+
+After the separate proposal above, the owner explicitly allowed one M2 desktop
+test and a normal restart three minutes after arming. A separate private
+authorization receipt pins the reviewed plan, helper and fresh read-only
+preflight. The earlier preparation records retain their original scopes.
+
+Arming completed at 18:33:28 UTC+08:00. The existing one-shot
+`phxfb-boot=1` value was written, its existing forced-commit trigger completed,
+and the value was independently read back. The persistent M2 marker remains
+absent. Exactly the recorded normal-restart scheduler was observed, with
+restart expected approximately 18:36:29 UTC+08:00. The prepared cancel
+command targets only that scheduler's matching process identity and the
+expected one-shot flag; it was not executed.
+
+Independent pre-restart checks retained the same loaded build-35 driver,
+all 55 installed entries, 15 active plugin/runtime entries and 15 retained
+original entries. NMXAccel and IONDRVFramebuffer remain present, PhxAMDFB
+is absent, all three display switches are zero, and stop/pending/extra-probe
+markers are absent. No new WindowServer report appeared since the accepted
+Metal postcheck. No current-boot initializer, GPU probe or display takeover
+was replayed, and no runtime pointer, driver, startup helper, EFI or security
+setting was changed by arming.
+
+The next boot is to use the unchanged initializer, one-shot consumption and
+software fallback. There is no automatic failed-test retry or automatic
+old-RADV-pointer restoration. Hard kernel/bus hangs and external recovery
+remain unverified. This is an arming checkpoint before restart, not desktop
+or postboot acceptance; it does not verify WindowServer's mapped RADV image
+or correct physical display size. See the separate
+[arming record](validation/radv-installed-default-m2-arming-20261113.json).
+
 ## Verification and rollback requirements
 
 For any later candidate, verify the exact workflow/source commit, archive

@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "kind": "owner-authorized-installed-candidate-single-boot-M2-arming",
+  "checked_at": "2026-11-13T18:34:57.317860+08:00",
+  "os": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "architecture": "x86_64"
+  },
+  "authorization": {
+    "owner_explicitly_allowed_previously_presented_proposal": true,
+    "separate_private_authorization_pins_reviewed_plan_and_helper": true,
+    "historical_pre_authorization_plan_and_records_preserved": true,
+    "scope": "One M2 desktop-test boot with normal restart three minutes after arming; retain existing initialization and software fallback; no automatic retry"
+  },
+  "candidate": {
+    "source_commit": "94291c8a7bf759b91e393150bf79c15da7495b03",
+    "library_sha256": "a76ff2b7d3f88dc2b64222b9806300f81be41d04e474c5c763a73c3e36c3ad0c",
+    "kernel_source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+    "kernel_build": 35,
+    "native_abi": "1.12",
+    "prior_installed_default_Metal_record": "radv-installed-default-metal-20261113.json"
+  },
+  "arming": {
+    "armed_at": "2026-11-13T18:33:28.467528+08:00",
+    "one_shot_phxfb_boot_readback": "1",
+    "existing_forced_commit_trigger_command_completed": true,
+    "persistent_M2_marker_absent": true,
+    "normal_restart_delay_minutes": 3,
+    "restart_scheduled_at": "2026-11-13T18:33:29.684357+08:00",
+    "expected_restart_approximately": "2026-11-13T18:36:29.684357+08:00",
+    "scheduled_restart_identity_independently_verified": true,
+    "current_boot_initializer_or_GPU_probe_replayed": false,
+    "current_boot_display_takeover_executed": false,
+    "runtime_pointer_driver_startup_EFI_or_security_changed": false,
+    "automatic_retry": false
+  },
+  "independent_pre_restart_readback": {
+    "same_boot_loaded_driver_and_build35_verified": true,
+    "installed_baseline_entries_unchanged": 55,
+    "active_plugin_runtime_entries_unchanged": 15,
+    "retained_original_plugin_runtime_entries_unchanged": 15,
+    "NMXAccel_count": 1,
+    "PhxAMDFB_count": 0,
+    "IONDRVFramebuffer_count": 1,
+    "three_display_switches_zero": true,
+    "persistent_stop_pending_and_extra_probe_markers_absent": true,
+    "new_WindowServer_report_since_Metal_acceptance": false
+  },
+  "fallback_and_limits": {
+    "existing_next_boot_initializer_and_software_fallback_retained": true,
+    "exact_scheduler_identity_cancellation_command_retained": true,
+    "cancel_command_executed": false,
+    "failed_desktop_test_automatically_retried": false,
+    "firmware_fallback_automatically_restores_old_RADV_pointer": false,
+    "hard_hang_or_external_recovery_verified": false,
+    "postboot_evidence_collected_at_this_checkpoint": false,
+    "desktop_rendering_or_stability_accepted": false,
+    "WindowServer_candidate_image_identity_verified": false,
+    "physical_display_size_corrected": false,
+    "raw_logs_identities_addresses_personal_paths_helpers_or_binaries_published": false,
+    "full_stack_publication_block_preserved": true
+  }
+}
