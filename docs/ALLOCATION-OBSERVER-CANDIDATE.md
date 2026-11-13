@@ -6,6 +6,11 @@ monitor must remain free to recover while snapshot collection is blocked,
 refused or dead. No actual failed-boot snapshot has been obtained and the
 allocation root cause remains unconfirmed.
 
+The [execution review plan](ALLOCATION-EXECUTION-PLAN.md) separates passive
+read feasibility from startup ordering and a later display attempt. It records
+the remaining package, authorization and recovery gates; it adds no launcher
+or target execution.
+
 ## Process relationship
 
 `tools/allocation_observer.py` is intended to run as a separate peer process.

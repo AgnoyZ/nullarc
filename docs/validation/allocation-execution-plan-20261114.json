@@ -1,0 +1,81 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "reviewed-plan-only; target-execution-not-ready-or-authorized",
+  "plan": "docs/ALLOCATION-EXECUTION-PLAN.md",
+  "reviewed_combined_commit": "f3ff243da716ff755433fdb01ac8bb91183682a4",
+  "kernel_snapshot_source": "1c17a1712cb3a64db31148cb33d0c2c9741e7e5d",
+  "capture_source": "e2cb77bc7b1d0ff058744e1b7a1746da32e2a45e",
+  "observer_source": "25510a8321d45b8223883987c9145652517b4939",
+  "reviewed_source_facts": {
+    "reference_initialization_and_claim_precede_explicit_release": true,
+    "installed_monitor_control_points_read_only_checked": true,
+    "installed_monitor_hash_unchanged": true,
+    "framebuffer_boot_hold_seconds": 120,
+    "hold_timer_starts_at_hold_initialization_not_observer_launch": true,
+    "hold_can_expire_without_explicit_monitor_release": true,
+    "observer_performs_its_own_baseline": true,
+    "observer_marker_is_not_a_workload_ordering_proof": true,
+    "observer_has_no_workload_admission_or_recovery_interface": true,
+    "generic_serial_boot_gate_is_not_independent_recovery_proof": true
+  },
+  "source_contract_limits": {
+    "snapshot_bytes": 3888,
+    "categories": 7,
+    "retained_records_per_category": 4,
+    "counter_bits": 64,
+    "counters_saturate": true,
+    "capture_reader_requests_per_phase": 1,
+    "capture_subprocess_wait_budget_seconds_per_phase": 5,
+    "observation_window_min_seconds": 1,
+    "observation_window_max_seconds": 300,
+    "proposed_display_observation_seconds": 180,
+    "max_notifications": 64,
+    "max_scans": 66,
+    "max_directory_entries_per_scan": 4096,
+    "total_wall_time_guaranteed": false
+  },
+  "phases": [
+    {
+      "id": "A",
+      "objective": "Passive snapshot feasibility on firmware desktop",
+      "status": "not-authorized-not-executed",
+      "read_budget": "one baseline and one matching second read; no added GPU workload",
+      "requires": ["reviewed retained package", "rollback and recovery packet", "fresh scoped authorization", "live preflight"],
+      "escalates_to_M2_automatically": false
+    },
+    {
+      "id": "B",
+      "objective": "Review startup admission and independent recovery integration",
+      "status": "design-requirements-only; implementation-missing",
+      "requires": ["completed Phase A", "precise baseline boundary", "same-boot ordering evidence", "actual integration failure tests"],
+      "observer_must_not_be_a_serial_recovery_dependency": true
+    },
+    {
+      "id": "C",
+      "objective": "One display attempt with same-boot evidence before fallback",
+      "status": "not-authorized-not-executed",
+      "requires": ["completed earlier gates", "new one-use grant", "explicit startup and fallback scope", "bounded postboot review"],
+      "automatic_retry_or_persistent_rearming": false
+    }
+  ],
+  "current_no_go_reasons": [
+    "No retained installable build-37 kernel/reader package and rollback packet is established by the zero-artifact compile result.",
+    "No target snapshot read has established live transport or comparison feasibility.",
+    "No startup integration enforces the selected baseline boundary while preserving independent recovery.",
+    "Old M2/reboot grants are consumed; no new target execution grant is inferred from continuing source work."
+  ],
+  "validation_scope": {
+    "this_change": "documentation, local source/evidence consistency and privacy review only",
+    "prior_test_result_reference": "docs/validation/allocation-observer-20261114.json",
+    "prior_full_python_tests": 465,
+    "prior_tests_rerun_or_extended_by_plan": false,
+    "new_driver_or_tool_source": false,
+    "native_driver_build": false,
+    "target_metadata_commands": false,
+    "target_service_open": false,
+    "installation_or_startup_change": false,
+    "GPU_work_or_arming_or_reboot": false,
+    "allocation_root_cause_confirmed": false
+  }
+}
