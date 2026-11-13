@@ -106,3 +106,19 @@ The installed mesboot's exact source/build remains unknown. No result here
 distinguishes pending from invalid in the old failure or attributes raw-2 to
 host preparation. No deployment, target service open, GPU execution, arming
 or reboot occurred.
+
+## Local verification, 2026-11-14
+
+Source commit `fe2992f8a875204d30459227d5143b07fa7a9c8e` passed **516 Python tests**
+in 285.129 seconds, with no skipped tests. The separate focused
+file passed eight methods, including three new methods and all 81 internal
+actual-method cases. Both runs began and ended with a clean checkout; HEAD
+and all twelve recorded source/test input hashes remained unchanged.
+
+The source commit's ref, commit/tree/parent and all five changed files were
+independently verified after exact-object REST fast-forward with
+`force=false`. Automatic full-stack run `43500555300` is
+`completed/cancelled`, not a build pass. The
+[validation record](validation/allocation-queue-readiness-20261114.json)
+separates executed CPU fakes, static-only source findings and unproven
+hardware, recovery and root-cause claims.

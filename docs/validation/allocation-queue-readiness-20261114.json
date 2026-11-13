@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "aggregate-readiness-and-queue-identity-gap-characterized-with-actual-source-CPU-fakes; target-root-cause-unconfirmed",
+  "source_commit": "fe2992f8a875204d30459227d5143b07fa7a9c8e",
+  "documentation": "docs/ALLOCATION-QUEUE-READINESS.md",
+  "focused_tests": {
+    "methods_passed": 8,
+    "new_methods": 3,
+    "retained_methods": 5,
+    "actual_adoption_internal_cases": 81,
+    "retained_adoption_cases": 73,
+    "new_readiness_cases": [
+      "readiness-none",
+      "readiness-compute-only",
+      "readiness-graphics-only",
+      "readiness-both",
+      "readiness-identity-collision",
+      "readiness-stopping-retained",
+      "readiness-missing-pci",
+      "readiness-zero-submission"
+    ],
+    "skipped": 0
+  },
+  "executed_with_host_fakes": {
+    "actual_adoptQueue_gpuReady_claimAccel_bootMemory": true,
+    "actual_queueIndex_and_bootstrap_arithmetic_headers": true,
+    "ASan_UBSan_and_warnings_as_errors": true,
+    "memory_locks_flush_and_PCI_publication_faked": true,
+    "compute_graphics_and_both_bootstrap_exports_byte_identical": true,
+    "aggregate_claim_does_not_select_engine": true,
+    "missing_PCI_claim_refused": true,
+    "queueIndex_refuses_missing_requested_engine": true,
+    "adoption_zero_sequence_fence_without_supplied_GPU_completion": true,
+    "active_flag_rejected_by_unchanged_bootstrap_validator": true,
+    "synthetic_stopping_keeps_queue_but_clears_activity_and_refuses_claim": true,
+    "synthetic_stopping_export_can_equal_unadopted_bootstrap_metadata": true,
+    "actual_stop_teardown_gpuSubmit_doQueryInfo_or_concurrency_executed": false,
+    "initial_dirty_export_refusal_ran_zero_tests": true,
+    "initial_direct_TMR_alignment_fixture_failure_preserved": true,
+    "only_new_readiness_fixture_corrected_for_existing_1MiB_TMR_alignment": true
+  },
+  "static_review_only": {
+    "gpuSubmit_selects_requested_queue_under_lock_and_checks_stopping": true,
+    "doQueryInfo_S1B_flag_uses_aggregate_predicate": true,
+    "stop_retains_active_resources_via_quarantine": true,
+    "allocation_snapshot_copies_history_not_fresh_claim_admission": true
+  },
+  "actual_source_fragment_sha256": {
+    "actual_adopt_queue_sha256": "74e435ccc522184502bf58085b5d349d4e4490bb9b72f5c019242dad7d5aa74f",
+    "actual_queue_structure_sha256": "0833bc92ed5738979eb94cbfeda0f7205d682de6bb05518e248fe93b0b4fea6a",
+    "actual_readiness_source_sha256": {
+      "gpuReady": "836cb7d624d186b016b88fd53199c2681100c7736e23df93138f294c6c508d05",
+      "claimAccel": "7e3af0dc0bc3b69962d9edf3c261d106379ef384da24001be029f088c38e760f",
+      "bootMemory": "bcd13501ce6c85594766311a94d32f086e82313c3eaba907913055d59e33604e"
+    }
+  },
+  "full_python_tests": {
+    "count": 516,
+    "reported_seconds": 285.129,
+    "passed": true,
+    "clean_before": true,
+    "clean_after": true,
+    "HEAD_unchanged": true,
+    "recorded_inputs_unchanged": true
+  },
+  "full_python_tests_skipped": 0,
+  "source_hashes_at_full_test": {
+    "src/phxbringup/PhxBringup.cpp": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8",
+    "src/phxbringup/PhxBootMemory.h": "8b10ca43114c17e7baf70d6984391685ea3d4a4a2a01a6f70fc3964cb2c63349",
+    "src/phxbringup/PhxGartLayout.h": "ccdea678e69dfb4968bdb3d948a77fe24a8933eba75f165321f8056117f15804",
+    "src/phxbringup/PhxPspLayout.h": "7b66a4c0fd509621148d3afe9bf2b98be5f59c66d6c933b6d0120a38fec5779e",
+    "src/phxbringup/PhxHardwarePolicy.hpp": "b98b0e7803a42d34f02e17fd97801dc7cc2c02bbe75d896368001fcb7195677e",
+    "tests/test_queue_adoption.cpp": "cf88068ec9ec49eb7782384677bc21addb1d5415fdcb1abdf7f3789656374031",
+    "tests/test_queue_adoption_runner.py": "9fa203bab037c55c43ca2028021ab0ac4525f0c6d7801789ce305faa9a64ceed",
+    "tools/test_queue_adoption.py": "eb870af44444e4456e742c22314ff951ac57dfd504c631eadca85f03fd03c9af",
+    "tools/prepare_source.py": "4f2dc1c830bf18cdac365c66d879e1bdd775b1302338a8eee8079440a8220569",
+    "tools/phxctl/mesboot.c": "d734d4d7d07c745cb4b26a7b5954d522facfd08645a3f3fbb193c3b5b2ed4917",
+    "tools/phx_boot_gate.sh": "4369068b8936b46eaf1d04260d382ed1e8b10196b752de84b014402de3db80d5",
+    "src/phxbringup/PhxMesQueueLayout.h": "328db142647bb14f26273ed1644b33927ed2ddf6838990d51f1596edf1cd5cea"
+  },
+  "source_remote_verification": {
+    "ref_commit_tree_parent_and_five_files_independently_verified": true,
+    "exact_existing_commit_preserved": true,
+    "REST_fast_forward_force_false": true,
+    "automatic_fullstack_runs": [
+      43500555300
+    ],
+    "automatic_fullstack_final": "completed/cancelled; not a build pass"
+  },
+  "limits": {
+    "production_source_ABI_guards_budgets_pin_cleanup_or_return_codes_changed": false,
+    "target_service_open_kernel_load_GPU_execution_deployment_arming_or_reboot": false,
+    "native_target_build_or_manual_workflow_dispatch": false,
+    "per_engine_hardware_readiness_completion_or_ownership_proven": false,
+    "independent_recovery_or_complete_startup_candidate_proven": false,
+    "allocation_root_cause_confirmed": false,
+    "actual_reboot_session_resume_verified": false
+  },
+  "next_required": [
+    "bind selected-engine initialization/adoption evidence to the same lifecycle and attempt without weakening existing gates",
+    "retain native delivery, two real Phase A passive reads, separately owned recovery and fresh target authorization requirements"
+  ]
+}
