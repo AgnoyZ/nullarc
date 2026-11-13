@@ -193,14 +193,90 @@ GPU probe or device-enumeration invocation, firmware-initialization replay,
 desktop arming, reboot, EFI change or security change in this installation
 phase. The alias switch does not force already-running clients to reload.
 
-The earlier process-scoped Metal pass applies to the exact installed candidate
-bytes, but the default global loading route and desktop use have not been
-executed or accepted after this switch. The private rollback helper restores
-the exact original alias target and leaves both directories intact. It has
-passed an isolated alias/open-file fixture; live deployment rollback and
+At this installation checkpoint, the earlier process-scoped Metal pass applied
+to the exact installed candidate bytes, but the default global loading route
+and desktop use had not been executed or accepted after the switch. The private
+rollback helper restores the exact original alias target and leaves both
+directories intact. It has passed an isolated alias/open-file fixture; live deployment rollback and
 recovery from a hard hardware hang remain untested. No automatic rollback,
 M2 test or reboot was armed. See the separate
 [installation record](validation/radv-cleanup-candidate-runtime-install-20261113.json).
+
+## Installed default-route Metal test, 2026-11-13
+
+Following the owner's continuation of acceleration troubleshooting, one bounded
+Metal compute invocation passed at 18:05:30 UTC+08:00 using the installed
+candidate through the plugin's default loading route. The test did not use
+`NVMTL_ICD_LIB`, Vulkan/RADV selection variables or DYLD library-selection
+overrides. Diagnostic library logging and a separate shader-cache directory
+were retained. No runtime pointer was changed during this test.
+
+Both the single enumeration process and the single compute process were
+checked against the actual resolved runtime path and the statically inspected
+Mach-O image identities of the installed candidate and plugin. No other Vulkan
+library was mapped. The unique Metal device was registry-verified as PCI
+`1002:1900`; both processes reported native ABI 1.12 and kernel build 35.
+
+The compute process returned zero without a timeout. All six counts
+`1, 63, 64, 257, 4097, 65537`, with output offsets alternating between 0 and
+256 bytes, passed exact-output, unchanged-input and prefix/suffix guard
+checks. Its 1.779-second elapsed time is not a benchmark. The checked process
+logs contained no device-lost, command-refusal or cleanup-crash marker;
+that observation does not exclude every hardware or kernel fault. Six static
+identity fixtures also checked the positive case and refusal of wrong or
+missing image identities, an extra Vulkan loader and a wrong runtime path.
+
+The 18:05:35 postcheck verified the same boot and loaded driver, all 55
+installed baseline entries, all 15 active plugin/runtime entries and all 15
+retained-original plugin/runtime entries. NMXAccel and IONDRVFramebuffer
+remained present, PhxAMDFB remained absent, all three display switches were
+zero, and M2 arming/stop/pending/extra-probe markers were absent. No new
+WindowServer report appeared in the checked directories. There was no local
+native build, additional installation, initialization replay, desktop
+takeover, automatic retry or reboot.
+
+This accepts bounded Metal compute through the installed default route with
+the current mixed plugin/compiler stack. It does not establish desktop
+rendering, sleep, video, stability, complete userspace provenance or corrected
+physical display size. See the separate
+[default-route test record](validation/radv-installed-default-metal-20261113.json).
+The previous artifact, isolated test and installation records remain historical
+checkpoints with their original scopes.
+
+### Single-boot desktop-test preparation
+
+A fresh private single-boot M2 plan and its arm/cancel commands were prepared,
+but neither command was executed. The plan is pinned to the installed-default
+Metal result, the same boot, build 35 and the unchanged installed stack.
+Read-only preflight and mocked authorization/cancellation guards passed.
+The NVRAM, arming and scheduler mutation functions remain unchanged from the
+previous reviewed single-boot helper; startup readiness checks were added.
+
+An initially missing `local.phxboot` registration required investigation.
+The installed plist has both `RunAtLoad` and `LaunchOnlyOnce` enabled. On the
+current boot, the initializer log ends with normal completion at 16:09:23;
+same-boot launchd events then record the service becoming inactive and being
+removed. The local manuals permit unprivileged system-domain queries and
+describe this single-run setting. The observed absence is consistent with
+that completed job, rather than establishing a missing startup installation.
+The on-disk startup files still match the installed baseline. No task was
+loaded, bootstrapped, enabled or restarted to make this determination.
+
+The proposed later action requires separate owner approval for one M2 boot
+and a normal restart three minutes after arming, because the explicit pointer
+installation authorization retained M2 off and prohibited reboot. It would
+set only the existing one-shot arming value and commit trigger, leave the
+persistent M2 marker absent, and retain existing next-boot initialization and
+fallback. It would not switch the current display or manually replay the
+initializer. Failed desktop tests would not be automatically retried.
+
+Earlier soft WindowServer-crash fallback was observed, but a hard kernel/bus
+hang can defeat the software recovery path. External recovery and live
+runtime-pointer rollback remain untested. Firmware fallback retains the
+candidate runtime alias; it does not automatically restore the old RADV
+pointer. A future read-only postboot collector is prepared, but neither its
+file hashes nor its alias checks certify which library WindowServer mapped.
+M2 remains off and no reboot is scheduled at this preparation checkpoint.
 
 ## Verification and rollback requirements
 
@@ -215,10 +291,10 @@ is recorded above; live rollback and hardware-hang recovery remain unverified.
 
 The hosted no-device test refuses to run when the target services are
 present. It must not be repurposed as a GPU validation pass on this laptop.
-Any target test needs a separately bounded process and explicit selection
-of the candidate library. Keep M2 off; neither a cleanup fix nor hosted CI
-is permission to repeat desktop takeover automatically. The initial
-command-stream failure, desktop stability and physical display size remain
+Any target test needs a separately bounded process and verification of the
+actual candidate library mapped by that process. Keep M2 off; neither a cleanup
+fix nor hosted CI is permission to repeat desktop takeover automatically. The
+initial command-stream failure, desktop stability and physical display size remain
 unresolved.
 
 Machine-readable observations are in [the preparation record](validation/radv-cleanup-candidate-preparation-20261113.json).
