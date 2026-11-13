@@ -26,9 +26,13 @@ The corrected hosted kernel/reader compile retained zero artifacts. Its
 success is not a target package receipt. A later package review must identify
 the exact retained bytes, corresponding source, signatures and delivery path;
 no binary is fetched, built locally, uploaded or installed by this plan.
-Existing two-kext/RADV publication exceptions do not expand to a full stack
-or the standalone reader. Actual OS build and live identities remain future
-preflight facts, not assumptions taken from the repository's target name.
+The [retained-package review](ALLOCATION-PACKAGE-REVIEW.md) revalidated the old
+build-36 archive and offline build-35 backup, but found no build-37 delivery
+among the six current repository artifacts. Separate bootable recovery media
+also remains unverified. Existing two-kext/RADV publication exceptions do not
+expand to a full stack or the standalone reader. Actual OS build and live
+identities remain future preflight facts, not assumptions taken from the
+repository's target name.
 
 ## Startup ordering found in source
 

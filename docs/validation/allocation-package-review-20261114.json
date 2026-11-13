@@ -1,0 +1,123 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "read-only-inventory-complete; build37-delivery-and-recovery-gate-unmet",
+  "review": "docs/ALLOCATION-PACKAGE-REVIEW.md",
+  "reviewed_head": "eab936d7d636abe5585d920016d0d17d418428f5",
+  "snapshot_source": "1c17a1712cb3a64db31148cb33d0c2c9741e7e5d",
+  "artifact_inventory": {
+    "repository_artifacts": 6,
+    "two_kext_source_builds": [
+      34,
+      34,
+      35,
+      36
+    ],
+    "RADV_artifacts": 2,
+    "build37_package_established": false,
+    "snapshot_compile_run": 43463527011,
+    "snapshot_compile_attempt": 2,
+    "snapshot_compile_success": true,
+    "snapshot_run_artifacts": 0,
+    "local_candidate_paths": 28,
+    "local_search_scope": "ignored build/ archives and named target executables; fixtures, backups and OC trees excluded",
+    "whole_machine_absence_claimed": false
+  },
+  "revalidated_build36": {
+    "source": "3948e122d6ae26fa0644a70838bc0bfb76d91752",
+    "artifact_id": 14046979860,
+    "artifact_expires_at": "2026-11-20T14:52:10Z",
+    "zip_sha256": "d38e0c83fa5c7faaf7f7ec9a558447b05208f84f71d0bf1522bcc615cc89b382",
+    "package_sha256": "890b64e65d12bd62e4cd098ec5dd7581b39d2b0aa64131b32ac40c2840db3575",
+    "package_files": 25,
+    "project_source_files": 85,
+    "SDK_blobs_against_retained_tree": 1226,
+    "fresh_SDK_tree_fetched": false,
+    "strict_signatures_passed": true,
+    "kexts": {
+      "PhxBringup": {
+        "sha256": "3ac7816a80504bf587d3c684c0941e12dd6c686c2d8f48e3dcff093fdd2b176b",
+        "bytes": 116160,
+        "strict_signature_reverified": true
+      },
+      "PhxAccel": {
+        "sha256": "4db98733b4dc9098d69938e511a57dc07266d0f6f722fb3c8bf119edc6ef6465",
+        "bytes": 356288,
+        "strict_signature_reverified": true
+      }
+    },
+    "native_build_reproduced": false,
+    "loadability_or_current_loaded_identity_proven": false
+  },
+  "offline_recovery_review": {
+    "build35_backup_files": 334,
+    "all_backup_bytes_match_saved_manifest": true,
+    "build35_strict_signature_passed": true,
+    "historical_after_manifest_integrity_verified": true,
+    "historical_active_executable_content_changes": 1,
+    "historical_added_retained_build35_files": 3,
+    "historical_unrelated_files_unchanged": 331,
+    "live_EFI_checked_or_mounted": false,
+    "separate_bootable_recovery_media_verified": false,
+    "restore_executed": false
+  },
+  "source_inputs": {
+    "src/phxbringup/PhxBringup.cpp": {
+      "sha256": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8",
+      "unchanged_since_snapshot_source": true,
+      "git_blob": "1bf66e77ec41802584a756ac68001de0c26984dc"
+    },
+    "src/phxbringup/PhxAllocationDiagnostic.hpp": {
+      "sha256": "7c220396a14748936b88330c6bd371e51b66181911b146e495883f2de836e63b",
+      "unchanged_since_snapshot_source": true,
+      "git_blob": "7793ca6f9b7eb20b5b3a64bb60186a612d88ebcd"
+    },
+    "src/phxbringup/PhxAllocationSnapshot.h": {
+      "sha256": "e5c863996e2373f5f3d2c87e5cc963bd5c60770c59478d3c120264508a640c01",
+      "unchanged_since_snapshot_source": true,
+      "git_blob": "5ff6ca0e3adbd9da0221b3d155deef68b2c05206"
+    },
+    "tools/allocation_snapshot.cpp": {
+      "sha256": "5e07e32ea833e55f78a9704cf5c63b20099844856b6bb387c1a40d0bdd2f771d",
+      "unchanged_since_snapshot_source": true,
+      "git_blob": "d455d63a60b66b867f2ec2233244f6e795a4a72f"
+    },
+    ".github/workflows/kernel-compile-check.yml": {
+      "sha256": "9917caac4861580f91267f5395dd646b18b119424fc10106703f7c3af93df2a0",
+      "unchanged_since_snapshot_source": true,
+      "git_blob": "b17eb9b4a351b5d09652c9064340a81d38a6f682"
+    },
+    ".github/workflows/kext-artifacts.yml": {
+      "sha256": "e434ef8de8f32787eeb38b12ce55fb35174dcd434aaa1da6b2e6a21e3d2483ad",
+      "unchanged_since_snapshot_source": true,
+      "git_blob": "e1dff658271d0b94d043222dd06b14969c3608f9"
+    }
+  },
+  "continuity_recheck": {
+    "check_only_admission": "ready",
+    "launchd_registered": true,
+    "helper_and_plist_hashes_match": true,
+    "automatic_claims": 0,
+    "new_agent_started": false,
+    "actual_reboot_verified": false
+  },
+  "pending_gates": [
+    "retained reviewed build37 kernel and reader delivery",
+    "usable independently reviewed recovery route",
+    "fresh exact install/load/passive-read scope and live preflight",
+    "startup admission with independent recovery before a later display attempt"
+  ],
+  "validation_scope": {
+    "driver_or_tool_source_changed": false,
+    "prior_full_test_result": "docs/validation/goal-continuity-20261114.json",
+    "prior_482_tests_rerun": false,
+    "workflow_dispatched": false,
+    "binary_downloaded_or_uploaded": false,
+    "target_binary_executed": false,
+    "native_driver_built_locally": false,
+    "target_service_opened": false,
+    "installation_or_GPU_startup_changed": false,
+    "GPU_work_or_arming_or_reboot": false,
+    "allocation_root_cause_confirmed": false
+  }
+}
