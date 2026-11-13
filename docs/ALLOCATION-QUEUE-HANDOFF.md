@@ -117,3 +117,20 @@ assign the old raw-2 import result to preparation. Obtaining that evidence
 still requires the reviewed build-37 kernel/reader delivery, a usable separate
 recovery route and a newly authorized Phase A scope. Existing one-shot grants
 remain consumed.
+
+## Local verification, 2026-11-14
+
+Source commit `aa4261124ce469e87c3514a7b4414c31d2a0a2f2` passed **520 Python tests**
+in 288.102 seconds, without skipped tests. The dedicated clean-export
+run separately passed all 94 raw fake-I/O processes and six exact-filter
+compositions. The full suite includes all eleven transport-runner methods,
+four of them new, including execution of that same actual C harness. HEAD
+and all fifteen recorded source/test hashes remained unchanged; the checkout
+was clean before and after.
+
+The source ref, commit/tree/parent and all five changed files were independently
+verified after exact-object REST fast-forward with `force=false`. Automatic
+full-stack run `43504341682` is `completed/cancelled`, not a build pass.
+The [validation record](validation/allocation-queue-handoff-20261114.json)
+retains exact request scalars, raw statuses, fake transport counts, filter
+results and limits. Production source and installed startup are unchanged.

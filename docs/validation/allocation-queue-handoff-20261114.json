@@ -1,0 +1,293 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "source_commit": "aa4261124ce469e87c3514a7b4414c31d2a0a2f2",
+  "status": "actual-dual-engine-partial-handoff-and-filter-status-loss-reproduced-with-fake-IO; target-root-cause-unconfirmed",
+  "documentation": "docs/ALLOCATION-QUEUE-HANDOFF.md",
+  "focused_actual_C": {
+    "retained_transport_cases": 52,
+    "retained_completion_cases": 20,
+    "retained_submission_cases": 16,
+    "new_dual_engine_cases": 6,
+    "exact_source_filter_compositions": 6,
+    "raw_processes": 94,
+    "filter_processes": 6,
+    "all_passed": true,
+    "ASan_UBSan_enabled": true,
+    "native_IOKit_framework_link": false,
+    "actual_sched_test_compute_then_graphics": true,
+    "adoption_results_are_fake_transport_only": true,
+    "kernel_adoption_or_claim_executed": false
+  },
+  "actual_source_filters": {
+    "initializer": "tail -12",
+    "boot": "grep -E \"^compute:|^gfx:|adopt\""
+  },
+  "actual_dual_engine_cases": [
+    {
+      "case": "ok",
+      "actual_mesboot_returncode": 0,
+      "gpu": {
+        "scheduler_bells": 4,
+        "work_bells": 2,
+        "adoptions": 2,
+        "writes_after_failure": 0,
+        "sleeps": 6
+      },
+      "handoff": {
+        "fake_transport_successes": 2,
+        "fake_transport_refusals": 0,
+        "graphics_preamble_dwords": 960,
+        "adoption_requests": [
+          [
+            39059456,
+            1024,
+            39063552,
+            24,
+            8,
+            39124992
+          ],
+          [
+            39256064,
+            2048,
+            39272448,
+            1112,
+            968,
+            39321601
+          ]
+        ]
+      },
+      "source_filter_composition": {
+        "filter_status": 0,
+        "claim_hook_requested": true,
+        "kernel_claim_executed": false
+      }
+    },
+    {
+      "case": "gfx-timeout",
+      "actual_mesboot_returncode": 75,
+      "gpu": {
+        "scheduler_bells": 4,
+        "work_bells": 2,
+        "adoptions": 1,
+        "writes_after_failure": 0,
+        "sleeps": 55
+      },
+      "handoff": {
+        "fake_transport_successes": 1,
+        "fake_transport_refusals": 0,
+        "graphics_preamble_dwords": 960,
+        "adoption_requests": [
+          [
+            39059456,
+            1024,
+            39063552,
+            24,
+            8,
+            39124992
+          ]
+        ]
+      },
+      "source_filter_composition": {
+        "filter_status": 0,
+        "claim_hook_requested": true,
+        "kernel_claim_executed": false
+      }
+    },
+    {
+      "case": "gfx-wrong-scratch",
+      "actual_mesboot_returncode": 75,
+      "gpu": {
+        "scheduler_bells": 4,
+        "work_bells": 2,
+        "adoptions": 1,
+        "writes_after_failure": 0,
+        "sleeps": 55
+      },
+      "handoff": {
+        "fake_transport_successes": 1,
+        "fake_transport_refusals": 0,
+        "graphics_preamble_dwords": 960,
+        "adoption_requests": [
+          [
+            39059456,
+            1024,
+            39063552,
+            24,
+            8,
+            39124992
+          ]
+        ]
+      },
+      "source_filter_composition": {
+        "filter_status": 0,
+        "claim_hook_requested": true,
+        "kernel_claim_executed": false
+      }
+    },
+    {
+      "case": "gfx-wrong-memory",
+      "actual_mesboot_returncode": 75,
+      "gpu": {
+        "scheduler_bells": 4,
+        "work_bells": 2,
+        "adoptions": 1,
+        "writes_after_failure": 0,
+        "sleeps": 55
+      },
+      "handoff": {
+        "fake_transport_successes": 1,
+        "fake_transport_refusals": 0,
+        "graphics_preamble_dwords": 960,
+        "adoption_requests": [
+          [
+            39059456,
+            1024,
+            39063552,
+            24,
+            8,
+            39124992
+          ]
+        ]
+      },
+      "source_filter_composition": {
+        "filter_status": 0,
+        "claim_hook_requested": true,
+        "kernel_claim_executed": false
+      }
+    },
+    {
+      "case": "compute-adopt-status",
+      "actual_mesboot_returncode": 74,
+      "gpu": {
+        "scheduler_bells": 3,
+        "work_bells": 1,
+        "adoptions": 1,
+        "writes_after_failure": 0,
+        "sleeps": 4
+      },
+      "handoff": {
+        "fake_transport_successes": 0,
+        "fake_transport_refusals": 1,
+        "graphics_preamble_dwords": 960,
+        "adoption_requests": [
+          [
+            39059456,
+            1024,
+            39063552,
+            24,
+            8,
+            39124992
+          ]
+        ]
+      },
+      "source_filter_composition": {
+        "filter_status": 0,
+        "claim_hook_requested": true,
+        "kernel_claim_executed": false
+      }
+    },
+    {
+      "case": "gfx-adopt-status",
+      "actual_mesboot_returncode": 74,
+      "gpu": {
+        "scheduler_bells": 4,
+        "work_bells": 2,
+        "adoptions": 2,
+        "writes_after_failure": 0,
+        "sleeps": 6
+      },
+      "handoff": {
+        "fake_transport_successes": 1,
+        "fake_transport_refusals": 1,
+        "graphics_preamble_dwords": 960,
+        "adoption_requests": [
+          [
+            39059456,
+            1024,
+            39063552,
+            24,
+            8,
+            39124992
+          ],
+          [
+            39256064,
+            2048,
+            39272448,
+            1112,
+            968,
+            39321601
+          ]
+        ]
+      },
+      "source_filter_composition": {
+        "filter_status": 0,
+        "claim_hook_requested": true,
+        "kernel_claim_executed": false
+      }
+    }
+  ],
+  "guard_evidence_reused": {
+    "validation": "docs/validation/allocation-queue-readiness-20261114.json",
+    "source_commit": "fe2992f8a875204d30459227d5143b07fa7a9c8e",
+    "actual_kernel_source_bytes_unchanged": true,
+    "compute_only_claim_guard_result_previously_tested_with_CPU_fakes": true,
+    "this_review_executes_no_kernel_claim": true
+  },
+  "resource_review": {
+    "static_only": true,
+    "six_scalars_do_not_convey_MQD_EOP_GART_scheduler_CSB_KIQ_lifetimes": true,
+    "actual_default_region_collision_demonstrated": false,
+    "framebuffer_system_memory_pool_is_not_this_VRAM_offset_allocator": true
+  },
+  "unit_tests_added": 4,
+  "full_python_tests": {
+    "count": 520,
+    "reported_seconds": 288.102,
+    "passed": true,
+    "clean_before": true,
+    "clean_after": true,
+    "HEAD_unchanged": true,
+    "recorded_inputs_unchanged": true
+  },
+  "full_python_tests_skipped": 0,
+  "source_hashes_at_full_test": {
+    "tools/phxctl/mesboot.c": "d734d4d7d07c745cb4b26a7b5954d522facfd08645a3f3fbb193c3b5b2ed4917",
+    "tests/test_bringup_transport.c": "e4325fc2fe0820a8a14d3e54aa52a7372d93a915092d98d570ab80ffd3649b5b",
+    "tools/test_bringup_transport.py": "5ab9876077a43e5a16c6e1213c7fe78806ceac26b3c6ce19a2d8db289ba5d222",
+    "tests/test_bringup_transport_runner.py": "a08ff0079527d9e86578d6b75363757ecd9e6bd2877846f7958ccb4bd4713dea",
+    "src/phxbringup/PhxBringup.cpp": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8",
+    "src/phxbringup/PhxNativeABI.h": "05c1feb4a825e6bf8b3212a2b46275430bf51c03a36753509594c66e5bbeaef6",
+    "src/phxbringup/PhxPspLayout.h": "7b66a4c0fd509621148d3afe9bf2b98be5f59c66d6c933b6d0120a38fec5779e",
+    "src/phxbringup/PhxBootMemory.h": "8b10ca43114c17e7baf70d6984391685ea3d4a4a2a01a6f70fc3964cb2c63349",
+    "src/phxbringup/PhxGartLayout.h": "ccdea678e69dfb4968bdb3d948a77fe24a8933eba75f165321f8056117f15804",
+    "src/phxbringup/PhxMesQueueLayout.h": "328db142647bb14f26273ed1644b33927ed2ddf6838990d51f1596edf1cd5cea",
+    "src/phxaccel/accel/phxfb.cpp": "d8fc998e884036274a56c7864ec2daadaac6ae02049b34811b632df5f807553c",
+    "tools/phxctl/csb_gfx11.h": "f7400527d24ec6a60200ab670a2a78ac0f123d11dda4cc6b745a48e7b1e0d805",
+    "tools/phxctl/full.sh": "c91891c43ffaf28a363d5f4494c521795d0acd8aa9194ca70d9a6c86fe974c18",
+    "tools/phxctl/phxboot.sh": "6c0271c306b8edbe0bc5b294794a8f47480a6bd25eae9c0a9207471f8fd794d8",
+    "tools/prepare_source.py": "4f2dc1c830bf18cdac365c66d879e1bdd775b1302338a8eee8079440a8220569"
+  },
+  "source_remote_verification": {
+    "ref_commit_tree_parent_and_five_files_independently_verified": true,
+    "exact_existing_commit_preserved": true,
+    "REST_fast_forward_force_false": true,
+    "automatic_fullstack_runs": [
+      43504341682
+    ],
+    "automatic_fullstack_final": "completed/cancelled; not a build pass"
+  },
+  "limits": {
+    "production_source_ABI_guards_budgets_pin_cleanup_or_return_codes_changed": false,
+    "new_handoff_fixture_executes_startup_scripts_or_installed_helpers": false,
+    "target_service_open_kernel_load_GPU_execution_deployment_arming_or_reboot": false,
+    "native_target_build_or_manual_workflow_dispatch": false,
+    "complete_initializer_or_independent_recovery_proven": false,
+    "allocation_root_cause_confirmed": false,
+    "actual_reboot_session_resume_verified": false
+  },
+  "next_required": [
+    "carry each required engine initialization/adoption result through the same owned attempt before claim",
+    "retain native build37 delivery, two real Phase A passive reads, separately owned recovery and fresh execution authorization"
+  ]
+}
