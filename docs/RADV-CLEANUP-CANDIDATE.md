@@ -481,3 +481,72 @@ boot, build 35, PhxAMDFB absent, firmware framebuffer present, all display gates
 and frame count zero, no M2 NVRAM/markers or shutdown process, and unchanged
 installed RADV/plugin hashes. The diagnostic is source-validated but remains
 uninstalled. See `validation/radv-native-allocation-diagnostic-20261113.json`.
+
+## Installed allocation diagnostic and bounded compute check, 2026-11-13
+
+The owner's continuation of the proposed controlled diagnostic reproduction
+was limited to a verified RADV pointer installation and one fresh independent
+process check. The RADV artifact exception itself was not used as deployment
+authorization. M2 desktop takeover, initializer replay and reboot were excluded
+from this execution scope.
+
+Manual run `43431292256`, job `131905168529`, passed on `macos-15-intel`
+at source `8ba13b55bc7b19fa962f4673622c766f000910d4`. It compiled and
+signed RADV, checked its dependencies and the four no-device refusals, and
+published one seven-day RADV-only artifact (`14040835112`). Local static review
+verified the Actions ZIP digest, outer archive checksum, all 66 inner manifest
+files, the 19 ordered patches, corresponding sources and notices, x86_64 dylib
+structure, required exports, strict signature, system-only dependencies, and
+the allocation-diagnostic strings and Apple error-logging import. Unchanged
+upstream source archives matched the previously verified pinned package. No
+candidate code was loaded during this archive review.
+
+The installed diagnostic library SHA256 is
+`8ed4e8a6cf77e5cc0aedf9401f33f4aabe2808a7ce722e655b34b66feccfb45a`.
+Installation created a fresh versioned runtime and atomically switched only
+the existing runtime alias. All other runtime bytes and configuration were
+copied identically from the previous candidate. The previous candidate,
+protected original runtime and Metal plugin remain intact; no mapped library
+was overwritten. An independent pointer/hash readback passed. Fourteen CPU/file
+fixtures checked the preparation guards and exact pointer switch/rollback;
+they do not prove recovery from a real hardware hang. The new rollback helper
+can restore the exact predecessor after a changed boot when its integrity and
+pointer checks pass; rollback still cannot replace existing process mappings.
+
+On macOS 26.7.2 / 25G332 with build 35 and M2 off, a fresh ordinary-user
+default-route enumeration verified the actual candidate and plugin image
+identities. One subsequent Metal compute invocation completed in about two
+seconds. All six cases (1, 63, 64, 257, 4097 and 65537 elements) passed exact
+result, unchanged-input and output-guard checks, including alternating output
+offsets. No driver-selection environment override, initialization, automatic
+retry, desktop takeover or reboot was performed. The postcheck found the same
+boot, unchanged retained components and no new WindowServer report.
+
+This successful independent-process test did not reproduce the desktop refusal.
+Its saved stderr contained zero `radv-native-alloc:` records, and the bounded
+administrator unified-log query returned zero matching events. Consequently,
+real refusal-log persistence and the original allocation cause remain
+unverified; no budget change or allocation fix is justified by this result.
+
+A fresh one-boot desktop plan and helper are prepared, pinned and separately
+guarded. Administrator read-only preflight passed; the installed startup and
+recovery inputs were checked against the prior reviewed attempt, with one
+per-boot generated log pinned to its current value. An authorization-guard
+check confirmed that desktop arming refuses without explicit new one-boot M2
+and scheduled-restart authorization. Nothing is armed or scheduled. If later
+authorized, the plan uses only one-shot NVRAM arming, keeps the persistent M2
+marker absent, and schedules one normal restart after three minutes. It
+preserves the existing software fallback and captures the first diagnostic
+record grouped by boot and WindowServer process, together with crash/loader
+evidence of the actual candidate image. The previous software fallback was
+observed; recovery from a hard kernel or bus hang is not guaranteed. A desktop
+failure or success must be investigated before any second attempt.
+
+The 25 focused RADV checks passed again with Python 3.12. A final administrator
+readback at 21:33:12 UTC+08:00 verified the diagnostic pointer and library,
+unchanged retained candidates/plugin, the same boot and firmware framebuffer,
+zero display gates/frame count, and absent M2 arming and shutdown state.
+
+See `validation/radv-native-allocation-candidate-20261113.json`. All raw logs,
+machine identities, helper programs and operational plans remain ignored and
+private under `build/`.
