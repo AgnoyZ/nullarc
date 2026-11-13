@@ -64,8 +64,10 @@ other built runtime library is packaged.
 `radv-artifacts.yml` runs only by manual dispatch on the development branch
 and `macos-15-intel`. `package_radv.py` requires clean pinned inputs, exact
 ordered patch hashes (9 + 7 + 2), matching build report and no-device/ABI
-evidence. It checks x86_64 Mach-O type 6, required exports, relocatable dylib
-identity, system-only dependencies and strict ad-hoc signature verification
+evidence. Source-provenance JSON is compared structurally (object field order
+is immaterial; patch array order and all values remain exact); license text
+bytes are compared verbatim. It checks x86_64 Mach-O type 6, required exports,
+relocatable dylib identity, system-only dependencies and strict ad-hoc signature verification
 before and after staging. It rejects extra artifact files and symlinks.
 
 The only runtime file is `libvulkan_radeon.dylib`. The package also carries

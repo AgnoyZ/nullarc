@@ -121,7 +121,10 @@ def check_inputs(artifacts, expected_notices, expected, commit):
     if seen != allowed:
         raise ValueError("Missing required artifact files")
     for name, data in expected_notices.items():
-        if (artifacts / name).read_bytes() != data:
+        actual = (artifacts / name).read_bytes()
+        matches = (json.loads(actual) == json.loads(data) if name.endswith("/source-provenance.json")
+                   else actual == data)
+        if not matches:
             raise ValueError("Notice/provenance differs from pinned source: " + name)
     library = artifacts / "nvmtl" / LIBRARY
     metadata = inspect_macho(library, 6)

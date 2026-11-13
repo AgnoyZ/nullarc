@@ -112,6 +112,18 @@ class PackageFixture(unittest.TestCase):
         self.assertEqual(self.report, self.check())
         self.assertEqual(18, len(self.series))
 
+    def test_builder_provenance_key_order_is_semantic_but_changes_are_rejected(self):
+        # prepare_radv emits patches before the two booleans; JSON object order is not provenance.
+        data = {key: self.expected[key] for key in ("mesa_commit", "cobalt_commit", "nullarc_commit",
+                                                   "patches", "hardware_tested", "deployment_performed")}
+        target = self.artifacts / "DEPENDENCY-LICENSES/Mesa-RADV/source-provenance.json"
+        target.write_text(json.dumps(data, indent=2) + "\n")
+        self.assertEqual(self.report, self.check())
+        data["patches"] = list(reversed(data["patches"]))
+        target.write_text(json.dumps(data))
+        with self.assertRaisesRegex(ValueError, "differs from pinned"):
+            self.check()
+
     def test_extra_binary_log_and_empty_directory_rejected(self):
         for name in ("nvmtl/other.dylib", "raw.log", "NVMTLDriver.bundle"):
             path = self.artifacts / name
