@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+  "source_build": 35,
+  "scope": "Administrator-authorized replacement of only the PhxBringup bundle on the actual EFI; candidate loading and hardware execution remain pending a user-controlled boot",
+  "artifact_validation_record": "native-submit-build35-artifact-20261113.json",
+  "compatibility_review": {
+    "known_running_PhxBringup_source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+    "known_running_binary_matched_baseline_bundle_identity": true,
+    "changed_kernel_source_files_since_running_baseline": ["src/phxbringup/PhxBringup.cpp"],
+    "source_change": "Build 34 to 35 plus the per-client first-submit-refusal latch and bounded log",
+    "native_ABI_major_unchanged": 1,
+    "native_ABI_minor_unchanged": 12,
+    "PhxAccel_source_unchanged_since_baseline_source": true,
+    "candidate_PhxBringup_executable_SHA256": "be51307b48f4a047e9f14195899d814e55cc323a6eba88260c16670d7885dedf",
+    "prior_PhxBringup_executable_SHA256": "37f1d88a00ee3f2c865db170510278c2f16cba2c044219b181c9e5d06f7eb629"
+  },
+  "private_helper_checks": {
+    "isolated_filesystem_cases_passed": 4,
+    "cases": [
+      "normal single-bundle replacement retains old bundle and unrelated bytes",
+      "injected final verification failure restores the old active bundle",
+      "staging name collision refuses replacement",
+      "candidate-byte mismatch refuses replacement"
+    ],
+    "same_boot_collection_guard_rejected_original_boot": true,
+    "these_checks_execute_real_kernel_or_GPU_paths": false,
+    "partition_plan_script_and_candidate_identity_pinned": true
+  },
+  "deployment": {
+    "macOS_administrator_authorization_completed": true,
+    "read_only_partition_and_existing_config_checks_passed_before_writes": true,
+    "full_EFI_backup_files_verified": 331,
+    "independent_backup_readback_files_verified": 331,
+    "copied_backup_ownership_adjusted_for_ordinary_user_readback_without_byte_changes": true,
+    "active_PhxBringup_bundle_replaced": true,
+    "known_running_old_bundle_retained_on_EFI": true,
+    "baseline_and_candidate_strict_signatures_verified_during_deployment": true,
+    "unrelated_EFI_files_verified_unchanged": 328,
+    "OpenCore_config_byte_for_byte_unchanged": true,
+    "installed_system_stack_entries_verified_unchanged": 55,
+    "system_PhxAccel_plugin_runtime_firmware_or_helpers_replaced": false,
+    "startup_markers_or_framebuffer_switches_changed": false,
+    "EFI_unmounted_after_deployment": true,
+    "EFI_or_backup_drift_bypassed": false,
+    "separate_external_bootable_recovery_media_verified": false
+  },
+  "runtime_and_acceptance": {
+    "kernel_running_at_deployment_checkpoint": 34,
+    "NMXAccel_present_at_checkpoint": true,
+    "IONDRVFramebuffer_present_at_checkpoint": true,
+    "PhxAMDFB_present_at_checkpoint": false,
+    "M2_marker_or_phxfb_boot_arming_present_at_checkpoint": false,
+    "candidate_loaded_in_running_kernel": false,
+    "new_GPU_work_or_initialization_replay_executed_by_agent": false,
+    "M2_rearmed_or_failed_desktop_takeover_reenabled": false,
+    "automatic_restart_or_new_watchdog_created": false,
+    "NVRAM_BIOS_partition_layout_or_security_setting_changed": false,
+    "original_native_refusal_or_display_failure_cause_recovered": false,
+    "desktop_acceleration_accepted": false,
+    "physical_display_size_corrected": false,
+    "raw_UUIDs_logs_dumps_personal_EFI_backups_or_private_helpers_published": false,
+    "next_step": "One user-controlled normal reboot with existing startup/recovery policy; verify build 35 and exact binary identity, collect same-boot refusal records read-only, and stop at any failure without replaying initialization"
+  }
+}

@@ -1,6 +1,7 @@
 # First native-submit refusal diagnostic
 
-Source candidate, 2026-11-13. Not installed or target-accepted.
+Source candidate, 2026-11-13. Subsequently staged to the actual target EFI
+under administrator authorization; not yet loaded or target-accepted.
 
 The failed desktop boot logged `VK_ERROR_DEVICE_LOST`, but the pinned RADV
 queue layer can convert several distinct failures to that result. Known native
@@ -88,8 +89,8 @@ run `43370193766` successfully. That older run is separate evidence for
 that commit, not a full-stack acceptance of build 35. The two-kext package
 does not distribute the rebuilt RADV, translator, LLVM or Metal plugin.
 
-The staging operation compared 55 installed files and retained the same
-boot, startup-marker state and framebuffer switches. No deployment,
+That earlier local artifact-staging operation compared 55 installed entries
+and retained the same boot, startup-marker state and framebuffer switches. No deployment,
 initialization replay, M2 rearming, reboot or new GPU workload was performed.
 Desktop acceleration, the original submission failure and the physical
 display-size issue remain unresolved.
@@ -108,10 +109,25 @@ it for provenance and does not reapply it.
 ## Conditions before a separate hardware session
 
 Keep the current fallback and the existing recovery behavior. No deployment,
-M2 rearming, initialization replay, watchdog or restart is performed by this
-diagnostic work. First review native compilation, signing, source/artifact
-hashes and the existing recovery backup. Installing this candidate would be
-a separate, reviewed operation, followed by a user-controlled boot.
+M2 rearming, initialization replay, watchdog or restart was part of the
+source or package preparation. A later, separate administrator-authorized
+operation replaced only `PhxBringup.kext` in the actual EFI, after native
+build/provenance review and a verified full EFI backup. The known-running
+old bundle remains on that EFI; all 328 unrelated EFI files, the existing
+config, 55 installed system-stack entries and startup/display state were
+preserved. PhxAccel was not replaced. The source difference from the
+installed PhxBringup baseline is only the diagnostic latch/log and build
+number. See [the target staging record](validation/native-submit-build35-deployment-20261113.json).
+
+At the deployment checkpoint, the current kernel was still build 34 and
+the partition was unmounted. A single user-controlled normal reboot is
+required to load the candidate. Keep M2 off and the firmware framebuffer
+policy intact; do not re-enable the failed desktop takeover. The prepared
+private collector refuses the original boot and checks both the candidate
+binary identity and build 35 before reading logs. It filters refusal records
+by the new boot identity and submits no GPU work. Full backup contents and
+rollback copies were checked; external bootable recovery media was not
+tested, and no guarantee of recovery from every possible failure is made.
 
 Do not reproduce the desktop failure merely to see whether a log appears.
 An eventual bounded session must have an explicit capture and recovery plan.
