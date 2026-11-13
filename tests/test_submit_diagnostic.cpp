@@ -44,6 +44,7 @@ static void IOLog(const char *format, ...) {
 }
 
 #define FAKE_HANDLERS(X) \
+    X(doAllocationSnapshot, PHXN_SEL_ALLOCATION_SNAPSHOT) \
     X(doHello, PHXN_SEL_HELLO) \
     X(doQueryInfo, PHXN_SEL_QUERYINFO) \
     X(doReadRegs, PHXN_SEL_READREGS) \
@@ -92,7 +93,7 @@ public:
     }
     IOReturn handle(uint32_t selector, IOExternalMethodArguments *args) {
         const bool early = selector == PHXN_SEL_WAITSEQ || selector == PHXN_SEL_TOPOLOGY ||
-                           selector == PHXN_SEL_SURF_GPU_MARK;
+                           selector == PHXN_SEL_SURF_GPU_MARK || selector == PHXN_SEL_ALLOCATION_SNAPSHOT;
         assert(early ? !activeLock : activeLock == lock && lock->held);
         ++calls;
         calledSelector = selector;
@@ -113,7 +114,7 @@ static IOReturn call(IOAccelPhxNativeClient &client, uint32_t selector,
     const IOReturn result = client.externalMethod(selector, args, nullptr, nullptr, nullptr);
     assert(!activeLock && !client.mutex.held);
     const bool early = selector == PHXN_SEL_WAITSEQ || selector == PHXN_SEL_TOPOLOGY ||
-                       selector == PHXN_SEL_SURF_GPU_MARK;
+                       selector == PHXN_SEL_SURF_GPU_MARK || selector == PHXN_SEL_ALLOCATION_SNAPSHOT;
     assert(early ? events == std::vector<std::string>{"handler"} :
                    !events.empty() && events.front() == "lock" && events.back() == "unlock");
     return result;
@@ -218,7 +219,7 @@ int main() {
         assert(logs.size() == 1 && client.calls == 2 && client.reaps == 2);
         ++cases;
     }
-    assert(cases == 70 && nonSubmitPaths == 29);
+    assert(cases == 72 && nonSubmitPaths == 30);
     printf("{\"cases\":%u,\"non_submit_dispatch_paths\":%u,\"hardware_executed\":false,\"kernel_loaded\":false}\n",
            cases, nonSubmitPaths);
 }

@@ -19,6 +19,7 @@ constexpr unsigned kIOMapAnywhere = 1;
 constexpr const char *kIOServicePlane = "IOService";
 mach_port_t mach_task_self();
 CFMutableDictionaryRef IOServiceMatching(const char *);
+io_service_t IOServiceGetMatchingService(mach_port_t, CFMutableDictionaryRef);
 kern_return_t IOServiceGetMatchingServices(mach_port_t, CFMutableDictionaryRef, io_iterator_t *);
 io_object_t IOIteratorNext(io_iterator_t);
 kern_return_t IORegistryEntryGetParentEntry(io_registry_entry_t, const char *, io_registry_entry_t *);

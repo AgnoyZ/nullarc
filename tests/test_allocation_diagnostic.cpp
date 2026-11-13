@@ -89,6 +89,16 @@ int main(int argc, char **argv) {
         IOAccelPhxNativeClient other(peer); other.bos[1] = c.bos[1];
         assert(gemCall(other, v) == kIOReturnBusy);
         assert(messages.size() == 5 && peer.vm[0].busyLogs[0][0] == 1 && p.vm[0].busyLogs[0][0] == 4);
+    } else if (test == "snapshot-context-reuse") {
+        pending(p);
+        for (unsigned i = 0; i < 10; ++i) assert(gemCall(c, v) == kIOReturnBusy);
+        // A reused context starts a new IOLog budget but must not reset service history.
+        std::memset(p.vm[0].busyLogs, 0, sizeof p.vm[0].busyLogs);
+        for (unsigned i = 0; i < 10; ++i) assert(gemCall(c, v) == kIOReturnBusy);
+        phxn_allocation_snapshot snapshot; p.allocationHistory.copy(&snapshot, 37);
+        assert(snapshot.observed == 20 && snapshot.counts[PHXN_ALLOC_MAP_PENDING] == 20);
+        for (unsigned i = 0; i < 4; ++i) assert(snapshot.records[PHXN_ALLOC_MAP_PENDING][i].ordinal == i + 1);
+        assert(messages.size() == 8 && p.aperture.observations == 20);
     } else if (test == "diagnostic-sample-saturation") {
         for (unsigned seed : {0u, 3u, 4u, 255u}) {
             uint8_t count = seed;
@@ -155,6 +165,27 @@ int main(int argc, char **argv) {
         assert(message.rfind("PhxAlloc: v1 ", 0) == 0);
         for (const char *forbidden : {"0x10000", "0x400000", "0x200000", "0x180", "handle=", "pid=", "va=", "ptr="})
             assert(message.find(forbidden) == std::string::npos);
+    }
+    phxn_allocation_snapshot snapshot{}; p.allocationHistory.copy(&snapshot, 37);
+    if (test == "retirement-cap-matrix") {
+        assert(snapshot.observed == 1200);
+        for (unsigned reason = 0; reason < 4; ++reason) assert(snapshot.counts[reason] == 300);
+    }
+    if (test == "pending-overlap" || test == "pending-overlap-cap")
+        assert(snapshot.counts[PHXN_ALLOC_MAP_OVERLAP] == (test == "pending-overlap" ? 1 : 300));
+    for (unsigned reason = 0; reason < 7; ++reason) {
+        for (unsigned i = 0; i < 4 && i < snapshot.counts[reason]; ++i) {
+            const auto &r = snapshot.records[reason][i];
+            assert(r.reason == reason && r.status == kIOReturnBusy && r.ordinal && !r.reserved);
+            if (reason < 4) {
+                assert(r.last_seq == 5 && r.submitted == 5 && r.observation_valid == !(reason & 1));
+                assert(r.retired == ((reason & 1) ? 0 : test == "map-other-queue-pending" ? 2 : 4));
+                const bool otherQueue = test == "map-other-queue-invalid" || test == "map-other-queue-pending";
+                const unsigned expectedDone = otherQueue ? 5 : (reason & 1) ? 6 : 4;
+                assert(r.queue[0].fence_read == 1 && r.queue[0].done == expectedDone);
+                if (test == "map-invalid-short-circuit") assert(!r.queue[1].fence_read && !r.queue[1].reason);
+            }
+        }
     }
     assert(!p.mutex);
     std::cout << "{\"case\":\"" << test << "\",\"passed\":true,\"hardware_executed\":false}\n";

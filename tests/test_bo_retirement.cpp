@@ -107,6 +107,8 @@ IOBufferMemoryDescriptor *IOBufferMemoryDescriptor::inTaskWithPhysicalMask(void 
 #endif
 class PhxBringup {
 public:
+    PhxAllocationHistory allocationHistory{};
+    void recordAllocation(const phxn_allocation_record &);
 #include "bo-structures.inc"
     VmCtx vm[kMaxCtx]{};
     HwVmid hwv[kNumUserVmids]{};

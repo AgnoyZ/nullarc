@@ -54,10 +54,18 @@ struct IOExternalMethodArguments {
     const void *structureInput{};
     uint64_t scalarInput[4]{}, scalarOutput[4]{77, 77, 77, 77};
 };
+struct PhxBringup {
+    int mutex{}; int *gpuLock{&mutex};
+    PhxAllocationHistory allocationHistory{};
+    void recordAllocation(const phxn_allocation_record &);
+};
+static void IOLockLock(int *p) { assert(p && !*p); *p = 1; }
+static void IOLockUnlock(int *p) { assert(p && *p); *p = 0; }
 // The actual struct is needed before the test client declaration.
 #include "bo-struct.inc"
 class IOAccelPhxNativeClient {
 public:
+    PhxBringup service; PhxBringup *owner{&service};
 #include "bo-state.inc"
     using Bo = PhxClientBo;
     Bo bos[PHXN_MAX_BOS]{};

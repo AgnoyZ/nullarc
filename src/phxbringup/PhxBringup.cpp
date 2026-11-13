@@ -36,7 +36,7 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
 #include "PhxBoPolicy.hpp"
 #include "PhxAllocationDiagnostic.hpp"
 
-#define PHX_KEXT_BUILD 36u
+#define PHX_KEXT_BUILD 37u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -168,6 +168,8 @@ public:
     IOReturn vmUnmap(uint32_t vmid, uint64_t va, uint64_t size);
     IOReturn gpuSubmit(uint32_t vmid, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seq);
     uint64_t gpuRetired() const;
+    void recordAllocation(const phxn_allocation_record &record);
+    IOReturn copyAllocationSnapshot(phxn_allocation_snapshot *out);
     const phx_topology *capturedTopology() const { return topology; }
     IOReturn setPowerState(unsigned long ordinal, IOService *whichDevice) override;
 
@@ -235,6 +237,7 @@ private:
     bool queueProgress(const GpuQueue &q, uint64_t *done, PhxQueueObservation *observation = nullptr) const;
     uint64_t gpuRetiredLocked(PhxRetirementObservation *observation = nullptr) const;
     IOLock *gpuLock{nullptr};
+    PhxAllocationHistory allocationHistory{}; // gpuLock; survives native-client close/context reuse
     // One GPUVM context (page tables) per client, and the eight hardware VMIDs lent to contexts at submission time,
     // as amdgpu does: a fixed VMID per client capped Metal at eight processes, and with every app allowed Metal the
     // ninth got no device (2026-10-20). A context's handle is its index + 1.
@@ -310,6 +313,7 @@ private:
     };
 
     IOReturn doHello(IOExternalMethodArguments *a);
+    IOReturn doAllocationSnapshot(IOExternalMethodArguments *a);
     IOReturn doQueryInfo(IOExternalMethodArguments *a);
     IOReturn doTopology(IOExternalMethodArguments *a);
     IOReturn doReadRegs(IOExternalMethodArguments *a);
@@ -1140,6 +1144,9 @@ IOReturn PhxBringup::vmIdleLocked(uint32_t handle, bool repair, uint32_t operati
         const uint64_t retired = gpuRetiredLocked(&observation);
         if (retired < c->lastSeq) {
             const int op = operation == PHX_AMDGPU_VA_OP_MAP ? 0 : operation == PHX_AMDGPU_VA_OP_UNMAP ? 1 : -1;
+            if (op >= 0)
+                allocationHistory.record(phxAllocationRetirement(static_cast<uint32_t>(op * 2 + (observation.valid ? 0 : 1)),
+                    static_cast<uint32_t>(kIOReturnBusy), c->lastSeq, retired, observation));
             if (op >= 0 && phxAllocationDiagnosticSample(c->busyLogs[op][observation.valid ? 0 : 1])) {
                 const PhxQueueObservation &a = observation.queue[0], &b = observation.queue[1];
                 IOLog("PhxAlloc: v1 op=%s reason=%s IOReturn=0x%08x last=%llu submitted=%llu retired=%llu "
@@ -1362,6 +1369,21 @@ uint64_t PhxBringup::gpuRetired() const {
     const uint64_t retired = gpuRetiredLocked();
     IOLockUnlock(gpuLock);
     return retired;
+}
+
+void PhxBringup::recordAllocation(const phxn_allocation_record &record) {
+    if (!gpuLock) return;
+    IOLockLock(gpuLock);
+    allocationHistory.record(record);
+    IOLockUnlock(gpuLock);
+}
+
+IOReturn PhxBringup::copyAllocationSnapshot(phxn_allocation_snapshot *out) {
+    if (!gpuLock || !out) return kIOReturnNotReady;
+    IOLockLock(gpuLock);
+    allocationHistory.copy(out, PHX_KEXT_BUILD);
+    IOLockUnlock(gpuLock);
+    return kIOReturnSuccess;
 }
 
 IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seqOut) {
@@ -2174,6 +2196,10 @@ static bool shape(const IOExternalMethodArguments *a, uint32_t sin, uint32_t sou
 
 IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMethodArguments *a,
                                                 IOExternalMethodDispatch *, OSObject *, void *) {
+    // Independent version handshake: never enter the normal dispatcher/reaper,
+    // even for denied or malformed snapshot requests, or require Hello first.
+    if (selector == PHXN_SEL_ALLOCATION_SNAPSHOT)
+        return doAllocationSnapshot(a);
     if (selector == PHXN_SEL_WAITSEQ)
         return doWaitSeq(a);
     if (selector == PHXN_SEL_TOPOLOGY)
@@ -2225,6 +2251,21 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
     }
     IOLockUnlock(lock);
     return r;
+}
+
+IOReturn IOAccelPhxNativeClient::doAllocationSnapshot(IOExternalMethodArguments *a) {
+    if (!a || !shape(a, 1, 0, 0, sizeof(phxn_allocation_snapshot)) || !a->scalarInput || !a->structureOutput)
+        return kIOReturnBadArgument;
+    if (a->scalarInput[0] != PHXN_ALLOCATION_SNAPSHOT_VERSION)
+        return kIOReturnUnsupported;
+    IOLockLock(lock);
+    IOReturn result = kIOReturnNotReady;
+    if (!closed && owner) {
+        result = privileged ? owner->copyAllocationSnapshot(static_cast<phxn_allocation_snapshot *>(a->structureOutput))
+                            : kIOReturnNotPrivileged;
+    }
+    IOLockUnlock(lock);
+    return result;
 }
 
 IOReturn IOAccelPhxNativeClient::doHello(IOExternalMethodArguments *a) {
@@ -2466,6 +2507,7 @@ IOReturn IOAccelPhxNativeClient::doBoImportHost(IOExternalMethodArguments *a) {
     if (static_cast<SInt64>(h) > gBosHandlesHigh) gBosHandlesHigh = static_cast<SInt64>(h);
     IOMemoryDescriptor *md = IOMemoryDescriptor::withAddressRange(va, size, kIODirectionInOut, task);
     if (!md) {
+        if (owner) owner->recordAllocation(phxAllocationRefusal(PHXN_ALLOC_HOST_DESCRIPTOR, static_cast<uint32_t>(kIOReturnNoMemory), size));
         if (phxAllocationDiagnosticSample(allocationFailureLogs[1]))
             IOLog("PhxAlloc: v1 op=BO_IMPORT_HOST stage=descriptor IOReturn=0x%08x bytes=%llu direction=inout sample=%u limit=%u\n",
                   static_cast<unsigned>(kIOReturnNoMemory), static_cast<unsigned long long>(size),
@@ -2475,6 +2517,7 @@ IOReturn IOAccelPhxNativeClient::doBoImportHost(IOExternalMethodArguments *a) {
     const IOReturn r = md->prepare();
     if (r != kIOReturnSuccess) {
         md->release();
+        if (owner) owner->recordAllocation(phxAllocationRefusal(PHXN_ALLOC_HOST_PREPARE, static_cast<uint32_t>(r), size));
         if (phxAllocationDiagnosticSample(allocationFailureLogs[2]))
             IOLog("PhxAlloc: v1 op=BO_IMPORT_HOST stage=prepare IOReturn=0x%08x bytes=%llu direction=inout sample=%u limit=%u\n",
                   static_cast<unsigned>(r), static_cast<unsigned long long>(size),
@@ -2525,6 +2568,8 @@ IOReturn IOAccelPhxNativeClient::doGemVa(IOExternalMethodArguments *a) {
                 continue;
             }
             if (va < maps[i].va + maps[i].size && maps[i].va < va + v->map_size) {
+                if (maps[i].pending && owner)
+                    owner->recordAllocation(phxAllocationRefusal(PHXN_ALLOC_MAP_OVERLAP, static_cast<uint32_t>(kIOReturnBusy), v->map_size));
                 if (maps[i].pending && phxAllocationDiagnosticSample(allocationFailureLogs[0]))
                     IOLog("PhxAlloc: v1 op=GPU_MAP reason=pending-overlap IOReturn=0x%08x bytes=%llu sample=%u limit=%u\n",
                           static_cast<unsigned>(kIOReturnBusy), static_cast<unsigned long long>(v->map_size),

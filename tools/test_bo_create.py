@@ -21,6 +21,7 @@ def extract_state(source):
 def extract_source(source):
     parts = []
     patterns = [r'^struct PhxClientBo \{.*?^\};',
+                r'^void PhxBringup::recordAllocation\([^\n]*\) \{.*?^\}',
                 r'^static bool shape\([^\n]*\) \{.*?^\}',
                 r'^IOReturn IOAccelPhxNativeClient::doBoCreate\([^\n]*\) \{.*?^\}',
                 r'^IOReturn IOAccelPhxNativeClient::doBoImportHost\([^\n]*\) \{.*?^\}']
@@ -63,6 +64,7 @@ def exercise(out):
     if result != {'allocation_cases': 30, 'hardware_executed': False}:
         raise RuntimeError('Unexpected allocation test report')
     inputs = [source, ROOT / 'src/phxbringup/PhxBoPolicy.hpp', ROOT / 'src/phxbringup/PhxNativeABI.h',
+              ROOT / 'src/phxbringup/PhxAllocationSnapshot.h',
               ROOT / 'src/phxbringup/PhxAllocationDiagnostic.hpp',
               ROOT / 'tests/test_bo_create.cpp']
     result['source_sha256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs}

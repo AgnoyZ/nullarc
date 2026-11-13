@@ -70,5 +70,15 @@ int main(int argc, char **argv) {
             assert(message.find(forbidden) == std::string::npos);
     }
     assert(!client.allocationFailureLogs[0] && !zeroes);
+    phxn_allocation_snapshot snapshot{}; client.service.allocationHistory.copy(&snapshot, 37);
+    const bool silent = test == "host-budget-silent" || test == "host-invalid-silent" || test == "host-success-silent";
+    assert(snapshot.observed == (silent ? 0 : test == "host-cap-stages" ? 600 : attempts));
+    for (unsigned reason : {PHXN_ALLOC_HOST_DESCRIPTOR, PHXN_ALLOC_HOST_PREPARE}) {
+        for (unsigned i = 0; i < 4 && i < snapshot.counts[reason]; ++i) {
+            const auto &r = snapshot.records[reason][i];
+            assert(r.reason == reason && r.bytes == 4096 && !r.observation_valid && !r.last_seq && !r.submitted);
+            assert(r.status == uint32_t(reason == PHXN_ALLOC_HOST_DESCRIPTOR ? kIOReturnNoMemory : expected));
+        }
+    }
     std::cout << "{\"case\":\"" << test << "\",\"passed\":true,\"hardware_executed\":false}\n";
 }

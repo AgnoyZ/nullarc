@@ -1,5 +1,9 @@
 # Allocation refusal kernel diagnostic, build 36
 
+The later [build-37 software snapshot candidate](ALLOCATION-SNAPSHOT-CANDIDATE.md)
+adds a bounded evidence channel that does not rely on IOLog persistence. It is
+uninstalled and does not change the hardware findings below.
+
 This diagnostic candidate follows the failed build-35 desktop attempt recorded
 in [the RADV result](RADV-CLEANUP-CANDIDATE.md#diagnostic-desktop-refusal-captured-and-firmware-fallback-restored-2026-11-13).
 It is diagnostic instrumentation, not an allocation or desktop repair. Build 36

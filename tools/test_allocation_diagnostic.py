@@ -18,7 +18,7 @@ BUSY_CASES = (
     'map-snapshot-once', 'map-late-completion', 'map-zero-sequence-silent',
     'map-not-ready-silent', 'reclaim-silent', 'pending-overlap', 'pending-overlap-cap',
     'ordinary-overlap-silent', 'retirement-cap-matrix', 'independent-context-cap',
-    'diagnostic-sample-saturation', 'bo-lifetime-unchanged',
+    'diagnostic-sample-saturation', 'bo-lifetime-unchanged', 'snapshot-context-reuse',
 ) + tuple('progress-' + reason for reason in (
     'missing-output', 'no-aperture', 'inactive', 'unaligned-fence', 'history-overflow',
     'future-floor', 'all-ones-fence', 'regressed-fence', 'future-fence', 'zero-sequence',
@@ -71,6 +71,7 @@ def exercise(out):
         rows.extend(check_result(subprocess.run([str(binary), case], capture_output=True,
                                                text=True, timeout=15), case) for case in cases)
     inputs = [source, ROOT / 'src/phxbringup/PhxAllocationDiagnostic.hpp',
+              ROOT / 'src/phxbringup/PhxAllocationSnapshot.h',
               ROOT / 'src/phxbringup/PhxNativeABI.h', ROOT / 'src/phxbringup/PhxHardwarePolicy.hpp',
               ROOT / 'src/phxbringup/PhxBoPolicy.hpp',
               *(ROOT / 'tests' / name for name in ('test_bo_retirement.cpp', 'test_bo_create.cpp',

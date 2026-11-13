@@ -41,7 +41,7 @@ def exercise(out):
                    check=True, timeout=120)
     process = subprocess.run([str(binary)], capture_output=True, text=True, check=True, timeout=30)
     result = json.loads(process.stdout)
-    expected = {'cases': 70, 'non_submit_dispatch_paths': 29,
+    expected = {'cases': 72, 'non_submit_dispatch_paths': 30,
                 'hardware_executed': False, 'kernel_loaded': False}
     if result != expected or any(type(result[k]) is not type(v) for k, v in expected.items()):
         raise RuntimeError('Unexpected actual-dispatcher diagnostic report')

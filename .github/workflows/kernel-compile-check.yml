@@ -23,6 +23,10 @@ jobs:
           xcrun clang --version
       - name: Exercise actual allocation diagnostics on CPU
         run: python3 tools/test_allocation_diagnostic.py --out build/allocation-diagnostic-tests
+      - name: Exercise passive allocation snapshot on CPU
+        run: python3 tools/test_allocation_snapshot.py --out build/allocation-snapshot-tests
+      - name: Compile snapshot reader without opening any service
+        run: clang++ -std=c++17 -Wall -Wextra -Werror tools/allocation_snapshot.cpp -framework IOKit -framework CoreFoundation -o build/allocation-snapshot
       - name: Checkout pinned MacKernelSDK
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

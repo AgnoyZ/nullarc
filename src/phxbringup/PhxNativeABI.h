@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include "../amd/phx_topology.h"
+#include "PhxAllocationSnapshot.h"
 
 #define PHXN_UC_TYPE      0x4E34384Eu   /* 'N48N' */
 #define PHXN_ABI_VERSION  1u
