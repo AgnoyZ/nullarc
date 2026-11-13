@@ -114,6 +114,41 @@ the scoped PhxBringup check instead. Those cancellations are not full-stack
 build passes. Earlier runs were left untouched. No full-stack or desktop
 acceptance is claimed.
 
+## Retained diagnostic package and read-only preparation
+
+The existing owner-authorized, manual two-kext workflow completed successfully
+in run **`43446700859`**, job `131957914403`, at exact source commit
+`3948e122d6ae26fa0644a70838bc0bfb76d91752` on `macos-15-intel`. It retained
+one seven-day artifact under the scope in [KEXT-PROVENANCE.md](KEXT-PROVENANCE.md).
+The downloaded package SHA-256 is
+`890b64e65d12bd62e4cd098ec5dd7581b39d2b0aa64131b32ac40c2840db3575`;
+its PhxBringup executable SHA-256 is
+`3ac7816a80504bf587d3c684c0941e12dd6c686c2d8f48e3dcff093fdd2b176b`.
+
+Independent local inspection verified the GitHub artifact digest, outer and
+inner checksums, both strict ad-hoc signatures, x86_64 Mach-O types, all 85
+exported project source files against the pinned commit, and all 1,226 SDK
+source blobs against the pinned SDK Git tree. The PhxBringup executable contains
+the expected allocation diagnostic strings. These checks inspected binary
+structure and provenance; they did not load or execute either kext.
+
+Read-only target checks on 2026-11-13 confirmed build 35 on macOS 26.7.2
+(`25G332`), M2 off and the firmware framebuffer present. Installed runtime,
+plugin, startup and recovery inputs match the previous verified state, apart
+from the expected per-boot generated address log. A read-only EFI inspection
+verified all 334 current files and a fresh complete backup, then unmounted the
+partition; the older 331-file backup was also verified. Neither backup is a
+tested independent bootable recovery medium.
+
+A fresh private deployment, collection and rollback plan is prepared. Only
+PhxBringup is a proposed replacement: the native ABI header and PhxAccel source
+tree are unchanged from the installed build-35 source, and the packaged
+PhxAccel is not proposed for installation. The plan first requires a verified
+build-36 firmware boot, then at most one fresh M2 collection with the existing
+fallback. New installation, restarts and M2 execution still require explicit
+authorization. No driver replacement, GPU call, M2 arming or restart scheduling
+was performed during package preparation.
+
 ## Next evidence required
 
 A future, separately authorized collection needs candidate/source identity,
