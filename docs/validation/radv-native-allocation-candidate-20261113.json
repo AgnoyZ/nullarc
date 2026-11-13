@@ -75,15 +75,18 @@
     "proposed_normal_restart_delay_minutes": 3,
     "existing_software_fallback_preserved": true,
     "hard_kernel_or_bus_hang_recovery_guaranteed": false,
-    "armed": true,
-    "restart_scheduled": true,
+    "armed": false,
+    "restart_scheduled": false,
     "explicit_new_M2_and_restart_authorization_received": true,
     "fresh_administrator_preflight_passed_before_arming": true,
     "armed_at": "2026-11-13T21:42:19.171331+08:00",
     "scheduled_at": "2026-11-13T21:42:20.413082+08:00",
     "expected_restart_approximately": "2026-11-13T21:45:20.413082+08:00",
     "automatic_second_attempt_authorized": false,
-    "status": "Scheduled; still on preparation boot at independent readback; no desktop outcome yet"
+    "status": "Completed with desktop failure; existing software fallback restored firmware desktop; no second attempt authorized",
+    "arming_was_verified_before_restart": true,
+    "authorized_attempt_completed": true,
+    "authorization_spent": true
   },
   "local_regression": {
     "python": "3.12.16",
@@ -91,23 +94,23 @@
     "passed": true
   },
   "final_readback": {
-    "checked_at": "2026-11-13T21:42:35.594985+08:00",
-    "same_preparation_boot": true,
-    "one_shot_M2_NVRAM_verified": true,
-    "persistent_M2_marker_absent": true,
+    "checked_at": "2026-11-13T21:52:20.622301+08:00",
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "kernel_build": 35,
+    "loaded_kernel_image_matches_preparation": true,
     "diagnostic_pointer_and_library_verified": true,
-    "previous_candidate_original_and_plugin_unchanged": true,
-    "installed_startup_driver_recovery_pins_verified": 52,
+    "retained_predecessor_original_and_plugin_unchanged": true,
     "firmware_framebuffer_present": true,
     "PhxAMDFB_absent": true,
     "display_gates_zero": true,
-    "exact_scheduled_shutdown_identity_verified": true,
-    "expected_restart_approximately": "2026-11-13T21:45:20.413082+08:00",
-    "reboot_performed_at_readback": false
+    "M2_NVRAM_and_markers_absent": true,
+    "shutdown_and_GPU_helper_processes_absent": true,
+    "only_expected_generated_per_boot_log_pin_changed": true
   },
   "initialization_replayed": false,
   "M2_enabled": false,
-  "reboot_performed": false,
+  "reboot_performed": true,
   "automatic_retry": false,
   "budget_policy_changed": false,
   "allocation_cause_fix_claimed": false,
@@ -123,6 +126,106 @@
     "shutdown_process_absent": true,
     "desktop_arming_receipts_absent": true
   },
-  "next_boot_M2_one_shot_armed": true,
-  "current_boot_display_takeover_enabled": false
+  "next_boot_M2_one_shot_armed": false,
+  "current_boot_display_takeover_enabled": false,
+  "pre_restart_arming_readback": {
+    "checked_at": "2026-11-13T21:42:35.594985+08:00",
+    "same_preparation_boot": true,
+    "one_shot_M2_NVRAM_verified": true,
+    "persistent_M2_marker_absent": true,
+    "diagnostic_pointer_and_library_verified": true,
+    "previous_candidate_original_and_plugin_unchanged": true,
+    "installed_startup_driver_recovery_pins_verified": 52,
+    "firmware_framebuffer_present": true,
+    "PhxAMDFB_absent": true,
+    "display_gates_zero": true,
+    "exact_scheduled_shutdown_identity_verified": true,
+    "expected_restart_approximately": "2026-11-13T21:45:20.413082+08:00",
+    "reboot_performed_at_readback": false
+  },
+  "desktop_reproduction": {
+    "status": "Failed; existing software fallback restored firmware desktop",
+    "one_authorized_M2_attempt_executed": true,
+    "startup_local": {
+      "M2_startup": "2026-11-13 21:45:52 +0800",
+      "M2_armed_and_released": "2026-11-13 21:46:02 +0800",
+      "first_native_GPU_MAP_refusal": "2026-11-13 21:46:06.420158 +0800",
+      "fallback_startup": "2026-11-13 21:47:25 +0800",
+      "fallback_startup_completed": "2026-11-13 21:47:36 +0800"
+    },
+    "WindowServer_crash_reports": 4,
+    "WindowServer_crash_signals": {
+      "SIGSEGV_stack_guard_and_repeated_SkyLight_frames": 1,
+      "SIGABRT": 3
+    },
+    "actual_candidate_and_plugin_loaded_image_verified_for_all_four_WindowServer_processes": true,
+    "unified_diagnostic": {
+      "actual_native_records": 44,
+      "WindowServer_records": 43,
+      "Dock_helper_records": 1,
+      "failed_boot_process_groups": 5,
+      "collector_self_audit_rows_excluded": 1,
+      "sampled_failure_counts": {
+        "GPU_MAP": 23,
+        "BO_IMPORT_HOST": 12,
+        "GPU_UNMAP": 9
+      },
+      "native_GPU_MAP_and_GPU_UNMAP_IOReturn": "0xe00002d5",
+      "native_GPU_MAP_and_GPU_UNMAP_meaning": "kIOReturnBusy",
+      "native_BO_IMPORT_HOST_return": "0x00000002",
+      "native_BO_IMPORT_HOST_code_meaning": "KERN_PROTECTION_FAILURE",
+      "BO_CREATE_refusal_records": 0,
+      "CPU_MAP_refusal_records": 0,
+      "real_unified_log_persistence_proven": true,
+      "bounded_per_operation_sampling_is_not_total_failure_count": true
+    },
+    "source_findings": {
+      "kernel_source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+      "current_kernel_source_identical_to_build35_source": true,
+      "selected_exact_candidate_sources_reconstructed": 9,
+      "ordered_patches_applied_to_selected_files": 19,
+      "GPU_UNMAP_busy_path": "vmUnmap -> vmIdleLocked: context lastSeq exceeds conservative gpuRetiredLocked observation",
+      "GPU_MAP_busy_paths": [
+        "vmIdleLocked completion guard",
+        "overlap with pending mapping in doGemVa"
+      ],
+      "ordinary_BO_MAP_busy_conversion": "kIOReturnBusy -> -EBUSY -> VK_ERROR_OUT_OF_DEVICE_MEMORY",
+      "Darwin_GEMVA_busy_wait_or_retry_implemented": false,
+      "host_import_prepare_path": "doBoImportHost uses kIODirectionInOut and forwards md->prepare error; observed raw 2 is consistent with this path",
+      "host_import_raw2_errno_conversion": "-EIO; host import returns invalid external handle rather than a proved budget shortage",
+      "sampled_busy_refusals_are_native_allocation_provenance": true,
+      "failed_boot_budget_exhaustion_proven": false,
+      "normal_in_flight_work_vs_stale_or_invalid_retirement_vs_hang_resolved": false,
+      "exact_first_MAP_busy_branch_resolved": false,
+      "host_page_protection_or_origin_resolved": false
+    },
+    "cpu_checks": {
+      "actual_source_BO_retirement_cases": 82,
+      "actual_source_BO_create_import_cases": 30,
+      "address_and_undefined_sanitizers": true,
+      "passed": true,
+      "real_GPU_or_kernel_executed_by_CPU_checks": false
+    },
+    "independent_fallback_readback": {
+      "checked_at": "2026-11-13T21:52:20.622301+08:00",
+      "OS_version": "26.7.2",
+      "OS_build": "25G332",
+      "kernel_build": 35,
+      "loaded_kernel_image_matches_preparation": true,
+      "diagnostic_pointer_and_library_verified": true,
+      "retained_predecessor_original_and_plugin_unchanged": true,
+      "firmware_framebuffer_present": true,
+      "PhxAMDFB_absent": true,
+      "display_gates_zero": true,
+      "M2_NVRAM_and_markers_absent": true,
+      "shutdown_and_GPU_helper_processes_absent": true,
+      "only_expected_generated_per_boot_log_pin_changed": true
+    },
+    "additional_GPU_tests_or_second_M2_attempt": false,
+    "driver_or_budget_policy_fix_deployed": false,
+    "complete_root_cause_established": false,
+    "next_investigation": "Measure the exact busy branch, context and conservative retirement values, queue-observation validity and host-import prepare result. Resolve bounded VM mutation/completion synchronization without editing live page tables, weakening pin protections or increasing budgets. No second desktop attempt is authorized by this result."
+  },
+  "original_desktop_failure_reproduced": true,
+  "native_allocation_refusal_provenance_established": true
 }

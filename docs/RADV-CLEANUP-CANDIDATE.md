@@ -568,8 +568,108 @@ plugin. The current boot still used the firmware framebuffer, with PhxAMDFB
 absent and all display gates zero. No initializer was replayed and no current
 boot display takeover was performed.
 
-This is a scheduled attempt, not a completed reboot or a desktop result. The
-existing software fallback remains unchanged; hard kernel or bus hang recovery
-is not guaranteed. The next action is read-only postboot collection using the
+At this checkpoint the attempt was scheduled, with no completed reboot or
+desktop result yet. The existing software fallback remained unchanged; recovery
+from a hard kernel or bus hang was not guaranteed. The next action is read-only postboot collection using the
 pinned collector, then boot/process and actual loaded-image correlation. There
 is no automatic second attempt. The original allocation cause remains unknown.
+
+## Diagnostic desktop refusal captured and firmware fallback restored, 2026-11-13
+
+The authorized one-shot completed. Startup recorded PhxAMDFB present at
+21:45:52 UTC+08:00 and desktop release at 21:46:02. Four WindowServer processes
+then produced crash reports. The installed software recovery detected four
+reports, cleared M2 and restarted. The fallback boot started at 21:47:25 and
+completed startup at 21:47:36. No second M2 attempt or additional GPU test was
+performed during the postboot investigation.
+
+The bounded administrator capture contains **44 actual native refusal records**
+from the diagnostic RADV: 43 from four WindowServer processes and one from a
+Dock helper, all in the failed boot. The initial collector's substring count
+was 45 because it also matched the log command's own audit message in the
+fallback boot. Analysis excluded that self-record by requiring the diagnostic
+prefix and verified candidate sender image. There are five real boot/process
+groups, rather than the initial six. These are bounded samples, not a complete
+count of every failure after the per-operation logging cap.
+
+| Operation | Sampled records | Original native result |
+| --- | ---: | --- |
+| GPU_MAP | 23 | `0xe00002d5`, `kIOReturnBusy` |
+| GPU_UNMAP | 9 | `0xe00002d5`, `kIOReturnBusy` |
+| BO_IMPORT_HOST | 12 | `0x00000002`, `KERN_PROTECTION_FAILURE` |
+
+No BO_CREATE or CPU_MAP refusal record was found in this capture. The first
+GPU_MAP refusal occurred at 21:46:06.420158 for an 81920-byte request. The
+diagnostic's real unified-log persistence is now demonstrated. Every one of
+the four WindowServer processes has matching same-process plugin/driver loader
+records and crash-image identities for the installed diagnostic candidate.
+The reports comprise one SIGSEGV with a stack-guard protection failure and
+repeated SkyLight render/scissor frames, and three SIGABRT reports in
+CoreDisplay paths. They must not all be described as the same assertion.
+
+### Established error provenance
+
+The current kernel source is byte-identical to the build-35 source at
+`2a1c771d19893f20f53a54cb1566c376a4c5fbfb`. Nine relevant RADV source files were
+reconstructed from the verified candidate's corresponding-source archive and
+19 ordered patches; no native driver build was run. The installed SDK headers
+confirm the two native error-code definitions above.
+
+In `PhxBringup::vmIdleLocked`, `lastSeq` greater than the conservative
+`gpuRetiredLocked()` observation returns Busy before editing GPU page tables.
+Both `vmMap` and `vmUnmap` use that guard. For the observed UNMAP results this
+is the only Busy return path in the reviewed source. MAP can also return Busy
+when `doGemVa` finds an overlapping pending mapping, so the exact branch for
+each MAP refusal is not yet recorded.
+
+The exact Darwin call chain returns Busy as `-EBUSY`. Its `acd_cmd_gem_va`
+wrapper immediately propagates the refusal; it does not wait for prior GPU
+completion or retry Busy. For ordinary BO creation,
+`radv_amdgpu_winsys_bo_create` converts a failed GPU map into
+`VK_ERROR_OUT_OF_DEVICE_MEMORY`. This explains how a native synchronization
+refusal can reach the plugin's generic allocation and "VRAM full" messages.
+For example, the last WindowServer process logged two Busy maps at
+21:46:50.756596 and 21:46:50.756980, followed by the colour-image `-2` message
+at 21:46:50.757199. A request-size or budget increase is not justified by this
+error label.
+
+Host import is a separate refusal class. `doBoImportHost` requests
+`kIODirectionInOut` and forwards an `IOMemoryDescriptor::prepare()` failure.
+The observed raw Mach protection code is consistent with that path, but the
+actual page permissions and origin are not captured. In the exact Darwin
+transport raw 2 becomes `-EIO`; the host-import caller reports an invalid
+external handle. An imported BO's later GPU_MAP failure is yet another path
+and must not be confused with refusal of BO_IMPORT_HOST itself.
+
+### Remaining uncertainty and current state
+
+The evidence establishes native error provenance and a VM mutation/completion
+contract mismatch. It does not establish whether the retirement guard saw
+ordinary in-flight work, a stale or invalid queue-completion observation, or a
+GPU hang. The conservative retirement function returns zero for some invalid
+observations too. It also does not identify every MAP Busy branch or explain
+the host pages' protection failure. A complete allocation/desktop root cause
+and a working fix remain unproven.
+
+The existing actual-source CPU harnesses passed 82 BO-retirement cases and
+30 BO-create/import cases with address/undefined sanitizers. Their Busy and
+cleanup checks confirm conservative refusal behavior with explicit OS/device
+fakes; they do not validate desktop liveness or prove a repair.
+
+Independent administrator readback at 21:52:20 UTC+08:00 verified macOS
+26.7.2 / 25G332, build 35 and the same loaded kernel image as preparation. The
+firmware framebuffer is present, PhxAMDFB absent, display gates zero, M2
+NVRAM/markers absent, and no shutdown or GPU-helper process is running. The
+diagnostic pointer/library and retained predecessor, protected original and
+plugin are intact. Of the 52 startup/driver/recovery pins, only the expected
+per-boot generated log changed. No runtime rollback, budget change or fix was
+deployed. Current-boot counters reset on fallback and are not evidence of
+failed-boot resource usage.
+
+Further diagnosis should record the precise Busy branch, context last sequence,
+conservative retirement and queue-observation validity, and the host-import
+prepare result. Any correction needs bounded completion synchronization while
+preserving the prohibition on editing live page tables and the host-page pin
+protections. The one-shot authorization is spent; this result does not
+authorize another desktop attempt. Raw captures, source reconstruction and
+correlation remain private under ignored `build/`.
