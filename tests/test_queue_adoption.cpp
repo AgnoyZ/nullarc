@@ -1,5 +1,6 @@
-// Execute the staged kernel method. Only OS locks, mappings and flushing are faked.
-#include "PhxPspLayout.h"
+// Execute staged kernel methods. OS locks, mappings, flushing and PCI property/matching are faked.
+#include "PhxGartLayout.h"
+#include "PhxHardwarePolicy.hpp"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -16,9 +17,20 @@ static void IOLog(const char *, ...) {}
 struct FakeMap {
     std::vector<uint32_t> words;
     uint64_t length;
+    unsigned accesses{0};
     explicit FakeMap(size_t bytes) : words(bytes / 4, 0xA5A5A5A5), length(bytes) {}
-    uintptr_t getVirtualAddress() { return reinterpret_cast<uintptr_t>(words.data()); }
+    uintptr_t getVirtualAddress() { ++accesses; return reinterpret_cast<uintptr_t>(words.data()); }
     uint64_t getLength() const { return length; }
+};
+static const bool fakeTrue = true;
+static const void *kOSBooleanTrue = &fakeTrue;
+struct FakePci {
+    unsigned properties{0}, registrations{0};
+    void setProperty(const char *name, const void *value) {
+        assert(!std::strcmp(name, "nmxgpu-claimed") && value == kOSBooleanTrue);
+        ++properties;
+    }
+    void registerService() { assert(properties); ++registrations; }
 };
 class PhxBringup {
 public:
@@ -33,15 +45,117 @@ public:
     uint64_t gSeq{0x1122334455667788ull};
     bool pspLayoutConfigured{true}, pspSubmissionFaulted{false}, stopping{false};
     PhxPspLayout pspLayout{PHX_PSP_LAYOUT_VERSION, 0, 0x10000, 0x2000, 0x20000, 0x2000, {0, 0}};
+    uint64_t ringMc{0x100000000ull}, tmrSize{0x1000};
+    bool tmrSetUp{true};
+    FakePci device;
+    FakePci *pci{&device};
     unsigned flushes{0}, target{0};
     void hdpFlush() { assert(depth == 2 && !gq[target].ready); ++flushes; }
     IOReturn adoptQueue(const uint64_t in[6]);
+    IOReturn claimAccel();
+    IOReturn bootMemory(PhxBootMemory *);
+#include "queue-readiness-declaration.inc"
 };
 #include "queue-adoption.inc"
+#include "queue-readiness-methods.inc"
+
+static void adopt(PhxBringup &p, bool graphics) {
+    uint64_t input[6] = {graphics ? 0x50000ull : 0x40000ull, 1024,
+        graphics ? 0x52000ull : 0x42000ull, graphics ? 0x20ull : 0x18ull, 13,
+        graphics ? 0x53001ull : 0x43000ull};
+    p.target = graphics ? 1 : 0;
+    assert(p.adoptQueue(input) == kIOReturnSuccess);
+}
+
+static PhxBootMemory snapshotAndClaim(PhxBringup &p, bool ready, IOReturn claim) {
+    assert(p.gpuReady() == ready);
+    const auto memory = p.memory.words, bells = p.bells.words;
+    unsigned char queues[sizeof(p.gq)]; std::memcpy(queues, p.gq, sizeof(p.gq));
+    const unsigned accesses = p.memory.accesses, flushes = p.flushes;
+    const unsigned properties = p.device.properties, registrations = p.device.registrations;
+    PhxBootMemory observation{};
+    assert(p.bootMemory(&observation) == kIOReturnSuccess);
+    assert(depth == 0 && !p.gpuMutex.held && !p.smuMutex.held);
+    assert(observation.flags == (PHX_BOOT_LAYOUT_CONFIGURED | PHX_BOOT_RING_ACTIVE | PHX_BOOT_TMR_ACTIVE |
+                                (ready ? PHX_BOOT_GPU_ACTIVE : 0)));
+    assert(p.claimAccel() == claim);
+    assert(p.device.properties == properties + (claim == kIOReturnSuccess));
+    assert(p.device.registrations == registrations + (claim == kIOReturnSuccess));
+    assert(p.memory.accesses == accesses && p.flushes == flushes);
+    assert(p.memory.words == memory && p.bells.words == bells);
+    assert(std::memcmp(queues, p.gq, sizeof(p.gq)) == 0);
+    return observation;
+}
+
+static void prepareReadinessFixture(PhxBringup &p) {
+    // The bootstrap validator additionally requires a 1 MiB-aligned TMR base.
+    // Keep the original adoption-only fixtures and their boundary cases unchanged.
+    p.memory.words.resize(0x400000 / 4, 0xA5A5A5A5);
+    p.memory.length = p.fbAperLen = p.fbSize = 0x400000;
+    p.pspLayout.tmrOffset = 0x100000;
+}
+
+static void readinessCase(const std::string &test) {
+    const PhxGartLayout layout{PHX_GART_LAYOUT_VERSION, 0x4000000000ull, 0x5000, 0x70000, 0x71000};
+    PhxBringup p;
+    prepareReadinessFixture(p);
+    if (test == "readiness-identity-collision") {
+        PhxBringup graphics, both;
+        prepareReadinessFixture(graphics); prepareReadinessFixture(both);
+        adopt(p, false); adopt(graphics, true); adopt(both, false); adopt(both, true);
+        const auto computeState = snapshotAndClaim(p, true, kIOReturnSuccess);
+        const auto graphicsState = snapshotAndClaim(graphics, true, kIOReturnSuccess);
+        const auto bothState = snapshotAndClaim(both, true, kIOReturnSuccess);
+        assert(!p.gq[1].ready && !graphics.gq[0].ready && both.gq[0].ready && both.gq[1].ready);
+        assert(std::memcmp(&computeState, &graphicsState, sizeof(computeState)) == 0);
+        assert(std::memcmp(&computeState, &bothState, sizeof(computeState)) == 0);
+        assert(phx780m::queueIndex(true, p.gq[0].ready, p.gq[1].ready) == -1);
+        assert(phx780m::queueIndex(false, graphics.gq[0].ready, graphics.gq[1].ready) == -1);
+        assert(!phxGartLayoutValid(&layout, &computeState));
+        return;
+    }
+    if (test == "readiness-none") {
+        const auto state = snapshotAndClaim(p, false, kIOReturnNotReady);
+        assert(phxGartLayoutValid(&layout, &state));
+        return;
+    }
+    if (test == "readiness-zero-submission") p.gSeq = 0;
+    if (test == "readiness-graphics-only") adopt(p, true);
+    else adopt(p, false);
+    if (test == "readiness-both") adopt(p, true);
+    if (test == "readiness-stopping-retained") {
+        // Inject the stopping predicate, not a model or execution of stop()/teardown/concurrency.
+        p.stopping = true;
+        const auto stopped = snapshotAndClaim(p, false, kIOReturnNotReady);
+        PhxBringup cold;
+        prepareReadinessFixture(cold);
+        const auto beforeAdoption = snapshotAndClaim(cold, false, kIOReturnNotReady);
+        assert(p.gq[0].ready && !cold.gq[0].ready);
+        assert(std::memcmp(&stopped, &beforeAdoption, sizeof(stopped)) == 0);
+        assert(phxGartLayoutValid(&layout, &stopped)); // Arithmetic metadata is not lifecycle/ownership proof.
+        return;
+    }
+    if (test == "readiness-missing-pci") p.pci = nullptr;
+    const auto state = snapshotAndClaim(p, true, p.pci ? kIOReturnSuccess : kIOReturnNotReady);
+    assert(!phxGartLayoutValid(&layout, &state)); // Preserve the pre-initialization validator's active-queue refusal.
+    if (test == "readiness-zero-submission") {
+        assert(p.gSeq == 0 && p.gq[0].head == p.gq[0].tail && p.gq[0].retiredSeq == 0);
+        assert(p.memory.words[p.gq[0].fenceOff / 4] == 0 && p.memory.words[p.gq[0].fenceOff / 4 + 1] == 0);
+        assert(p.flushes == 1); // Only the fake CPU-side adoption flush; no device completion was supplied.
+    } else {
+        assert(test == "readiness-compute-only" || test == "readiness-graphics-only" ||
+               test == "readiness-both" || test == "readiness-missing-pci");
+    }
+}
 
 int main(int argc, char **argv) {
     assert(argc == 2);
     const std::string test = argv[1];
+    if (test.rfind("readiness-", 0) == 0) {
+        readinessCase(test);
+        std::cout << "{\"case\":\"" << test << "\",\"passed\":true,\"hardware_executed\":false}\n";
+        return 0;
+    }
     PhxBringup p;
     uint64_t input[6] = {0x40000, 1024, 0x42000, 0x18, 13, 0x43000};
     IOReturn expected = kIOReturnSuccess;

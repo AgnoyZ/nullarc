@@ -86,6 +86,13 @@ propagation before display setup. Merely changing the claim call to use an
 explicit open would not establish those prerequisites. Keep kernel readiness,
 VM guards, budgets, pin direction, resource retention and cleanup intact.
 
+The [queue-readiness evidence review](ALLOCATION-QUEUE-READINESS.md) now
+exercises the actual adoption, aggregate readiness, claim and bootstrap
+export methods with CPU-only fakes. It demonstrates that compute-only,
+graphics-only and both-queue states can export identical activity metadata;
+that aggregate result cannot certify a selected graphics queue. The review
+preserves the existing claim guard and bootstrap active-queue refusal.
+
 Recovery must already be available under a separate reviewed owner before
 baseline or initialization, without depending on stage completion, observer
 acknowledgement, kill/reap or this executor's release callback. The legacy

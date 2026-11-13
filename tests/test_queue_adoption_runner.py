@@ -1,6 +1,10 @@
+from contextlib import redirect_stdout
 import hashlib
+import io
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -10,7 +14,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from prepare_source import prepare
-from test_queue_adoption import CASES, check_result, exercise, extract_source
+from test_queue_adoption import CASES, READINESS_CASES, check_result, exercise, extract_source, extract_readiness_source
 
 
 class QueueAdoptionRunnerTests(unittest.TestCase):
@@ -36,6 +40,34 @@ class QueueAdoptionRunnerTests(unittest.TestCase):
         for source in (self.source.replace('PhxBringup::adoptQueue(', 'PhxBringup::missing('),
                        self.source.replace('struct GpuQueue {', 'struct Missing {'), self.source * 2):
             with self.assertRaises(RuntimeError): extract_source(source)
+
+    def test_actual_readiness_fragments_and_source_identity(self):
+        declaration, methods, hashes = extract_readiness_source(self.source)
+        self.assertIn(declaration, self.source)
+        self.assertEqual(hashlib.sha256(declaration.encode()).hexdigest(), hashes['gpuReady'])
+        self.assertEqual({'gpuReady', 'claimAccel', 'bootMemory'}, set(hashes))
+        for name in ('claimAccel', 'bootMemory'):
+            self.assertIn('PhxBringup::' + name + '(', methods)
+        self.assertEqual(8, len(READINESS_CASES))
+        self.assertTrue(set(READINESS_CASES).issubset(CASES))
+
+    def test_readiness_extraction_rejects_missing_or_duplicate_actual_source(self):
+        for source in (self.source * 2,
+                       self.source.replace('bool gpuReady() const', 'bool missingReady() const'),
+                       self.source.replace('PhxBringup::claimAccel(', 'PhxBringup::missingClaim('),
+                       self.source.replace('PhxBringup::bootMemory(', 'PhxBringup::missingBootMemory(')):
+            with self.subTest(source=source[:30]), self.assertRaises(RuntimeError):
+                extract_readiness_source(source)
+
+    @unittest.skipIf(os.name == 'nt' or not shutil.which('clang++'), 'POSIX Clang required for actual host-only methods')
+    def test_actual_adoption_readiness_claim_and_export_cases(self):
+        with tempfile.TemporaryDirectory(prefix='phx-queue-readiness-') as directory, redirect_stdout(io.StringIO()):
+            result = exercise(Path(directory) / 'audit')
+        self.assertEqual(set(CASES), {row['case'] for row in result['cases']})
+        self.assertEqual(list(READINESS_CASES), result['readiness_cases'])
+        self.assertEqual(extract_readiness_source(self.source)[2], result['actual_readiness_source_sha256'])
+        self.assertFalse(result['hardware_executed'])
+        self.assertFalse(result['kernel_loaded'])
 
     def test_crash_false_or_wrong_report_is_rejected(self):
         good = {'case': 'compute', 'passed': True, 'hardware_executed': False}
