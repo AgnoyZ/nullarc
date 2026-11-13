@@ -95,8 +95,24 @@ The first hosted run, `43443404094` at source commit `c89dd0a`, passed the
 43 focused CPU cases and compiled, linked and signed PhxBringup. It then failed
 because the new `lipo -verify_arch` invocation placed the input file after the
 architecture list. The workflow was corrected to put the input file first;
-the kernel source is unchanged by this CI correction. A fresh run is required
-before claiming the complete hosted check passed.
+the kernel source is unchanged by this CI correction.
+
+The corrected hosted run **`43444215578`** passed at commit `ec7a26f` on
+`macos-15-intel`: all 43 focused CPU cases, PhxBringup
+compilation/linking, strict ad-hoc signature validation, x86_64 verification,
+and the source-cleanliness check. The run's artifact count is zero. It did not
+load a target kernel or execute GPU work.
+
+The Ubuntu `source-tests` job `131945953357` in run `43443224639`, at kernel
+source commit `c89dd0a`, also passed its complete source-test matrix, including
+all 33 check stages, the 417 Python tests and new diagnostic harness. The local
+replay stopped after 31 successful stages once that complete hosted matrix had
+passed; the remaining two duplicate long shader simulations are not local
+passes. This was not a test failure. The automatic full-stack
+runs for this change and its CI-only correction were cancelled to use
+the scoped PhxBringup check instead. Those cancellations are not full-stack
+build passes. Earlier runs were left untouched. No full-stack or desktop
+acceptance is claimed.
 
 ## Next evidence required
 
