@@ -280,3 +280,9 @@ records its source boundaries, unresolved gates and plan-only validation.
 The later [startup source audit](ALLOCATION-STARTUP-AUDIT.md) adds failure
 propagation evidence and requirements. Neither supplies an installed observer,
 startup integration or a target execution grant.
+
+The [initializer interface review](ALLOCATION-INITIALIZER-CONTRACT.md) exercises
+the complete current mesboot entrypoint and the existing stage executor with
+fake I/O. It identifies the legacy claim/layout boundary and the executor's
+synchronous release dependency; neither is a complete initialization chain
+or independent recovery implementation.
