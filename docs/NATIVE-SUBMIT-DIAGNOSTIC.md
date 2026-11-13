@@ -204,3 +204,33 @@ hardware session; clearing protection and repeating the same opaque boot
 is not an accepted next step. Desktop acceleration and physical display
 size remain unresolved. Earlier source, artifact and deployment JSONs are
 historical checkpoints and have not been rewritten.
+
+## Subsequent owner-authorized initialization retry
+
+After clarifying that the 15:01 restart was manual, the owner explicitly
+requested another reboot and said they would let initialization run without
+manually interrupting it. This new authorization supersedes the previous
+stop-and-investigate next step for this one attempt. It does not establish
+that the earlier hang or the automatic recovery mechanism is fixed.
+
+The preparation rechecked the running build/identity, all 55 current installed
+entries, firmware framebuffer, inactive initialization state, absence of
+M2/NVRAM arming and absence of an existing shutdown process. An initial
+backup-metadata check stopped before marker removal because the copy inherited
+the destination group. Readback confirmed that protection remained intact
+and no reboot had been scheduled. A separately pinned revision retained the
+backup ownership explicitly and passed the same checks.
+
+At 15:27 local time, the administrator-authorized operation backed up and
+removed only the stop marker, then scheduled the requested normal reboot for
+approximately 15:30. Independent readback verified the backup bytes/metadata,
+marker removal, scheduled process, all 55 installed entries unchanged and
+M2/NVRAM arming still absent. Startup helpers, drivers, userspace and EFI
+were not changed, and initialization was not replayed in the running boot.
+
+The existing three-/four-minute initialization restart timers are unchanged;
+they require a responsive system and are not a verified recovery guarantee
+for a wedged kernel or bus. The owner should allow six to eight minutes after
+restart before judging this attempt. Reboot completion, initialization,
+acceleration and any automatic protective recovery are still unverified at
+this scheduled-reboot checkpoint. See [the retry record](validation/native-submit-build35-retry-20261113.json).

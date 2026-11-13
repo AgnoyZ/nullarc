@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "timezone": "UTC+08:00",
+  "candidate_source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+  "preceding_checkpoint": "native-submit-build35-postboot-20261113.json",
+  "authorization": "Owner explicitly requested another reboot for startup initialization and said they would not manually restart this attempt",
+  "scope": "Back up and remove the protective stop marker, then schedule one normal reboot; keep firmware framebuffer and existing recovery policy",
+  "preparation": {
+    "running_build35_and_candidate_identity_verified": true,
+    "current_installed_stack_entries_matched": 55,
+    "NMXAccel_absent_and_firmware_framebuffer_present": true,
+    "M2_pending_and_framebuffer_NVRAM_arming_absent": true,
+    "startup_job_not_persistently_disabled": true,
+    "no_existing_shutdown_process": true,
+    "initial_backup_group_mismatch_failed_before_marker_removal": true,
+    "initial_failure_marker_intact_and_no_reboot_scheduled_verified": true,
+    "revised_helper_preserved_backup_owner_and_group": true,
+    "earlier_attempt_and_original_deployment_helper_preserved": true
+  },
+  "applied": {
+    "macOS_administrator_authorization_completed": true,
+    "rearmed_local": "2026-11-13T15:27:11+08:00",
+    "protective_stop_marker_backed_up_and_removed": true,
+    "backup_bytes_and_original_metadata_independently_verified": true,
+    "scheduled_reboot_process_independently_observed": true,
+    "scheduled_delay_minutes": 3,
+    "expected_restart_approximately_local": "2026-11-13T15:30:11+08:00",
+    "same_running_boot_after_preparation_verified": true,
+    "installed_stack_entries_independently_verified_unchanged": 55,
+    "startup_job_restarted_in_current_boot": false,
+    "GPU_initialization_replayed_in_current_boot": false,
+    "M2_or_NVRAM_arming_changed": false,
+    "driver_userspace_firmware_startup_helper_or_EFI_changed": false,
+    "existing_initialization_restart_timers_modified": false
+  },
+  "pending_and_limits": {
+    "status": "Rearmed and normal reboot scheduled; not a completed hardware test",
+    "reboot_completion_verified": false,
+    "initialization_success_verified": false,
+    "automatic_GPU_hang_recovery_verified_or_guaranteed": false,
+    "timed_restart_requires_responsive_system": true,
+    "suggested_observation_minutes_after_restart": [6, 8],
+    "desktop_acceleration_accepted": false,
+    "physical_display_size_corrected": false,
+    "raw_UUIDs_logs_addresses_personal_configs_or_private_helpers_published": false,
+    "next_step": "After the requested reboot, inspect services, protection state and boot-separated logs read-only; distinguish user intervention, scheduled reboot and protective stop"
+  }
+}
