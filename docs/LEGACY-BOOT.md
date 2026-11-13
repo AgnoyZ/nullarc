@@ -193,3 +193,12 @@ GFXOFF exit is established; keep the bases and readback guards intact. See
 `MES-START.md` for the software-output validation correction, test coverage and
 limits. Startup/display protections remain active. Acceleration and display
 dimensions remain unresolved.
+
+The later offline access audit found that the installed CLI's `wreg` branch
+does not validate its returned scalar count. The printed zero readbacks are
+therefore not an independent reply-shape check; a short target reply or a
+transport root cause is not established. A private checked-CLI/reset-state
+observation template is prepared and requires a new manual boot before its
+boot-specific plan can be created. No installed helper or kernel is changed,
+and the template has no selector or later execution stage. See
+[`validation/gc-access-audit-20261113.json`](validation/gc-access-audit-20261113.json).

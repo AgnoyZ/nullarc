@@ -24,6 +24,7 @@
     "CP_and_RLC_boot_readiness_observed": true
   },
   "selector_probe": {
+    "later_transport_qualification": "gc-access-audit-20261113.json: the same installed CLI binary was later found not to compare its wreg returned scalar count. The zero words below are its reported values; no short target reply or transport root cause is established.",
     "private_probe_sha256": "fe1ed3f1654a8eb71baae7b7fa7f63fb2d5d0b44498de40e81faaee65675a724",
     "offline_cases_previously_passed": 16,
     "new_boot_pinned_plan_hash_checked": true,

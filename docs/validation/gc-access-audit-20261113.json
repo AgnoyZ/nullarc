@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "repository_at_review": "27fc8d0a85043d2361df0dd5e4bee599d1f8d2aa",
+  "scope": "Offline inspection of the accepted candidate kernel and installed userspace CLI; preparation of a private, strictly checked, no-selector next-boot observation template",
+  "target_context": {
+    "hardware": "Radeon 780M, Ryzen 8845H",
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "prior_target_record": "gc-power-selector-target-20261113.json",
+    "current_boot_remains_terminal_for_GPU_commands": true,
+    "GPU_commands_sent_during_this_review": 0
+  },
+  "kernel_source_and_binary_inspection": {
+    "source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+    "candidate_binary_sha256": "37f1d88a00ee3f2c865db170510278c2f16cba2c044219b181c9e5d06f7eb629",
+    "running_private_kernel_identity_matches_prior_accepted_candidate": true,
+    "current_on_disk_EFI_kernel_bytes_rechecked": false,
+    "reason_for_limit": "The accepted private candidate artifact was inspected; the current EFI binary was not available at the recorded path and no partition was mounted for this review",
+    "current_and_deployed_source_method_bodies_equal": [
+      "rreg", "wreg", "writeReg", "readRegs", "doDbgWriteReg"
+    ],
+    "identified_candidate_writeReg_machine_sequence": [
+      "Bounds-check the dword address against the MMIO mapping length",
+      "Store the caller's 32-bit value at the mapping plus four times the register index",
+      "Execute mfence",
+      "Load a 32-bit word from the same mapping and index",
+      "Store the readback through the caller's output pointer"
+    ],
+    "identified_candidate_debug_method_forwards_arguments_and_readback": true,
+    "ordered_instruction_checker_cases_passed": 9,
+    "instruction_checker_mutations_cover": [
+      "missing write", "wrong index stride", "wrong data register", "missing fence",
+      "wrong read stride", "missing output store", "missing bounds comparison", "wrong argument"
+    ],
+    "limits": [
+      "This inspection covers identified functions in the candidate artifact, not a runtime kernel-memory read or proof of the complete dispatch path",
+      "It does not prove hardware write acceptance, physical mapping cache attributes, exclusive ownership, power readiness or a selector root cause"
+    ]
+  },
+  "installed_CLI_inspection": {
+    "binary_sha256": "f5186b8f134c31b2c737e55122b549ab38188aea2ba429a4ea3137c3ecdf759a",
+    "wreg_command_branch_inspected": true,
+    "debug_selector": 108,
+    "input_scalar_count": 2,
+    "output_scalar_capacity": 1,
+    "returned_scalar_count_reloaded_or_compared_before_print": false,
+    "qualification_of_prior_selector_words": "The earlier zeros are words printed by the installed CLI. That branch did not independently validate the returned scalar count, so a complete reply shape must not be inferred from its printed readback alone.",
+    "short_reply_actually_occurred_on_target_established": false,
+    "this_gap_proven_to_cause_selector_zero_readbacks": false,
+    "previous_stop_remains_in_force": true
+  },
+  "primary_source_review": {
+    "Linux_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "existing_references": ["linux-mes-selector-reference.json", "linux-gfx-power-reference.json"],
+    "findings": [
+      "The ordinary non-VF SOC15 path resolves to WREG32/RREG32; in-range amdgpu_device accesses use dword-scaled direct MMIO",
+      "The RLCG/shadow paths remain conditional on VF/full-access predicates; this review does not establish them as a requirement for this target",
+      "The PSP firmware path still contains additional GFXHUB, golden-register, constants, RLC and CP initialization stages after RLC autoload completion; CP/RLC readiness observations do not certify all those stages",
+      "GRBM_SOFT_RESET and CP_SOFT_RESET_CNTL use GC base index 0; CP_ME_CNTL uses base index 1. The next observer checks these definitions rather than assuming one common segment."
+    ],
+    "reset_or_halt_bits_collected_on_target_yet": false,
+    "missing_reset_clear_or_golden_sequence_established_as_cause": false,
+    "Linux_implementation_bodies_or_headers_copied_into_new_implementation": false
+  },
+  "private_checked_CLI": {
+    "source_commit": "853d43c1ab5d25e75b84ad1acabb5022d4445d11",
+    "source_sha256": "b561d0030b94cf157ff1b8712dba0e7a85316e0989062710a424cef7074b2a50",
+    "native_binary_sha256": "4254c6a09b04aeefb43daa118c038e2f0b71f43ba74cddb0ea10366b318e241d",
+    "exact_cached_source_checked_against_git": true,
+    "ASan_UBSan_real_CLI_reply_shape_and_ABI_cases_passed": 36,
+    "ASan_UBSan_existing_firmware_control_cases_passed": 60,
+    "native_CommonCrypto_verify_file_only_cases_passed": 4,
+    "successful_zero_data_and_truncated_reply_distinguished_in_synthetic_tests": true,
+    "native_Intel_IOKit_compilation_passed": true,
+    "native_target_execution": false,
+    "installed_CLI_replaced": false,
+    "service_close_status_reported": false
+  },
+  "next_reset_observer": {
+    "status": "private_offline_template_prepared_not_target_executed",
+    "source_sha256": "bb1d176a85da8cb5d58ef01cf72d03ce841fd9c2d0410596d4fe2cffef7fb596",
+    "native_binary_sha256": "63ab5eb9ebf8aafb23c2a34e6b7c262ff2fc2cafa7051618459c08223255a187",
+    "fixed_register_reads": 18,
+    "new_read_only_fields": ["GRBM_SOFT_RESET", "CP_ME_CNTL", "CP_SOFT_RESET_CNTL"],
+    "positive_controls_and_bootstrap_metadata_checks_retained": true,
+    "GPU_register_writes_by_observer": 0,
+    "ASan_UBSan_cases_passed": 229,
+    "native_Intel_IOKit_compilation_passed": true,
+    "mocked_four_phase_controller_cases_passed": 16,
+    "synthetic_boot_preparation_cases_passed": 13,
+    "real_stopped_boot_refusal_checked_before_output_creation": true,
+    "new_boot_specific_target_plan_created": false,
+    "manual_new_boot_required_before_preparation": true,
+    "future_session_changes": [
+      "Fresh boot seconds and private session identity",
+      "Private checked-CLI path without replacing installed helpers",
+      "Reviewed whole-file SHA-256 arguments for TOC staging and IP firmware loads",
+      "Fixed reset/halt observations after baseline, PSP, firmware and IMU stages"
+    ],
+    "actual_adapted_helpers_compile": true,
+    "preparation_sends_GPU_commands": false,
+    "same_new_boot_duplicate_preparation_refused": true,
+    "selector_DisallowGfxOff_GART_MES_queue_shader_adoption_claim_display_or_reset_write_stage_present": false,
+    "reset_and_halt_fields_automatically_cleared": false,
+    "halt_or_reset_state_alone_establishes_selector_cause": false
+  },
+  "preservation_and_privacy": {
+    "kernel_build_or_replacement": false,
+    "installed_helper_or_EFI_replacement": false,
+    "startup_guards_changed": false,
+    "automatic_reboot_or_watchdog": false,
+    "private_review_manifest_and_next_step_rollback_notes_saved": true,
+    "raw_disassembly_snapshots_logs_addresses_layouts_firmware_EFI_or_private_identifiers_published": false,
+    "private_diagnostic_binaries_uploaded": false,
+    "GPU_acceleration_verified": false,
+    "EDID_dimensions_fixed_or_verified": false
+  }
+}

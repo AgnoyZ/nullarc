@@ -149,9 +149,11 @@ checked PSP/TOC/TMR, seventeen firmware loads, RLC autoload and GFX power
 prerequisites passed again. The boot-pinned private selector probe then
 received a successful DisallowGfxOff (`0x1a`, argument zero) acknowledgement.
 CP/RLC readiness and idle selection were observed before the first selector
-write. Expected `0x0c`, the kernel's immediate readback was zero and a second
-read was also zero. The probe stopped there: it never selected pipe 1, restored
-idle, initialized GART, reset/activated MES or created/submitted a queue. No
+write. Expected `0x0c`, the installed CLI reported an immediate readback of zero
+and a second read of zero. The later offline audit below qualifies the unchecked
+`wreg` reply count in this installed binary. The probe stopped there: it never
+selected pipe 1, restored idle, initialized GART, reset/activated MES or
+created/submitted a queue. No
 further GPU register writes or same-boot retries followed. See
 `validation/mes-selector-target-20261112.json`.
 
@@ -257,9 +259,11 @@ independent hardware GFXOFF-exit measurement.
 
 The separately invoked VMID-only probe first rechecked positive controls,
 readiness, named power flags and idle selection. It wrote VMID 1 with MEID,
-PIPEID and QUEUEID zero (encoded selection `0x10`). The kernel's immediate
-readback and subsequent read were both zero. It stopped on this first
-selection, without an idle-restoration write or a later-stage command. The
+PIPEID and QUEUEID zero (encoded selection `0x10`). The installed CLI reported
+zero for the immediate readback and subsequent read. Its `wreg` reply count was
+not independently checked, as detailed in the later offline audit below. It
+stopped on this first selection, without an idle-restoration write or a
+later-stage command. The
 failure is thus also observed for a value other than the earlier ME3 selection;
 it does not establish that every field or every GC write fails. Do not assume
 write-only semantics, change the independently matched bases, or remove guards.
@@ -284,3 +288,50 @@ offline source analysis before preparing another bounded manual-boot test.
 Acceleration and EDID dimensions remain unresolved. Sanitized evidence is
 `validation/gc-power-selector-target-20261113.json`; raw captures and identities
 remain private.
+
+## Offline access-path audit and next observation template, 2026-11-13
+
+An offline inspection checked the accepted private candidate artifact against
+its prior binary hash and running private kernel identity. The five relevant
+method bodies match the deployed source revision. The identified `writeReg`
+machine code bounds-checks the dword offset, stores the caller's 32-bit value,
+executes `mfence`, loads the same address and forwards the result. Eight
+instruction-sequence mutations were rejected alongside the accepted sequence.
+This does not prove the whole dispatch path, physical mapping/cache attributes
+or hardware acceptance. The current EFI binary was unavailable at the recorded
+path; it was not mounted or independently rehashed for this review.
+
+Inspection of the installed CLI exposed a diagnostic limitation: its `wreg`
+branch requests one output scalar but does not compare the returned count
+before printing the output buffer. Thus the prior printed zero words do not
+independently establish a complete reply shape. A short reply on the target
+has **not** been observed or established as the cause. The earlier stop remains
+binding; this finding is not permission for a same-boot retry.
+
+A private userspace CLI was compiled from exact repository source `853d43c`,
+which already checks IOKit status/counts and kernel ABI. Thirty-six actual-CLI
+synthetic shape/ABI cases and sixty existing firmware/control cases passed
+under ASan/UBSan; four native CommonCrypto file-only cases passed without
+opening IOKit. Successful zero data and malformed reply sizes are tested
+separately. No installed helper is replaced. Its service-close return remains
+unreported; this limitation is not removed by the other transport checks.
+
+The next private template adds only three read-only state fields to the
+fifteen-field observer: GRBM soft reset, CP ME halt control and CP soft reset
+control. Their offsets and individual segment indices were checked against the
+pinned primary source. The eighteen-read observer passed 229 ASan/UBSan cases
+and native Intel IOKit compilation; the stage controller passed sixteen mocked
+cases and the boot preparer thirteen synthetic cases. The real stopped boot
+was rejected before any target-plan creation or GPU command.
+
+After a new manual boot, preparation must bind a new plan to that boot and
+recheck startup acceptance and input hashes. Only future private-session
+helpers use the checked CLI, with reviewed whole-file SHA-256 arguments added
+to staging/loading calls. The existing PSP/firmware/IMU order is retained;
+every stage gets a fixed observation. There is no selector, DisallowGfxOff,
+GART, MES, queue, shader, adoption, claim, display or reset-write stage. Reset
+and halt states are observations, not an instruction to clear bits or a
+diagnosis by themselves. Neither new private native tool has executed against
+the target GPU. Source, binary inspection limits and preparation evidence are in
+`validation/gc-access-audit-20261113.json`. Acceleration and EDID dimensions
+remain unresolved.

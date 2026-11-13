@@ -123,6 +123,7 @@
     "selector_writes_during_inhibit_observation": 0
   },
   "VMID_only_selector_probe": {
+    "later_transport_qualification": "gc-access-audit-20261113.json: these are words reported by the installed CLI; its wreg branch did not compare the returned scalar count. This does not establish that a short reply occurred or caused the zero values.",
     "readiness_positive_controls_named_power_flags_and_idle_checked_first": true,
     "VMID_field_requested": 1,
     "MEID_PIPEID_QUEUEID_fields_requested": 0,
