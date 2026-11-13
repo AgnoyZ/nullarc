@@ -1,0 +1,69 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "subject": "Persistent allocation-investigation goal and exact-session user-login continuation",
+  "source_commit": "92197dd6911848de1a1f661261cd2335b164ad76",
+  "source_parent": "0658700d9f6c5ef6743617d127bf782e60674074",
+  "local_cli_version": "0.167.1",
+  "source_inputs_sha256": {
+    "tools/goal_resume.py": "3e5eff90e9c1a0aa1dbf9d00ac5a3e50a256c5f93a84910d979de41680ea8a02",
+    "tests/test_goal_resume.py": "8fc34fb17b5a5e7a4d22b7b5b9da484ce94a5eed35ad7efb6ce8f78276ff9b5c",
+    "tools/allocation_capture.py": "5388b0c1a4f91c315451628ed44257907f56e30e7ccf5afc088bd97922c5d328",
+    "tools/allocation_observer.py": "2601c9e8a88bf686f8f779b57948ebd18e49c913a2308d75838666e0498925a3",
+    "tools/phxctl/phxboot.sh": "6c0271c306b8edbe0bc5b294794a8f47480a6bd25eae9c0a9207471f8fd794d8"
+  },
+  "local_tests": {
+    "focused_continuation_tests": 17,
+    "focused_result": "success",
+    "clean_committed_full_python_tests": 482,
+    "full_python_seconds": 194.164,
+    "full_result": "success",
+    "inputs_unchanged": true,
+    "checkout_clean_before_and_after": true,
+    "real_resume_agent_started_by_tests": false
+  },
+  "local_installation": {
+    "dedicated_user_launchagent_installed_and_loaded": true,
+    "goal_persisted_and_read_back_active": true,
+    "goal_and_thread_identifiers_kept_private": true,
+    "checkpoint_and_manual_resume_entry_outside_repository": true,
+    "private_permissions_verified": true,
+    "installed_helper_matches_tested_source": true,
+    "native_cli_sha256_pinned": true,
+    "current_boot_deferred": true,
+    "actual_saved_session_check_only_admission": "ready",
+    "automatic_attempt_claim_created": false,
+    "resume_model_process_started": false,
+    "launch_stderr_empty": true,
+    "credentials_copied": false,
+    "goal_database_directly_edited_by_helper": false,
+    "end_to_end_reboot_resume_verified": false
+  },
+  "synchronization": {
+    "method": "exact Git objects through REST, guarded fast-forward, force=false",
+    "source_ref_tree_parent_verified": true,
+    "three_source_commit_files_independently_downloaded_and_matched": true
+  },
+  "automatic_full_stack_run": {
+    "run_id": 43481341083,
+    "conclusion": "cancelled",
+    "counts_as_build_pass": false
+  },
+  "execution_boundary": {
+    "session_continuation_installation_authorized_by_user": true,
+    "GPU_startup_monitor_changed": false,
+    "driver_runtime_plugin_or_EFI_changed": false,
+    "security_or_authentication_policy_weakened": false,
+    "target_GPU_work_or_M2_arming_or_reboot": false,
+    "old_M2_and_reboot_grants_consumed": true,
+    "allocation_root_cause_confirmed": false
+  },
+  "limits": [
+    "Continuation begins after user login; a powered-off or unusable OS cannot execute the agent.",
+    "Retained state, compatible pinned executable, authentication and network/model availability are required.",
+    "At most one automatic launch is claimed per boot; an uncertain or failed launch is retained for manual review, not automatically replayed.",
+    "A paused, completed, blocked or limited goal is not reactivated by the helper.",
+    "Local admission and simulated boot tests do not establish a real reboot-to-resume result.",
+    "Automatic continuation preserves the source/read-only execution scope and does not restore consumed GPU/reboot grants."
+  ]
+}

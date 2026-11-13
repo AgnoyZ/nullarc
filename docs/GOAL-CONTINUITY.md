@@ -52,3 +52,25 @@ and network/model service are necessary. Power-off time and an unusable OS
 cannot be covered. Logs and manual exact-session resume instructions must
 remain available when automatic resume fails. No end-to-end reboot result is
 claimed without observing a real authorized reboot and subsequent resume.
+
+## Local verification, 2026-11-14
+
+Source commit **`92197dd6911848de1a1f661261cd2335b164ad76`** passed all
+**482 Python tests** in 194.164 seconds in a clean committed checkout,
+including 17 continuation tests. The recorded source inputs were unchanged,
+and the checkout remained clean. The source commit's remote ref/tree/parent
+and all three changed files were independently verified through the Git API.
+Automatic full-stack run `43481341083` was cancelled and is not a build pass.
+
+The dedicated user LaunchAgent was installed and loaded. Read-back verified
+private permissions, the installed helper's source hash, next-boot deferral
+on the current boot, empty launch stderr and no automatic attempt claim.
+The real saved goal/session/checkpoint/executable also passed check-only
+admission with the installation-boot guard explicitly bypassed for validation;
+no Codex resume process was started. The goal was independently read back as
+active. No goal/session database was directly modified by the helper.
+
+This confirms local configuration and admission, not a completed reboot.
+The [validation record](validation/goal-continuity-20261114.json) keeps that
+distinction. No GPU startup, driver, runtime, EFI or security setting was
+changed, and no reboot or target workload was requested.
