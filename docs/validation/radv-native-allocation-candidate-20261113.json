@@ -75,8 +75,15 @@
     "proposed_normal_restart_delay_minutes": 3,
     "existing_software_fallback_preserved": true,
     "hard_kernel_or_bus_hang_recovery_guaranteed": false,
-    "armed": false,
-    "restart_scheduled": false
+    "armed": true,
+    "restart_scheduled": true,
+    "explicit_new_M2_and_restart_authorization_received": true,
+    "fresh_administrator_preflight_passed_before_arming": true,
+    "armed_at": "2026-11-13T21:42:19.171331+08:00",
+    "scheduled_at": "2026-11-13T21:42:20.413082+08:00",
+    "expected_restart_approximately": "2026-11-13T21:45:20.413082+08:00",
+    "automatic_second_attempt_authorized": false,
+    "status": "Scheduled; still on preparation boot at independent readback; no desktop outcome yet"
   },
   "local_regression": {
     "python": "3.12.16",
@@ -84,6 +91,27 @@
     "passed": true
   },
   "final_readback": {
+    "checked_at": "2026-11-13T21:42:35.594985+08:00",
+    "same_preparation_boot": true,
+    "one_shot_M2_NVRAM_verified": true,
+    "persistent_M2_marker_absent": true,
+    "diagnostic_pointer_and_library_verified": true,
+    "previous_candidate_original_and_plugin_unchanged": true,
+    "installed_startup_driver_recovery_pins_verified": 52,
+    "firmware_framebuffer_present": true,
+    "PhxAMDFB_absent": true,
+    "display_gates_zero": true,
+    "exact_scheduled_shutdown_identity_verified": true,
+    "expected_restart_approximately": "2026-11-13T21:45:20.413082+08:00",
+    "reboot_performed_at_readback": false
+  },
+  "initialization_replayed": false,
+  "M2_enabled": false,
+  "reboot_performed": false,
+  "automatic_retry": false,
+  "budget_policy_changed": false,
+  "allocation_cause_fix_claimed": false,
+  "pre_authorization_readback": {
     "checked_local": "2026-11-13 21:33:12 +0800",
     "same_boot": true,
     "diagnostic_pointer_and_library_verified": true,
@@ -95,10 +123,6 @@
     "shutdown_process_absent": true,
     "desktop_arming_receipts_absent": true
   },
-  "initialization_replayed": false,
-  "M2_enabled": false,
-  "reboot_performed": false,
-  "automatic_retry": false,
-  "budget_policy_changed": false,
-  "allocation_cause_fix_claimed": false
+  "next_boot_M2_one_shot_armed": true,
+  "current_boot_display_takeover_enabled": false
 }

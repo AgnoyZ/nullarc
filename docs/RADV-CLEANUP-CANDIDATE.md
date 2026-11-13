@@ -533,8 +533,8 @@ guarded. Administrator read-only preflight passed; the installed startup and
 recovery inputs were checked against the prior reviewed attempt, with one
 per-boot generated log pinned to its current value. An authorization-guard
 check confirmed that desktop arming refuses without explicit new one-boot M2
-and scheduled-restart authorization. Nothing is armed or scheduled. If later
-authorized, the plan uses only one-shot NVRAM arming, keeps the persistent M2
+and scheduled-restart authorization. At preparation, nothing was armed or
+scheduled. The plan uses only one-shot NVRAM arming, keeps the persistent M2
 marker absent, and schedules one normal restart after three minutes. It
 preserves the existing software fallback and captures the first diagnostic
 record grouped by boot and WindowServer process, together with crash/loader
@@ -550,3 +550,26 @@ zero display gates/frame count, and absent M2 arming and shutdown state.
 See `validation/radv-native-allocation-candidate-20261113.json`. All raw logs,
 machine identities, helper programs and operational plans remain ignored and
 private under `build/`.
+
+## Authorized single diagnostic desktop boot scheduled, 2026-11-13
+
+The owner separately and explicitly authorized one fresh M2 desktop boot, a
+normal restart delayed three minutes, and the existing failure fallback
+restart. A fresh administrator preflight passed before execution. The pinned
+helper armed only the one-shot M2 NVRAM value at 21:42:19 UTC+08:00 and observed
+the scheduled normal-restart process. Its expected restart time is approximately
+2026-11-13 21:45:20 UTC+08:00. No persistent M2 marker was created.
+
+Independent administrator readback at 21:42:35 UTC+08:00 confirmed the same
+preparation boot, the one-shot arming value, the exact scheduled process
+identity, all 52 installed startup/driver/recovery pins, the diagnostic runtime
+pointer and library, and unchanged retained candidates, original runtime and
+plugin. The current boot still used the firmware framebuffer, with PhxAMDFB
+absent and all display gates zero. No initializer was replayed and no current
+boot display takeover was performed.
+
+This is a scheduled attempt, not a completed reboot or a desktop result. The
+existing software fallback remains unchanged; hard kernel or bus hang recovery
+is not guaranteed. The next action is read-only postboot collection using the
+pinned collector, then boot/process and actual loaded-image correlation. There
+is no automatic second attempt. The original allocation cause remains unknown.
