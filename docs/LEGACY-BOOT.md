@@ -202,3 +202,33 @@ observation template is prepared and requires a new manual boot before its
 boot-specific plan can be created. No installed helper or kernel is changed,
 and the template has no selector or later execution stage. See
 [`validation/gc-access-audit-20261113.json`](validation/gc-access-audit-20261113.json).
+
+## Later fresh-boot Metal compute result, 2026-11-13
+
+After the user explicitly restored the existing startup switch and manually
+rebooted, the installed legacy startup path reported successful compute/gfx
+sentinels, queue adoption and accelerator claim. The candidate's private running
+identity, exact accepted provider profile and geometry were rechecked; seven
+pinned installed-stack file hashes remained unchanged. The older installed
+PhxAccel is still running, not the different downloaded candidate. Its kernel
+identity matches the installed file. The checked reset-observation template
+was **not** executed on this already-initialized boot.
+
+A freshly compiled private `metal-smoke` selected the unique registry-verified
+PCI `1002:1900` device and passed all six real Metal compute cases, including
+every result, unchanged input, poisoned output and guard checks. There was one
+attempt, no fallback and no timeout. This is bounded compute acceptance of the
+accepted PhxBringup candidate plus the existing accelerator/runtime, not
+acceptance of a new PhxAccel or the full downstream stack. The legacy log alone
+still does not independently verify its CLI reply shapes, and this later boot
+does not explain the earlier selector readbacks or invalidate their stop guards.
+
+The desktop still uses IONDRVFramebuffer; PhxAMDFB is absent and desktop GPU
+compositing is not established. The existing script has armed the next display
+boot; the M2 marker is present and no off/pending marker remains. A separate
+manual boot is needed before checking display takeover and frame progress.
+Do not rerun initialization or the unused reset-observation template on the
+current initialized boot. No driver/plugin/EFI replacement, new watchdog or
+automatic reboot was performed by this probe. EDID dimensions remain unverified.
+Sanitized evidence and provenance limits are in
+[`validation/metal-postboot-target-20261113.json`](validation/metal-postboot-target-20261113.json).

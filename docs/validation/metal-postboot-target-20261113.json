@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "repository_at_probe": "05c5570554b9e43045311ea9c2d36dacad9c1f06",
+  "scope": "Fresh-boot acceptance of bounded Metal compute on the accepted PhxBringup candidate with the existing installed PhxAccel and userspace runtime; desktop display takeover remains pending",
+  "target": {
+    "hardware": "Radeon 780M, Ryzen 8845H",
+    "PCI_vendor": "1002",
+    "PCI_device": "1900",
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64",
+    "fresh_manual_boot_distinct_from_prior_selector_stop": true
+  },
+  "running_stack": {
+    "PhxBringup_source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+    "previously_accepted_PhxBringup_artifact_sha256": "37f1d88a00ee3f2c865db170510278c2f16cba2c044219b181c9e5d06f7eb629",
+    "running_private_kernel_identity_matches_accepted_candidate": true,
+    "current_EFI_kernel_bytes_independently_rehashed": false,
+    "exact_provider_profile_matches_reviewed_input": true,
+    "legacy_profile_status_zero_and_startup_enabled": true,
+    "observed_geometry_matches_reviewed_input": true,
+    "installed_PhxAccel_bundle_version": "0.1",
+    "installed_PhxAccel_executable_sha256": "cbc8fed6f07ca86948a1c0836c80f3aa49eb5f6e14b2e06720dd29d822f61bcd",
+    "downloaded_PhxAccel_candidate_executable_sha256": "4db98733b4dc9098d69938e511a57dc07266d0f6f722fb3c8bf119edc6ef6465",
+    "running_PhxAccel_private_identity_matches_installed_file": true,
+    "running_PhxAccel_private_identity_matches_downloaded_candidate": false,
+    "installed_PhxAccel_and_userspace_source_commits_independently_established": false,
+    "seven_previously_pinned_installed_file_hashes_unchanged_before_and_after_smoke": true
+  },
+  "startup_observations": {
+    "existing_startup_switch_restored_at_user_request_before_manual_reboot": true,
+    "initialization_path": "Existing LaunchDaemon and installed legacy startup scripts on the fresh boot, not the prepared checked reset-observation controller",
+    "legacy_boot_log_reports_expected_compute_and_graphics_sentinels": true,
+    "legacy_boot_log_reports_both_queue_adoptions_and_claim_success": true,
+    "legacy_boot_log_reports_normal_completion": true,
+    "legacy_CLI_IOKit_reply_shape_independently_verified_by_this_log": false,
+    "independent_Metal_probe_below_is_separate_from_legacy_log_success": true,
+    "prepared_checked_CLI_reset_observation_template_executed": false,
+    "prior_stopped_boot_retried": false,
+    "standalone_selector_probe_replayed": false,
+    "earlier_zero_selector_readback_cause_established": false
+  },
+  "Metal_compute_probe": {
+    "source": "tools/metal_smoke.m",
+    "source_sha256": "2f93cf5879426c24ecd1450d606e17fc6fbc4971b5f4623dc9057115c270af4a",
+    "fresh_private_userspace_probe_compiled_from_reviewed_source": true,
+    "list_exit_code": 0,
+    "unique_registry_verified_PCI_1002_1900_device": true,
+    "execution_attempts": 1,
+    "execution_exit_code": 0,
+    "real_Metal_compute_dispatched": true,
+    "CPU_or_other_GPU_fallback_used": false,
+    "cases": [
+      {"uint32_elements": 1, "output_offset_bytes": 0, "exact_results_input_and_guards_passed": true},
+      {"uint32_elements": 63, "output_offset_bytes": 256, "exact_results_input_and_guards_passed": true},
+      {"uint32_elements": 64, "output_offset_bytes": 0, "exact_results_input_and_guards_passed": true},
+      {"uint32_elements": 257, "output_offset_bytes": 256, "exact_results_input_and_guards_passed": true},
+      {"uint32_elements": 4097, "output_offset_bytes": 0, "exact_results_input_and_guards_passed": true},
+      {"uint32_elements": 65537, "output_offset_bytes": 256, "exact_results_input_and_guards_passed": true}
+    ],
+    "per_command_timeout_seconds": 30,
+    "timeout_or_failed_case": false,
+    "first_error_stop_and_no_retry_retained": true,
+    "elapsed_seconds": 2.877,
+    "elapsed_time_is_not_a_benchmark": true
+  },
+  "display_and_next_boot": {
+    "NMXAccel_present_after_smoke": true,
+    "IONDRVFramebuffer_present": true,
+    "PhxAMDFB_present": false,
+    "display_copy_path_enabled": false,
+    "display_frames_reported": 0,
+    "M2_startup_marker_present": true,
+    "next_boot_display_arming_read_as_1": true,
+    "startup_off_marker_absent": true,
+    "pending_initialization_marker_absent": true,
+    "display_disable_boot_argument_present": false,
+    "WindowServer_GPU_compositing_verified": false,
+    "next_step": "A separate operator-controlled boot, then inspect PhxAMDFB, NMXAccel, display frame progress and WindowServer state without replaying initialization on the current boot"
+  },
+  "limits": [
+    "This accepts only the six bounded Metal compute cases on this mixed running stack, not the downloaded PhxAccel or the complete current downstream runtime",
+    "Kernel identity was compared with the previously accepted candidate; the EFI partition was not mounted or independently rehashed during this review",
+    "The legacy startup log does not remove its CLI reply-count limitations or establish exclusive physical memory ownership",
+    "A later fresh-boot success neither explains the earlier selector observations nor permits retrying the old stopped boots or weakening their guards",
+    "Desktop rendering, presentation, video, sustained stability, performance, sleep/wake and EDID physical dimensions remain unverified",
+    "The prepared reset-observation template was not executed and must not be treated as an unused initialization path on this already-initialized boot"
+  ],
+  "preservation_and_privacy": {
+    "installed_driver_plugin_or_helper_replaced_during_probe": false,
+    "kernel_locally_built": false,
+    "EFI_NVRAM_BIOS_partition_or_security_setting_changed_by_probe": false,
+    "new_watchdog_or_automatic_restart_started_by_probe": false,
+    "raw_logs_register_snapshots_addresses_layouts_firmware_EFI_or_private_identifiers_published": false,
+    "private_diagnostic_binary_uploaded": false
+  }
+}

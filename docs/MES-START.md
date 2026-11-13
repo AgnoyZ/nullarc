@@ -276,7 +276,8 @@ execute the real GPU. The installed CLI used for the SMU/selector calls does not
 report its service-close result; its checked transport/readback observations
 do not establish exclusive ownership or a complete hardware-state proof.
 
-The current boot is initialized and terminal for further GPU writes. A private
+The boot used for that selector diagnostic was initialized and terminal for
+further GPU writes. A private
 stop record also blocks the parent phase workflow. Startup acceptance and
 installed-stack hashes were checked before the access test; those hashes,
 startup guards, candidate/profile/geometry and IONDRVFramebuffer were rechecked
@@ -335,3 +336,19 @@ diagnosis by themselves. Neither new private native tool has executed against
 the target GPU. Source, binary inspection limits and preparation evidence are in
 `validation/gc-access-audit-20261113.json`. Acceleration and EDID dimensions
 remain unresolved.
+
+## Subsequent fresh-boot compute acceptance, 2026-11-13
+
+A later user-authorized restoration of the existing startup switch and manual
+boot took the legacy initialization path through queue adoption and claim.
+The older installed accelerator published NMXAccel, and a separate private
+Metal smoke passed all six real compute cases on the PCI-verified 780M. This
+is new, bounded execution evidence for that running mixed stack, not a replay
+of the stopped selector experiment or execution of the checked reset-observation
+template. It does not explain the earlier zero readbacks, remove CLI transport
+limits, prove memory ownership or accept the standalone guarded MES workflow.
+
+Desktop takeover is still pending a separate manual boot: IONDRVFramebuffer
+remains present, PhxAMDFB is absent and the next display boot is armed. See
+`LEGACY-BOOT.md` and `validation/metal-postboot-target-20261113.json` for the
+identity checks, six compute results and remaining display/provenance limits.
