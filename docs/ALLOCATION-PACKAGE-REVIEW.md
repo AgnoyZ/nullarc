@@ -91,3 +91,5 @@ The [machine-readable review](validation/allocation-package-review-20261114.json
 records the checks and their limits. The next permitted work is source-only
 review of a precise delivery route and startup admission/recovery design;
 target installation, reads and any later display attempt remain separate.
+The [source-only handoff](ALLOCATION-SOURCE-PACKET.md) now defines the scoped
+in-tree input export; it does not supply or authorize native binary delivery.
