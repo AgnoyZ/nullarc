@@ -1,0 +1,148 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "scope": "One authorized build-36 M2 reproduction and read-only post-fallback investigation",
+  "candidate": {
+    "build": 36,
+    "source_commit": "3948e122d6ae26fa0644a70838bc0bfb76d91752",
+    "hosted_package_run": 43446700859,
+    "executable_sha256": "3ac7816a80504bf587d3c684c0941e12dd6c686c2d8f48e3dcff093fdd2b176b",
+    "exact_loaded_image_verified_on_preparation_and_fallback_boots": true,
+    "new_kernel_record_from_failed_M2_boot_recovered": false,
+    "OS_version": "26.7.2",
+    "OS_build": "25G332"
+  },
+  "execution": {
+    "timezone": "+08:00",
+    "one_shot_armed_at": "2026-11-13T23:33:06+08:00",
+    "independent_arming_readback_at": "2026-11-13T23:33:31+08:00",
+    "scheduled_shutdown_announcement": "2026-11-13T23:36:06+08:00",
+    "M2_startup_at": "2026-11-13T23:36:33+08:00",
+    "display_released_at": "2026-11-13T23:36:42+08:00",
+    "existing_monitor_reported_crashes_or_hangs": 3,
+    "existing_software_fallback_reboot_observed": true,
+    "fallback_boot_time": "2026-11-13T23:37:53+08:00",
+    "fallback_startup_completed_at": "2026-11-13T23:38:10+08:00",
+    "one_M2_grant_consumed": true,
+    "automatic_second_attempt_authorized": false,
+    "initializer_manually_replayed": false
+  },
+  "primary_capture": {
+    "start": "2026-11-13T23:33:05+08:00",
+    "end": "2026-11-13T23:41:59+08:00",
+    "maximum_minutes": 15,
+    "raw_rows_before_boot_process_image_filtering": 124,
+    "verified_kernel_allocation_records": 0,
+    "verified_RADV_refusal_samples": 37,
+    "failed_boots_with_verified_RADV_samples": 1,
+    "sender_image_UUID_and_path_verified": true,
+    "sample_counts_are_not_total_failures_or_unique_requests": true,
+    "native_results": [
+      { "operation": "GPU_MAP", "samples": 15, "native_result": "0xe00002d5", "meaning": "Busy" },
+      { "operation": "GPU_UNMAP", "samples": 10, "native_result": "0xe00002d5", "meaning": "Busy" },
+      { "operation": "BO_IMPORT_HOST", "samples": 12, "native_result": "0x00000002", "meaning": "Mach protection failure" }
+    ],
+    "WindowServer_samples": 35,
+    "WindowServer_process_lifetimes_with_samples": 4,
+    "Dock_MAP_samples": 1,
+    "SecurityAgent_MAP_samples": 1,
+    "first_WindowServer_reached_each_eight_sample_operation_cap": true,
+    "same_request_kernel_RADV_or_plugin_correlation_established": false,
+    "neighboring_plugin_import_message_uniquely_identifies_native_stage": false
+  },
+  "crashes": {
+    "new_WindowServer_reports": 3,
+    "JSON_header_and_body_parsed": true,
+    "capture_times_boot_PIDs_and_expected_project_images_checked": true,
+    "RADV_crash_path_redacted_and_exact_path_confirmed_by_same_boot_PID_unified_records": true,
+    "first_report": {
+      "signal": "SIGSEGV",
+      "exception_context": "Stack-guard protection exception",
+      "top_project_frames": ["nvlog", "nvmtl_vk_cmd_begin", "-[NVMTLCommandQueue commandBuffer]"],
+      "repeated_SkyLight_RenderEncoder_and_SetScissor_frames": true,
+      "intrinsic_logger_defect_proven": false
+    },
+    "later_reports": {
+      "count": 2,
+      "signal": "SIGABRT",
+      "path": "CoreDisplay Assert and RunFullDisplayPipe"
+    },
+    "crash_protection_exception_equals_native_host_import_event": false
+  },
+  "observation_gap": {
+    "supplementary_query_seconds": 81,
+    "case_insensitive_prefix_query_without_sender_restrictions_found_allocation_records": 0,
+    "all_kernel_query_raw_rows": 17794,
+    "explicit_failed_boot_timestamp_and_process_matched_kernel_rows": 8743,
+    "candidate_UUID_path_or_diagnostic_prefix_matches": 0,
+    "empty_message_rows": 128,
+    "empty_message_senders": ["AppleACPIPlatform", "IONVMeFamily"],
+    "query_stderr_empty": true,
+    "current_boot_dmesg_reconstructs_failed_boot": false,
+    "candidate_format_strings_in_text_cstring_and_IOLog_import_verified": true,
+    "public_XNU_logging_source_revision_reviewed": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+    "public_XNU_revision_matched_to_installed_kernel": false,
+    "target_per_image_logging_resolution_failure_measured": false,
+    "missing_logs_establish_completed_or_idle_queues": false
+  },
+  "inferences_and_limits": {
+    "reviewed_driver_UNMAP_Busy_path": "Retirement guard",
+    "reviewed_driver_MAP_Busy_paths": ["Retirement guard", "Pending overlap"],
+    "raw_import_code_consistent_with_propagated_prepare_failure": true,
+    "kernel_prepare_stage_captured": false,
+    "retirement_pending_versus_invalid_distinguished": false,
+    "queue_fence_values_or_progress_recovered": false,
+    "GPU_hang_proven": false,
+    "host_page_permissions_or_origin_established": false,
+    "VRAM_exhaustion_established": false,
+    "full_root_cause_established": false,
+    "desktop_acceleration_accepted": false
+  },
+  "current_verified_state": {
+    "checked_at": "2026-11-13T23:50:55+08:00",
+    "loaded_build": 36,
+    "exact_packaged_loaded_image_verified": true,
+    "firmware_framebuffer_present": true,
+    "PhxAMDFB_absent": true,
+    "display_gates_zero": true,
+    "M2_NVRAM_and_markers_absent": true,
+    "pending_shutdown_or_GPU_helper_absent": true,
+    "startup_completed": true,
+    "immutable_runtime_plugin_driver_startup_recovery_inputs_verified": true,
+    "generated_per_boot_address_log_expected_to_change": true,
+    "full_retained_EFI_backup_verified": true,
+    "EFI_identity_verified_and_unmounted": true,
+    "hard_kernel_or_bus_hang_recovery_guaranteed": false
+  },
+  "independent_model_review": {
+    "review_date": "2026-11-14",
+    "reviewer": "Claude Code using the locally configured Opus alias",
+    "sanitized_evidence_and_source_packet_provided": true,
+    "reviewer_tools_MCP_and_hooks_disabled": true,
+    "initial_response_incomplete": true,
+    "focused_corrective_review_completed": true,
+    "outputs_checked_against_actual_source_and_evidence": true,
+    "material_factual_errors_found_and_rejected": true,
+    "rejected_claims_or_proposals": [
+      "Observed retirement-pending or prepare-stage kernel records",
+      "Submission-time VMID binding timeout as a MAP Busy path",
+      "Hardware undamaged because the firmware fallback recovered",
+      "Physical-segment probing before preparing pageable descriptor memory"
+    ],
+    "existing_Busy_to_RADV_memory_failure_source_chain_rechecked": true,
+    "new_hardware_root_cause_established": false,
+    "reviewer_proposals_installed_or_GPU_executed": false
+  },
+  "followup_validation_and_preservation": {
+    "actual_source_CPU_diagnostic_cases_passed": 43,
+    "sanitizers": ["AddressSanitizer", "UndefinedBehaviorSanitizer"],
+    "CPU_tests_validate_target_logging_persistence": false,
+    "kernel_source_or_installed_binaries_changed": false,
+    "new_GPU_test_or_M2_retry_performed": false,
+    "startup_helper_or_recovery_policy_changed": false,
+    "global_logging_or_security_settings_changed": false,
+    "EFI_config_Windows_BIOS_partition_or_license_changed": false,
+    "local_native_driver_build_performed": false,
+    "raw_diagnostics_or_private_machine_identities_published": false
+  }
+}

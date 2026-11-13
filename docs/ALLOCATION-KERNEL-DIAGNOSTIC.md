@@ -3,10 +3,12 @@
 This diagnostic candidate follows the failed build-35 desktop attempt recorded
 in [the RADV result](RADV-CLEANUP-CANDIDATE.md#diagnostic-desktop-refusal-captured-and-firmware-fallback-restored-2026-11-13).
 It is diagnostic instrumentation, not an allocation or desktop repair. Build 36
-has now passed the first firmware-framebuffer boot and exact loaded-image
-verification under fresh owner authorization, as recorded below. Its new M2
-reproduction is the next phase, not an established result. The previous
-one-shot authorization is spent; the new authorization is recorded separately.
+passed the first firmware-framebuffer boot and exact loaded-image verification
+under fresh owner authorization, then completed its single authorized M2
+reproduction. That reproduction failed and the existing monitor restored the
+firmware desktop. Native refusal codes persisted, but the new kernel diagnostic
+records did not appear in the retained capture. The full cause remains
+unresolved. Both the earlier and this build-36 one-shot M2 grants are spent.
 
 ## Observation contract
 
@@ -214,14 +216,131 @@ replay across attempt directories. Fresh live preflight also passed with build
 36 and M2 still off. Actual arming, restart and postboot results require their
 separate receipts; none is established by these preparation checks.
 
+## Single build-36 M2 outcome and firmware fallback
+
+The executor armed the one-shot at 23:33:06 +0800 on 2026-11-13; independent
+readback completed at 23:33:31. The uniquely identified shutdown announced the
+second normal restart for 23:36:06. The existing startup ran with PhxAMDFB at
+23:36:33, adopted its queues and released the display at 23:36:42. Its monitor
+subsequently reported three WindowServer crashes or hangs and requested the
+existing fallback reboot. No initializer was manually replayed.
+
+Collection completed at 23:42:12. The original window ran from 23:33:05 to
+23:41:59, within its fifteen-minute bound. Its 124 raw rows include both the
+M2 and fallback boots and the collector's own audit row; those are not a single
+failure population. Exact sender-image UUID/path, boot and process grouping
+identified 37 RADV diagnostic samples, all on the failed M2 boot:
+
+| Operation | Samples | Original native result |
+| --- | ---: | --- |
+| GPU_MAP | 15 | `0xe00002d5`, Busy |
+| GPU_UNMAP | 10 | `0xe00002d5`, Busy |
+| BO_IMPORT_HOST | 12 | raw `0x00000002`, Mach protection failure |
+
+WindowServer accounts for 35 samples across four process lifetimes. Dock and
+SecurityAgent account for one MAP refusal each. The first WindowServer reached
+the per-process eight-sample cap for each operation; these are sampled records,
+not total failures or unique allocation requests. Later plugin messages also
+recorded command-buffer allocation returning `VkResult -2` and refused imported
+host pointers. A nearby plugin import message can follow a MAP failure as well
+as a host-import failure, so adjacency does not identify the native stage.
+There are no request IDs establishing one-to-one correspondence.
+
+Three new WindowServer reports were parsed using their JSON headers and bodies,
+capture times, boot identities, PIDs and loaded images. All belong to this M2
+boot and contain the expected RADV and plugin image identities. Crash reports
+redact the RADV directory; its exact path and UUID are independently present
+in the same boot/PID's unified records. The first
+faulted in `nvlog` called by `nvmtl_vk_cmd_begin`, with repeated SkyLight
+`RenderEncoder`/`SetScissor` frames and a stack-guard protection exception. This
+does not establish a defect in `nvlog`, nor is that exception the same event as
+a native host-import protection refusal. The other two reports aborted through
+CoreDisplay's `RunFullDisplayPipe` assertion path. Their capture times, rather
+than the later report filenames, were used for correlation. These stacks show
+failure consequences; they do not identify the queue-retirement branch.
+
+The new boot time is 23:37:53; startup history records PhxAMDFB absent and normal
+completion at 23:38:10. Kernel logs independently record the absent one-shot
+and retained firmware framebuffer on this fallback boot. Readbacks at 23:41:56
+and 23:50:55 verified build 36 and its exact packaged loaded Mach-O identity,
+IONDRVFramebuffer present, PhxAMDFB absent, zero display gates, no M2 NVRAM or
+markers, no pending shutdown/GPU helper and completed startup. Fixed runtime,
+plugin, driver, startup and recovery inputs, the full retained EFI backup and
+EFI identity/unmounted state passed verification. Only the expected generated
+per-boot address log differs. This fallback result is not desktop-acceleration
+acceptance or proof of recovery from a hard kernel/bus hang.
+
+### Kernel observation gap
+
+The primary capture contains zero verified `PhxAlloc: v1` records. A separate
+81-second query spanning the failing boot used case-insensitive diagnostic
+prefixes without sender restrictions and found no allocation diagnostic under
+another attribution. Another query removed all message-prefix restrictions:
+17,794 raw kernel rows became 8,743 after explicit timestamp, boot and process
+filtering. None matched the candidate UUID, sender path or diagnostic prefix.
+The 128 empty-message rows came from AppleACPIPlatform and IONVMeFamily, not the
+candidate. Query stderr was empty. The current-boot circular dmesg and bounded
+system.log check also yielded no candidate diagnostics; current dmesg cannot
+reconstruct the failed boot. An empty capture is not an idle/completed queue.
+
+The candidate's binary still contains its diagnostic format strings in
+`__TEXT,__cstring` and imports `IOLog`. Source-only review of Apple's public
+XNU revision `f6217f891ac0bb64f3d375211650a4c1ff8ca1ea`,
+`iokit/Kernel/IOLib.cpp` and `libkern/os/log.c`, found an additional possible
+observation failure: IOLog forwards the format and caller to unified logging;
+dynamic/fileset image resolution can reject an unresolved format address,
+non-text format or mismatched caller image before storing a unified record.
+This public revision has not been matched to the installed kernel, and no
+per-image resolution failure was measured on the target. It is a logging
+hypothesis to test, not an established explanation for the missing records.
+Repeatedly querying the same absent records cannot recover the missing fence
+observations.
+
+Within the reviewed driver source, UNMAP Busy leads to the retirement guard;
+MAP Busy additionally permits pending overlap. The raw import code is consistent
+with a propagated `prepare()` failure, rather than the explicit budget or
+descriptor-allocation results. Those are source-path deductions, not captured
+kernel stage records. This attempt cannot distinguish `retirement-pending`
+from `retirement-invalid`, read either queue's fence/progress values, or prove
+the host pages' origin and permissions. It does not establish VRAM exhaustion.
+
+The 43 actual-source CPU diagnostic cases were rerun with address/undefined
+sanitizers after collection and all passed. They do not validate target log
+persistence. No kernel source, installed binary, logging configuration, startup
+helper or recovery policy was changed by this follow-up. The sanitized record
+is [the build-36 postboot result](validation/allocation-kernel-build36-postboot-20261113.json).
+
+### Independent model review, 2026-11-14
+
+At the owner's request, Claude Code reviewed a sanitized evidence/source packet,
+then completed a short corrective review. Its tools, MCP servers and hooks were
+disabled. The initial response was incomplete, and both responses contained
+material factual errors: they invented observed pending/prepare-stage records
+despite the empty kernel capture, confused submission-time VMID binding with
+MAP, or overread recovery as evidence of undamaged hardware. Those claims were
+rejected against the retained logs and actual source. A proposed physical-segment
+probe before preparing pageable memory was also rejected; the SDK requires this
+virtual-range descriptor to be prepared before extracting its backing data.
+
+The useful source lead remains the API boundary: the existing VM guard can
+return Busy while retirement is below a context's last sequence; the Darwin
+GEM_VA wrapper does not wait/retry it, and RADV maps the VA failure to device
+memory failure. That source chain does not establish which branch occurred on
+the target. Neither model agreement nor its proposed page-permission diagnosis
+adds the missing fence, stage or page-origin observations. No reviewer proposal
+was installed or executed against the GPU.
+
 ## Next evidence required
 
-The newly authorized collection still needs candidate/source identity,
-the precise failing boot and process/image correlation, and a bounded capture
-of both `PhxAlloc: v1` and the installed RADV's native diagnostics, preserving
-the existing fallback. The prepared deployment/recovery plan and first
-firmware-boot readiness checks precede any new M2 attempt. Source changes alone
-do not authorize execution.
+Before another target reproduction, prepare and validate an observation path
+that does not depend solely on post-reboot unified-log persistence: retain
+bounded kernel messages while the failing boot is still running, or expose a
+bounded diagnostic snapshot for a passive collector. A proposed collector must
+be reviewed against the unchanged fallback and must prove that the candidate's
+records are readable; successful CPU formatting is insufficient. No new helper
+has been installed and no global logging/security setting was changed here.
+Any later installation or real M2 reproduction needs a new concrete execution
+scope; the completed one-shot must not be replayed or expanded into a retry.
 
 Validated-but-incomplete sequences alone cannot distinguish ordinary in-flight
 work from a hang. Repeated bounded observations and progress evidence would be
