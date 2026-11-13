@@ -1,0 +1,165 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "scope": "Same operator-controlled boot as target discovery; distinct checked baseline/PSP/firmware/IMU observations, then GFXOFF inhibition and a bounded VMID-only selector probe",
+  "hardware": "Radeon 780M, Ryzen 8845H",
+  "os": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "repository_at_test": "428fd8b4f6064dd03271307ac07926a271f7f349",
+  "deployed_kernel_source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+  "deployed_kernel_binary_sha256": "37f1d88a00ee3f2c865db170510278c2f16cba2c044219b181c9e5d06f7eb629",
+  "previous_target_mapping_reference": "ip-discovery-target-20261113.json",
+  "boot_identity_checks": {
+    "same_boot_as_discovery": true,
+    "private_plans_bound_to_boot_seconds_and_session_identity": true,
+    "full_boottime_string_not_used_for_identity": true,
+    "reason": "Clock adjustment changed the boottime microsecond field without a different boot; identity uses seconds plus the private boot session identifier"
+  },
+  "private_userspace_tools": {
+    "transport_source_commit": "853d43c1ab5d25e75b84ad1acabb5022d4445d11",
+    "standalone_configured_baseline": {
+      "fixed_GC_reads": 13,
+      "GPU_register_writes": 0,
+      "ASan_UBSan_cases_passed": 90,
+      "source_sha256": "c8d8752aa772fbdd09c69e04a732f18bcee324c279b7bd3b957c4f335a9e80cd",
+      "native_binary_sha256": "8bff68326b0aa7afffb103f48a10173c1d86a049f2b9f0c6d96b9a5d877e93b1",
+      "target_nonzero_GC_reads": 0
+    },
+    "phased_observer": {
+      "fixed_reads": 15,
+      "GC_reads": 13,
+      "positive_controls": [
+        "PSP initialization status",
+        "RCC memory size matched to checked geometry"
+      ],
+      "GPU_register_writes": 0,
+      "explicit_configured_and_TMR_ready_metadata_modes": true,
+      "bootstrap_metadata_unchanged_before_and_after_each_capture": true,
+      "ASan_UBSan_cases_passed": 205,
+      "source_sha256": "822218ae88039c2359f2c0dceef6082b32cc8a7fea790ee8a644d80fece53ca2",
+      "fixture_sha256": "67f7efc6cd190b0a60851f92a60a70411b889898b6cffd5fed8caa9ccbc50f8d",
+      "native_binary_sha256": "b117a154704eda934f16e608e4c4a16c41e952b7c29196fd6a25e227dde67e14"
+    },
+    "four_phase_controller": {
+      "mocked_state_and_failure_cases_passed": 16,
+      "ordered_stages": ["baseline", "psp", "firmware", "power"],
+      "selector_or_later_stage_implemented": false
+    },
+    "access_controller": {
+      "mocked_state_transport_and_failure_cases_passed_after_output_fix": 89,
+      "source_sha256": "dd717dbf023294826ef2433e8aca0b3a3eafc222962f4179b16fca1202c380ce",
+      "fixture_sha256": "dca9d9c578b37ad95f89a527ac293b7ec59d983cebfc93fa679def60b65ea17e",
+      "real_GPU_or_helpers_executed_by_mocked_tests": false,
+      "stages": ["inhibit", "VMID-only selector"],
+      "normal_observer_diagnostic_requires_exact_private_pinned_match": true,
+      "unexpected_diagnostic_or_nonzero_exit_rejected": true,
+      "same_plan_replay_or_continuation_after_fault_refused": true,
+      "installed_phxctl_close_status_reported": false
+    },
+    "native_Intel_IOKit_observers_compiled_locally": true,
+    "kernel_built_locally": false,
+    "userspace_tools_installed_or_published": false
+  },
+  "ordered_target_observations": [
+    {
+      "phase": "baseline",
+      "positive_controls_valid": true,
+      "nonzero_GC_reads_of_13": 0,
+      "CP_RLC_readiness_observed": false,
+      "selector_writes": 0
+    },
+    {
+      "phase": "PSP_TOC_TMR",
+      "checked_sequence_and_readbacks_passed": true,
+      "positive_controls_valid": true,
+      "nonzero_GC_reads_of_13": 0,
+      "CP_RLC_readiness_observed": false,
+      "selector_writes": 0
+    },
+    {
+      "phase": "firmware_and_RLC_autoload",
+      "firmware_loads_acknowledged": 17,
+      "RLC_autoload_acknowledged": true,
+      "positive_controls_valid": true,
+      "nonzero_GC_reads_of_13": 1,
+      "only_nonzero_GC_field": "IMU scratch",
+      "CP_RLC_readiness_observed": false,
+      "selector_writes": 0
+    },
+    {
+      "phase": "IMU_power",
+      "SMU_driver_interface": 8,
+      "EnableGfxImu_argument": 1,
+      "EnableGfxImu_acknowledged": true,
+      "positive_controls_valid": true,
+      "nonzero_GC_reads_of_13": 9,
+      "CP_RLC_readiness_observed": true,
+      "RLC_enabled_bit_asserted": true,
+      "RLC_boot_complete_observed": true,
+      "named_GFX_POWER_STATUS_bit_asserted": true,
+      "named_GFX_CLOCK_STATUS_bit_asserted": true,
+      "named_GFX_PIPELINE_POWER_STATUS_bit_asserted": true,
+      "selector_writes": 0
+    }
+  ],
+  "software_output_validation_stop": {
+    "native_observer_completed_successfully": true,
+    "GPU_register_writes": 0,
+    "normal_layout_diagnostic_mistakenly_rejected": true,
+    "SMU_or_selector_command_reached": false,
+    "original_attempt_and_tool_sources_preserved_privately": true,
+    "recovery": "A distinct reviewed plan followed an exact-output fix and new mocked cases; the previous completed read-only capture and absence of any SMU/selector attempt were pinned and rechecked. No terminal GPU fault was retried."
+  },
+  "GFXOFF_inhibit_observation": {
+    "DisallowGfxOff_message": 26,
+    "argument": 0,
+    "acknowledged": true,
+    "all_15_fixed_register_values_identical_before_and_after": true,
+    "nonzero_GC_reads_of_13_before_and_after": 9,
+    "CP_RLC_readiness_and_named_power_clock_flags_retained": true,
+    "GFXOFF_hardware_exit_independently_verified": false,
+    "selector_writes_during_inhibit_observation": 0
+  },
+  "VMID_only_selector_probe": {
+    "readiness_positive_controls_named_power_flags_and_idle_checked_first": true,
+    "VMID_field_requested": 1,
+    "MEID_PIPEID_QUEUEID_fields_requested": 0,
+    "expected_encoded_selection": 16,
+    "kernel_immediate_write_readback": 0,
+    "subsequent_readback": 0,
+    "selector_writes_issued": 1,
+    "idle_restoration_attempted": false,
+    "post_failure_GPU_register_writes": 0,
+    "status": "stopped",
+    "same_boot_retry_permitted": false
+  },
+  "interpretation": {
+    "GC_reads_remained_globally_zero_after_IMU": false,
+    "failure_seen_for_a_selector_value_other_than_the_previous_ME3_value": true,
+    "MEID_only_failure_established": false,
+    "all_selector_fields_or_all_GC_writes_known_to_fail": false,
+    "all_power_or_access_causes_eliminated": false,
+    "write_only_semantics_established": false,
+    "root_cause_or_fix_established": false
+  },
+  "guards_and_limits_after_stop": {
+    "candidate_identity_profile_geometry_and_startup_guards_rechecked": true,
+    "installed_stack_hashes_rechecked": true,
+    "automatic_GPU_initialization_blocked": true,
+    "experimental_display_not_armed": true,
+    "framebuffer": "IONDRVFramebuffer",
+    "pending_initialization": false,
+    "GART_MES_reset_activation_or_queue_executed_this_boot": false,
+    "shader_adoption_claim_or_display_takeover_executed": false,
+    "automatic_restart": false,
+    "kernel_installed_helpers_or_EFI_replaced": false,
+    "private_session_manifests_and_rollback_notes_saved": true,
+    "stop_guard_added_to_parent_private_phase_session": true,
+    "raw_logs_register_snapshots_addresses_layouts_boot_identity_EFI_or_firmware_published": false,
+    "GPU_Metal_or_desktop_acceleration_verified": false,
+    "EDID_dimensions_fixed_or_verified": false
+  },
+  "next_step": "Offline review of the GC access path and initialization prerequisites. No further target GPU writes or initialization on this stopped boot; any later target experiment requires a distinct reviewed bounded plan and a manual boot. Keep the mapping constants and selector readback guards."
+}

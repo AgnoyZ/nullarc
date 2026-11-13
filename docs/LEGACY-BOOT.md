@@ -178,5 +178,18 @@ on 2026-11-13, without repeating initialization; see
 The bounded private capture and offline table checks passed. All target GC,
 MMHUB and OSSSYS bases compared match the existing reference constants, including
 both direct GC segment macros. This does not establish selector access or
-power/clock readiness, and no further initialization followed. Acceleration
-and display dimensions remain unresolved.
+power/clock readiness; no further initialization had followed at the capture
+checkpoint. The subsequent same-boot staged observation is recorded in
+[`validation/gc-power-selector-target-20261113.json`](validation/gc-power-selector-target-20261113.json).
+PSP/TMR, seventeen firmware loads, RLC autoload and IMU passed. Fixed GC reads
+changed from all zero before initialization to nine nonzero fields after IMU,
+with positive controls, CP/RLC readiness and named power/clock flags checked.
+An acknowledged DisallowGfxOff request left the fifteen fixed observations
+unchanged. A bounded VMID-only selection then failed immediately and
+subsequently with zero readback, before GART or MES. It stopped after that
+first selector write, without restoration or later GPU writes. This boot is
+terminal for further initialization. Neither the selector cause nor a complete
+GFXOFF exit is established; keep the bases and readback guards intact. See
+`MES-START.md` for the software-output validation correction, test coverage and
+limits. Startup/display protections remain active. Acceleration and display
+dimensions remain unresolved.

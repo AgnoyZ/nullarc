@@ -192,7 +192,8 @@ once before any PSP/firmware/power initialization. Its configured-only snapshot,
 firmware-ready and memory-size gates passed. The bounded memory-window read
 completed with a private 10 KiB output; only MM_INDEX/MM_INDEX_HI address
 selectors were written. No VRAM data, power, GART, MES, queue or display writes
-were made. No further GPU register writes or initialization followed.
+were made. No further GPU register writes or initialization had followed at
+that capture-only checkpoint; the subsequent stages are recorded below.
 
 Offline validation accepted binary version 1.1, a 1,212-byte declared envelope,
 all three present table checksums, and an IP discovery version 3 table with
@@ -218,3 +219,68 @@ IONDRVFramebuffer. Acceleration and EDID dimensions remain unresolved. The
 sanitized evidence is `validation/ip-discovery-target-20261113.json`; raw data,
 addresses, layouts, EFI and firmware remain private. No kext or installed
 helper was changed.
+
+## Same-boot staged power and VMID observations, 2026-11-13
+
+After discovery, a separately reviewed private plan observed the existing
+checked PSP/firmware/IMU stages without GART or MES. Before initialization, a
+standalone zero-write observer read thirteen fixed GC registers, all zero.
+A second observer added PSP-initialization and memory-size positive controls,
+validated explicit configured/TMR-ready metadata, and required unchanged
+bootstrap metadata around every capture. Both positive controls passed at all
+four stages:
+
+| Completed stage | Nonzero GC fields of 13 | CP/RLC readiness observed |
+| --- | ---: | --- |
+| Configured-only baseline | 0 | No |
+| Checked PSP/TOC/TMR | 0 | No |
+| Seventeen firmware loads and RLC autoload | 1 (IMU scratch) | No |
+| Acknowledged EnableGfxImu | 9 | Yes |
+
+After IMU, the named RLC GFX power, clock and pipeline-power status bits were
+asserted, RLC was enabled and boot completion was observed. GC reads therefore
+do not remain globally zero after this initialization. These observations do
+not prove complete GFXOFF exit or eliminate every power/access condition.
+
+The first access-controller attempt stopped after a successful read-only
+snapshot because it incorrectly rejected the observer's normal layout message
+on stderr. No SMU or selector command was reached. Its sources, logs and
+terminal state were retained. A distinct plan pinned that completed capture
+and absence of GPU writes, then used a corrected exact diagnostic comparison;
+unexpected output and nonzero exits still fail. This was a software validation
+recovery, not a retry after a GPU failure.
+
+The subsequent single DisallowGfxOff request was acknowledged. All fifteen
+fixed register values were identical before and after it, with nine nonzero
+GC fields and the readiness/power checks retained. This is still not an
+independent hardware GFXOFF-exit measurement.
+
+The separately invoked VMID-only probe first rechecked positive controls,
+readiness, named power flags and idle selection. It wrote VMID 1 with MEID,
+PIPEID and QUEUEID zero (encoded selection `0x10`). The kernel's immediate
+readback and subsequent read were both zero. It stopped on this first
+selection, without an idle-restoration write or a later-stage command. The
+failure is thus also observed for a value other than the earlier ME3 selection;
+it does not establish that every field or every GC write fails. Do not assume
+write-only semantics, change the independently matched bases, or remove guards.
+
+The standalone and phased observers passed 90 and 205 ASan/UBSan cases
+respectively and compiled as private Intel IOKit userspace programs. The
+four-stage controller passed 16 mocked state/failure cases; the corrected access
+controller passed 89 mocked state, output and failure cases. These tests do not
+execute the real GPU. The installed CLI used for the SMU/selector calls does not
+report its service-close result; its checked transport/readback observations
+do not establish exclusive ownership or a complete hardware-state proof.
+
+The current boot is initialized and terminal for further GPU writes. A private
+stop record also blocks the parent phase workflow. Startup acceptance and
+installed-stack hashes were checked before the access test; those hashes,
+startup guards, candidate/profile/geometry and IONDRVFramebuffer were rechecked
+after the stop.
+There was no GART, MES reset/activation, queue, shader, adoption, claim or display
+takeover on this boot, and no kext, installed helper or EFI replacement. Private
+session manifests and Chinese next-step/rollback notes are saved. Continue
+offline source analysis before preparing another bounded manual-boot test.
+Acceleration and EDID dimensions remain unresolved. Sanitized evidence is
+`validation/gc-power-selector-target-20261113.json`; raw captures and identities
+remain private.
