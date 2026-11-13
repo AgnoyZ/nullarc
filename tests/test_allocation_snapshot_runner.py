@@ -31,6 +31,8 @@ class AllocationSnapshotTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'output exists'): exercise(Path(temp))
 
     def test_workflow_and_read_only_client_contract(self):
+        # Optional diagnostics must not add a dependency to isolated legacy ABI fixtures.
+        self.assertNotIn('PhxAllocationSnapshot.h', (ROOT / 'src/phxbringup/PhxNativeABI.h').read_text())
         for name in ('build.yml', 'kernel-compile-check.yml'):
             self.assertIn('python3 tools/test_allocation_snapshot.py', (ROOT / '.github/workflows' / name).read_text())
         source = (ROOT / 'tools/allocation_snapshot.cpp').read_text()

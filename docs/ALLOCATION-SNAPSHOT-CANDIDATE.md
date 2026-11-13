@@ -99,6 +99,17 @@ no binaries. Local native driver builds, installation and target execution
 are outside this source change. Hosted results are recorded separately after
 the exact committed candidate is tested.
 
+The first source commit, `925fd1d`, passed the scoped hosted kernel/reader
+compile in run `43462656741`. Its automatically triggered priority workflow
+`43462507687` passed the Ubuntu host-contract job but failed the Intel isolated
+wait-model fixture: the new optional header had been included transitively by
+the base ABI header, while that fixture copied only the old ABI dependencies.
+The correction removes that unnecessary include and includes the optional
+header directly in the dispatcher test. The base ABI header is byte-identical
+to the pre-candidate version. This is an include-dependency repair, not a GPU
+behavior change. The cancelled automatic full-stack run `43462507811` is not
+a full-stack build pass. Corrected-commit results are recorded separately.
+
 The consumed build-36 M2/reboot grants are not reusable. This candidate does
 not authorize arming, startup changes, installation, initialization, GPU work,
 desktop takeover or another reboot. Existing safety gates, budgets, pin

@@ -48,6 +48,7 @@ def exercise(out):
     result['actual_dispatcher_SHA256'] = hashlib.sha256(method.encode()).hexdigest()
     result['actual_latch_declaration_SHA256'] = hashlib.sha256(state.encode()).hexdigest()
     inputs = [source, ROOT / 'src/phxbringup/PhxNativeABI.h',
+              ROOT / 'src/phxbringup/PhxAllocationSnapshot.h',
               ROOT / 'src/phxbringup/PhxBootMemory.h', ROOT / 'src/phxbringup/PhxPspLayout.h',
               ROOT / 'src/amd/phx_topology.h', ROOT / 'tests/test_submit_diagnostic.cpp']
     result['inputs_SHA256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()

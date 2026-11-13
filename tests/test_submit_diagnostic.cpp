@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "PhxNativeABI.h"
+#include "PhxAllocationSnapshot.h"
 #include "PhxBootMemory.h"
 
 using IOReturn = uint32_t;
