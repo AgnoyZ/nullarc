@@ -111,3 +111,14 @@ Primary API sources consulted at Khronos Vulkan-Docs tag `v1.4.363` on
 
 - Khronos, [command-buffer submission](https://github.com/KhronosGroup/Vulkan-Docs/blob/v1.4.363/chapters/cmdbuffers.adoc), `vkQueueSubmit` failure requirements.
 - Khronos, [memory](https://github.com/KhronosGroup/Vulkan-Docs/blob/v1.4.363/chapters/memory.adoc), `VkPhysicalDeviceMemoryBudgetPropertiesEXT` process estimates.
+
+## Later build-35 startup checkpoint
+
+The separate first-native-submit diagnostic was subsequently built, staged
+and verified loaded. Its first initialization attempt remained unfinished;
+the owner reports manually restarting after observing the machine stuck.
+The next boot then invoked the existing protective stop. This later event
+must not be conflated with the earlier WindowServer-triggered display
+fallback above. NMXAccel is absent on this protective boot. See
+[the postboot record](validation/native-submit-build35-postboot-20261113.json)
+and [the diagnostic follow-up](NATIVE-SUBMIT-DIAGNOSTIC.md#postboot-investigation-initialization-stopped).

@@ -1,7 +1,11 @@
 # First native-submit refusal diagnostic
 
 Source candidate, 2026-11-13. Subsequently staged to the actual target EFI
-under administrator authorization; not yet loaded or target-accepted.
+under administrator authorization and verified loaded as build 35. The first
+startup initialization did not complete; the owner reports a manual restart
+after observing it stuck. The next boot disabled initialization through the
+existing protection. Hardware acceptance remains failed/pending; see the
+[postboot checkpoint](validation/native-submit-build35-postboot-20261113.json).
 
 The failed desktop boot logged `VK_ERROR_DEVICE_LOST`, but the pinned RADV
 queue layer can convert several distinct failures to that result. Known native
@@ -119,7 +123,7 @@ preserved. PhxAccel was not replaced. The source difference from the
 installed PhxBringup baseline is only the diagnostic latch/log and build
 number. See [the target staging record](validation/native-submit-build35-deployment-20261113.json).
 
-At the deployment checkpoint, the current kernel was still build 34 and
+At the historical deployment checkpoint, the current kernel was still build 34 and
 the partition was unmounted. A single user-controlled normal reboot is
 required to load the candidate. Keep M2 off and the firmware framebuffer
 policy intact; do not re-enable the failed desktop takeover. The prepared
@@ -139,3 +143,64 @@ the uncertain in-flight resources and stop at the first failure or timeout.
 This candidate does not deploy the separate RADV cleanup-order fix. A
 two-kext artifact does not contain that userspace library. Neither candidate
 accepts desktop acceleration or corrects the 42-inch display-size report.
+
+## Postboot investigation: initialization stopped
+
+Read-only inspection on 2026-11-13 verified build 35 and an exact match between
+the loaded PhxBringup binary identity and the candidate. PhxAccel is loaded,
+but the current boot has no NMXAccel service and no PhxAMDFB. IONDRVFramebuffer
+remains present. The three accelerator display sysctls are unregistered
+(`unknown oid`), not registered values of zero. M2 and the framebuffer NVRAM
+arming remain absent.
+
+The private startup log establishes this sequence, in UTC+08:00:
+
+- At 15:01:52, initialization began with PhxAMDFB off the panel. No completion
+  entry was retained for that attempt.
+- The owner subsequently confirmed that the machine appeared stuck and they
+  manually restarted it. This is owner-reported manual intervention, not
+  evidence that a watchdog automatically recovered the machine.
+- At 15:05:07, the next startup detected the unfinished attempt, created the
+  persistent stop marker and removed the pending marker. This protective
+  stop is distinct from the preceding manual restart.
+
+The firmware-load log was modified at 15:01:54 and contains 17 load responses,
+all with zero IOReturn and zero PSP status. These responses show that those
+requests returned reported success; they do not establish later RLC autoload,
+SMU power-up, MES/queue readiness, completed GPU work or desktop acceleration.
+The retained output does not identify the exact stage where initialization
+stopped. The startup pipeline filters/buffers output, so missing compute or
+graphics lines cannot establish that those stages were never entered.
+
+Bounded unified-log extraction was parsed using timezone-aware timestamps
+and separated by boot identity. Of 14,581 returned kernel records, 1,328 were
+outside the requested interval and excluded. The retained set contains 622
+records from the previous working boot, 3,512 from the unfinished attempt and
+9,119 from the protective boot. These boot groups were kept separate. No
+first-native-submit refusal was recovered from either new boot. Missing
+messages do not exclude a native failure; this diagnostic also does not
+instrument every legacy firmware/power/queue initialization step.
+
+The relevant readable report inventory found a shutdown-stall report from
+the earlier working boot's shutdown, before the unfinished attempt began.
+No later matching report was observed in the scanned readable directories;
+one legacy report directory was absent or inaccessible. No NVRAM panic-info
+variable was available. Neither observation proves there was no panic. A
+loginwindow historical-panic preference and the scripts' existing timed
+restart commands do not override the owner's report or identify the hang.
+
+Readback matched 53 of the 55 installed-stack entries against the deployment
+baseline, with no unreadable entries. The two changed files were startup
+runtime outputs: the application allowlist now contains the built-in-tools
+policy, and the firmware-address log contains the new attempt's responses.
+Installed kexts, plugins, libraries, firmware and startup helper bytes were
+unchanged. Do not describe all 55 entries as unchanged after startup.
+
+The agent performed no initialization replay, new GPU workload, display
+arming, driver replacement, EFI operation or reboot during this inspection.
+The stop marker is preserved. The next useful diagnostic is a reviewed way
+to retain individual initialization-stage results before any separate
+hardware session; clearing protection and repeating the same opaque boot
+is not an accepted next step. Desktop acceleration and physical display
+size remain unresolved. Earlier source, artifact and deployment JSONs are
+historical checkpoints and have not been rewritten.

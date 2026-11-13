@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "timezone": "UTC+08:00",
+  "candidate_source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+  "deployment_checkpoint": "native-submit-build35-deployment-20261113.json",
+  "scope": "Read-only postboot investigation after owner-reported stuck initialization and manual restart; preserve the existing protective stop",
+  "target": {
+    "hardware": "Radeon 780M, Ryzen 8845H",
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "current_boot": {
+    "started_local": "2026-11-13T15:04:59+08:00",
+    "PhxBringup_build": 35,
+    "loaded_binary_identity_matches_pinned_candidate": true,
+    "PhxAccel_kext_loaded": true,
+    "PhxAccel_replaced_during_build35_deployment": false,
+    "NMXAccel_service_count": 0,
+    "PhxAMDFB_service_count": 0,
+    "IONDRVFramebuffer_service_count": 1,
+    "accelerator_display_sysctls": {
+      "debug.nvaccelfb": "unknown oid",
+      "debug.nvaccel_iop": "unknown oid",
+      "debug.nvaccel_iop_ok": "unknown oid"
+    },
+    "missing_sysctls_interpreted_as_zero": false,
+    "protective_stop_marker_present": true,
+    "protective_stop_marker_created_local": "2026-11-13T15:05:07+08:00",
+    "M2_marker_present": false,
+    "initialization_pending_marker_present": false,
+    "framebuffer_NVRAM_arming_present": false,
+    "pending_GPU_initialization_or_shutdown_process_observed": false
+  },
+  "unfinished_attempt": {
+    "startup_log_entry_local": "2026-11-13T15:01:52+08:00",
+    "PhxAMDFB_on_panel": false,
+    "completion_entry_retained": false,
+    "owner_reported_machine_stuck": true,
+    "restart_initiator": "owner-reported manual restart after observing the machine stuck",
+    "automatic_watchdog_recovery_established": false,
+    "exact_hang_stage_established": false,
+    "hang_cause_established": false,
+    "subsequent_boot_protective_stop_confirmed_by_startup_log": true,
+    "existing_timed_restart_commands_are_proof_of_this_restart_cause": false,
+    "buffered_pipeline_missing_lines_prove_unexecuted_stages": false
+  },
+  "firmware_response_log": {
+    "modified_local": "2026-11-13T15:01:54+08:00",
+    "load_response_count": 17,
+    "all_responses_parsed": true,
+    "all_reported_IOKit_returns_zero": true,
+    "all_reported_PSP_statuses_zero": true,
+    "later_autoload_SMU_MES_queue_or_GPU_execution_success_established": false,
+    "raw_addresses_or_log_published": false
+  },
+  "unified_kernel_capture": {
+    "requested_start_local": "2026-11-13T15:00:30+08:00",
+    "requested_end_exclusive_local": "2026-11-13T15:08:00+08:00",
+    "command_completed_without_timeout": true,
+    "raw_returned_records": 14581,
+    "timestamp_parse_failures_after_format_normalization": 0,
+    "out_of_window_records_excluded": 1328,
+    "baseline_boot_records": 622,
+    "unfinished_attempt_records": 3512,
+    "protective_boot_records": 9119,
+    "aware_timestamps_and_private_boot_identities_used": true,
+    "boot_groups_kept_separate": true,
+    "first_native_submit_refusal_recovered": false,
+    "missing_message_excludes_native_failure": false,
+    "native_submission_diagnostic_covers_every_legacy_initialization_step": false,
+    "raw_logs_or_boot_identifiers_published": false
+  },
+  "restart_evidence_limits": {
+    "readable_report_inventory_included_recursive_errors": true,
+    "matching_report_since_window_start": "Shutdown stall before the unfinished boot began; belongs to the baseline boot shutdown",
+    "later_matching_report_observed_in_scanned_directories": false,
+    "legacy_report_directory_absent_or_inaccessible": true,
+    "NVRAM_panic_info_present": false,
+    "historical_loginwindow_panic_preference_proves_a_new_panic": false,
+    "absence_of_report_or_NVRAM_variable_excludes_panic": false,
+    "kernel_panic_or_watchdog_identified_as_hang_cause": false
+  },
+  "installed_stack_readback": {
+    "baseline_entries": 55,
+    "entries_matched": 53,
+    "unreadable_entries": 0,
+    "changed_runtime_outputs": [
+      "application allowlist: built-in-tools policy",
+      "firmware-address log: new initialization responses"
+    ],
+    "installed_kext_plugin_library_firmware_and_helper_bytes_unchanged": true,
+    "all_55_entries_claimed_unchanged_after_startup": false
+  },
+  "preservation_and_acceptance": {
+    "agent_replayed_initialization": false,
+    "agent_submitted_new_GPU_work": false,
+    "agent_cleared_protection_or_armed_M2": false,
+    "agent_replaced_driver_or_userspace": false,
+    "agent_changed_EFI_NVRAM_BIOS_partitions_or_security": false,
+    "agent_created_watchdog_or_rebooted": false,
+    "pinned_deployment_helper_or_plan_modified": false,
+    "separate_read_only_collector_handles_missing_sysctls": true,
+    "raw_logs_UUIDs_addresses_personal_configs_or_backups_published": false,
+    "candidate_loaded": true,
+    "candidate_hardware_accepted": false,
+    "desktop_acceleration_accepted": false,
+    "physical_display_size_corrected": false,
+    "next_step": "Keep protection in place; prepare and review durable per-stage initialization capture before considering any separate hardware test"
+  }
+}
