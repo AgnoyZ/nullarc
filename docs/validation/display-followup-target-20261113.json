@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "repository_source_commit": "4f35a609331752d5e2dcac24f8b878d32aa6f309",
+  "scope": "Read-only failed-display-boot investigation and metadata-only query on the working fallback; no new acceleration acceptance",
+  "target": {
+    "hardware": "Radeon 780M, Ryzen 8845H",
+    "PCI_vendor": "1002",
+    "PCI_device": "1900",
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "failed_boot_kernel_log": {
+    "filtered_by_aware_incident_timestamps": true,
+    "filtered_by_kernel_process_image": true,
+    "filtered_by_private_crash_boot_identity": true,
+    "raw_time_range_query_contained_out_of_window_and_other_boot_records": true,
+    "final_record_count": 1533,
+    "observed_handle_exhaustion_messages": 0,
+    "observed_kernel_map_space_failure_messages": 0,
+    "observed_driver_GPU_fault_or_timeout_messages": 0,
+    "absence_of_messages_excludes_these_causes": false,
+    "current_boot_counters_substituted_for_failed_boot_counters": false
+  },
+  "native_ABI_metadata_query": {
+    "selectors_allowed": [0, 1],
+    "GPU_work_submitted": false,
+    "abi_major": 1,
+    "abi_minor": 12,
+    "kext_build": 34,
+    "visible_total_bytes": 268435456,
+    "hidden_total_bytes": 1610612736,
+    "GTT_cap_bytes": 536870912,
+    "max_BOs": 4096,
+    "values_are_per_client_software_limits_not_measured_physical_VRAM": true,
+    "fresh_query_client_usage_is_WindowServer_usage": false
+  },
+  "installed_RADV_metadata_query": {
+    "installed_library_SHA256": "1f2181d1183fa95f33eb3f626c96aa27fa242e4e96c49f6785fa7e53ee128f78",
+    "header_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+    "header_version": "1.4.363",
+    "header_checkout_revision_and_clean_state_verified": true,
+    "private_probe_binary_SHA256": "b6c44641aa4e010b6c567b390187dd04bb2068fa8af8dbb84678d32b52555dd8",
+    "direct_loaded_installed_RADV_without_alternate_loader": true,
+    "unique_physical_device_checked_against_PCI_vendor_and_device": true,
+    "mock_or_alternate_device_environment_removed": true,
+    "bounded_attempt_count": 1,
+    "timeout_seconds": 20,
+    "exit_code": 0,
+    "VkDevice_created": false,
+    "command_pool_created": false,
+    "explicit_Vulkan_device_memory_allocation_called": false,
+    "GPU_work_submitted": false,
+    "memory_budget_extension_present": true,
+    "heaps": [
+      {
+        "index": 0,
+        "size_bytes": 268435456,
+        "device_local": false,
+        "reported_budget_bytes": 268435456,
+        "reported_query_process_usage_bytes": 0
+      },
+      {
+        "index": 1,
+        "size_bytes": 536870912,
+        "device_local": true,
+        "reported_budget_bytes": 536870912,
+        "reported_query_process_usage_bytes": 0
+      }
+    ],
+    "memory_type_count": 17,
+    "reported_heap_sizes_consistent_with_reviewed_APU_two_thirds_rule": true,
+    "ABI_discrepancy_established": false,
+    "global_VRAM_exhaustion_established": false,
+    "allocation_success_or_acceleration_established": false,
+    "boot_and_startup_marker_state_unchanged": true
+  },
+  "pinned_source_audit": {
+    "Mesa_commit": "f5cb8ee032adabef599ae892ec4e42d796b84da9",
+    "Cobalt_commit": "d6c9aedf8e6526a39e349b5886cbc8c7ddf77f65",
+    "Phoenix_patch_source_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+    "Cobalt_patch_count": 9,
+    "Phoenix_patch_count": 7,
+    "native_only_downstream_patch_in_adapter_reconstruction": true,
+    "partial_Mesa_files": [
+      "src/amd/vulkan/radv_queue.c",
+      "src/amd/vulkan/winsys/amdgpu/radv_amdgpu_cs.c",
+      "src/amd/vulkan/radv_physical_device.c"
+    ],
+    "retrieved_files_Git_blob_and_size_verified": true,
+    "applicable_patch_receipts_verified_in_isolated_private_repository": true,
+    "full_Mesa_build_performed_locally": false,
+    "exact_installed_source_commits_or_patch_sets_established": false,
+    "recognized_native_errors_usually_mapped_without_default_trace": true,
+    "CS_can_fail_before_native_submit_or_during_signal_attachment": true,
+    "winsys_maps_unrecognized_submission_errno_to_VK_ERROR_UNKNOWN": true,
+    "outer_queue_maps_non_success_to_device_lost": true,
+    "high_level_device_lost_alone_proves_hardware_hang": false,
+    "exact_incident_native_refusal_recovered": false,
+    "pending_resource_guard_identified_as_actual_incident_cause": false,
+    "pending_resource_or_queue_guards_weakened": false
+  },
+  "native_CI_checkpoint": {
+    "run_id": 43370193766,
+    "source_commit": "4f35a609331752d5e2dcac24f8b878d32aa6f309",
+    "source_tests": "success",
+    "macos_kexts": "in_progress",
+    "active_step": "Compile, link, sign and test kernel, Metal, translator and RADV",
+    "runner": "macos-15-intel",
+    "native_completion_verified": false,
+    "hardware_executed_by_CI": false
+  },
+  "preservation_and_limits": {
+    "installed_driver_library_helper_or_startup_switch_changed": false,
+    "EFI_NVRAM_BIOS_partition_or_security_setting_changed": false,
+    "agent_rearmed_M2_replayed_initialization_or_rebooted": false,
+    "new_watchdog_created": false,
+    "raw_crashes_logs_UUIDs_addresses_layouts_or_personal_paths_published": false,
+    "runtime_or_diagnostic_binary_uploaded": false,
+    "new_kernel_or_userspace_fix_installed": false,
+    "current_fallback_boot_compute_retested": false,
+    "desktop_acceleration_accepted": false,
+    "physical_display_size_corrected": false,
+    "next_step": "Review native build completion and candidate provenance, then prepare a bounded pre-conversion submission-error capture before any separate hardware test"
+  }
+}

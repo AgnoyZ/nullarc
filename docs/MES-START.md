@@ -360,3 +360,11 @@ RADV command-stream failure cleanup; another process logged
 patch has bounded CPU tests, not native-runtime or GPU acceptance. Do not rearm
 display takeover, replay initialization or treat this as acceptance of the
 guarded MES workflow. See `validation/display-postboot-target-20261113.json`.
+
+The read-only follow-up found that the pinned RADV queue layer converts
+different submission failures into device loss; the exact original native
+refusal remains unknown. A metadata-only query on the fallback boot reports
+256 MiB ordinary and 512 MiB device-local heaps, consistent with the reviewed
+APU split, not evidence of global VRAM exhaustion. Keep the fallback state;
+see `DISPLAY-FAILURE-20261113.md` and
+`validation/display-followup-target-20261113.json` for source/provenance limits.
