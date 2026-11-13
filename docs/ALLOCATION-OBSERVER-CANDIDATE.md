@@ -120,5 +120,28 @@ initialization, GPU work, startup change or reboot.
 The local focused pass on 2026-11-14 completed 23 observer tests, including the
 temporary-directory native kqueue case, and all 21 existing capture tests.
 The five executable/test/workflow input hashes remained unchanged during that
-pass. Clean-commit and hosted verification are recorded after synchronization;
-these focused results alone are not a full-suite pass.
+pass. These focused results alone are not a full-suite pass.
+
+## Verified committed source, 2026-11-14
+
+Source commit **`25510a8321d45b8223883987c9145652517b4939`** passed all
+**465 Python tests** in a clean committed checkout. All five recorded input
+hashes remained unchanged, and the checkout was clean afterward. The existing
+driver, ABI, standalone reader, capture helper and boot sources are unchanged.
+The installed monitor's privately retained hash also remained unchanged.
+
+Manual run **`43474284672`, attempt 1**, passed both jobs. Intel macOS job
+`132053964441` passed 21 capture and all 23 observer tests, including the
+temporary-directory native notification case. Ubuntu job `132053964198`
+passed 21 capture tests and reported 23 observer cases: 22 passed and the
+single native kqueue case was explicitly skipped. Both source-integrity steps
+passed and the artifact count is zero. The cancelled automatic full-stack run
+`43474132251` is not a driver-build pass.
+
+The source commit's ref/tree/parent were verified through GitHub's Git API,
+and all five changed files were independently downloaded as blobs and matched
+local bytes. The [machine-readable validation record](validation/allocation-observer-20261114.json)
+retains source identity, input hashes, counts, jobs and evidence limits.
+These checks validate source contracts and temporary-file/process behavior;
+they do not establish actual startup ordering, pre-fallback capture, GPU
+causation, hardware recovery or the allocation root cause.

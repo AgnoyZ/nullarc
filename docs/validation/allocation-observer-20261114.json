@@ -1,0 +1,91 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "subject": "Uninstalled independent report-triggered allocation observer source candidate",
+  "source_commit": "25510a8321d45b8223883987c9145652517b4939",
+  "source_parent": "d666d966682118679544723b8bfe477657afde86",
+  "snapshot_candidate_build": 37,
+  "source_inputs_sha256": {
+    "tools/allocation_observer.py": "2601c9e8a88bf686f8f779b57948ebd18e49c913a2308d75838666e0498925a3",
+    "tests/test_allocation_observer.py": "669f91f9afa2a53232afb265f87701634a83d523a3bbdd636061dd52edc88836",
+    ".github/workflows/allocation-capture-check.yml": "9c88d0bae32d02d750109d8a495a2c264d7444b29b085783dfb2b266ca0aa68e",
+    "tools/allocation_capture.py": "5388b0c1a4f91c315451628ed44257907f56e30e7ccf5afc088bd97922c5d328",
+    "tests/test_allocation_capture.py": "92e913f366ddce2b03590d52bbe21cdfa18e560bf5b2aa7bac5af816406db731"
+  },
+  "local": {
+    "focused_observer_tests": 23,
+    "focused_capture_tests": 21,
+    "focused_result": "success",
+    "native_notification_case": "temporary directory only",
+    "clean_committed_python_tests": 465,
+    "clean_committed_python_seconds": 184.799,
+    "clean_committed_result": "success",
+    "source_inputs_unchanged_during_tests": true,
+    "checkout_clean_before_and_after": true
+  },
+  "hosted": {
+    "workflow": ".github/workflows/allocation-capture-check.yml",
+    "run_id": 43474284672,
+    "attempt": 1,
+    "head_sha": "25510a8321d45b8223883987c9145652517b4939",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "job_id": 132053964441,
+        "host": "macos-15-intel",
+        "capture_tests_passed": 21,
+        "observer_cases_reported": 23,
+        "observer_tests_passed": 23,
+        "observer_tests_skipped": 0,
+        "native_notification_case": "passed on temporary directory",
+        "source_integrity": "success",
+        "conclusion": "success"
+      },
+      {
+        "job_id": 132053964198,
+        "host": "ubuntu-24.04",
+        "capture_tests_passed": 21,
+        "observer_cases_reported": 23,
+        "observer_tests_passed": 22,
+        "observer_tests_skipped": 1,
+        "native_notification_case": "explicitly skipped; no kqueue",
+        "source_integrity": "success",
+        "conclusion": "success"
+      }
+    ],
+    "artifact_count": 0,
+    "native_driver_compilation": false,
+    "target_service_opened": false,
+    "automatic_full_stack_run": {
+      "run_id": 43474132251,
+      "conclusion": "cancelled",
+      "counts_as_driver_build_pass": false
+    }
+  },
+  "synchronization": {
+    "method": "exact existing Git objects through REST, guarded fast-forward, force=false",
+    "source_ref_tree_parent_verified": true,
+    "five_changed_files_independently_downloaded_and_byte_matched": true
+  },
+  "execution_boundary": {
+    "existing_driver_abi_reader_capture_helper_and_boot_sources_unchanged": true,
+    "installed_monitor_hash_unchanged": true,
+    "observer_installed_or_enabled": false,
+    "candidate_kext_installed_or_loaded_by_this_work": false,
+    "target_reader_executed": false,
+    "target_gpu_work": false,
+    "arming_or_reboot": false,
+    "old_M2_and_reboot_grants_consumed": true,
+    "new_target_execution_authorized_by_source_work": false,
+    "allocation_root_cause_confirmed": false
+  },
+  "limits": [
+    "Blocked/dead observer independence is tested against a stub recovery process, not the installed monitor or real firmware recovery.",
+    "A newly discovered report file triggers collection but does not prove a valid completed crash report or GPU causation.",
+    "Reports can arrive during baseline; workload ordering and the baseline boundary require a separate execution plan.",
+    "The 1-300 second window and event/scan caps bound observation decisions, not total wall time or uninterruptible kernel/filesystem operations.",
+    "Existing fallback must run as an independent peer, with no wait or mandatory observer acknowledgement.",
+    "Build-37 first-four retention, saturated-counter lower bounds and native-client lifecycle limits remain unchanged.",
+    "Actual installation, startup integration, pre-fallback collection and hardware recovery remain untested and need fresh scoped authorization."
+  ]
+}
