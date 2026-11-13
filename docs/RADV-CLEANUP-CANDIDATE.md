@@ -139,7 +139,7 @@ and other compiler components is still incomplete. The earlier artifact
 record remains the historical pre-execution checkpoint. See the separate
 [target test record](validation/radv-cleanup-candidate-metal-20261113.json).
 
-### Prepared runtime switch, not installed
+### Runtime-switch preparation checkpoint
 
 A private manual installation/rollback helper has been prepared and checked
 without performing a system write. The proposed installation creates a new
@@ -156,19 +156,62 @@ file, unchanged library bytes and refusal of an unexpected alias target.
 This is helper validation, not a root installation, live deployment rollback
 or external recovery test. Neither action changes already-running process
 mappings. The prepared helper does not initialize firmware, arm M2, modify
-NVRAM, alter security or reboot. Deployment still requires the owner's
-separate authorization under the repository instructions; this preparation
-does not extend the artifact publication exception to automatic installation.
+NVRAM, alter security or reboot. At that checkpoint, deployment still required
+the owner's separate authorization under the repository instructions; the
+preparation did not extend the artifact publication exception to automatic
+installation. The subsequent authorization and installation are recorded below.
+
+## Authorized runtime-pointer installation, 2026-11-13
+
+After reviewing the bounded proposal, the owner explicitly allowed only the
+system RADV runtime-pointer switch, retention of the original, M2 remaining
+off and no firmware initialization or reboot. A separate private authorization
+record pins the already-reviewed plan and helper; the historical preparation
+plan and previous test records were not rewritten to imply earlier permission.
+
+The single administrator installation completed successfully at
+17:56:15 UTC+08:00. It created a fresh, versioned, root-owned runtime directory
+with six entries and atomically switched the runtime alias. Only the RADV
+library bytes differ from the retained original runtime. The other five
+entries preserve their bytes or relative symlink targets, ownership and modes.
+The original protected runtime and installed Metal plugin remain intact;
+mapped library files were not overwritten or removed.
+
+Independent post-install inspection at 17:57:07 UTC+08:00 verified the new
+alias target, the installed candidate's full SHA-256 and strict signature,
+directory ownership/mode and all six runtime entries. The original runtime
+still matches its recorded state. The only changed entry among the original
+55-entry installed baseline is the runtime alias; the other 54 entries and
+all 15 original resolved plugin/runtime entries match. Temporary staging
+and switch paths are absent.
+
+The same boot and loaded build-35 identity were retained. NMXAccel and
+IONDRVFramebuffer are present, PhxAMDFB is absent, all three display switches
+remain zero, and M2 NVRAM/stop/pending markers remain absent. No initializer,
+probe or shutdown process was found during postcheck. There was no additional
+GPU probe or device-enumeration invocation, firmware-initialization replay,
+desktop arming, reboot, EFI change or security change in this installation
+phase. The alias switch does not force already-running clients to reload.
+
+The earlier process-scoped Metal pass applies to the exact installed candidate
+bytes, but the default global loading route and desktop use have not been
+executed or accepted after this switch. The private rollback helper restores
+the exact original alias target and leaves both directories intact. It has
+passed an isolated alias/open-file fixture; live deployment rollback and
+recovery from a hard hardware hang remain untested. No automatic rollback,
+M2 test or reboot was armed. See the separate
+[installation record](validation/radv-cleanup-candidate-runtime-install-20261113.json).
 
 ## Verification and rollback requirements
 
 For any later candidate, verify the exact workflow/source commit, archive
 manifest and hashes, x86_64 Mach-O type, signature, required exports,
 system-only dependencies, source/patch provenance and native ABI evidence.
-Keep the original runtime and link intact until the deployment route and
-rollback are separately reviewed; avoid overwriting a library mapped by
-running processes. This checkpoint contains a verified baseline backup,
-not a tested deployment or executable recovery mechanism.
+Keep the original runtime and its exact alias target recorded until the
+deployment route and rollback are separately reviewed; avoid overwriting a
+library mapped by running processes. The original preparation checkpoint
+contained a verified baseline backup. The later authorized pointer installation
+is recorded above; live rollback and hardware-hang recovery remain unverified.
 
 The hosted no-device test refuses to run when the target services are
 present. It must not be repurposed as a GPU validation pass on this laptop.

@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "kind": "owner-authorized-manual-radv-runtime-pointer-installation",
+  "checked_at": "2026-11-13T17:57:07.882792+08:00",
+  "os": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "architecture": "x86_64"
+  },
+  "authorization": {
+    "owner_explicitly_allowed_reviewed_proposal": true,
+    "scope": "Switch only the system RADV runtime pointer, retain the original, keep M2 off and perform no firmware initialization or reboot",
+    "reviewed_helper_and_plan_pins_verified": true,
+    "historical_pre_authorization_plan_preserved": true,
+    "new_GPU_probe_authorized_or_invoked": false,
+    "desktop_takeover_authorized_or_armed": false,
+    "firmware_initialization_authorized_or_invoked": false,
+    "reboot_authorized_or_scheduled": false
+  },
+  "candidate": {
+    "source_commit": "94291c8a7bf759b91e393150bf79c15da7495b03",
+    "workflow_run_id": 43399540297,
+    "artifact_id": 14024179574,
+    "installed_library_sha256": "a76ff2b7d3f88dc2b64222b9806300f81be41d04e474c5c763a73c3e36c3ad0c",
+    "matches_previous_process_scoped_Metal_pass": true,
+    "previous_target_test_record": "radv-cleanup-candidate-metal-20261113.json",
+    "strict_signature_verified_after_install": true,
+    "local_native_build_performed": false
+  },
+  "installation": {
+    "finished_at": "2026-11-13T17:56:15.789892+08:00",
+    "administrator_attempts": 1,
+    "returncode": 0,
+    "timed_out": false,
+    "method": "Create a complete versioned runtime directory and atomically replace only the runtime symlink",
+    "new_runtime_entries": 6,
+    "unchanged_nonRADV_entries": 5,
+    "only_binary_content_change": "libvulkan_radeon.dylib",
+    "original_runtime_retained_and_unchanged": true,
+    "original_library_sha256": "1f2181d1183fa95f33eb3f626c96aa27fa242e4e96c49f6785fa7e53ee128f78",
+    "original_plugin_and_kexts_unchanged": true,
+    "mapped_library_files_overwritten_or_removed": false,
+    "existing_process_mappings_forced_to_reload": false,
+    "automatic_retry": false
+  },
+  "independent_readback": {
+    "system_alias_resolves_to_installed_candidate": true,
+    "installed_candidate_hash_matches_verified_artifact": true,
+    "all_six_runtime_entries_and_metadata_verified": true,
+    "new_directory_root_owned_mode_0755": true,
+    "original_baseline_entries": 55,
+    "changed_baseline_entries": 1,
+    "sole_changed_baseline_entry": "runtime symlink target",
+    "unchanged_other_original_installed_entries": 54,
+    "unchanged_original_resolved_plugin_runtime_entries": 15,
+    "staging_and_temporary_alias_paths_absent": true,
+    "same_boot_and_loaded_build35_identity": true,
+    "PhxBringup_build": 35,
+    "NMXAccel_present": true,
+    "IONDRVFramebuffer_present": true,
+    "PhxAMDFB_absent": true,
+    "three_display_switches_registered_zero": true,
+    "M2_NVRAM_stop_and_pending_markers_absent": true,
+    "initializer_probe_or_shutdown_process_absent": true,
+    "postcheck_passed": true
+  },
+  "rollback": {
+    "private_prepared_helper_retained": true,
+    "method": "Atomically restore the exact original runtime symlink target while retaining both runtime directories",
+    "isolated_alias_and_open_file_fixture_passed": true,
+    "live_deployment_rollback_executed": false,
+    "existing_mappings_changed_by_pointer_rollback": false,
+    "automatic_rollback_armed": false,
+    "hard_hang_or_external_boot_recovery_verified": false
+  },
+  "acceptance_and_limits": {
+    "pointer_installation_and_static_integrity_verified": true,
+    "default_global_candidate_device_loading_executed_or_accepted": false,
+    "additional_GPU_probe_or_device_enumeration_invoked": false,
+    "new_desktop_acceptance_established": false,
+    "firmware_initialization_replayed": false,
+    "M2_or_desktop_takeover_enabled": false,
+    "reboot_performed": false,
+    "EFI_NVRAM_BIOS_partitions_security_or_startup_helpers_changed": false,
+    "physical_display_size_corrected": false,
+    "complete_installed_userspace_source_provenance_established": false,
+    "original_desktop_stream_creation_failure_resolved": false,
+    "raw_logs_identities_addresses_personal_paths_helpers_or_binaries_published": false,
+    "historical_artifact_and_target_test_records_preserved": true,
+    "full_stack_publication_block_preserved": true
+  }
+}
