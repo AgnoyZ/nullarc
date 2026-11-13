@@ -310,6 +310,59 @@ or postboot acceptance; it does not verify WindowServer's mapped RADV image
 or correct physical display size. See the separate
 [arming record](validation/radv-installed-default-m2-arming-20261113.json).
 
+## Installed-candidate M2 result and fallback, 2026-11-13
+
+The one authorized desktop test did not pass. The existing initializer
+reported PhxAMDFB on the panel at 18:37:10 UTC+08:00 and released the armed
+display path at 18:37:18. Three captured WindowServer reports then showed
+`EXC_CRASH` / `SIGABRT` in `CoreDisplay::DisplayPipe::RunFullDisplayPipe`.
+The unchanged early-failure monitor detected three reports, disabled M2 and
+rebooted. The firmware-fallback boot began at 18:38:22 and its initializer
+completed at 18:38:39. This observed software fallback does not validate
+recovery from a hard kernel or bus hang.
+
+All three crash reports contain the candidate RADV and installed plugin's
+matching Mach-O image identities. Their candidate paths are redacted by the
+reporter, so those fields alone cannot establish an exact path. Independent
+same-process, same-boot loader logs corroborate the installed candidate's
+resolved path and image identity, plus the installed plugin's path and image
+identity, before each captured abort. Current file hashes still match the
+pinned candidate and plugin. The failure therefore cannot be attributed to
+WindowServer simply retaining the old RADV library.
+
+Each of those three processes logged `vkAllocateCommandBuffers` returning
+`-2`, followed by a nil command buffer, and later `vkAllocateMemory(image)`
+returning `-2` and `newTextureWithDescriptor: FAILED`. Reporter logs immediately
+after the corresponding fault captures identify the assertion as
+`m_combinedLUTTexture - Failed to get a MTLTexture`. The observed failing
+allocation and texture-creation paths are established; their underlying
+kernel, winsys, resource-lifetime or memory-type cause is not. The plugin's
+"VRAM full" diagnostic is not independent proof of global VRAM exhaustion.
+The checked per-process log windows contain no spelled-out device-lost or
+backend-disable marker; this does not exclude an unlogged GPU fault.
+
+None of the three faulting threads has the prior `radv_destroy_cmd_buffer`
+cleanup crash stack. This is a limited observation of this attempt, rather
+than proof that every cleanup defect or the original allocation failure is
+resolved. The earlier bounded compute pass remains a compute-only result.
+
+Postboot readback found build 35 and NMXAccel present, PhxAMDFB absent,
+IONDRVFramebuffer present, all three display switches zero, frame samples
+remaining zero and one-shot/persistent/stop/pending markers absent. All 15
+active and 15 retained-original plugin/runtime entries match. Among the 55
+installed baseline entries, only the initializer-generated firmware-address
+log changed; the other 54 entries match. The candidate runtime pointer remains
+selected. Two shutdown-stall diagnostics were retained privately without
+interpreting them as evidence of a hard GPU hang or guaranteed recovery.
+
+Collection and analysis added no GPU submission, initialization replay,
+arming, installation or reboot. No automatic retry is scheduled. Preserve
+this firmware-fallback state and investigate the native command-stream and
+image-memory allocation refusals before another hardware test. The complete
+installed userspace provenance, desktop stability and physical display size
+remain unresolved. See the separate
+[desktop-result record](validation/radv-installed-default-m2-result-20261113.json).
+
 ## Verification and rollback requirements
 
 For any later candidate, verify the exact workflow/source commit, archive

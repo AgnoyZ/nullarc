@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "kind": "installed-default-candidate-single-boot-M2-failure-and-software-fallback",
+  "checked_at": "2026-11-13T18:50:30.347411+08:00",
+  "os": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "architecture": "x86_64"
+  },
+  "scope": {
+    "one_separately_authorized_M2_boot": true,
+    "arming_record": "radv-installed-default-m2-arming-20261113.json",
+    "postboot_collection_and_analysis_only": true,
+    "new_GPU_submission_initialization_replay_or_rearming_by_collection": false,
+    "driver_runtime_or_startup_installation_by_collection": false,
+    "additional_reboot_scheduled_by_collection": false,
+    "automatic_failed_test_retry": false
+  },
+  "candidate": {
+    "source_commit": "94291c8a7bf759b91e393150bf79c15da7495b03",
+    "library_sha256": "a76ff2b7d3f88dc2b64222b9806300f81be41d04e474c5c763a73c3e36c3ad0c",
+    "installed_plugin_sha256": "805cc00b4a31528de5374c65fc7c87893d0bff23d527b00ba5b122d60f8fe966",
+    "kernel_source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+    "kernel_build": 35,
+    "native_abi": "1.12",
+    "complete_installed_userspace_source_provenance_established": false
+  },
+  "timeline": {
+    "armed_at": "2026-11-13T18:33:28.467528+08:00",
+    "M2_initializer_started_at": "2026-11-13T18:37:10+08:00",
+    "armed_display_path_released_at": "2026-11-13T18:37:18+08:00",
+    "WindowServer_fault_capture_times": [
+      "2026-11-13T18:37:36.608200+08:00",
+      "2026-11-13T18:37:47.493700+08:00",
+      "2026-11-13T18:37:58.467100+08:00"
+    ],
+    "firmware_fallback_boot_started_at": "2026-11-13T18:38:22+08:00",
+    "fallback_initializer_completed_at": "2026-11-13T18:38:39+08:00",
+    "initial_postboot_collection_checked_at": "2026-11-13T18:41:02.145715+08:00"
+  },
+  "display_attempt_and_fallback": {
+    "PhxAMDFB_on_panel_reported_by_existing_initializer": true,
+    "three_WindowServer_reports_triggered_existing_early_failure_policy": true,
+    "existing_monitor_disabled_M2_and_rebooted": true,
+    "firmware_fallback_initializer_completed": true,
+    "new_watchdog_or_fallback_policy_installed": false,
+    "candidate_runtime_pointer_automatically_reverted": false,
+    "hard_kernel_bus_hang_or_external_recovery_verified": false,
+    "shutdown_stall_diagnostics_retained_privately": 2,
+    "shutdown_stall_reports_used_as_proof_of_hard_GPU_hang": false
+  },
+  "crash_and_loader_identity": {
+    "captured_WindowServer_reports": 3,
+    "all_EXC_CRASH_SIGABRT": true,
+    "all_faulting_threads_include_CoreDisplay_RunFullDisplayPipe_assert": true,
+    "previous_RADV_cleanup_stack_in_faulting_threads": false,
+    "candidate_and_plugin_crash_image_identities_match_all_three": true,
+    "candidate_exact_paths_redacted_in_crash_reports": true,
+    "exact_candidate_and_plugin_paths_and_image_identities_correlated_in_same_process_same_boot_loader_logs": true,
+    "current_candidate_and_plugin_file_hashes_match": true,
+    "report_filename_used_as_exact_fault_capture_time": false
+  },
+  "failed_boot_allocation_findings": {
+    "vkAllocateCommandBuffers_minus2_before_each_captured_abort": true,
+    "nil_command_buffer_logged": true,
+    "vkAllocateMemory_image_minus2_before_each_captured_abort": true,
+    "newTextureWithDescriptor_failure_before_each_captured_abort": true,
+    "LUT_texture_assertion_text": "m_combinedLUTTexture - Failed to get a MTLTexture",
+    "same_report_time_assertion_text_correlated_for_each_abort": true,
+    "colour_image_memory_refusal_diagnostic_observed": true,
+    "global_VRAM_exhaustion_independently_established": false,
+    "underlying_kernel_winsys_memory_type_or_resource_lifetime_cause_established": false,
+    "spelled_device_lost_or_backend_disabled_marker_in_three_checked_process_windows": false,
+    "all_unlogged_GPU_or_kernel_faults_excluded": false,
+    "current_fallback_tmp_log_substituted_for_failed_boot_log": false
+  },
+  "post_fallback_state": {
+    "loaded_PhxBringup_identity_and_build35_match": true,
+    "NMXAccel_count": 1,
+    "PhxAMDFB_count": 0,
+    "IONDRVFramebuffer_count": 1,
+    "three_display_switches_zero": true,
+    "frame_counter_samples": [
+      0,
+      0
+    ],
+    "one_shot_NVRAM_absent": true,
+    "persistent_stop_and_pending_markers_absent": true,
+    "test_reboot_scheduler_remaining": false,
+    "installed_baseline_entries": 55,
+    "unchanged_installed_baseline_entries": 54,
+    "changed_installed_entry": "initializer-generated firmware-address log",
+    "changed_entry_owner_and_mode_unchanged": true,
+    "active_plugin_runtime_entries_unchanged": 15,
+    "retained_original_plugin_runtime_entries_unchanged": 15,
+    "installed_read_errors": 0,
+    "candidate_runtime_alias_and_file_hash_match": true
+  },
+  "acceptance_and_limits": {
+    "M2_desktop_test_passed": false,
+    "bounded_compute_pass_extended_to_desktop_acceptance": false,
+    "all_RADV_cleanup_faults_excluded": false,
+    "original_allocation_failure_resolved": false,
+    "physical_display_size_corrected": false,
+    "raw_logs_UUIDs_addresses_personal_paths_helpers_or_binaries_published": false,
+    "historical_preparation_test_and_arming_records_preserved": true,
+    "full_stack_publication_block_preserved": true,
+    "next_step": "Preserve the completed firmware fallback and investigate native command-stream and image-memory allocation refusals before any separately reviewed hardware retry"
+  }
+}
