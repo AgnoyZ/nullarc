@@ -31,6 +31,7 @@ tests/fixtures/*
 !tests/fixtures/compute_increment.metal
 !tests/fixtures/packaging_only.c
 !tests/fixtures/radv_cmd_buffer_constructor.c
+!tests/fixtures/radv_iokit_transport.c
 
 # Reference dumps and vendor assets if downloaded locally
 reference/

@@ -1,0 +1,101 @@
+From: Radeon 780M Tahoe downstream
+Subject: [PATCH] Preserve native allocation refusals in bounded unified error logs
+
+--- a/src/amd/common/darwin/ac_darwin_iokit.c
++++ b/src/amd/common/darwin/ac_darwin_iokit.c
+@@ -17,6 +17,7 @@
+ 
+ #include <IOKit/IOKitLib.h>
+ #include <mach/mach.h>
++#include <os/log.h>
+ 
+ struct iokit_ctx {
+    io_connect_t conn;
+@@ -28,17 +29,78 @@
+  * selector 3 nor 21, so those travel as 15 and 16. */
+ #define ACD_PROXY_SERVICE "NMXAccel"
+ 
++/* Keep the original IOReturn before acd_kr_to_errno merges NoMemory and NoResources.
++ * Eight failures per operation per process, including concurrent clients; no pointer/VA values.
++ * No extra IOKit calls, allocation retries or changes to the transport's return value.
++ */
++enum acd_alloc_operation {
++   ACD_ALLOC_CREATE, ACD_ALLOC_IMPORT, ACD_ALLOC_GPU_MAP, ACD_ALLOC_GPU_UNMAP,
++   ACD_ALLOC_CPU_MAP, ACD_ALLOC_OPERATION_COUNT
++};
++
++static unsigned acd_alloc_failures[ACD_ALLOC_OPERATION_COUNT];
++
++static void
++acd_log_alloc_failure(enum acd_alloc_operation op, const char *name, bool proxy, uint32_t selector,
++                      kern_return_t kr, uint64_t bytes, uint64_t alignment, uint64_t domains, uint64_t flags,
++                      uint32_t handle)
++{
++   const int saved_errno = errno;
++   unsigned count = __atomic_load_n(&acd_alloc_failures[op], __ATOMIC_RELAXED);
++   do {
++      if (count >= 8)
++         return;
++   } while (!__atomic_compare_exchange_n(&acd_alloc_failures[op], &count, count + 1, false,
++                                         __ATOMIC_RELAXED, __ATOMIC_RELAXED));
++
++   char line[384];
++   snprintf(line, sizeof(line),
++            "radv-native-alloc: op=%s route=%s selector=%u IOReturn=0x%08x bytes=%llu alignment=%llu "
++            "domains=0x%llx flags=0x%llx handle=%u sample=%u/8",
++            name, proxy ? "proxy" : "direct", selector, (unsigned)kr,
++            (unsigned long long)bytes, (unsigned long long)alignment,
++            (unsigned long long)domains, (unsigned long long)flags, handle, count + 1);
++   fprintf(stderr, "%s\n", line);
++   os_log_error(OS_LOG_DEFAULT, "%{public}s", line);
++   errno = saved_errno;
++}
++
++static void
++acd_log_call_failure(bool proxy, uint32_t logical_selector, uint32_t wire_selector, kern_return_t kr,
++                      const uint64_t *sin, uint32_t nsin, const void *stin, size_t stinsz)
++{
++   if (logical_selector == ACD_SEL_BO_CREATE && stin && stinsz == sizeof(struct n48n_gem_create_in)) {
++      const struct n48n_gem_create_in *in = stin;
++      acd_log_alloc_failure(ACD_ALLOC_CREATE, "BO_CREATE", proxy, wire_selector, kr,
++                            in->bo_size, in->alignment, in->domains, in->domain_flags, 0);
++   } else if (logical_selector == ACD_SEL_BO_IMPORT_HOST && sin && nsin == 4) {
++      acd_log_alloc_failure(ACD_ALLOC_IMPORT, "BO_IMPORT_HOST", proxy, wire_selector, kr,
++                            sin[1], 4096, 0, sin[2], 0);
++   } else if (logical_selector == ACD_SEL_GEM_VA && stin && stinsz == sizeof(struct n48n_gem_va)) {
++      const struct n48n_gem_va *in = stin;
++      if (in->operation == N48N_VA_OP_MAP || in->operation == N48N_VA_OP_UNMAP) {
++         const bool map = in->operation == N48N_VA_OP_MAP;
++         acd_log_alloc_failure(map ? ACD_ALLOC_GPU_MAP : ACD_ALLOC_GPU_UNMAP,
++                               map ? "GPU_MAP" : "GPU_UNMAP", proxy, wire_selector, kr,
++                               in->map_size, 0, 0, in->flags, in->handle);
++      }
++   }
++}
++
+ static int
+ iokit_call(void *ctx, uint32_t sel, const uint64_t *sin, uint32_t nsin, const void *stin, size_t stinsz,
+            uint64_t *sout, uint32_t *nsout, void *stout, size_t *stoutsz)
+ {
+    struct iokit_ctx *c = ctx;
++   const uint32_t logical_selector = sel;
+    if (c->proxy)
+       sel = sel == ACD_SEL_BO_CREATE ? 15 : sel == ACD_SEL_BO_IMPORT_HOST ? 16 : sel;
+    uint32_t cnt = nsout ? *nsout : 0;
+    size_t osz = stoutsz ? *stoutsz : 0;
+    kern_return_t kr = IOConnectCallMethod(c->conn, sel, sin, nsin, stin, stinsz, sout, nsout ? &cnt : NULL,
+                                           stout, stoutsz ? &osz : NULL);
++   if (kr != KERN_SUCCESS)
++      acd_log_call_failure(c->proxy, logical_selector, sel, kr, sin, nsin, stin, stinsz);
+    if (nsout)
+       *nsout = cnt;
+    if (stoutsz)
+@@ -56,6 +118,8 @@
+    if (kr == kIOReturnSuccess) {
+       *addr = (void *)(uintptr_t)a;
+       *size = (size_t)s;
++   } else {
++      acd_log_alloc_failure(ACD_ALLOC_CPU_MAP, "CPU_MAP", c->proxy, UINT32_MAX, kr, 0, 0, 0, 0, handle);
+    }
+    return (int)kr;
+ }

@@ -110,7 +110,7 @@ class PackageFixture(unittest.TestCase):
 
     def test_exact_standalone_report_and_notices(self):
         self.assertEqual(self.report, self.check())
-        self.assertEqual(18, len(self.series))
+        self.assertEqual(19, len(self.series))
 
     def test_builder_provenance_key_order_is_semantic_but_changes_are_rejected(self):
         # prepare_radv emits patches before the two booleans; JSON object order is not provenance.
@@ -200,7 +200,7 @@ class PackageFixture(unittest.TestCase):
             self.assertTrue(source.getmember("mesa/source-link.c").issym())
             self.assertEqual(b"/* Fixture source, never compiled */\n", source.extractfile("mesa/source.c").read())
         series = json.loads(files["SOURCE/patch-series.json"])["patches"]
-        self.assertEqual(18, len(series))
+        self.assertEqual(19, len(series))
         for entry in series:
             self.assertEqual(entry["sha256"], hashlib.sha256(files["SOURCE/" + entry["path"]]).hexdigest())
         self.assertFalse(json.loads(files["package-report.json"])["hardware_tested"])

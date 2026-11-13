@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "date": "2026-11-13",
+  "target": "Radeon 780M / gfx1103 / PCI 1002:1900",
+  "failed_desktop_test_record": "radv-installed-default-m2-result-20261113.json",
+  "root_cause_established": false,
+  "privileged_historical_log_retry": {
+    "completed": true,
+    "events": 144,
+    "identical_to_unprivileged_capture": true,
+    "original_native_refusal_records": 0
+  },
+  "source_findings": {
+    "NoMemory_and_NoResources_merge_to_ENOMEM": true,
+    "multiple_RADV_failure_stages_merge_to_minus_two": true,
+    "VRAM_plus_GTT_domain_request_does_not_implement_kernel_spill": true,
+    "failed_boot_budget_or_resource_exhaustion_proven": false
+  },
+  "diagnostic": {
+    "patch": "patches/radv/0003-bounded-native-allocation-diagnostics.patch",
+    "operations": [
+      "BO_CREATE",
+      "BO_IMPORT_HOST",
+      "GPU_MAP",
+      "GPU_UNMAP",
+      "CPU_MAP"
+    ],
+    "original_IOReturn_retained": true,
+    "direct_and_proxy_wire_selectors_retained": true,
+    "max_records_per_operation_per_process": 8,
+    "saturating_atomic_limit": true,
+    "sinks": [
+      "stderr",
+      "os_log_error"
+    ],
+    "raw_addresses_or_contents_logged": false,
+    "extra_IOKit_calls_or_retries": false,
+    "budget_policy_changed": false
+  },
+  "cpu_validation": {
+    "cases": 54,
+    "concurrent_calls": 1200,
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "passed": true,
+    "actual_patched_pinned_transport": true,
+    "IOKit_and_logging_faked": true,
+    "real_log_persistence_proven": false
+  },
+  "hosted_native_validation": {
+    "status": "pending",
+    "runner": "macos-15-intel",
+    "workflow": ".github/workflows/build.yml",
+    "artifact_retention_requested": false
+  },
+  "target_state_readback": {
+    "later_boot_than_historical_fallback": true,
+    "build": 35,
+    "firmware_framebuffer_present": true,
+    "PhxAMDFB_absent": true,
+    "M2_off": true,
+    "display_gates_and_frame_count_zero": true,
+    "installed_candidate_and_plugin_hashes_unchanged": true
+  },
+  "installed_diagnostic": false,
+  "GPU_test_performed": false,
+  "initialization_replayed": false,
+  "M2_armed": false,
+  "reboot_scheduled": false,
+  "limitations": [
+    "Stored logs cannot identify the original native IOReturn.",
+    "A native NoMemory still does not identify the exact internal kernel branch.",
+    "The diagnostic does not cover failures confined to userspace VA reservation or host malloc.",
+    "No allocation-cause fix or desktop acceleration acceptance is claimed."
+  ]
+}

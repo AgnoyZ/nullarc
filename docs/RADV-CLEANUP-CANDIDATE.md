@@ -383,3 +383,66 @@ initial command-stream failure, desktop stability and physical display size rema
 unresolved.
 
 Machine-readable observations are in [the preparation record](validation/radv-cleanup-candidate-preparation-20261113.json).
+
+
+## Native allocation investigation, 2026-11-13
+
+After sudo-mcp authentication was restored, the completed failed-desktop boot
+was queried again with administrator privileges. The bounded query returned
+144 events, byte-for-byte identical to the earlier unprivileged query. Neither
+query contains the transport's original allocation refusal. No new hardware
+attempt was made. The privileged retry therefore establishes access to the
+stored logs, not an allocation root cause.
+
+Source review identifies three independent losses of diagnostic information:
+
+- `acd_kr_to_errno` maps both `NoMemory` and `NoResources` to `-ENOMEM`.
+- RADV buffer creation maps several VA reservation, BO allocation and GPU-map
+  errors to `VK_ERROR_OUT_OF_DEVICE_MEMORY` (`-2`); command-stream CPU mapping
+  failure can also become `-2`.
+- Existing native transport tracing and RADV buffer-allocation messages use
+  stderr. The saved unified-log window has no matching original refusal, so
+  absence of those lines does not identify the failing branch.
+
+Build 35 uses software budgets per native client: visible VRAM 256 MiB,
+high-pool VRAM 1536 MiB, GTT 512 MiB with a 256 MiB single-BO limit, and host
+imports 4096 MiB with a 1024 MiB single-import limit. The client has 4095
+nonzero BO handles and 4096 map slots. These are source limits, not measured
+failed-boot usage or evidence of global physical-memory exhaustion. In this
+allocator a request containing VRAM and GTT still enters the VRAM branch;
+GTT spill is not implemented merely by setting both domain bits. That is a
+candidate budget mechanism, not a demonstrated explanation of this failure.
+
+A third downstream RADV patch now records native BO creation, host import,
+GPU map/unmap and CPU-map refusals before raw IOReturn information is lost.
+Each record includes operation, direct/proxy route, actual wire selector,
+original IOReturn, request size/alignment/domain/flags where available, BO
+handle and a sample ordinal. It logs at most eight failures per operation per
+process using a saturating atomic counter. Both stderr and `os_log_error`
+receive the record; no environment override is required. CPU/GPU/host virtual
+addresses and data contents are omitted. The diagnostic makes no extra IOKit
+call, retry or GPU allocation, preserves errno, return status and output behavior,
+and does not change memory budgets or fallback policy.
+
+The pinned MIT Darwin transport is retained as a hash-verified test fixture.
+CPU-only fault injection executes the actual patched transport with explicit
+IOKit/logging doubles: 54 cases cover original return/output behavior,
+direct/proxy selectors, five operation classes, four refusal codes, successes,
+malformed and unrelated calls, privacy, saturation, and 1200 concurrent calls.
+ASan/UBSan validation passed locally. The existing source build workflow on
+`macos-15-intel` compiles the real RADV with Apple logging and runs the existing
+four no-device refusals. Artifact retention remains disabled. Hosted validation
+is pending at this source checkpoint.
+
+Limits: the patch has not been installed or executed by WindowServer. Real
+unified-log persistence and the underlying allocation cause remain unverified.
+It cannot report failures confined to userspace VA reservation or host malloc,
+and a raw `NoMemory` alone may still require deeper kernel diagnostics to
+separate budget, descriptor and page-table failures. QueryInfo lacks a live
+handle/map occupancy or host-import budget snapshot, and current-boot counters
+cannot reconstruct a prior boot. Preserve the firmware fallback; deployment
+and any future hardware reproduction need a separate bounded plan. A read-only
+check at 20:29 UTC+08:00 found a later boot (19:13:32), still with build 35,
+PhxAMDFB absent, firmware framebuffer present, all display gates and frame count
+zero, M2 markers/NVRAM absent, and unchanged candidate/plugin hashes. It is not
+the historical 18:38 boot and its counters were not used as failed-boot evidence.

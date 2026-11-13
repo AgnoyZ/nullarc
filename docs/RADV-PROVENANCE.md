@@ -9,9 +9,10 @@ public distribution. The separate two-kext exception and the full-stack upload
 block remain unchanged. No release, installation, initialization, GPU test,
 desktop takeover or reboot is authorized by this workflow.
 
-The artifact is an experimental constructor-cleanup candidate. It initializes
-destructor-owned state before fallible command-stream creation. It preserves
-the stream-creation failure; its cause and desktop behavior remain unresolved.
+The artifact is an experimental constructor-cleanup and allocation-diagnostic
+candidate. It initializes destructor-owned state before fallible command-stream
+creation, and records bounded native allocation refusals. It preserves failures;
+their causes and desktop behavior remain unresolved.
 The installed mixed userspace has incomplete source provenance. Do not claim
 that a fresh build differs from the installed library only by this patch.
 
@@ -26,13 +27,19 @@ committed source only. The review used the following exact revisions:
 | Cobalt64 | `d6c9aedf8e6526a39e349b5886cbc8c7ddf77f65` | Nine ordered Mesa patches, README, root MIT license, third-party notices and original ABI header |
 | nullarc Phoenix series | `8aba872560a3c9b7dc7a0ddebfad001c6dddf315` | Seven ordered patches, README, original LICENSE/LICENSES and THIRD_PARTY_NOTICES |
 | Vulkan-Headers | `6802bb4733b63ed5efd3adb308a6c885ef180ea1` | Complete committed source, LICENSE.md, Apache-2.0 and MIT texts |
-| downstream nullarc | Package's exact source commit | Two ordered RADV patches, ABI/topology headers, build/verification/test recipes, project licenses and supplemental ABI notices |
+| downstream nullarc | Package's exact source commit | Three ordered RADV patches, ABI/topology headers, build/verification/test recipes, project licenses and supplemental ABI notices |
 
 Primary references: [Mesa licensing](https://docs.mesa3d.org/license.html),
 [Cobalt patch license and ordering](https://github.com/Almosst-DEV/Cobalt64/blob/d6c9aedf8e6526a39e349b5886cbc8c7ddf77f65/mesa-patches/README.txt),
 [Cobalt root license](https://github.com/Almosst-DEV/Cobalt64/blob/d6c9aedf8e6526a39e349b5886cbc8c7ddf77f65/LICENSE),
 [Phoenix component license table](https://github.com/luuumi-dev/nullarc/blob/8aba872560a3c9b7dc7a0ddebfad001c6dddf315/LICENSE),
 and [Vulkan-Headers license](https://github.com/KhronosGroup/Vulkan-Headers/blob/6802bb4733b63ed5efd3adb308a6c885ef180ea1/LICENSE.md).
+The allocation diagnostic changes the MIT Darwin IOKit transport supplied by
+the pinned Cobalt patch series. Its original SPDX notice is preserved in the
+patch target and test fixture. No new runtime dependency beyond Apple system
+logging is introduced. The existing compile/test workflow retains no artifact
+by default; this diagnostic does not expand the publication exception.
+
 The pinned Mesa licensing text and command-buffer source were read from a
 Git-object-verified mirror at the identical commit; GitLab remains canonical.
 
@@ -63,7 +70,7 @@ other built runtime library is packaged.
 
 `radv-artifacts.yml` runs only by manual dispatch on the development branch
 and `macos-15-intel`. `package_radv.py` requires clean pinned inputs, exact
-ordered patch hashes (9 + 7 + 2), matching build report and no-device/ABI
+ordered patch hashes (9 + 7 + 3), matching build report and no-device/ABI
 evidence. Source-provenance JSON is compared structurally (object field order
 is immaterial; patch array order and all values remain exact); license text
 bytes are compared verbatim. It checks x86_64 Mach-O type 6, required exports,
@@ -79,7 +86,7 @@ stay within the component root. Archives normalize ownership and timestamps.
 An inner manifest covers every file; an outer SHA256SUMS covers the tarball.
 Only that tarball and its checksum file are uploaded, for seven days.
 
-Reconstruction: unpack `SOURCE/mesa-base.tar.gz`; apply the eighteen patches
+Reconstruction: unpack `SOURCE/mesa-base.tar.gz`; apply the nineteen patches
 listed in `SOURCE/patch-series.json` in order using `git apply` (or `patch -p1`)
 from the Mesa root. Unpack the project, Cobalt, Phoenix and Vulkan source
 archives to inspect original notices and reproduce the build recipe. The

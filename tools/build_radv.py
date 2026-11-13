@@ -10,6 +10,7 @@ import subprocess
 from prepare_source import ROOT, git, verify_checkout
 from prepare_radv import prepare_radv
 from verify_artifacts import inspect_macho
+from test_radv_allocation_diagnostic import patched_transport
 
 
 def meson_command(stage, build):
@@ -110,6 +111,9 @@ def build_radv(mesa, cobalt, headers, out, artifacts, plugin_bundle=False):
     destination = runtime_destination(artifacts, plugin_bundle)
     stage = out / "source"
     provenance = prepare_radv(mesa, cobalt, stage)
+    transport = stage / "src/amd/common/darwin/ac_darwin_iokit.c"
+    if transport.read_text() != patched_transport():
+        raise RuntimeError("Prepared allocation transport differs from the fault-injected pinned source")
     abi_probe = out / "radv-abi"
     run("xcrun", "clang", "-arch", "x86_64", "-std=c11", "-Wall", "-Wextra", "-Werror",
         "-I" + str(stage / "include/darwin"), "-I" + str(ROOT / "src/phxbringup"),

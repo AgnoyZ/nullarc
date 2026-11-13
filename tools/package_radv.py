@@ -21,6 +21,9 @@ SOURCE_PATHS = (
     "tools/prepare_source.py", "tools/firmware_profile.py", "tools/verify_artifacts.py",
     "tools/package_radv.py", "tools/radv_no_device.c", "tools/radv-build-requirements.txt",
     "tools/test_radv_cmd_init.py", "tests/test_radv_abi.c", "tests/test_radv_cmd_init.c",
+    "tools/test_radv_allocation_diagnostic.py", "tests/test_radv_allocation_diagnostic.c",
+    "tests/test_radv_allocation_diagnostic_runner.py", "tests/radv_iokit_stubs.h",
+    "tests/fixtures/radv_iokit_transport.c",
     "tests/test_radv.py", "tests/test_radv_package.py", "tests/fixtures/radv_cmd_buffer_constructor.c",
     "src/phxbringup/PhxNativeABI.h", "src/amd/phx_topology.h", "patches/radv",
     "upstream.lock.json", ".github/workflows/radv-artifacts.yml", "LICENSE", "LICENSES",
@@ -72,8 +75,8 @@ def patch_inputs(root, cobalt, lock, commit):
     for name in lock["radv-patches"]:
         data = git(root, "show", commit + ":" + name).replace(b"\r\n", b"\n")
         series.append(("downstream", Path(name).name, data))
-    if [part for part, _, _ in series] != ["Cobalt64"] * 9 + ["radv-phoenix"] * 7 + ["downstream"] * 2:
-        raise ValueError("RADV publication requires the reviewed 9 + 7 + 2 patch series")
+    if [part for part, _, _ in series] != ["Cobalt64"] * 9 + ["radv-phoenix"] * 7 + ["downstream"] * 3:
+        raise ValueError("RADV publication requires the reviewed 9 + 7 + 3 patch series")
     return series
 
 

@@ -80,6 +80,7 @@
   },
   "radv-patches": [
     "patches/radv/0001-native-phoenix-only.patch",
-    "patches/radv/0002-initialize-command-buffer-cleanup-before-stream.patch"
+    "patches/radv/0002-initialize-command-buffer-cleanup-before-stream.patch",
+    "patches/radv/0003-bounded-native-allocation-diagnostics.patch"
   ]
 }
