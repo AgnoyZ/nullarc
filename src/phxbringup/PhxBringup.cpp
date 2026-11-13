@@ -34,8 +34,9 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
 #include <libkern/version.h>
 #include "PhxHardwarePolicy.hpp"
 #include "PhxBoPolicy.hpp"
+#include "PhxAllocationDiagnostic.hpp"
 
-#define PHX_KEXT_BUILD 35u
+#define PHX_KEXT_BUILD 36u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -231,8 +232,8 @@ private:
     GpuQueue gq[2]{};
     uint64_t gSeq{0};
     uint64_t queueFence(const GpuQueue &q) const;
-    bool queueProgress(const GpuQueue &q, uint64_t *done) const;
-    uint64_t gpuRetiredLocked() const;
+    bool queueProgress(const GpuQueue &q, uint64_t *done, PhxQueueObservation *observation = nullptr) const;
+    uint64_t gpuRetiredLocked(PhxRetirementObservation *observation = nullptr) const;
     IOLock *gpuLock{nullptr};
     // One GPUVM context (page tables) per client, and the eight hardware VMIDs lent to contexts at submission time,
     // as amdgpu does: a fixed VMID per client capped Metal at eight processes, and with every app allowed Metal the
@@ -250,6 +251,7 @@ private:
         uint64_t lastSeq, retireSeq;
         PhxRetiredBuffers *retiredBuffers;
         uint32_t hw;                      // the hardware VMID pointed at these tables, 0 = none
+        uint8_t busyLogs[2][2];            // gpuLock: map/unmap x pending/invalid observation
     };
     static constexpr uint32_t kMaxCtx = 96;
     VmCtx vm[kMaxCtx]{};
@@ -272,7 +274,7 @@ private:
     bool vmFlushTlb(uint32_t vmid) const;
     bool vmBindingValid(uint32_t vmid, uint64_t physical) const;
     bool vmOwnershipKnown(uint32_t repairing) const;
-    IOReturn vmIdleLocked(uint32_t handle, bool repair);
+    IOReturn vmIdleLocked(uint32_t handle, bool repair, uint32_t operation = 0);
     void ringPut(GpuQueue &q, uint32_t idx, uint32_t value);
     thread_call_t hangCall{nullptr};
     volatile bool hangStop{false};
@@ -351,6 +353,7 @@ private:
     bool hello{false}, closed{false};
     bool sessionClaimed{false};
     bool submitFailureLogged{false}; // protected by lock; one refusal per native client
+    uint8_t allocationFailureLogs[3]{}; // lock: pending overlap, host descriptor, host prepare
     uint32_t vmid{0};        // this client's GPUVM context, taken on its first GPU mapping or submission
     uint64_t lastSeq{0};     // its newest submission: the context is released only once the GPU is past it
     bool ensureVmid() { return vmid || (vmid = owner->vmidAlloc()) != 0; }
@@ -894,6 +897,7 @@ uint32_t PhxBringup::vmidAlloc() {
         c.lastSeq = c.retireSeq = 0;
         c.retiredBuffers = nullptr;
         c.hw = 0;
+        bzero(c.busyLogs, sizeof(c.busyLogs));
         IOLockUnlock(gpuLock);
         return i + 1;
     }
@@ -1127,11 +1131,35 @@ bool PhxBringup::vmOwnershipKnown(uint32_t repairing) const {
 }
 
 // gpuLock held. A retry may repair this slot's failed invalidation, but not an unrelated uncertain slot.
-IOReturn PhxBringup::vmIdleLocked(uint32_t handle, bool repair) {
+IOReturn PhxBringup::vmIdleLocked(uint32_t handle, bool repair, uint32_t operation) {
     VmCtx *c = vmCtx(handle);
     if (!c || !gpuReady() || !mmio || !fbAper || !vmOwnershipKnown(repair ? c->hw : 0))
         return kIOReturnNotReady;
-    if (c->lastSeq && gpuRetiredLocked() < c->lastSeq) return kIOReturnBusy;
+    if (c->lastSeq) {
+        PhxRetirementObservation observation{};
+        const uint64_t retired = gpuRetiredLocked(&observation);
+        if (retired < c->lastSeq) {
+            const int op = operation == PHX_AMDGPU_VA_OP_MAP ? 0 : operation == PHX_AMDGPU_VA_OP_UNMAP ? 1 : -1;
+            if (op >= 0 && phxAllocationDiagnosticSample(c->busyLogs[op][observation.valid ? 0 : 1])) {
+                const PhxQueueObservation &a = observation.queue[0], &b = observation.queue[1];
+                IOLog("PhxAlloc: v1 op=%s reason=%s IOReturn=0x%08x last=%llu submitted=%llu retired=%llu "
+                      "q0_reason=%s q0_read=%u q0_done=%llu q0_floor=%llu q0_count=%u q0_pending=%llu "
+                      "q1_reason=%s q1_read=%u q1_done=%llu q1_floor=%llu q1_count=%u q1_pending=%llu sample=%u limit=%u\n",
+                      op == 0 ? "GPU_MAP" : "GPU_UNMAP", observation.valid ? "retirement-pending" : "retirement-invalid",
+                      static_cast<unsigned>(kIOReturnBusy), static_cast<unsigned long long>(c->lastSeq),
+                      static_cast<unsigned long long>(observation.submitted), static_cast<unsigned long long>(retired),
+                      phxQueueObservationName(a.reason), static_cast<unsigned>(a.fenceRead),
+                      static_cast<unsigned long long>(a.done), static_cast<unsigned long long>(a.floor), a.count,
+                      static_cast<unsigned long long>(a.firstPending),
+                      phxQueueObservationName(b.reason), static_cast<unsigned>(b.fenceRead),
+                      static_cast<unsigned long long>(b.done), static_cast<unsigned long long>(b.floor), b.count,
+                      static_cast<unsigned long long>(b.firstPending),
+                      static_cast<unsigned>(c->busyLogs[op][observation.valid ? 0 : 1]),
+                      static_cast<unsigned>(kPhxAllocationDiagnosticLimit));
+            }
+            return kIOReturnBusy;
+        }
+    }
     if (c->hw && !vmBindingValid(c->hw, c->phys)) {
         hwv[c->hw - kFirstUserVmid].faulted = true;
         return kIOReturnNotReady;
@@ -1155,7 +1183,7 @@ IOReturn PhxBringup::vmMap(uint32_t handle, uint64_t va, IOMemoryDescriptor *md,
         return kIOReturnBadArgument;
     if (!gpuLock) return kIOReturnNotReady;
     IOLockLock(gpuLock);
-    const IOReturn idle = vmIdleLocked(handle, true);
+    const IOReturn idle = vmIdleLocked(handle, true, PHX_AMDGPU_VA_OP_MAP);
     if (idle != kIOReturnSuccess) { IOLockUnlock(gpuLock); return idle; }
     VmCtx &c = vm[handle - 1];
     // Validate the whole range before writing; an unreadable tree is not an empty mapping.
@@ -1223,7 +1251,7 @@ IOReturn PhxBringup::vmUnmap(uint32_t handle, uint64_t va, uint64_t size) {
         return kIOReturnBadArgument;
     if (!gpuLock) return kIOReturnNotReady;
     IOLockLock(gpuLock);
-    const IOReturn idle = vmIdleLocked(handle, true);
+    const IOReturn idle = vmIdleLocked(handle, true, PHX_AMDGPU_VA_OP_UNMAP);
     if (idle != kIOReturnSuccess) { IOLockUnlock(gpuLock); return idle; }
     VmCtx &c = vm[handle - 1];
     // Preflight every page so a malformed later branch cannot silently authorize release.
@@ -1267,42 +1295,64 @@ uint64_t PhxBringup::queueFence(const GpuQueue &q) const {
 }
 
 // gpuLock held. Reject impossible observations before retiring history or publishing more work.
-bool PhxBringup::queueProgress(const GpuQueue &q, uint64_t *doneOut) const {
-    if (!doneOut || !fbAper || !q.ready || (q.fenceOff & 7) ||
-        q.tail - q.head > 63 || q.retiredSeq > gSeq) return false;
+bool PhxBringup::queueProgress(const GpuQueue &q, uint64_t *doneOut, PhxQueueObservation *observation) const {
+    using Reason = PhxQueueObservationReason;
+    if (observation) *observation = PhxQueueObservation{};
+    const auto refuse = [observation](Reason reason) {
+        if (observation) observation->reason = reason;
+        return false;
+    };
+    if (!doneOut) return refuse(Reason::MissingOutput);
+    if (!fbAper) return refuse(Reason::NoAperture);
+    if (!q.ready) return refuse(Reason::Inactive);
+    const uint32_t count = q.tail - q.head;
+    if (observation) { observation->floor = q.retiredSeq; observation->count = count; }
+    if (q.fenceOff & 7) return refuse(Reason::UnalignedFence);
+    if (count > 63) return refuse(Reason::HistoryOverflow);
+    if (q.retiredSeq > gSeq) return refuse(Reason::FutureFloor);
     const uint64_t done = queueFence(q);
-    if (done == UINT64_MAX || done < q.retiredSeq || done > gSeq) return false;
+    if (observation) { observation->fenceRead = true; observation->done = done; }
+    if (done == UINT64_MAX) return refuse(Reason::AllOnesFence);
+    if (done < q.retiredSeq) return refuse(Reason::RegressedFence);
+    if (done > gSeq) return refuse(Reason::FutureFence);
     uint64_t previous = q.retiredSeq;
     bool observed = done == q.retiredSeq;
-    const uint32_t count = q.tail - q.head;
     for (uint32_t i = 0; i < count; ++i) {
         const uint64_t seq = q.fseq[(q.head + i) & 63];
-        if (!seq || seq <= previous || seq > gSeq) return false;
+        if (!seq) return refuse(Reason::ZeroSequence);
+        if (seq <= previous) return refuse(Reason::NonmonotonicSequence);
+        if (seq > gSeq) return refuse(Reason::FutureSequence);
         if (seq == done) observed = true;
         previous = seq;
     }
-    if (!observed) return false;
+    if (!observed) return refuse(Reason::UnknownFence);
     *doneOut = done;
+    if (observation) observation->reason = Reason::Valid;
     return true;
 }
 
 // gpuLock held: queue entries, sequence and history indices belong to one serialized snapshot.
-uint64_t PhxBringup::gpuRetiredLocked() const {
+uint64_t PhxBringup::gpuRetiredLocked(PhxRetirementObservation *observation) const {
+    if (observation) { *observation = PhxRetirementObservation{}; observation->submitted = gSeq; }
     if (!fbAper || !mmio || (!gq[0].ready && !gq[1].ready)) return 0;
     uint64_t retired = gSeq;
-    for (const GpuQueue &q : gq) {
+    for (uint32_t index = 0; index < 2; ++index) {
+        const GpuQueue &q = gq[index];
         if (!q.ready) continue;
         uint64_t done = 0;
-        if (!queueProgress(q, &done)) return 0;
+        PhxQueueObservation *queue = observation ? &observation->queue[index] : nullptr;
+        if (!queueProgress(q, &done, queue)) return 0;
         const uint32_t count = q.tail - q.head;
         for (uint32_t i = 0; i < count; ++i) {
             const uint64_t seq = q.fseq[(q.head + i) & 63];
             if (seq > done) {
+                if (queue) queue->firstPending = seq;
                 if (seq - 1 < retired) retired = seq - 1;
                 break;
             }
         }
     }
+    if (observation) observation->valid = true;
     return retired;
 }
 
@@ -2415,11 +2465,20 @@ IOReturn IOAccelPhxNativeClient::doBoImportHost(IOExternalMethodArguments *a) {
     }
     if (static_cast<SInt64>(h) > gBosHandlesHigh) gBosHandlesHigh = static_cast<SInt64>(h);
     IOMemoryDescriptor *md = IOMemoryDescriptor::withAddressRange(va, size, kIODirectionInOut, task);
-    if (!md)
+    if (!md) {
+        if (phxAllocationDiagnosticSample(allocationFailureLogs[1]))
+            IOLog("PhxAlloc: v1 op=BO_IMPORT_HOST stage=descriptor IOReturn=0x%08x bytes=%llu direction=inout sample=%u limit=%u\n",
+                  static_cast<unsigned>(kIOReturnNoMemory), static_cast<unsigned long long>(size),
+                  static_cast<unsigned>(allocationFailureLogs[1]), static_cast<unsigned>(kPhxAllocationDiagnosticLimit));
         return kIOReturnNoMemory;
+    }
     const IOReturn r = md->prepare();
     if (r != kIOReturnSuccess) {
         md->release();
+        if (phxAllocationDiagnosticSample(allocationFailureLogs[2]))
+            IOLog("PhxAlloc: v1 op=BO_IMPORT_HOST stage=prepare IOReturn=0x%08x bytes=%llu direction=inout sample=%u limit=%u\n",
+                  static_cast<unsigned>(r), static_cast<unsigned long long>(size),
+                  static_cast<unsigned>(allocationFailureLogs[2]), static_cast<unsigned>(kPhxAllocationDiagnosticLimit));
         return r;
     }
     hostUsed += size;
@@ -2465,8 +2524,13 @@ IOReturn IOAccelPhxNativeClient::doGemVa(IOExternalMethodArguments *a) {
                     freei = i;
                 continue;
             }
-            if (va < maps[i].va + maps[i].size && maps[i].va < va + v->map_size)
+            if (va < maps[i].va + maps[i].size && maps[i].va < va + v->map_size) {
+                if (maps[i].pending && phxAllocationDiagnosticSample(allocationFailureLogs[0]))
+                    IOLog("PhxAlloc: v1 op=GPU_MAP reason=pending-overlap IOReturn=0x%08x bytes=%llu sample=%u limit=%u\n",
+                          static_cast<unsigned>(kIOReturnBusy), static_cast<unsigned long long>(v->map_size),
+                          static_cast<unsigned>(allocationFailureLogs[0]), static_cast<unsigned>(kPhxAllocationDiagnosticLimit));
                 return maps[i].pending ? kIOReturnBusy : kIOReturnBadArgument;
+            }
         }
         if (freei < 0)
             return kIOReturnNoMemory;

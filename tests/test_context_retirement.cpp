@@ -1,5 +1,6 @@
 // Execute the staged cleanup implementation; OS objects and hardware observations are explicit fakes.
 #include "PhxNativeABI.h"
+#include "PhxAllocationDiagnostic.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
@@ -147,8 +148,8 @@ public:
     void reapContexts(); void reapContextsLocked();
     uint32_t vmidAlloc();
     uint64_t queueFence(const GpuQueue &) const;
-    bool queueProgress(const GpuQueue &, uint64_t *) const;
-    uint64_t gpuRetiredLocked() const;
+    bool queueProgress(const GpuQueue &, uint64_t *, PhxQueueObservation * = nullptr) const;
+    uint64_t gpuRetiredLocked(PhxRetirementObservation * = nullptr) const;
     uint64_t gpuRetired() const;
     void stop(IOService *);
 };
@@ -443,12 +444,16 @@ int main(int argc, char **argv) {
                 p.reapContexts(); reclaimed(p, normal, host);
             }
             if (test == "alloc-pending" || test == "alloc-reclaims" || test == "alloc-stopping-after-lock") {
+                for (auto &operation : p.vm[0].busyLogs) for (auto &count : operation) count = 4;
                 for (unsigned i = 1; i < PhxBringup::kMaxCtx; ++i) p.vm[i].busy = true;
                 if (test == "alloc-reclaims") p.aperture.words[0x100 / 8] = 5;
                 if (test == "alloc-stopping-after-lock") { p.aperture.words[0x100 / 8] = 5; stopAfterLock = true; }
                 const uint32_t allocated = p.vmidAlloc();
                 assert(allocated == (test == "alloc-reclaims" ? 1u : 0u));
-                if (allocated) assert(frees == 1 && host.completes == 1 && p.vm[0].busy && !p.vm[0].closing && !p.vm[0].retiredBuffers);
+                if (allocated) {
+                    assert(frees == 1 && host.completes == 1 && p.vm[0].busy && !p.vm[0].closing && !p.vm[0].retiredBuffers);
+                    for (const auto &operation : p.vm[0].busyLogs) for (auto count : operation) assert(!count);
+                }
                 else retained(p, normal, host);
             }
             if (test == "double-reap") { p.reapContexts(); reclaimed(p, normal, host); }

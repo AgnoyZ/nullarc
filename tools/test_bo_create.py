@@ -11,6 +11,13 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def extract_state(source):
+    state = re.findall(r'^    uint8_t allocationFailureLogs\[3\]\{\};[^\n]*$', source, re.M)
+    if len(state) != 1:
+        raise RuntimeError('Expected actual allocation diagnostic counters')
+    return state[0] + '\n'
+
+
 def extract_source(source):
     parts = []
     patterns = [r'^struct PhxClientBo \{.*?^\};',
@@ -36,12 +43,15 @@ def exercise(out):
     if out.exists():
         raise RuntimeError('Output exists; choose a fresh directory')
     source = ROOT / 'src/phxbringup/PhxBringup.cpp'
-    extracted = extract_source(source.read_text(encoding='utf-8'))
+    text = source.read_text(encoding='utf-8')
+    extracted = extract_source(text)
+    state = extract_state(text)
     out.mkdir(parents=True)
     # These methods refer only to this ABI, the policy header and explicit fakes.
     # Read current bytes directly; report hashes rather than silently exporting an older HEAD.
     structure = re.search(r'^struct PhxClientBo \{.*?^\};', extracted, re.M | re.S)[0]
     (out / 'bo-struct.inc').write_text(structure, encoding='utf-8')
+    (out / 'bo-state.inc').write_text(state, encoding='utf-8')
     (out / 'bo-methods.inc').write_text(extracted.replace(structure, '', 1), encoding='utf-8')
     binary = out / 'bo-create-test'
     subprocess.run([compiler, '-std=c++17', '-Wall', '-Wextra', '-Werror',
@@ -53,9 +63,11 @@ def exercise(out):
     if result != {'allocation_cases': 30, 'hardware_executed': False}:
         raise RuntimeError('Unexpected allocation test report')
     inputs = [source, ROOT / 'src/phxbringup/PhxBoPolicy.hpp', ROOT / 'src/phxbringup/PhxNativeABI.h',
+              ROOT / 'src/phxbringup/PhxAllocationDiagnostic.hpp',
               ROOT / 'tests/test_bo_create.cpp']
     result['source_sha256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs}
     result['actual_methods_sha256'] = hashlib.sha256(extracted.encode()).hexdigest()
+    result['actual_diagnostic_state_sha256'] = hashlib.sha256(state.encode()).hexdigest()
     result['kernel_loaded'] = False
     result['limitation'] = 'Actual allocation control flow, arithmetic and cleanup; fake allocation, task, pins and locks. No real GPU or kernel-address-space pressure measurement.'
     (out / 'report.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')

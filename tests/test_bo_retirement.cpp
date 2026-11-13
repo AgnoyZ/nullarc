@@ -1,6 +1,7 @@
 // Execute staged methods; descriptor backing, page tables, MMIO and queue completion are host fakes.
 #include "PhxNativeABI.h"
 #include "PhxHardwarePolicy.hpp"
+#include "PhxAllocationDiagnostic.hpp"
 #include <cassert>
 #include <cstdarg>
 #include <cstdint>
@@ -80,7 +81,12 @@ struct IOBufferMemoryDescriptor : IOMemoryDescriptor {};
 #endif
 struct FakeMap {
     std::vector<uint64_t> words = std::vector<uint64_t>(128, 0);
-    uintptr_t getVirtualAddress() { return reinterpret_cast<uintptr_t>(words.data()); }
+    unsigned observations{0};
+    std::function<void()> observationHook;
+    uintptr_t getVirtualAddress() {
+        ++observations; if (observationHook) observationHook();
+        return reinterpret_cast<uintptr_t>(words.data());
+    }
 };
 struct IOExternalMethodArguments {
     uint32_t scalarInputCount{0}, scalarOutputCount{0}, structureInputSize{0}, structureOutputSize{0};
@@ -163,15 +169,15 @@ public:
         ++submissions; *seq = ++gSeq; vm[0].lastSeq = *seq; return kIOReturnSuccess;
     }
     bool vmOwnershipKnown(uint32_t) const;
-    IOReturn vmIdleLocked(uint32_t, bool);
+    IOReturn vmIdleLocked(uint32_t, bool, uint32_t = 0);
     IOReturn vmCanReclaim(uint32_t);
     IOReturn vmMap(uint32_t, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t, bool *);
     IOReturn vmUnmap(uint32_t, uint64_t, uint64_t);
     bool vmFlushTlb(uint32_t) const;
     bool vmBindingValid(uint32_t, uint64_t) const;
     uint64_t queueFence(const GpuQueue &) const;
-    bool queueProgress(const GpuQueue &, uint64_t *) const;
-    uint64_t gpuRetiredLocked() const;
+    bool queueProgress(const GpuQueue &, uint64_t *, PhxQueueObservation * = nullptr) const;
+    uint64_t gpuRetiredLocked(PhxRetirementObservation * = nullptr) const;
     uint64_t gpuRetired() const;
 };
 class IOAccelPhxNativeClient {

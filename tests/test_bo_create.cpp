@@ -1,7 +1,9 @@
 // Actual allocation methods, fake IOKit. No device access.
 #include "PhxNativeABI.h"
 #include "PhxBoPolicy.hpp"
+#include "PhxAllocationDiagnostic.hpp"
 #include <cassert>
+#include <cstdarg>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -16,16 +18,22 @@ static SInt64 gBosHandlesHigh = 0, gBosHandlesFull = 0;
 static uint32_t gBosHandlesFullLogged = 0;
 static void OSAddAtomic64(int n, SInt64 *p) { *p += n; }
 static bool OSCompareAndSwap(uint32_t a, uint32_t b, uint32_t *p) { if (*p != a) return false; *p = b; return true; }
-static void IOLog(const char *, ...) {}
+static void (*logHook)(const char *, va_list) = nullptr;
+static void IOLog(const char *format, ...) {
+    va_list arguments; va_start(arguments, format);
+    if (logHook) logHook(format, arguments);
+    va_end(arguments);
+}
 static unsigned allocations, releases, prepares, zeroes;
 static bool allocFail, bytesFail, pinFail;
+static IOReturn pinResult = kIOReturnSuccess;
 static uint8_t storage[4096];
 static void fakeBzero(void *bytes, size_t size) {
     assert(bytes == storage && size == sizeof storage); ++zeroes; std::memset(bytes, 0, size);
 }
 struct IOMemoryDescriptor {
     static IOMemoryDescriptor *withAddressRange(uint64_t, uint64_t, unsigned, void *);
-    IOReturn prepare() { ++prepares; return pinFail ? kIOReturnVMError : kIOReturnSuccess; }
+    IOReturn prepare() { ++prepares; return pinFail ? kIOReturnVMError : pinResult; }
     void release() { ++releases; }
 };
 struct IOBufferMemoryDescriptor : IOMemoryDescriptor {
@@ -50,6 +58,7 @@ struct IOExternalMethodArguments {
 #include "bo-struct.inc"
 class IOAccelPhxNativeClient {
 public:
+#include "bo-state.inc"
     using Bo = PhxClientBo;
     Bo bos[PHXN_MAX_BOS]{};
     uint64_t visUsed{}, hiUsed{}, gttUsed{}, hostUsed{};
@@ -61,6 +70,7 @@ public:
 #include "bo-methods.inc"
 #undef bzero
 
+#ifndef PHX_NO_BO_CREATE_TEST_MAIN
 int main() {
     uint64_t rounded = 17;
     assert(!phx780m::boPageSize(0, &rounded) && rounded == 17);
@@ -137,3 +147,4 @@ int main() {
     }
     std::cout << "{\"allocation_cases\":30,\"hardware_executed\":false}\n";
 }
+#endif

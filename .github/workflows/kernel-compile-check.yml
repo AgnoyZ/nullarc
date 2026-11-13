@@ -1,0 +1,43 @@
+name: Compile allocation diagnostic kernel without publishing
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kernel-compile-check-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  kernel:
+    if: github.repository == 'AgnoyZ/nullarc' && github.ref == 'refs/heads/downstream/780m-tahoe'
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Record source and native compiler
+        run: |
+          git rev-parse HEAD
+          sw_vers
+          uname -m
+          xcrun clang --version
+      - name: Exercise actual allocation diagnostics on CPU
+        run: python3 tools/test_allocation_diagnostic.py --out build/allocation-diagnostic-tests
+      - name: Checkout pinned MacKernelSDK
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: acidanthera/MacKernelSDK
+          ref: 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          path: build-sdk
+          persist-credentials: false
+      - name: Compile and verify PhxBringup only
+        run: |
+          bash src/phxbringup/build.sh ./build-sdk
+          codesign --force --sign - src/phxbringup/build/PhxBringup.kext
+          codesign --verify --strict src/phxbringup/build/PhxBringup.kext
+          lipo -verify_arch x86_64 src/phxbringup/build/PhxBringup.kext/Contents/MacOS/PhxBringup
+          git diff --exit-code HEAD -- src
+      - name: Record validation limits
+        run: |
+          echo 'PhxBringup compile, link and ad-hoc signature checks only; no artifacts uploaded.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No installation, target kernel loading, GPU execution or desktop acceptance.' >> "$GITHUB_STEP_SUMMARY"

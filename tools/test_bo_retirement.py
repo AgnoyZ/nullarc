@@ -56,7 +56,9 @@ def extract_source(source):
         constants += '\n' + rows[0]
     maps = re.findall(r'^    struct Map \{.*?^    \};', source, re.M | re.S)
     if len(maps) != 1: raise RuntimeError('Expected actual client map structure')
-    return constants, shared, declarations, maps[0], '\n'.join(parts), hashes
+    state = re.findall(r'^    uint8_t allocationFailureLogs\[3\]\{\};[^\n]*$', source, re.M)
+    if len(state) != 1: raise RuntimeError('Expected actual allocation diagnostic counters')
+    return constants, shared, declarations, maps[0] + '\n' + state[0], '\n'.join(parts), hashes
 
 
 def check_result(result, case):

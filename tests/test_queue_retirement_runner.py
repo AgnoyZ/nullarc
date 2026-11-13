@@ -36,7 +36,7 @@ class QueueRetirementRunnerTests(unittest.TestCase):
         for name in ('vmBind', 'vmIdleLocked', 'reapContextsLocked'):
             start = self.source.index('PhxBringup::' + name + '(')
             body = self.source[start:self.source.index('\n}\n', start)]
-            self.assertIn('gpuRetiredLocked()', body)
+            self.assertIn('gpuRetiredLocked(', body)
             self.assertNotIn('gpuRetired()', body)
         start = self.source.index('uint64_t PhxBringup::gpuRetired()')
         body = self.source[start:self.source.index('\n}\n', start)]

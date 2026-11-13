@@ -1,6 +1,7 @@
 // Actual queue methods with checked host locks and synthetic, serialized device observations.
 #include "PhxHardwarePolicy.hpp"
 #include "PhxNativeABI.h"
+#include "PhxAllocationDiagnostic.hpp"
 #include <atomic>
 #include <cassert>
 #include <cstdint>
@@ -59,8 +60,8 @@ public:
     void reapContextsLocked() { assert(lockHeld); ++reaps; }
     void hdpFlush() { assert(lockHeld); ++flushes; }
     uint64_t queueFence(const GpuQueue &) const;
-    bool queueProgress(const GpuQueue &, uint64_t *) const;
-    uint64_t gpuRetiredLocked() const;
+    bool queueProgress(const GpuQueue &, uint64_t *, PhxQueueObservation * = nullptr) const;
+    uint64_t gpuRetiredLocked(PhxRetirementObservation * = nullptr) const;
     uint64_t gpuRetired() const;
     void ringPut(GpuQueue &, uint32_t, uint32_t);
     IOReturn gpuSubmit(uint32_t, bool, const uint64_t *, const uint32_t *, uint32_t, uint64_t *);

@@ -673,3 +673,8 @@ preserving the prohibition on editing live page tables and the host-page pin
 protections. The one-shot authorization is spent; this result does not
 authorize another desktop attempt. Raw captures, source reconstruction and
 correlation remain private under ignored `build/`.
+
+The next source-only kernel diagnostic is documented in
+[Allocation refusal kernel diagnostic, build 36](ALLOCATION-KERNEL-DIAGNOSTIC.md).
+It records the existing refusal branches and same-read queue observations;
+it is not installed and does not constitute a fix or a second desktop test.
