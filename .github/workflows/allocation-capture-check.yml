@@ -1,0 +1,23 @@
+name: Passive allocation capture contracts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fake-process-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, macos-15-intel]
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise collector with fake identity commands and a fake reader only
+        run: python3 -m unittest discover -s tests -p test_allocation_capture.py -v
+      - name: Verify source and execution scope
+        run: |
+          git diff --exit-code HEAD -- src tools tests
+          echo 'Fake processes and private temporary files only; no service open, GPU work, installation or artifacts.'

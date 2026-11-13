@@ -6,6 +6,10 @@ records. Its underlying retirement branch and host-import stage remain
 unconfirmed. This change provides another evidence channel; it does not fix
 allocation, prove a hang, or establish that video memory was exhausted.
 
+The separate [pre-fallback capture source candidate](ALLOCATION-CAPTURE-CANDIDATE.md)
+adds private baseline/failure persistence and same-boot identity checks. It is
+not installed or connected to the existing monitor.
+
 ## Bounded service storage
 
 `PhxBringup` owns one zero-initialized, 3,888-byte software history protected by
