@@ -1,6 +1,8 @@
 """Fault-inject the actual staged mesboot helpers; never connect to hardware."""
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
 import platform
 import shutil
@@ -108,6 +110,76 @@ def check_submission_case(result, fault):
     return summary
 
 
+def handoff_cases():
+    return ('ok', 'gfx-timeout', 'gfx-wrong-scratch', 'gfx-wrong-memory',
+            'compute-adopt-status', 'gfx-adopt-status')
+
+
+def check_handoff_case(result, fault):
+    if fault not in handoff_cases():
+        raise RuntimeError('Unknown handoff fixture')
+    status = 0 if fault == 'ok' else 74 if fault.endswith('adopt-status') else 75
+    if result.returncode != status or ('gpu-returned' in result.stdout) != (status == 0):
+        raise RuntimeError(f'Unexpected actual handoff exit ({fault}): {result.returncode}: {result.stderr}')
+    if status and ('mesboot transport:' if status == 74 else 'mesboot GPU:') not in result.stderr:
+        raise RuntimeError('Missing actual terminal failure diagnostic')
+    summaries = {}
+    for label in ('gpu', 'handoff'):
+        prefix = 'fake-' + label + '-summary '
+        rows = [line[len(prefix):] for line in result.stderr.splitlines() if line.startswith(prefix)]
+        if len(rows) != 1:
+            raise RuntimeError('Missing or repeated handoff accounting')
+        summaries[label] = json.loads(rows[0])
+    gpu, handoff = summaries['gpu'], summaries['handoff']
+    first = fault == 'compute-adopt-status'
+    requests = 1 if first or status == 75 else 2
+    expected_gpu = {'scheduler_bells': 3 if first else 4, 'work_bells': 1 if first else 2,
+                    'adoptions': requests, 'writes_after_failure': 0,
+                    'sleeps': 4 if first else 55 if status == 75 else 6}
+    if gpu != expected_gpu or any(type(v) is not int for v in gpu.values()):
+        raise RuntimeError('Unexpected handoff continuation, adoption or polling')
+    if set(handoff) != {'fake_transport_successes', 'fake_transport_refusals',
+                        'graphics_preamble_dwords', 'adoption_requests'}:
+        raise RuntimeError('Unexpected handoff shape')
+    for key in ('fake_transport_successes', 'fake_transport_refusals', 'graphics_preamble_dwords'):
+        if type(handoff[key]) is not int:
+            raise RuntimeError('Invalid handoff integer')
+    if handoff['fake_transport_refusals'] != (status == 74) or handoff['fake_transport_successes'] != requests - (status == 74):
+        raise RuntimeError('Wrong fake adoption transport results')
+    preamble = handoff['graphics_preamble_dwords']
+    if not 0 < preamble <= 2040:
+        raise RuntimeError('Invalid graphics preamble extent')
+    expected = [[0x2540000, 1024, 0x2541000, 6 * 4, 8, 0x2550000]]
+    if requests == 2:
+        expected.append([0x2570000, 2048, 0x2574000, 0x116 * 4, preamble + 8, 0x2580001])
+    values = handoff['adoption_requests']
+    if values != expected or any(type(v) is not int for row in values for v in row):
+        raise RuntimeError('Wrong actual six-scalar queue handoff')
+    return summaries
+
+
+def extract_handoff_filters(full, boot):
+    """Use only the two exact existing filters; never execute either startup script."""
+    full_rows = [line for line in full.splitlines() if 'MESBOOT_CS=$CS' in line and 'ADOPT_GFX=$AG' in line]
+    boot_rows = [line for line in boot.splitlines() if line.startswith('MC=1 CS=1 ADOPT=1 GFX=1 AG=1 bash ')]
+    if len(full_rows) != 1 or len(boot_rows) != 1:
+        raise RuntimeError('Expected one actual initializer and boot filter')
+    tail = full_rows[0].split(' | ', 1)[-1]
+    grep = boot_rows[0].split(' | ', 1)[-1]
+    if tail != 'tail -12' or grep != 'grep -E "^compute:|^gfx:|adopt"':
+        raise RuntimeError('Initializer filters changed; review before executing a fixture')
+    return tail, grep
+
+
+def check_handoff_pipeline(result):
+    # The marker is a file-free test hook, not a kernel claim or a display command.
+    if result.returncode != 0 or result.stdout.count('fake-claim-requested\n') != 1:
+        raise RuntimeError('Expected the legacy zero-status filters to reach the claim hook')
+    if 'fake-filter-status=0\n' not in result.stdout or 'compute:' not in result.stdout:
+        raise RuntimeError('Expected retained compute output and a successful filter')
+    return {'filter_status': 0, 'claim_hook_requested': True, 'kernel_claim_executed': False}
+
+
 def exercise(out):
     compiler = shutil.which("clang")
     if platform.system() not in ("Linux", "Darwin") or not compiler:
@@ -136,12 +208,36 @@ def exercise(out):
     for fault in submission_cases():
         result = subprocess.run([str(binary), "submission", fault], capture_output=True, text=True, timeout=10)
         submissions.append({"case": fault, **check_submission_case(result, fault)})
+    full = (ROOT / 'tools/phxctl/full.sh').read_text()
+    boot = (ROOT / 'tools/phxctl/phxboot.sh').read_text()
+    tail, grep = extract_handoff_filters(full, boot)
+    shell_environment = os.environ.copy()
+    for key in ('BASH_ENV', 'ENV', 'SHELLOPTS', 'BASHOPTS'):
+        shell_environment.pop(key, None)
+    handoffs = []
+    for fault in handoff_cases():
+        result = subprocess.run([str(binary), 'handoff', fault], capture_output=True, text=True, timeout=10)
+        observed = check_handoff_case(result, fault)
+        script = ('"$1" handoff "$2" 2>&1 | ' + tail + ' | ' + grep + '\n'
+                  'status=$?\nprintf "fake-filter-status=%s\\n" "$status"\n'
+                  'if [ "$status" -eq 0 ]; then printf "fake-claim-requested\\n"; fi\nexit "$status"\n')
+        filtered = subprocess.run(['bash', '--noprofile', '--norc', '-c', script,
+                                   'fake-handoff', str(binary), fault],
+                                  capture_output=True, text=True, timeout=10, env=shell_environment)
+        handoffs.append({'case': fault, 'actual_mesboot_returncode': result.returncode,
+                         **observed, 'source_filter_composition': check_handoff_pipeline(filtered)})
     report = {"source_provenance": provenance, "fault_injection_cases_passed": passed,
               "completion_path_cases_passed": completions,
               "submission_boundary_cases_passed": submissions,
+              'actual_handoff_cases_passed': handoffs,
+              'actual_source_filters': {'initializer': tail, 'boot': grep},
+              'handoff_inputs_sha256': {
+                  name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in
+                  ('tools/phxctl/mesboot.c', 'tools/phxctl/csb_gfx11.h', 'tools/phxctl/full.sh',
+                   'tools/phxctl/phxboot.sh', 'tests/test_bringup_transport.c', 'tools/test_bringup_transport.py')},
               "transport_backend": "fake IOKit; actual patched mesboot source",
               "hardware_executed": False, "driver_runtime_tested": False,
-              "limitation": "Injected transport/completion observations test actual userspace control flow, not GPU execution or packet correctness"}
+              "limitation": "Injected transport/completion observations test actual userspace control flow, not GPU execution or packet correctness. Handoff tests execute sched_test with both queues and exact extracted tail/grep filters, not startup scripts, native kernel adoption, kernel claim or display/recovery."}
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2), flush=True)
     return report

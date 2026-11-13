@@ -1,5 +1,9 @@
+from contextlib import redirect_stdout
+import io
 from pathlib import Path
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -10,9 +14,55 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from test_bringup_transport import cases, check_case, exercise, compile_native, completion_cases, check_completion_case
 from test_bringup_transport import submission_cases, check_submission_case
+from test_bringup_transport import handoff_cases, check_handoff_case, extract_handoff_filters, check_handoff_pipeline
 
 
 class TransportRunnerTests(unittest.TestCase):
+    def test_handoff_cases_cover_partial_graphics_failure_and_both_adoption_refusals(self):
+        self.assertEqual({'ok', 'gfx-timeout', 'gfx-wrong-scratch', 'gfx-wrong-memory',
+                          'compute-adopt-status', 'gfx-adopt-status'}, set(handoff_cases()))
+        self.assertEqual(6, len(handoff_cases()))
+
+    def test_handoff_accounting_rejects_swallowed_failure_or_wrong_queue_inputs(self):
+        gpu = {'scheduler_bells': 4, 'work_bells': 2, 'adoptions': 1, 'writes_after_failure': 0, 'sleeps': 55}
+        handoff = {'fake_transport_successes': 1, 'fake_transport_refusals': 0,
+                   'graphics_preamble_dwords': 960,
+                   'adoption_requests': [[0x2540000, 1024, 0x2541000, 24, 8, 0x2550000]]}
+        def result(gpu=gpu, handoff=handoff, code=75, stdout=''):
+            return subprocess.CompletedProcess([], code, stdout, 'mesboot GPU: gfx execution not confirmed\n'
+                'fake-gpu-summary ' + json.dumps(gpu) + '\nfake-handoff-summary ' + json.dumps(handoff))
+        self.assertEqual(handoff, check_handoff_case(result(), 'gfx-wrong-memory')['handoff'])
+        for invalid in (result(code=0), result(stdout='gpu-returned'), result(gpu={**gpu, 'adoptions': 2}),
+                        result(gpu={**gpu, 'sleeps': 0}), result(gpu={**gpu, 'writes_after_failure': 1}),
+                        result(handoff={**handoff, 'fake_transport_successes': True}),
+                        result(handoff={**handoff, 'fake_transport_refusals': 1}),
+                        result(handoff={**handoff, 'adoption_requests': []})):
+            with self.assertRaises(RuntimeError): check_handoff_case(invalid, 'gfx-wrong-memory')
+
+    def test_exact_source_filters_and_fake_claim_hook_are_validated(self):
+        full = (ROOT / 'tools/phxctl/full.sh').read_text()
+        boot = (ROOT / 'tools/phxctl/phxboot.sh').read_text()
+        self.assertEqual(('tail -12', 'grep -E "^compute:|^gfx:|adopt"'), extract_handoff_filters(full, boot))
+        for a, b in ((full * 2, boot), (full, boot * 2), (full.replace('tail -12', 'tail -12; exit 0'), boot),
+                     (full, boot.replace('grep -E', 'grep -F')), ('', boot)):
+            with self.assertRaises(RuntimeError): extract_handoff_filters(a, b)
+        text = 'compute: synthetic\nfake-filter-status=0\nfake-claim-requested\n'
+        self.assertTrue(check_handoff_pipeline(subprocess.CompletedProcess([], 0, text, ''))['claim_hook_requested'])
+        for code, stdout in ((1, text), (0, text.replace('compute:', 'absent:')),
+                             (0, text.replace('fake-claim-requested\n', '')), (0, text + 'fake-claim-requested\n')):
+            with self.assertRaises(RuntimeError): check_handoff_pipeline(subprocess.CompletedProcess([], code, stdout, ''))
+
+    @unittest.skipIf(os.name == 'nt' or not shutil.which('clang'), 'POSIX Clang required for actual fake-I/O C')
+    def test_actual_handoff_and_legacy_filter_compositions(self):
+        with tempfile.TemporaryDirectory(prefix='phx-handoff-') as directory, redirect_stdout(io.StringIO()):
+            report = exercise(Path(directory) / 'audit')
+        self.assertEqual(set(handoff_cases()), {row['case'] for row in report['actual_handoff_cases_passed']})
+        self.assertFalse(report['hardware_executed'])
+        self.assertFalse(report['driver_runtime_tested'])
+        self.assertEqual(52, len(report['fault_injection_cases_passed']))
+        self.assertEqual(20, len(report['completion_path_cases_passed']))
+        self.assertEqual(16, len(report['submission_boundary_cases_passed']))
+
     def test_submission_rejection_has_no_transport_or_state_changes(self):
         data = {"calls": 0, "ring_writes": 0, "wptr": 897, "seq": 0}
         def result(summary, status=76):

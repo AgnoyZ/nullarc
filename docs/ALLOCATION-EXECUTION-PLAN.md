@@ -286,3 +286,11 @@ the complete current mesboot entrypoint and the existing stage executor with
 fake I/O. It identifies the legacy claim/layout boundary and the executor's
 synchronous release dependency; neither is a complete initialization chain
 or independent recovery implementation.
+
+The [queue handoff review](ALLOCATION-QUEUE-HANDOFF.md) adds actual two-engine
+helper evidence: a graphics failure after a fake successful compute adoption
+still lets the old output filters return zero and request a claim hook. It
+preserves raw failures 74/75 and distinguishes fake transport acceptance from
+kernel adoption or claim. A complete candidate must carry every required
+engine's status and owned resource lifetime through the handoff; aggregate
+readiness and filtered output are insufficient.

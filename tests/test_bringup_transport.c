@@ -20,6 +20,9 @@ _Alignas(8) static unsigned char submission_packet[API_FRAME_SIZE_IN_DWORDS * 4 
 static unsigned char submission_original[sizeof(submission_packet)];
 static uint64_t submission_initial_wptr, submission_initial_seq;
 static int submission_success;
+static int handoff;
+static unsigned adoption_refusals, adoption_successes;
+static uint64_t adoption_inputs[2][6];
 
 static void submission_summary(void) {
     if (!submission_success) {
@@ -36,6 +39,18 @@ static void gpu_summary(void) {
     fprintf(stderr, "fake-gpu-summary {\"scheduler_bells\":%u,\"work_bells\":%u,\"adoptions\":%u,"
                     "\"writes_after_failure\":%u,\"sleeps\":%u}\n",
                     scheduler_bells, work_bells, adoptions, writes_after_failure, sleeps);
+    if (handoff) {
+        fprintf(stderr, "fake-handoff-summary {\"fake_transport_successes\":%u,\"fake_transport_refusals\":%u,"
+                        "\"graphics_preamble_dwords\":%zu,\"adoption_requests\":[",
+                        adoption_successes, adoption_refusals, sizeof(kCsbGfx11) / 4);
+        for (unsigned i = 0; i < adoptions; ++i) {
+            fputs(i ? ",[" : "[", stderr);
+            for (unsigned j = 0; j < 6; ++j)
+                fprintf(stderr, "%s%llu", j ? "," : "", (unsigned long long)adoption_inputs[i][j]);
+            fputc(']', stderr);
+        }
+        fputs("]}\n", stderr);
+    }
 }
 
 /* Deliberately injected observations, not emulation or evidence of working GPU packets. */
@@ -65,6 +80,8 @@ static void gpu_scalar(uint32_t selector, const uint64_t *input, uint64_t *outpu
         if (input[0] == SEG1(0x2041)) scratch1 = (uint32_t)input[1];
         *output = input[1];
     } else if (selector == SEL_DBG_ADOPTQ) {
+        assert(adoptions < 2);
+        memcpy(adoption_inputs[adoptions], input, sizeof(adoption_inputs[0]));
         ++adoptions;
     } else if (selector == SEL_DBG_DOORBELL) {
         if (input[0] == 0x16 * 4) {
@@ -83,15 +100,22 @@ static void gpu_scalar(uint32_t selector, const uint64_t *input, uint64_t *outpu
         } else {
             assert(input[0] == 6 * 4 || input[0] == GFX_DB * 4);
             ++work_bells;
-            if (strcmp(fault, "timeout") && strcmp(fault, "wrong-scratch")) {
+            const char *work_fault = fault;
+            if (handoff) {
+                work_fault = "ok";
+                if (input[0] == GFX_DB * 4 && (!strcmp(fault, "gfx-timeout") ||
+                    !strcmp(fault, "gfx-wrong-scratch") || !strcmp(fault, "gfx-wrong-memory")))
+                    work_fault = fault + 4;
+            }
+            if (strcmp(work_fault, "timeout") && strcmp(work_fault, "wrong-scratch")) {
                 if (input[0] == 6 * 4) scratch0 = 0xDEADBEEF;
                 else scratch1 = 0xDEADBEEF;
             }
-            if (strcmp(fault, "timeout") && strcmp(fault, "wrong-memory")) {
+            if (strcmp(work_fault, "timeout") && strcmp(work_fault, "wrong-memory")) {
                 if (input[0] == 6 * 4) compute_word = 0xFEEDF00D;
                 else graphics_word = 0x6F7A6F7A;
             }
-            gpu_failed = strcmp(fault, "ok") != 0;
+            gpu_failed = strcmp(work_fault, "ok") != 0;
         }
     } else assert(0);
 }
@@ -145,7 +169,18 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
     }
     assert(input_count == expected_in);
     assert((output_count ? *output_count : 0) == expected_out);
-    if (gpu_operation) { gpu_scalar(selector, input, output); return KERN_SUCCESS; }
+    if (gpu_operation) {
+        gpu_scalar(selector, input, output);
+        if (selector == SEL_DBG_ADOPTQ) {
+            if (handoff && ((!strcmp(fault, "compute-adopt-status") && adoptions == 1) ||
+                            (!strcmp(fault, "gfx-adopt-status") && adoptions == 2))) {
+                ++adoption_refusals;
+                return 5;
+            }
+            ++adoption_successes;
+        }
+        return KERN_SUCCESS;
+    }
     if (output_count) {
         assert(output);
         for (uint32_t i = 0; i < *output_count; ++i) output[i] = returned_word + i;
@@ -216,8 +251,10 @@ int main(int argc, char **argv) {
         puts("submission-returned");
         return 0;
     }
-    if (!strcmp(operation, "mes") || !strcmp(operation, "sched") || !strcmp(operation, "compute") || !strcmp(operation, "gfx")) {
+    if (!strcmp(operation, "mes") || !strcmp(operation, "sched") || !strcmp(operation, "compute") ||
+        !strcmp(operation, "gfx") || !strcmp(operation, "handoff")) {
         gpu_operation = operation;
+        handoff = !strcmp(operation, "handoff");
         assert(atexit(gpu_summary) == 0);
         assert(setenv("ADOPT", "1", 1) == 0 && setenv("ADOPT_GFX", "1", 1) == 0);
         unsetenv("MESBOOT_CS"); unsetenv("MESBOOT_GFX"); unsetenv("NO_CSB");
@@ -232,6 +269,9 @@ int main(int argc, char **argv) {
             assert(mes_submit(packet, sizeof(*packet), offsetof(union MESAPI__QUERY_MES_STATUS, api_status), "fixture") == 0);
             assert(packet->api_status.api_completion_fence_addr == VA(SCH_WB + 64));
             assert(packet->api_status.api_completion_fence_value == 1);
+        } else if (handoff) {
+            assert(setenv("MESBOOT_CS", "1", 1) == 0 && setenv("MESBOOT_GFX", "1", 1) == 0);
+            sched_test();
         } else if (!strcmp(operation, "sched")) sched_test();
         else if (!strcmp(operation, "compute")) compute_via_mes();
         else gfx_via_mes();
