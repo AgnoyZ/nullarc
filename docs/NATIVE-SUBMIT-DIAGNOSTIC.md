@@ -11,9 +11,11 @@ and published NMXAccel. That later initialization result is recorded in
 it does not accept native Metal workloads or desktop acceleration.
 The later [bounded Metal validation](validation/native-submit-build35-metal-20261113.json)
 passed all six real compute cases on that same initialized build-35 mixed
-stack. A separately recorded [single-boot desktop test](validation/native-submit-build35-m2-once-20261113.json)
-is now armed with a normal reboot scheduled; its postboot result is pending.
-Desktop takeover remains unaccepted.
+stack. The separately armed [single-boot desktop test](validation/native-submit-build35-m2-once-20261113.json)
+then reached PhxAMDFB, but three WindowServer crashes triggered the existing
+fallback. Its [postboot result](validation/native-submit-build35-m2-postboot-20261113.json)
+records the same RADV command-buffer cleanup stack in all three crashes.
+Desktop takeover remains unaccepted; keep M2 off.
 
 The failed desktop boot logged `VK_ERROR_DEVICE_LOST`, but the pinned RADV
 queue layer can convert several distinct failures to that result. Known native
@@ -352,3 +354,58 @@ medium is unverified and a wedged kernel or bus may prevent automatic recovery.
 This is an arming checkpoint, not desktop validation; reboot completion,
 arming consumption, actual takeover, WindowServer frame progress and the
 original failure cause are all pending. See [the one-shot record](validation/native-submit-build35-m2-once-20261113.json).
+
+## Single-boot desktop outcome: cleanup crashes and fallback
+
+The requested restart's startup log begins at 16:07:48 local time on
+2026-11-13 and reports the PhxAMDFB panel path. A kernel record at 16:07:50
+explicitly reports that `phxfb-boot` was removed and committed. Startup reported expected compute
+and graphics sentinels, zero queue-adoption and claim results, and display
+arming/release at 16:08:00 with AGDC enabled. The switch was consumed and
+the display path was attempted; these are not desktop correctness results.
+
+Three privately retained WindowServer reports, captured at approximately
+16:08:15, 16:08:25 and 16:08:36, all match that failed boot. Each reports
+`EXC_BAD_ACCESS`/`SIGSEGV` on the main thread with the same stack head:
+`radv_destroy_cmd_buffer`, `radv_create_cmd_buffer`,
+`vk_common_AllocateCommandBuffers`, `nvmtl_vk_cmd_begin`, then the Metal
+queue's command-buffer creation method. The crash RADV and Metal-plugin
+image identities match the active on-disk files, whose pinned hashes are
+unchanged. Complete installed source provenance is still not established.
+
+This stack is consistent with the known constructor cleanup defect covered
+by `4f35a609331752d5e2dcac24f8b878d32aa6f309`. That separate userspace fix
+was not deployed with the build-35 PhxBringup diagnostic. It initializes
+destructor-owned state before fallible command-stream creation; it does not
+explain why stream creation fails or guarantee desktop success. This new
+incident did not recover an original native refusal, and must not be assigned
+the earlier incident's `VK_ERROR_DEVICE_LOST` observation without evidence.
+
+The unchanged startup monitor logged three WindowServer failures and
+requested a reboot. The following boot began at 16:09:11 and completed its
+legacy initialization at 16:09:23 on the firmware framebuffer. Readback
+verified build 35 and candidate identity, NMXAccel present, PhxAMDFB absent,
+IONDRVFramebuffer present, no stop/pending/M2/NVRAM arming, and all three
+display sysctls zero. Two panel-copy counter samples were both zero, as
+expected for the current non-M2 desktop. This observes the early
+WindowServer-failure recovery path, not recovery from an unresponsive
+kernel or bus.
+
+The bounded kernel capture separates 1,356 failed-desktop records from 194
+current-fallback records. No first-submit refusal code or selected driver
+GPU-fault/timeout message was recovered. A separate failed-boot WindowServer
+query retained 4,479 records and recovered no `VK_ERROR_DEVICE_LOST` message.
+Missing messages do not exclude submission, allocation or GPU failures.
+Five matching reports were archived locally and hash-verified: the three
+WindowServer crashes and two shutdown-stall containers. The stall containers
+were retained without decoding or attributing their cause.
+
+Of 55 baseline entries, 54 matched; only the startup-generated
+firmware-address log changed. All 15 active plugin/runtime entries matched.
+Installed drivers, userspace, firmware and startup helpers were unchanged.
+The postboot investigation was read-only: no extra GPU work, initialization,
+switch change or reboot. The previous six Metal cases were not rerun or
+accepted for this new boot. Preserve this initialized firmware desktop and
+keep M2 off while separately reviewing the provenance-checked RADV cleanup
+candidate and the earlier fallible stream-creation path. The physical-size
+issue remains unresolved. See [the postboot record](validation/native-submit-build35-m2-postboot-20261113.json).

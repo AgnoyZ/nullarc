@@ -122,3 +122,17 @@ must not be conflated with the earlier WindowServer-triggered display
 fallback above. NMXAccel is absent on this protective boot. See
 [the postboot record](validation/native-submit-build35-postboot-20261113.json)
 and [the diagnostic follow-up](NATIVE-SUBMIT-DIAGNOSTIC.md#postboot-investigation-initialization-stopped).
+
+## Later build-35 bounded desktop retry
+
+After initialization recovered and a separately bounded real Metal compute
+test passed, the owner continued one desktop startup test with only one-shot
+NVRAM arming. The persistent M2 marker remained absent. That attempt reached
+PhxAMDFB, consumed the arming and released the display, then generated three
+WindowServer crashes in the same RADV command-buffer cleanup stack. The
+existing monitor requested a reboot; the following 16:09 boot restored the
+initialized firmware desktop. The cleanup-order userspace fix remained
+undeployed. This new capture recovered neither a native refusal code nor
+the earlier incident's device-loss message, so the earlier failure cause
+must remain unassigned. See [the separate postboot record](validation/native-submit-build35-m2-postboot-20261113.json)
+and [its analysis](NATIVE-SUBMIT-DIAGNOSTIC.md#single-boot-desktop-outcome-cleanup-crashes-and-fallback).

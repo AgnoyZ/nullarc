@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "timezone": "UTC+08:00",
+  "candidate_PhxBringup_source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+  "arming_checkpoint": "native-submit-build35-m2-once-20261113.json",
+  "preceding_compute_checkpoint": "native-submit-build35-metal-20261113.json",
+  "scope": "Read-only capture and diagnosis after the owner-reported reboot; do not rearm M2, replay initialization or submit additional GPU work",
+  "target": {
+    "hardware": "ThinkBook 16+ 2024, Ryzen 8845H, Radeon 780M",
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "failed_desktop_startup": {
+    "startup_started_local": "2026-11-13T16:07:48+08:00",
+    "PhxAMDFB_panel_path_reported": true,
+    "NVRAM_arming_consumed_removed_and_committed_log_local": "2026-11-13T16:07:50.101970+08:00",
+    "legacy_compute_and_graphics_sentinel_checks_reported_expected_values": true,
+    "both_queue_adoptions_and_accelerator_claim_reported_zero": true,
+    "display_armed_and_released_local": "2026-11-13T16:08:00+08:00",
+    "AGDC_reported_value": 1,
+    "three_WindowServer_crash_reports_matched_failed_boot_identity": true,
+    "existing_monitor_logged_M2_failure_and_requested_reboot": true,
+    "following_firmware_framebuffer_boot_observed": true,
+    "persistent_M2_marker_was_not_enabled": true
+  },
+  "WindowServer_reports": {
+    "count": 3,
+    "capture_times_local": [
+      "2026-11-13T16:08:15.001100+08:00",
+      "2026-11-13T16:08:25.464000+08:00",
+      "2026-11-13T16:08:36.494100+08:00"
+    ],
+    "all_exception_type": "EXC_BAD_ACCESS",
+    "all_signal": "SIGSEGV",
+    "all_crashed_on_main_thread": true,
+    "shared_stack_head": [
+      "radv_destroy_cmd_buffer",
+      "radv_create_cmd_buffer",
+      "vk_common_AllocateCommandBuffers",
+      "nvmtl_vk_cmd_begin",
+      "-[NVMTLCommandQueue commandBuffer]"
+    ],
+    "RADV_and_Metal_plugin_crash_image_identities_match_active_files": true,
+    "known_constructor_cleanup_fix_source_commit": "4f35a609331752d5e2dcac24f8b878d32aa6f309",
+    "known_cleanup_fix_in_installed_RADV": false,
+    "observed_stack_is_consistent_with_known_cleanup_failure_path": true,
+    "stack_proves_original_command_stream_allocation_failure_cause": false,
+    "cleanup_fix_guarantees_desktop_recovery": false
+  },
+  "bounded_log_observation": {
+    "collection_finished_local": "2026-11-13T16:11:33.152715+08:00",
+    "kernel_query_completed_without_timeout": true,
+    "timezone_aware_window_and_boot_identity_filtering": true,
+    "failed_desktop_boot_kernel_records": 1356,
+    "current_fallback_boot_kernel_records": 194,
+    "timestamp_parse_failures": 0,
+    "outside_window_records_excluded": 0,
+    "first_native_submit_refusal_codes_recovered": [],
+    "selected_driver_GPU_fault_or_timeout_messages_observed": 0,
+    "WindowServer_failed_boot_query_start_local": "2026-11-13T16:07:40+08:00",
+    "WindowServer_failed_boot_query_end_exclusive_local": "2026-11-13T16:08:55+08:00",
+    "WindowServer_same_boot_window_records": 4479,
+    "WindowServer_VK_ERROR_DEVICE_LOST_observed_in_this_query": false,
+    "missing_logs_exclude_failure": false,
+    "background_client_MACF_messages_attributed_to_WindowServer_or_bypassed": false
+  },
+  "current_fallback": {
+    "boot_started_local": "2026-11-13T16:09:11+08:00",
+    "startup_started_local": "2026-11-13T16:09:11+08:00",
+    "startup_completed_local": "2026-11-13T16:09:23+08:00",
+    "loaded_build": 35,
+    "loaded_candidate_identity_matches": true,
+    "NMXAccel_service_count": 1,
+    "PhxAMDFB_service_count": 0,
+    "IONDRVFramebuffer_service_count": 1,
+    "framebuffer_NVRAM_arming_present": false,
+    "stop_M2_and_pending_markers_present": false,
+    "display_sysctl_values": {
+      "debug.nvaccelfb": 0,
+      "debug.nvaccel_iop": 0,
+      "debug.nvaccel_iop_ok": 0
+    },
+    "two_frame_counter_samples": [
+      0,
+      0
+    ],
+    "known_GPU_initializer_test_or_shutdown_process_observed": false,
+    "closing_state_rechecked_local": "2026-11-13T16:18:36.420790+08:00"
+  },
+  "preservation": {
+    "installed_baseline_entries": 55,
+    "entries_matched": 54,
+    "only_changed_entry_role": "firmware-address log refreshed by startup",
+    "active_plugin_runtime_entries_matched": 15,
+    "driver_userspace_firmware_and_startup_helper_bytes_unchanged": true,
+    "matching_reports_archived_privately_and_hash_verified": 5,
+    "WindowServer_reports": 3,
+    "shutdown_stall_reports": 2,
+    "shutdown_stall_contents_decoded_or_cause_attributed": false,
+    "report_inventory_errors": 0,
+    "agent_rearmed_M2_replayed_initialization_submitted_GPU_work_or_rebooted": false,
+    "agent_changed_EFI_NVRAM_drivers_userspace_helpers_or_security": false
+  },
+  "acceptance_and_next_step": {
+    "status": "Desktop takeover failed; existing monitor requested reboot and initialized firmware-desktop fallback is now present",
+    "this_early_WindowServer_failure_recovery_path_observed": true,
+    "automatic_recovery_from_a_wedged_kernel_or_bus_verified_or_guaranteed": false,
+    "external_bootable_recovery_medium_verified": false,
+    "desktop_acceleration_accepted": false,
+    "original_command_stream_failure_or_native_refusal_cause_resolved": false,
+    "prior_six_Metal_cases_reexecuted_or_reaccepted_for_this_boot": false,
+    "physical_display_size_corrected": false,
+    "raw_logs_UUIDs_addresses_private_paths_or_binaries_published": false,
+    "next_step": "Keep M2 off and preserve initialized firmware desktop. Review and prepare the provenance-checked RADV cleanup candidate separately, then diagnose the earlier fallible command-stream path; no automatic deployment, GPU retry or reboot."
+  }
+}
