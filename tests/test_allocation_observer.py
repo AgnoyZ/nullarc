@@ -119,6 +119,11 @@ class ObserverTests(unittest.TestCase):
         self.assertEqual('window-expired', self.run_observer(baseline=slow)['outcome'])
         self.assertEqual(1, self.scan_count)
         self.assertNotIn('failure', self.trace)
+        started = json.loads((self.out / 'observer.started').read_bytes())
+        self.assertLess(started['deadline_monotonic'], self.now)
+        self.assertEqual(hashlib.sha256((self.out / 'baseline.json').read_bytes()).hexdigest(),
+                         started['baseline_sha256'])
+        self.assertEqual('window-expired', json.loads((self.out / 'observer.json').read_bytes())['outcome'])
 
     def test_event_storm_stops_at_fixed_scan_and_notification_caps(self):
         self.scans = [{}]

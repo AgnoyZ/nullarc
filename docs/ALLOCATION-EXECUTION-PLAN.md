@@ -1,6 +1,6 @@
 # Allocation snapshot execution plan: review before target use
 
-Status on 2026-11-14: **source review complete; target execution is not ready
+Status on 2026-11-14: **source/design review recorded; target execution is not ready
 or authorized**. This plan makes the next evidence steps reviewable. It is
 not an installer, launcher, arming receipt or hardware result. The consumed
 build-36 M2/reboot grants remain spent. No installation, service open, GPU
@@ -72,6 +72,14 @@ handshake. The generic [boot gate](BOOT-GATE.md) is not a drop-in solution:
 it executes stages serially and runs a release hook on exit. Placing a
 potentially kernel-blocked collector in that stage chain would not establish
 independent recovery.
+
+The [reference startup audit](ALLOCATION-STARTUP-AUDIT.md) found a further
+admission gap in pinned source fragments: failed initialization or claim can
+still reach later setup, because their statuses are not explicitly checked.
+The recovery function also has serial helper dependencies, although its AGDC
+handler schedules teardown work without explicitly waiting for that worker.
+The audit's command fakes characterize source control flow; they do not prove
+an installed integration or an actual kernel/AGDC hang.
 
 **Current decision: do not attach the observer to startup or run another M2
 attempt.** First complete the passive-read gate below. Then review one concrete
@@ -168,12 +176,22 @@ The integration must demonstrate all of these properties before installation:
   and retained capacity, not merely process existence or an observer marker.
   A missing, late, refused or changed baseline prevents the new workload;
   there is no automatic rearm or second initialization attempt.
+- After admission, require explicit success from the reviewed initialization
+  and claim steps before display setup/release. Matching filtered output or
+  the final shell command's success is insufficient. A failure takes only
+  the separately reviewed skip/recovery path, without another initialization.
+  Review the initializer's own argument/error contract and watchdog ownership;
+  the legacy wrapper's bare GART/MES calls, private-helper provenance gap and
+  global shutdown-process kill cannot be treated as an audited initializer.
 - An already available recovery path remains independent throughout watch
   setup, baseline, admission and failure collection. It never waits for an
   observer acknowledgement, result, kill or reap. The current monolithic
   monitor has no such baseline admission point; a wrapper or arbitrary shell
   hook is not evidence that this requirement has been met. Review the exact
-  change and its skip/fallback path before proposing deployment.
+  change and its skip/fallback path, including recovery helper non-return,
+  before proposing deployment. Preserve the existing asynchronous AGDC work
+  scheduling and recovery thresholds; an injected blocked helper is not an
+  observed kernel deadlock or permission to change that policy.
 - Use a same-boot monotonic event trail for completed baseline, admission,
   explicit initialization/release and recovery decision, with private boot
   identity and integrity links. Record the baseline-file hash at admission.
@@ -257,7 +275,8 @@ the current missing evidence.
 | One display/M2 attempt | Not authorized or executed | All preceding gates and a new one-use execution scope |
 | Allocation root cause | Unconfirmed | Captured target evidence within its stated limits |
 
-The [machine-readable plan](validation/allocation-execution-plan-20261114.json)
-records the reviewed source boundaries and these unresolved gates. This
-documentation change does not rerun or extend the previously reported 465-test
-source result, install an observer, or grant any target action.
+The original [machine-readable plan](validation/allocation-execution-plan-20261114.json)
+records its source boundaries, unresolved gates and plan-only validation.
+The later [startup source audit](ALLOCATION-STARTUP-AUDIT.md) adds failure
+propagation evidence and requirements. Neither supplies an installed observer,
+startup integration or a target execution grant.
