@@ -130,3 +130,22 @@ recovery policy is introduced here. The next integration review must address
 these concrete source findings together; the seven characterization cases do
 not satisfy Phase B's real integration failure tests. Build-36 Busy/raw-2 data
 still does not distinguish pending/invalid or confirm preparation-stage origin.
+
+## Local verification, 2026-11-14
+
+Source commit `de9051fa75385ef285654645999c8686b334b7a7` passed all **504
+Python tests** in 217.994 seconds, including the six new startup-audit tests
+and the strengthened late-baseline observer assertion. Recorded source hashes
+and HEAD were unchanged; the checkout was clean before and after the run.
+The seven source-fragment subprocess scenarios were also run directly from
+that committed source and their private report read back. A passing harness
+means the reference exhibits the characterized behavior, not startup acceptance.
+
+The source commit's remote ref/tree/parent and all five changed files were
+independently verified. Automatic full-stack run `43491822779` was cancelled
+and is not a build pass. The [validation record](validation/allocation-startup-audit-20261114.json)
+separates source characterization, static handler/argument review and installed
+helper file observations. No native target binary was built locally or run,
+and no target service, installed startup, GPU workload, arming or reboot was
+used for this audit. Native delivery, target reads and the actual allocation
+root cause remain unresolved.

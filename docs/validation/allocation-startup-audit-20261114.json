@@ -1,0 +1,109 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "source-control-flow-characterized; installed-helper-provenance-and-target-gates-unresolved",
+  "source_commit": "de9051fa75385ef285654645999c8686b334b7a7",
+  "documentation": "docs/ALLOCATION-STARTUP-AUDIT.md",
+  "focused_startup_unit_tests": 6,
+  "focused_existing_late_marker_unit_test": 1,
+  "actual_pinned_fragment_characterization": {
+    "cases": 7,
+    "passed": true,
+    "reference_sha256": "6c0271c306b8edbe0bc5b294794a8f47480a6bd25eae9c0a9207471f8fd794d8",
+    "inputs_sha256": {
+      "tools/phxctl/phxboot.sh": "6c0271c306b8edbe0bc5b294794a8f47480a6bd25eae9c0a9207471f8fd794d8",
+      "tools/test_allocation_startup.py": "b6495f956d670e585640136f9aa6b0d9b1f5cc172f489e87597d8cc2ed166ca9"
+    },
+    "fragments_sha256": {
+      "startup.inc": "0860551b0fe9def18361098824a47f9cd0f5fc3f81c55b040b9aefa028877463",
+      "recovery.inc": "7ae1296bed945461a66d775a56e8fd1b8a44f384154dd34e7eca93bfe7d1fb02"
+    },
+    "observations": {
+      "initializer_failure_does_not_block_claim_in_reference": true,
+      "nonzero_pipeline_status_does_not_block_claim_in_reference": true,
+      "claim_failure_does_not_block_later_setup_in_reference": true,
+      "startup_waits_for_initializer_and_claim": true,
+      "recovery_sysctl_precedes_its_shutdown_request": true,
+      "watch_hangs_definition_and_call_follow_startup": true
+    },
+    "scope": "Pinned actual source fragments; fake initializer, claim, system commands and blocking pipes. No complete reference/installed monitor, startup integration, actual GPU/sysctl hang, independent system recovery, target service or reboot is exercised or proven.",
+    "passing_is_characterization_not_startup_acceptance": true
+  },
+  "observer_late_baseline_counterexample": {
+    "actual_observer_with_fake_collector_watch_and_clock": true,
+    "hash_linked_started_marker_exists_after_deadline": true,
+    "completed_outcome": "window-expired",
+    "new_production_observer_or_handshake": false
+  },
+  "read_only_source_review": {
+    "AGDC_source_sha256": "5969568f38f45e35e8f357d2d68be993e53008901b95d22be8d3ba2a5dcba1b7",
+    "AGDC_handler_queues_worker_without_explicit_teardown_wait": true,
+    "AGDC_worker_has_synchronous_termination_call": true,
+    "kernel_latency_or_deadlock_demonstrated": false,
+    "mesboot_source_sha256": "d734d4d7d07c745cb4b26a7b5954d522facfd08645a3f3fbb193c3b5b2ed4917",
+    "current_source_gart_and_mes_require_explicit_layout": true,
+    "current_source_checked_scalar_refuses_transport_failure_with_exit_74": true,
+    "legacy_full_wrapper_source_sha256": "c91891c43ffaf28a363d5f4494c521795d0acd8aa9194ca70d9a6c86fe974c18",
+    "legacy_wrapper_schedules_own_watchdog_and_globally_kills_shutdown_processes": true
+  },
+  "installed_helper_file_review": {
+    "read_only_stable_file_identity": true,
+    "initializer_identical_to_reference": false,
+    "initializer_has_bare_GART_and_MES_call_forms": true,
+    "initializer_has_explicit_strict_shell_options": false,
+    "initializer_has_watchdog_and_global_kill_forms": true,
+    "binary_contains_reviewed_layout_and_transport_diagnostic_strings": false,
+    "source_identity_or_runtime_behavior_proven_by_strings": false,
+    "corresponding_source_origin_established_by_this_review": false,
+    "identity_executed_during_prior_failed_boot_established": false,
+    "raw_copies_paths_and_hashes_kept_private": true,
+    "binary_or_initializer_executed_or_changed": false
+  },
+  "full_python_tests": {
+    "count": 504,
+    "reported_seconds": 217.994,
+    "passed": true,
+    "clean_committed_checkout_before_and_after": true,
+    "recorded_input_hashes_unchanged": true,
+    "HEAD_unchanged": true
+  },
+  "source_hashes_at_full_test": {
+    "tools/test_allocation_startup.py": "b6495f956d670e585640136f9aa6b0d9b1f5cc172f489e87597d8cc2ed166ca9",
+    "tests/test_allocation_startup_runner.py": "98fa75d211e19e4539e048f62faa6e549ec7cd1cc679a5f31bab3e4de64fa7dd",
+    "tools/phxctl/phxboot.sh": "6c0271c306b8edbe0bc5b294794a8f47480a6bd25eae9c0a9207471f8fd794d8",
+    "tools/phxctl/full.sh": "c91891c43ffaf28a363d5f4494c521795d0acd8aa9194ca70d9a6c86fe974c18",
+    "tools/phxctl/mesboot.c": "d734d4d7d07c745cb4b26a7b5954d522facfd08645a3f3fbb193c3b5b2ed4917",
+    "src/phxaccel/accel/phxagdc.cpp": "5969568f38f45e35e8f357d2d68be993e53008901b95d22be8d3ba2a5dcba1b7",
+    "tests/test_allocation_observer.py": "b29e3d500ee05b230cdb4860ed28fc3352a4a816974b69b46a7800dcbf154eec",
+    "tools/allocation_observer.py": "2601c9e8a88bf686f8f779b57948ebd18e49c913a2308d75838666e0498925a3",
+    "tools/allocation_capture.py": "5388b0c1a4f91c315451628ed44257907f56e30e7ccf5afc088bd97922c5d328"
+  },
+  "limits": {
+    "reference_or_installed_monitor_executed_as_a_whole": false,
+    "binary_upload": false,
+    "target_service_open_or_GPU_execution": false,
+    "installed_startup_or_runtime_or_EFI_change": false,
+    "arming_or_reboot": false,
+    "installed_integration_or_independent_recovery_proven": false,
+    "actual_reboot_session_resume_verified": false,
+    "allocation_root_cause_confirmed": false,
+    "native_target_built_locally": false,
+    "manual_workflow_dispatched": false,
+    "real_target_sysctl_nvram_or_shutdown_command": false,
+    "production_VM_guards_budgets_pin_cleanup_or_return_codes_changed": false
+  },
+  "next_required": [
+    "trace installed helper byte identities to retained trusted build/source records without executing them",
+    "review explicit-layout initialization, failure propagation and ownership of recovery workers",
+    "retained reviewed native build37 kernel/reader delivery and usable recovery route",
+    "fresh exact passive-read scope and live preflight before target service use",
+    "actual source integration failure cases and a new one-use display scope before M2"
+  ],
+  "source_remote_verification": {
+    "ref_commit_tree_parent_and_five_files_independently_verified": true,
+    "exact_existing_commit_preserved": true,
+    "REST_fast_forward_force_false": true,
+    "automatic_fullstack_run": 43491822779,
+    "automatic_fullstack_final": "completed/cancelled; not a build pass"
+  }
+}
