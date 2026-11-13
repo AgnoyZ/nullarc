@@ -443,7 +443,17 @@ and run the four no-device refusals while skipping package creation and artifact
 upload. Its default remains true for the separately authorized seven-day package;
 the full-stack publication block is unchanged. The broader source build includes
 an expensive LLVM rebuild, so the scoped RADV job is the native acceptance check
-for this diagnostic. Hosted native validation is pending at this checkpoint.
+for this diagnostic.
+
+The scoped run `43428606885` passed on `macos-15-intel` at commit
+`cc6bae10cd84b576dfa43178df5d112127e6b8e5`: actual RADV compilation, ad-hoc
+signing and signature/dependency checks, exact prepared-transport comparison,
+and all four no-device refusals completed successfully. The 25 focused RADV
+checks also passed after the retention-control change. Both package creation
+and upload were independently verified skipped; the run has zero artifacts.
+The earlier full-stack run's source job passed, and its long native/LLVM stage
+was intentionally cancelled in favor of this scoped validation. This is not
+an installed-library or target-GPU acceptance result.
 
 Limits: the patch has not been installed or executed by WindowServer. Real
 unified-log persistence and the underlying allocation cause remain unverified.
@@ -465,3 +475,9 @@ are 3/21 for direct create/import and 15/16 through the proxy; CPU-map records
 use the non-selector sentinel. A saturated operation's later failures are
 intentionally omitted. Correlate the first record with the plugin refusal,
 not just with the later CoreDisplay assertion.
+
+The final target readback at 20:58:34 UTC+08:00 confirmed the same investigation
+boot, build 35, PhxAMDFB absent, firmware framebuffer present, all display gates
+and frame count zero, no M2 NVRAM/markers or shutdown process, and unchanged
+installed RADV/plugin hashes. The diagnostic is source-validated but remains
+uninstalled. See `validation/radv-native-allocation-diagnostic-20261113.json`.

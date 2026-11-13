@@ -50,14 +50,24 @@
     "real_log_persistence_proven": false
   },
   "hosted_native_validation": {
-    "status": "pending",
+    "status": "passed",
     "runner": "macos-15-intel",
     "workflow": ".github/workflows/radv-artifacts.yml",
     "artifact_retention_requested": false,
     "package_creation_requested": false,
     "broader_source_run_id": 43426508041,
     "broader_source_job_passed": true,
-    "broader_native_run_required_for_this_diagnostic": false
+    "broader_native_run_required_for_this_diagnostic": false,
+    "run_id": 43428606885,
+    "job_id": 131896129878,
+    "validated_commit": "cc6bae10cd84b576dfa43178df5d112127e6b8e5",
+    "actual_RADV_compile_sign_and_dependency_checks_passed": true,
+    "prepared_transport_compared_to_fault_injected_fixture": true,
+    "four_no_device_refusals_passed": true,
+    "package_creation_skipped": true,
+    "artifact_upload_skipped": true,
+    "artifact_count": 0,
+    "broader_native_run_intentionally_cancelled": true
   },
   "target_state_readback": {
     "later_boot_than_historical_fallback": true,
@@ -66,7 +76,8 @@
     "PhxAMDFB_absent": true,
     "M2_off": true,
     "display_gates_and_frame_count_zero": true,
-    "installed_candidate_and_plugin_hashes_unchanged": true
+    "installed_candidate_and_plugin_hashes_unchanged": true,
+    "final_checked_local": "2026-11-13 20:58:34 +0800"
   },
   "installed_diagnostic": false,
   "GPU_test_performed": false,
@@ -91,5 +102,10 @@
     "first_command_buffer_refusal_local": "2026-11-13 18:37:20.689257 +0800",
     "same_process_non_nil_texture_object_reported_later": true,
     "fresh_native_allocation_after_refusal_proven": false
+  },
+  "focused_validation_after_retention_control": {
+    "tests": 25,
+    "passed": true,
+    "python": "3.12"
   }
 }
