@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "kind": "manual-radv-artifact-and-static-download-verification",
+  "checked_at": "2026-11-13T17:28:40.152306+08:00",
+  "source_commit": "94291c8a7bf759b91e393150bf79c15da7495b03",
+  "workflow": {
+    "path": ".github/workflows/radv-artifacts.yml",
+    "event": "workflow_dispatch",
+    "run_id": 43399540297,
+    "conclusion": "success",
+    "native_runner": "macos-15-intel",
+    "all_steps_successful": true
+  },
+  "artifact": {
+    "id": 14024179574,
+    "name": "experimental-radv-94291c8a7bf759b91e393150bf79c15da7495b03",
+    "expires_at": "2026-11-20T09:25:59Z",
+    "retention_days": 7,
+    "github_zip_digest": "sha256:0776ef8ad25c860c2bf3719528aa48c9fb4e1d0de93cf2eb7ee88a372d78748b",
+    "github_zip_digest_verified": true,
+    "archive_sha256": "f13109eb7f4c7c9bb433f007f7110925369d47d215500c3effc7eb31bcdc381c",
+    "inner_manifest_files_verified": 65
+  },
+  "library": {
+    "name": "libvulkan_radeon.dylib",
+    "bytes": 20264288,
+    "sha256": "a76ff2b7d3f88dc2b64222b9806300f81be41d04e474c5c763a73c3e36c3ad0c",
+    "architecture": "x86_64",
+    "macho_type": 6,
+    "strict_signature_verified_locally": true,
+    "required_exports_verified_locally": true,
+    "system_only_dependencies_verified_locally": true
+  },
+  "sources": {
+    "archives": {
+      "mesa-base.tar.gz": 13772,
+      "vulkan-headers.tar.gz": 102,
+      "cobalt-radv.tar.gz": 19,
+      "phoenix-radv.tar.gz": 20,
+      "nullarc-radv.tar.gz": 47
+    },
+    "patches_verified": 18,
+    "project_and_phoenix_bytes_compared_to_git_objects": true,
+    "mesa_license_and_command_buffer_independent_blob_hashes_matched": true,
+    "source_archive_paths_links_ownership_timestamps_checked": true
+  },
+  "hosted_validation": {
+    "cpu_packaging_tests_passed": 10,
+    "actual_constructor_fault_injection_passed": true,
+    "native_abi_layout_verified": true,
+    "actual_no_device_cases_passed": 4,
+    "gpu_execution": false
+  },
+  "previous_attempt": {
+    "run_id": 43397975918,
+    "source_commit": "768f1d7c42532a5c5ae4bff2977bef13898e5c1f",
+    "conclusion": "cancelled",
+    "artifacts": 0,
+    "reason": "Review found JSON object field order was incorrectly treated as provenance identity; semantic comparison and a rejection regression were added.",
+    "runtime_build_source_abi_lock_patch_inputs_changed": false
+  },
+  "downloaded_and_staged": true,
+  "installed": false,
+  "candidate_executed_locally": false,
+  "hardware_tested": false,
+  "desktop_tested": false,
+  "initialization_performed": false,
+  "m2_rearmed": false,
+  "reboot_performed": false,
+  "full_stack_upload_block_preserved": true,
+  "two_kext_workflow_unchanged": true,
+  "historical_preparation_record_unchanged": true,
+  "not_established": [
+    "cause of command-stream creation failure",
+    "candidate GPU execution",
+    "candidate desktop stability",
+    "physical display size correction",
+    "deployment or executable rollback readiness"
+  ]
+}
