@@ -35,7 +35,7 @@ jobs:
           bash src/phxbringup/build.sh ./build-sdk
           codesign --force --sign - src/phxbringup/build/PhxBringup.kext
           codesign --verify --strict src/phxbringup/build/PhxBringup.kext
-          lipo -verify_arch x86_64 src/phxbringup/build/PhxBringup.kext/Contents/MacOS/PhxBringup
+          lipo src/phxbringup/build/PhxBringup.kext/Contents/MacOS/PhxBringup -verify_arch x86_64
           git diff --exit-code HEAD -- src
       - name: Record validation limits
         run: |

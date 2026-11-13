@@ -91,6 +91,13 @@ ad-hoc signature, and uploads no artifacts. No local native driver build is
 part of this work. A passing hosted compile would still not establish that
 the target accepts or runs the candidate.
 
+The first hosted run, `43443404094` at source commit `c89dd0a`, passed the
+43 focused CPU cases and compiled, linked and signed PhxBringup. It then failed
+because the new `lipo -verify_arch` invocation placed the input file after the
+architecture list. The workflow was corrected to put the input file first;
+the kernel source is unchanged by this CI correction. A fresh run is required
+before claiming the complete hosted check passed.
+
 ## Next evidence required
 
 A future, separately authorized collection needs candidate/source identity,
