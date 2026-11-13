@@ -1,0 +1,54 @@
+name: Build downloadable experimental RADV only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radv-artifacts-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  radv:
+    if: github.repository == 'AgnoyZ/nullarc' && github.ref == 'refs/heads/downstream/780m-tahoe'
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Test strict packaging policy and actual constructor failure paths on CPU
+        run: |
+          python3 -m unittest discover -s tests -p 'test_radv_package.py' -v
+          python3 -m unittest discover -s tests -p 'test_radv.py' -v
+      - name: Checkout pinned Vulkan headers
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: KhronosGroup/Vulkan-Headers
+          ref: 6802bb4733b63ed5efd3adb308a6c885ef180ea1
+          path: build-vulkan-headers
+          persist-credentials: false
+      - name: Prepare pinned Mesa and Cobalt sources and RADV build dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          python3 tools/fetch_radv.py build/inputs/radv
+          python3 -m venv build/radv-venv
+          build/radv-venv/bin/python -m pip install -r tools/radv-build-requirements.txt
+          command -v glslangValidator >/dev/null || brew install glslang
+          command -v pkg-config >/dev/null || brew install pkgconf
+          echo "$PWD/build/radv-venv/bin" >> "$GITHUB_PATH"
+      - name: Compile, sign and verify RADV and four no-device refusals
+        run: python3 tools/build_radv.py --mesa build/inputs/radv/mesa --cobalt build/inputs/radv/cobalt --vulkan-headers build-vulkan-headers --out build/radv-native --artifacts build/radv-artifacts
+      - name: Package only reviewed RADV, corresponding sources and notices
+        run: python3 tools/package_radv.py --mesa build/inputs/radv/mesa --cobalt build/inputs/radv/cobalt --vulkan-headers build-vulkan-headers --artifacts build/radv-artifacts --out build/radv-upload
+      - name: Upload manual RADV candidate package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: experimental-radv-${{ github.sha }}
+          path: build/radv-upload/upload/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Explain acceptance limits
+        run: |
+          echo 'One ad-hoc signed x86_64 RADV library, corresponding sources, provenance, notices and hashes.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No installation, initialization, GPU execution, desktop takeover or reboot. A constructor cleanup fix does not resolve the original stream-creation failure.' >> "$GITHUB_STEP_SUMMARY"

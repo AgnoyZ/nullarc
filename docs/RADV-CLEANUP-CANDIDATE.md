@@ -32,17 +32,18 @@ contents are included here. Complete source provenance for the installed
 mixed userspace remains unestablished: a clean source build must not be
 described as differing from the old library only by this cleanup patch.
 
-## Proposed narrow retention scope, not yet authorized
+## Authorized narrow retention scope
 
 The [repository instructions](../AGENTS.md) permit the separately reviewed
 two-kext artifact and explicitly exclude runtime libraries from that
 exception. The current full-stack workflow rejects public artifact
-retention. Neither guard was changed, and no new build or publication was
-dispatched. A separate RADV publication decision and component-specific
-source/notice review are required before enabling its retention. A public
+retention. On 2026-11-13 the owner separately authorized the scope below,
+subject to component-specific source/notice review before upload. The
+[RADV provenance review](RADV-PROVENANCE.md) defines the independent manual
+workflow; it preserves both existing guards. A public
 repository's downloadable artifact is not a private transfer to this laptop.
 
-The concrete proposed scope is one manually dispatched, seven-day RADV
+The authorized scope is one manually dispatched, seven-day RADV
 candidate package, built on `macos-15-intel`:
 
 - The only runtime binary is `libvulkan_radeon.dylib` with the reviewed
@@ -55,8 +56,11 @@ candidate package, built on `macos-15-intel`:
 - Preserve the existing full-stack publication guard and two-kext workflow.
   No release creation, visibility change or automatic deployment is proposed.
 
-This scope is a proposal awaiting authorization, not an assertion that a
-RADV-only packaging workflow or downloadable candidate already exists.
+Authorization is not a build result or a deployment decision. The original
+machine-readable preparation record is a historical pre-authorization
+checkpoint; it is not rewritten to imply that authorization existed then.
+A subsequent workflow result must establish whether a downloadable candidate
+actually exists.
 
 ## Verification and rollback requirements
 

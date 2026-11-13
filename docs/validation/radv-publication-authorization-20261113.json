@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "date": "2026-11-13",
+  "kind": "authorization-and-scoped-source-review",
+  "authorized_by_owner": true,
+  "authorized_scope": {
+    "trigger": "manual workflow_dispatch",
+    "repository_visibility": "public",
+    "retention_days": 7,
+    "runtime_binaries": ["libvulkan_radeon.dylib"],
+    "accompanying_material": ["corresponding sources", "notices", "provenance", "checksums"],
+    "installation": false,
+    "gpu_tests": false,
+    "initialization": false,
+    "desktop_takeover": false,
+    "reboot": false
+  },
+  "review": {
+    "mesa_commit": "f5cb8ee032adabef599ae892ec4e42d796b84da9",
+    "mesa_license_blob": "704f8162b48467ffa77908460570c803901c73d2",
+    "mesa_license_sha256": "0d1a0472ecc81830e75c20d59b0ea02841e3db21255e0ebad97ab682c54d6615",
+    "cobalt_commit": "d6c9aedf8e6526a39e349b5886cbc8c7ddf77f65",
+    "cobalt_license_sha256": "ec3822b70df32a509380bcf9a5884384f54a8a622780fca4c5340e31bbe77d79",
+    "cobalt_patch_readme_sha256": "d099ded98726e0d8694fc0e91b44f6e1ff724536231aa819ee334af9e4a5522c",
+    "cobalt_third_party_notices_sha256": "f0d77747822c654c3be253d6c62db032c93d7ea564b088e6b71431d5cc253f48",
+    "phoenix_patch_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+    "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+    "vulkan_license_sha256": "95ad366d23fadf701d355bc45fb8b82ae2d700239471d35d41286ac3b08ff903",
+    "patch_counts": {"Cobalt64": 9, "radv-phoenix": 7, "downstream": 2},
+    "notices_preserved_without_relicensing": true,
+    "scope_document": "docs/RADV-PROVENANCE.md"
+  },
+  "full_stack_public_upload_block_preserved": true,
+  "two_kext_workflow_unchanged": true,
+  "historical_preparation_record_unchanged": true,
+  "candidate_artifact_available_at_this_checkpoint": false,
+  "hardware_acceptance": false,
+  "open_issues": ["command-stream creation failure", "desktop stability", "physical display size"]
+}
