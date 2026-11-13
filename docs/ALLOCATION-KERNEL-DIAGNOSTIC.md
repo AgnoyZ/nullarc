@@ -1,12 +1,12 @@
 # Allocation refusal kernel diagnostic, build 36
 
-This source-only candidate follows the failed build-35 desktop attempt recorded
+This diagnostic candidate follows the failed build-35 desktop attempt recorded
 in [the RADV result](RADV-CLEANUP-CANDIDATE.md#diagnostic-desktop-refusal-captured-and-firmware-fallback-restored-2026-11-13).
 It is diagnostic instrumentation, not an allocation or desktop repair. Build 36
-has now been staged to the target EFI under fresh owner authorization, as
-recorded below, but has not yet been proven loaded or run. The running kernel
-remains build 35 pending the first restart. The previous one-shot authorization
-is spent; the new authorization is recorded separately.
+has now passed the first firmware-framebuffer boot and exact loaded-image
+verification under fresh owner authorization, as recorded below. Its new M2
+reproduction is the next phase, not an established result. The previous
+one-shot authorization is spent; the new authorization is recorded separately.
 
 ## Observation contract
 
@@ -151,7 +151,7 @@ fallback. Package preparation alone did not authorize installation, restarts or
 M2 execution. No driver replacement, GPU call, M2 arming or restart scheduling
 was performed during that preparation phase.
 
-## Owner-authorized staging; first firmware boot pending
+## Owner-authorized staging and first firmware restart
 
 On 2026-11-13 the owner explicitly authorized replacement of PhxBringup only,
 a first normal restart with M2 off to verify build 36, and one later M2
@@ -175,12 +175,44 @@ auxiliary kernel collection, runtime, plugin, firmware or startup helper was
 replaced. The running kernel was still build 35, M2 remained off and no GPU
 command or initializer was replayed.
 
-The first firmware-framebuffer restart is the next authorized phase. Candidate
-loading, its exact loaded image, completed startup and preserved runtime/recovery
-state must be verified before preparing the fresh one-shot M2 executor. The
-later M2 phase remains authorized but is not armed or automatically scheduled
+At this staging checkpoint the first firmware-framebuffer restart was the next
+authorized phase. Candidate loading, its exact loaded image, completed startup
+and preserved runtime/recovery state were required before preparing the fresh
+one-shot M2 executor. The later M2 phase was not armed or automatically scheduled
 by staging. Neither a successful copy nor the existing software fallback proves
-that build 36 will boot or recover from a kernel or bus hang.
+recovery from a kernel or bus hang.
+
+## Verified build-36 firmware boot; one M2 attempt prepared
+
+The first restart produced a new boot at 23:14:01 +0800 on 2026-11-13.
+Administrator readback at 23:23:19 +0800 verified actual build 36 on macOS
+26.7.2 (`25G332`) and its exact loaded Mach-O identity against the hosted
+package, not just a version property or staged file. The firmware framebuffer
+was present, PhxAMDFB absent, display gates zero, M2 NVRAM and markers absent,
+and the existing once-per-boot startup had completed. Runtime, plugin, retained
+originals, startup and recovery inputs were verified, including the expected
+new per-boot address log. A fresh read-only EFI inspection verified the complete
+resulting manifest, candidate and retained build 35, then unmounted it.
+
+Read-only preparation at 23:25:43 +0800 found no new WindowServer reports since
+that boot. A bounded 11.71-minute query for both allocation prefixes found zero
+verified kernel and zero verified RADV diagnostic records; one collector audit
+row was excluded. No additional GPU test or initializer was invoked. This
+proves a real candidate load and inherited startup on the firmware desktop,
+not M2 acceptance, allocation correctness or diagnostic persistence on failure.
+The root cause remains unresolved.
+
+The fresh one-shot M2 executor and bounded postboot collector are prepared
+under the already-granted owner authorization. Seven isolated guard checks
+passed: successful arming, preflight refusal, existing grant consumption,
+post-arming failure, a competing scheduler, post-scheduling failure, and log
+classification excluding audit/wrong-image/wrong-path/wrong-process or wrong
+boot records. These checks used fake NVRAM and schedulers; no real GPU, NVRAM or
+restart was invoked by them, and the unrelated fake scheduler was never
+cancelled. The existing grant is claimed exclusively before mutation to prevent
+replay across attempt directories. Fresh live preflight also passed with build
+36 and M2 still off. Actual arming, restart and postboot results require their
+separate receipts; none is established by these preparation checks.
 
 ## Next evidence required
 
