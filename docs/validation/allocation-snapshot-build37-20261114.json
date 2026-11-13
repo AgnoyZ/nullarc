@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-14",
+  "candidate_build": 37,
+  "source_commit": "1c17a1712cb3a64db31148cb33d0c2c9741e7e5d",
+  "baseline_commit": "e5703901c487302a02996fbe355e7a72f02b3e47",
+  "status": "source_candidate_only",
+  "input_sha256": {
+    "src/phxbringup/PhxBringup.cpp": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8",
+    "src/phxbringup/PhxAllocationDiagnostic.hpp": "7c220396a14748936b88330c6bd371e51b66181911b146e495883f2de836e63b",
+    "src/phxbringup/PhxAllocationSnapshot.h": "e5c863996e2373f5f3d2c87e5cc963bd5c60770c59478d3c120264508a640c01",
+    "src/phxbringup/PhxNativeABI.h": "05c1feb4a825e6bf8b3212a2b46275430bf51c03a36753509594c66e5bbeaef6",
+    "tools/allocation_snapshot.cpp": "5e07e32ea833e55f78a9704cf5c63b20099844856b6bb387c1a40d0bdd2f771d"
+  },
+  "base_abi_byte_identical_to_baseline": true,
+  "local": {
+    "python_unit_tests": 421,
+    "harness_cases": {
+      "allocation_snapshot": 30,
+      "allocation_snapshot_reader": 17,
+      "allocation_diagnostic": 44,
+      "submit_diagnostic": 72,
+      "bo_create": 30,
+      "bo_retirement": 82,
+      "context_retirement": 112,
+      "queue_retirement": 86,
+      "vm_binding": 71,
+      "page_tables": 98,
+      "vm_walk_cleanup": 55
+    },
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "isolated_legacy_wait_model_replays": 20
+  },
+  "hosted": {
+    "corrected_priority_run": 43463408809,
+    "corrected_priority_result": "success",
+    "corrected_scoped_run": 43463527011,
+    "corrected_scoped_result": "success",
+    "initial_scoped_run": 43462656741,
+    "initial_scoped_result": "success",
+    "initial_priority_run": 43462507687,
+    "initial_priority_result": "failure",
+    "initial_priority_failure": "Optional header was missing from the isolated ABI fixture; transitive include removed in the corrected commit.",
+    "cancelled_full_stack_runs": [
+      43462507811,
+      43463409087
+    ],
+    "corrected_scoped_attempts": [
+      {
+        "attempt": 1,
+        "result": "failure",
+        "runner_acquired": false,
+        "steps_executed": 0,
+        "reason": "Hosted runner was not acquired after multiple provisioning attempts."
+      },
+      {
+        "attempt": 2,
+        "result": "success",
+        "runner_acquired": true,
+        "reader_compiled_without_execution": true,
+        "kernel_compiled_linked_signed": true,
+        "strict_signature_verified": true,
+        "x86_64_verified": true,
+        "source_integrity_verified": true,
+        "artifact_count": 0
+      }
+    ],
+    "corrected_scoped_job": 132026834880,
+    "corrected_priority_jobs": [
+      132016046472,
+      132016047431
+    ],
+    "corrected_priority_artifact_count": 0
+  },
+  "execution_boundary": {
+    "installed": false,
+    "candidate_kernel_loaded_on_target": false,
+    "target_gpu_executed": false,
+    "target_rebooted": false,
+    "M2_armed": false,
+    "previous_hardware_authorization_spent": true,
+    "allocation_root_cause_confirmed": false,
+    "real_kernel_snapshot_persistence_verified": false
+  },
+  "limits": [
+    "CPU fakes do not prove kernel or GPU behavior.",
+    "First four samples per reason, fixed 3888-byte service storage; saturating counts include repeated and internal cleanup refusals.",
+    "History does not survive reboot or service replacement.",
+    "No addresses, process/context/BO identifiers or page contents in the export.",
+    "Hosted compilation does not establish target acceptance or acceleration."
+  ]
+}
