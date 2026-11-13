@@ -78,6 +78,7 @@
     "architecture": "x86_64"
   },
   "radv-patches": [
-    "patches/radv/0001-native-phoenix-only.patch"
+    "patches/radv/0001-native-phoenix-only.patch",
+    "patches/radv/0002-initialize-command-buffer-cleanup-before-stream.patch"
   ]
 }

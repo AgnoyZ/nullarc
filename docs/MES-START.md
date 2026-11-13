@@ -348,7 +348,15 @@ of the stopped selector experiment or execution of the checked reset-observation
 template. It does not explain the earlier zero readbacks, remove CLI transport
 limits, prove memory ownership or accept the standalone guarded MES workflow.
 
-Desktop takeover is still pending a separate manual boot: IONDRVFramebuffer
-remains present, PhxAMDFB is absent and the next display boot is armed. See
+At that checkpoint desktop takeover was pending a separate manual boot. See
 `LEGACY-BOOT.md` and `validation/metal-postboot-target-20261113.json` for the
 identity checks, six compute results and remaining display/provenance limits.
+
+The subsequent display boot failed and the existing startup monitor automatically
+returned to IONDRVFramebuffer after three WindowServer reports. NMXAccel remains
+present, but M2 and framebuffer arming have been cleared. Two reports identify
+RADV command-stream failure cleanup; another process logged
+`VK_ERROR_DEVICE_LOST` before a CoreDisplay abort. A source-only cleanup-order
+patch has bounded CPU tests, not native-runtime or GPU acceptance. Do not rearm
+display takeover, replay initialization or treat this as acceptance of the
+guarded MES workflow. See `validation/display-postboot-target-20261113.json`.

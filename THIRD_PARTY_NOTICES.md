@@ -42,6 +42,12 @@ MIT, Copyright The Mesa 3D Graphics Library contributors (https://docs.mesa3d.or
 https://gitlab.freedesktop.org/mesa/mesa). A few Mesa source files carry other permissive licenses, as listed on
 that page.
 
+`tests/fixtures/radv_cmd_buffer_constructor.c` is a constructor excerpt from that
+same pinned Mesa source, under its per-file MIT license. Its original Red Hat,
+Bas Nieuwenhuizen and Intel copyright notices and SPDX identifier are retained;
+the full MIT terms are in `LICENSES/MIT.txt`. The downstream cleanup-order patch
+is `patches/radv/0002-initialize-command-buffer-cleanup-before-stream.patch`.
+
 ## Cobalt64 (Navi48-MacOS) — RADV Darwin backend, `src/phxbringup/PhxNativeABI.h` layouts
 
 MIT License, Copyright (c) 2026 Navi48-MacOS contributors. The user-client ABI layouts and the RADV Darwin winsys

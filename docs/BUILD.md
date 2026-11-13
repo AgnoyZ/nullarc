@@ -147,9 +147,20 @@ The owner authorized public source visibility. Full-stack public runs remain com
 
 ## RADV source build and negative runtime tests
 
-`tools/prepare_radv.py` verifies clean exact Mesa/Cobalt/nullarc revisions, creates a fresh detached Mesa worktree and applies nine Cobalt, six Phoenix and one downstream patch in order. Upstream patch bytes are read from Git objects (not platform-dependent CRLF checkouts); provenance records their SHA-256 hashes. Existing outputs are never replaced. Git worktree bookkeeping is added to the ignored source cache; original source files are not changed.
+`tools/prepare_radv.py` verifies clean exact Mesa/Cobalt/nullarc revisions, creates a fresh detached Mesa worktree and applies nine Cobalt, seven Phoenix and two downstream patches in order. Upstream patch bytes are read from Git objects (not platform-dependent CRLF checkouts); provenance records their SHA-256 hashes. Existing outputs are never replaced. Git worktree bookkeeping is added to the ignored source cache; original source files are not changed.
 
 The downstream patch removes the mock source from the library, rejects MOCK/HOST_BO device modes, disallows non-Phoenix profiles and restricts the selected IOKit service to PhxBringup. The normal NMXAccel proxy path is preserved. These gates avoid treating host memory or fake fences as GPU acceleration.
+
+The second downstream patch initializes all destructor-owned command-buffer
+members before command-stream creation can fail. The earlier order left an
+uninitialized transient list and descriptor bases on the failure cleanup path.
+`tools/test_radv_cmd_init.py --out build/radv-cmd-init` runs the exact pinned
+constructor excerpt before and after the real patch under ASan/UBSan, with
+explicit fake APIs and six cases per variant. The negative control observes
+missing cleanup preconditions without executing the unsafe full Mesa destructor.
+`--source` can instead check the full pinned `radv_cmd_buffer.c`; a different
+constructor is rejected. These are CPU tests, not a native RADV build or GPU
+acceptance, and do not fix or explain stream-allocation failure or device loss.
 
 Standalone native build, using the same dependencies as the full build:
 

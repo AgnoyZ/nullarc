@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from prepare_radv import ordered_patches, prepare_radv
 from build_radv import meson_command, test_no_device as run_no_device_test, system_dependencies
+from test_radv_cmd_init import exercise as run_constructor_test, constructor, CONSTRUCTOR_SHA256, FIXTURE, PATCH
 
 
 def git(path, *args):
@@ -136,6 +137,31 @@ class RadvBuildTests(unittest.TestCase):
         with patch("build_radv.subprocess.run", return_value=result):
             with self.assertRaisesRegex(RuntimeError, "Unexpected no-device"):
                 run_no_device_test(Path("probe"), Path("library"))
+
+
+class RadvConstructorTests(unittest.TestCase):
+    def test_real_pinned_constructor_negative_control_and_patched_failure_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = run_constructor_test(Path(directory) / "result")
+        self.assertFalse(report["variants"]["negative"]["stream_failure_cleanup_preconditions_satisfied"])
+        self.assertTrue(report["variants"]["patched"]["stream_failure_cleanup_preconditions_satisfied"])
+        self.assertEqual(6, report["variants"]["patched"]["cases"])
+        self.assertFalse(report["variants"]["patched"]["hardware_executed"])
+        lock = json.loads((ROOT / "upstream.lock.json").read_text())
+        self.assertIn(PATCH.relative_to(ROOT).as_posix(), lock["radv-patches"])
+
+    def test_changed_or_ambiguous_constructor_rejected_before_output(self):
+        self.assertEqual(64, len(CONSTRUCTOR_SHA256))
+        original = FIXTURE.read_text()
+        with self.assertRaisesRegex(RuntimeError, "one pinned RADV constructor"):
+            constructor(original + original)
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "changed.c"
+            source.write_text(original.replace("return VK_SUCCESS;", "return -99;"))
+            output = Path(directory) / "result"
+            with self.assertRaisesRegex(RuntimeError, "reviewed pinned Mesa source"):
+                run_constructor_test(output, source)
+            self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

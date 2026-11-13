@@ -223,12 +223,45 @@ acceptance of a new PhxAccel or the full downstream stack. The legacy log alone
 still does not independently verify its CLI reply shapes, and this later boot
 does not explain the earlier selector readbacks or invalidate their stop guards.
 
-The desktop still uses IONDRVFramebuffer; PhxAMDFB is absent and desktop GPU
-compositing is not established. The existing script has armed the next display
-boot; the M2 marker is present and no off/pending marker remains. A separate
-manual boot is needed before checking display takeover and frame progress.
-Do not rerun initialization or the unused reset-observation template on the
-current initialized boot. No driver/plugin/EFI replacement, new watchdog or
-automatic reboot was performed by this probe. EDID dimensions remain unverified.
+At that compute checkpoint the desktop used IONDRVFramebuffer; PhxAMDFB was
+absent and desktop GPU compositing was not established. The existing script
+had armed a separate manual display boot. Do not replay initialization or the
+unused reset-observation template on an initialized boot. No driver/plugin/EFI
+replacement, new watchdog or automatic reboot was performed by the compute
+probe. EDID dimensions remained unverified.
 Sanitized evidence and provenance limits are in
 [`validation/metal-postboot-target-20261113.json`](validation/metal-postboot-target-20261113.json).
+
+## Subsequent display attempt and automatic fallback, 2026-11-13
+
+The next manual boot did take the panel through PhxAMDFB, but the existing
+startup monitor detected three WindowServer crash reports and automatically
+rebooted to IONDRVFramebuffer. The fallback boot still publishes PhxBringup and
+NMXAccel. Display copy is disabled, PhxAMDFB is absent, and the M2 marker and
+framebuffer arming variable have been removed by the existing fallback. The
+startup off marker is also absent. Do not rearm display takeover or repeat
+initialization while this failure is being investigated.
+
+Two reports show the same null dereference in RADV command-buffer destruction,
+called from the command-stream creation failure path. Private disassembly and
+crash state establish that path for the installed image. The installed plugin,
+RADV and translator match their respective crash-image identities; this does
+not establish their exact source commits or patch sets. Unified logs additionally
+show refused host imports, VRAM allocation refusal and, in the process that
+later aborts in CoreDisplay, a queue submission returning
+`VK_ERROR_DEVICE_LOST`. These are distinct observations; a single root cause
+and the allocation-failure cause are not established.
+
+The pinned Mesa constructor has a matching cleanup-order defect: its MSRTSS
+transient list and descriptor object bases were initialized after the fallible
+command-stream creation call. A downstream source patch now initializes the
+destructor-owned state first, preserving the failure return. The exact pinned
+constructor passed six CPU fault-injection cases before and after this real
+patch under ASan/UBSan; the negative control observes missing cleanup
+preconditions through explicit fake cleanup APIs. It does not execute the full
+Mesa destructor, prove an installed-runtime fix, resolve allocation failure or
+device loss, or establish desktop acceleration. No replacement runtime has been
+built, installed or accepted by this investigation. The earlier six-case Metal
+compute result is retained with its original limits. The 42-inch report remains
+unresolved. Sanitized evidence is in
+[`validation/display-postboot-target-20261113.json`](validation/display-postboot-target-20261113.json).

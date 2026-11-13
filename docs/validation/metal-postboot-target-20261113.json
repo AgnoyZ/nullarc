@@ -87,6 +87,13 @@
     "Desktop rendering, presentation, video, sustained stability, performance, sleep/wake and EDID physical dimensions remain unverified",
     "The prepared reset-observation template was not executed and must not be treated as an unused initialization path on this already-initialized boot"
   ],
+  "later_display_followup": {
+    "record": "display-postboot-target-20261113.json",
+    "manual_display_boot_completed": true,
+    "display_takeover_failed_and_existing_monitor_automatically_reverted": true,
+    "original_compute_checkpoint_above_retained_as_historical_evidence": true,
+    "do_not_rearm_or_reinitialize_pending_failure_analysis": true
+  },
   "preservation_and_privacy": {
     "installed_driver_plugin_or_helper_replaced_during_probe": false,
     "kernel_locally_built": false,

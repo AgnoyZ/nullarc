@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "repository_before_investigation": "a6de9e95cca15fe855c0379e049b4df78031ea10",
+  "scope": "Failed desktop takeover, completed existing automatic fallback, and a source-only RADV cleanup-order regression fix; no desktop acceleration acceptance",
+  "target": {
+    "hardware": "Radeon 780M, Ryzen 8845H",
+    "PCI_vendor": "1002",
+    "PCI_device": "1900",
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "display_boot_and_fallback": {
+    "manual_display_boot_used_existing_startup_path": true,
+    "PhxAMDFB_on_panel_reported_by_existing_script": true,
+    "legacy_queue_adoption_and_claim_reported_success": true,
+    "WindowServer_crash_reports_detected": 3,
+    "existing_monitor_automatically_disabled_takeover_and_rebooted": true,
+    "fallback_boot_completed": true,
+    "PhxBringup_present_after_fallback": true,
+    "NMXAccel_present_after_fallback": true,
+    "PhxAMDFB_present_after_fallback": false,
+    "IONDRVFramebuffer_present_after_fallback": true,
+    "display_copy_enabled_after_fallback": false,
+    "startup_off_marker_present": false,
+    "M2_marker_present_after_existing_fallback": false,
+    "framebuffer_next_boot_arming_present_after_existing_fallback": false,
+    "M2_marker_removal_is_expected_fallback_state_not_an_unexplained_driver_change": true
+  },
+  "installed_userspace_identity": {
+    "NVMTLDriver_sha256": "805cc00b4a31528de5374c65fc7c87893d0bff23d527b00ba5b122d60f8fe966",
+    "RADV_sha256": "1f2181d1183fa95f33eb3f626c96aa27fa242e4e96c49f6785fa7e53ee128f78",
+    "translator_sha256": "adee7bf50a4f1fd4d1e604cc87f736363eba2f5f23d2e82b1bb31143b92e50a2",
+    "each_installed_image_matches_private_crash_identity": true,
+    "exact_installed_source_commits_and_patch_sets_established": false,
+    "bundle_version_or_embedded_version_string_used_as_source_proof": false,
+    "newer_downloaded_PhxAccel_installed_by_this_investigation": false
+  },
+  "crash_findings": {
+    "EXC_BAD_ACCESS_reports": 2,
+    "EXC_CRASH_SIGABRT_reports": 1,
+    "both_bad_access_reports_share_faulting_instruction": true,
+    "both_bad_access_reports_have_null_base_at_faulting_list_read": true,
+    "bad_access_path": [
+      "WindowServer Metal compositor",
+      "NVMTLCommandQueue commandBuffer",
+      "nvmtl_vk_cmd_begin",
+      "vk_common_AllocateCommandBuffers",
+      "radv_create_cmd_buffer",
+      "radv_destroy_cmd_buffer"
+    ],
+    "private_constructor_return_address_identifies_cleanup_after_command_stream_creation_failure": true,
+    "abort_path": [
+      "CoreDisplay::Assert",
+      "CoreDisplay::DisplayPipe::RunFullDisplayPipe",
+      "CoreDisplay display presentation"
+    ],
+    "report_filename_and_header_time_are_not_used_as_exact_fault_capture_time": true,
+    "allocation_failure_root_cause_established": false,
+    "all_crashes_explained_by_one_defect": false
+  },
+  "failed_boot_unified_log_findings": {
+    "private_buffer_allocation_logged_VK_ERROR_OUT_OF_DEVICE_MEMORY": true,
+    "host_pointer_import_refusals_observed": true,
+    "queue_submit_logged_VK_ERROR_DEVICE_LOST": true,
+    "device_lost_log_correlated_privately_to_process_that_later_aborted_in_CoreDisplay": true,
+    "these_logs_establish_global_VRAM_exhaustion": false,
+    "underlying_kernel_winsys_or_GPU_cause_established": false,
+    "fallback_boot_tmp_log_used_as_failed_boot_log": false
+  },
+  "source_only_fix": {
+    "Mesa_commit": "f5cb8ee032adabef599ae892ec4e42d796b84da9",
+    "Mesa_file": "src/amd/vulkan/radv_cmd_buffer.c",
+    "Mesa_file_license": "MIT; original notices retained in the constructor fixture",
+    "patch": "patches/radv/0002-initialize-command-buffer-cleanup-before-stream.patch",
+    "change": "Move the existing descriptor bases, auxiliary-set, dynamic-array and transient-list initializers before fallible command-stream creation, so its existing destructor failure path receives initialized state",
+    "failure_return_preserved": true,
+    "real_pinned_constructor_SHA256": "bdfbc84e5888e499d2f8e8d9a324875f8730b9ce62a504c8317f74df8167f737",
+    "patched_constructor_SHA256": "42fb7051f8821779a545464749200edb59f82309ea066a6879c4860bbfca2653",
+    "patch_applied_and_checked_against_full_pinned_source_and_excerpt_fixture": true,
+    "ASan_UBSan_CPU_cases_per_variant": 6,
+    "negative_control_observes_missing_cleanup_preconditions": true,
+    "patched_stream_failure_has_initialized_cleanup_preconditions": true,
+    "test_APIs_and_destructor_precondition_observer_are_explicit_fakes": true,
+    "complete_Mesa_destructor_executed_by_CPU_test": false,
+    "new_native_RADV_build_verified": false,
+    "new_runtime_installed_or_GPU_tested": false,
+    "patch_resolves_allocation_failure_or_device_loss": false
+  },
+  "limits_and_next_step": [
+    "The prior six bounded real Metal compute cases remain accepted only for their original running mixed stack and boot",
+    "Desktop presentation, video, sustained stability, performance, sleep/wake and physical display dimensions remain unaccepted",
+    "The 42-inch physical-size report is unresolved",
+    "Do not infer that replacing PhxAccel alone resolves these userspace cleanup and device-loss observations",
+    "Keep the completed fallback state; do not rearm M2, reboot or replay initialization during investigation",
+    "Verify the complete pinned patched RADV build on the designated native CI host and establish runtime provenance before a separately reviewed hardware diagnostic",
+    "Investigate command-stream allocation refusal and device loss independently; the cleanup-order patch only makes that failure path safe to return"
+  ],
+  "preservation_and_privacy": {
+    "installed_driver_plugin_helper_or_startup_switch_changed_by_this_investigation": false,
+    "kernel_locally_built": false,
+    "EFI_NVRAM_BIOS_partition_or_security_setting_changed_by_agent": false,
+    "agent_replayed_initialization_or_rearmed_takeover": false,
+    "new_watchdog_or_automatic_restart_installed_by_agent": false,
+    "existing_monitor_reboot_distinguished_from_agent_action": true,
+    "raw_crashes_logs_disassembly_registers_addresses_layouts_UUIDs_or_personal_paths_published": false,
+    "new_runtime_or_diagnostic_binary_uploaded": false
+  }
+}
