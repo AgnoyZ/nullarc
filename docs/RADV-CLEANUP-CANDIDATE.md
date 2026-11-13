@@ -98,6 +98,68 @@ establish hardware or desktop acceptance. The original stream-creation
 failure, desktop stability and physical-size reporting remain unresolved.
 See [the artifact verification record](validation/radv-cleanup-candidate-artifact-20261113.json).
 
+## Isolated candidate Metal test, 2026-11-13
+
+After the owner's continuation of acceleration troubleshooting, the verified
+candidate passed one bounded Metal compute invocation at 17:43:25 UTC+08:00
+on macOS 26.7.2, build 25G332. This was process-specific target validation;
+the installed runtime alias and original library were not replaced.
+
+Static inspection of the actual installed plugin established that it reads
+`NVMTL_ICD_LIB` and passes the readable selected path to `dlopen`. This older
+binary differs from the current source's plugin-relative runtime selection.
+The test reused the exact previously reviewed Metal probe and selected the
+candidate by its absolute private path. Dynamic-loader readback in both
+the enumeration and compute processes verified the pinned installed plugin
+and only the candidate RADV library, without another Vulkan library. Both
+processes reported native ABI 1.12 and kernel build 35. The unique Metal
+device was registry-verified as PCI `1002:1900`.
+
+The single compute process returned zero without a timeout. All six counts
+`1, 63, 64, 257, 4097, 65537` passed exact output, unchanged-input and guard
+checks, with alternating output offsets of 0 and 256 bytes. The process
+used a separate Mesa shader-cache directory. Its roughly one-second runtime
+is not a performance benchmark. The local process logs contained no
+`VK_ERROR_DEVICE_LOST`, command-buffer refusal or cleanup-crash marker;
+this limited log observation does not exclude all kernel or hardware faults.
+
+The postcheck verified the same boot and loaded driver, all 55 baseline
+installed entries and all 15 resolved plugin/runtime entries. NMXAccel and
+IONDRVFramebuffer remained present, PhxAMDFB remained absent, all three
+display switches were zero, and M2 NVRAM/stop/pending markers were absent.
+No new WindowServer report appeared in the checked report directories.
+There was no local native build, system installation, firmware-initialization
+replay, desktop takeover, automatic retry or reboot.
+
+This accepts this candidate's bounded Metal compute result with the current
+mixed installed plugin/compiler stack. It does not accept desktop rendering,
+the original desktop failure path, hard-hang recovery, video, sleep, stability
+or physical-size reporting. The source provenance of the installed plugin
+and other compiler components is still incomplete. The earlier artifact
+record remains the historical pre-execution checkpoint. See the separate
+[target test record](validation/radv-cleanup-candidate-metal-20261113.json).
+
+### Prepared runtime switch, not installed
+
+A private manual installation/rollback helper has been prepared and checked
+without performing a system write. The proposed installation creates a new
+versioned runtime directory containing the candidate RADV plus identical
+copies or symlinks of the five existing non-RADV runtime entries. It then
+atomically replaces only the runtime alias. The protected original runtime,
+plugin, kexts and startup helpers stay intact; no mapped library is overwritten.
+Rollback restores the exact original alias target and retains both runtime
+directories, so it also avoids overwriting existing process mappings.
+
+Read-only status checks passed. An isolated filesystem fixture verified
+switching and restoring the alias, preservation of an already-open original
+file, unchanged library bytes and refusal of an unexpected alias target.
+This is helper validation, not a root installation, live deployment rollback
+or external recovery test. Neither action changes already-running process
+mappings. The prepared helper does not initialize firmware, arm M2, modify
+NVRAM, alter security or reboot. Deployment still requires the owner's
+separate authorization under the repository instructions; this preparation
+does not extend the artifact publication exception to automatic installation.
+
 ## Verification and rollback requirements
 
 For any later candidate, verify the exact workflow/source commit, archive
