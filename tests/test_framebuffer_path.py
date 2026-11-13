@@ -24,10 +24,11 @@ class FramebufferPathTests(unittest.TestCase):
 
     def test_patch_is_pinned_after_0027(self):
         names = list(self.provenance["historical_patches_sha256"])
-        self.assertEqual(28, len(names))
-        self.assertEqual("patches/0028-checked-framebuffer-pool-and-alias-retry.patch", names[-1])
-        patch = (ROOT / names[-1]).read_bytes()
-        self.assertEqual(hashlib.sha256(patch).hexdigest(), self.provenance["historical_patches_sha256"][names[-1]])
+        self.assertEqual(29, len(names))
+        self.assertEqual("patches/0027-bounded-ib-debug-reads.patch", names[26])
+        self.assertEqual("patches/0028-checked-framebuffer-pool-and-alias-retry.patch", names[27])
+        patch = (ROOT / names[27]).read_bytes()
+        self.assertEqual(hashlib.sha256(patch).hexdigest(), self.provenance["historical_patches_sha256"][names[27]])
 
     def test_pool_release_is_checked_as_integers_before_the_allocator(self):
         free = self.fb.split("IOReturn vramFree(NVRMVramRequest *r) {")[1].split("IOReturn rmCall(")[0]

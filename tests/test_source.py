@@ -53,7 +53,9 @@ class SourceTests(unittest.TestCase):
             prepare(self.stage)
     def test_provenance_is_not_hardware_pass(self):
         self.assertFalse(self.provenance["hardware_tested"])
-        self.assertEqual(28, len(self.provenance["historical_patches_sha256"]))
+        self.assertEqual(29, len(self.provenance["historical_patches_sha256"]))
+        self.assertEqual("patches/0029-first-native-submit-refusal.patch",
+                         list(self.provenance["historical_patches_sha256"])[-1])
     def test_firmware_profile_is_staged_and_bound_to_provenance(self):
         from firmware_profile import checked_header
         data = checked_header()

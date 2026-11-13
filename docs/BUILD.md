@@ -28,6 +28,11 @@ reproduces the previous actual debug-read overrun in an isolated source tree,
 then checks the corrected native-submit diagnostics under ASan/UBSan. It uses
 synthetic BO allocations and fake downstream submission; see IB-DEBUG-BOUNDS.md.
 
+The source-only first-submit refusal diagnostic has a separate CPU runner:
+`python3 tools/test_submit_diagnostic.py --out build/submit-diagnostic-check`.
+It executes the actual dispatcher with fake handlers and logging; see
+`NATIVE-SUBMIT-DIAGNOSTIC.md` for its limits and native-build requirement.
+
 With clang++ installed:
 
 ```sh

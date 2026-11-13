@@ -89,6 +89,8 @@ jobs:
         run: python3 tools/test_async_function.py --out build/async-function-tsan --sanitizer thread
       - name: Execute actual submission refusal paths with sanitizers
         run: python3 tools/test_submit_begin.py --out build/submit-begin
+      - name: Execute actual first native-submit refusal diagnostics with sanitizers
+        run: python3 tools/test_submit_diagnostic.py --out build/submit-diagnostic
       - name: Execute actual framebuffer mode and unsupported color callbacks
         run: python3 tools/test_hidpi.py
       - name: Exercise merged upstream topology and deterministic wait model

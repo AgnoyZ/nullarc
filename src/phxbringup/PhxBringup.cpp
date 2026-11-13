@@ -35,7 +35,7 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
 #include "PhxHardwarePolicy.hpp"
 #include "PhxBoPolicy.hpp"
 
-#define PHX_KEXT_BUILD 34u
+#define PHX_KEXT_BUILD 35u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -350,6 +350,7 @@ private:
     bool privileged{false};
     bool hello{false}, closed{false};
     bool sessionClaimed{false};
+    bool submitFailureLogged{false}; // protected by lock; one refusal per native client
     uint32_t vmid{0};        // this client's GPUVM context, taken on its first GPU mapping or submission
     uint64_t lastSeq{0};     // its newest submission: the context is released only once the GPU is past it
     bool ensureVmid() { return vmid || (vmid = owner->vmidAlloc()) != 0; }
@@ -2165,6 +2166,12 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         case PHXN_SEL_DBG_CLAIM: r = doDbgClaim(a); break;
         default:                 r = kIOReturnBadArgument; break;
         }
+    }
+    // RADV may turn different native refusals into DEVICE_LOST. Preserve the first native code
+    // without logging request contents, addresses or identifiers, or changing/retrying the result.
+    if (selector == PHXN_SEL_SUBMIT && r != kIOReturnSuccess && !submitFailureLogged) {
+        submitFailureLogged = true;
+        IOLog("PhxNative: first submit refusal IOReturn=0x%08x\n", static_cast<unsigned>(r));
     }
     IOLockUnlock(lock);
     return r;

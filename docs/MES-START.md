@@ -368,3 +368,9 @@ refusal remains unknown. A metadata-only query on the fallback boot reports
 APU split, not evidence of global VRAM exhaustion. Keep the fallback state;
 see `DISPLAY-FAILURE-20261113.md` and
 `validation/display-followup-target-20261113.json` for source/provenance limits.
+
+A subsequent source-only build-35 diagnostic records the first non-success
+native submit IOReturn per client, without changing dispatch results, the
+submission guards or reclamation methods. It has CPU dispatcher tests and
+has not been installed or accepted on the target. See
+`NATIVE-SUBMIT-DIAGNOSTIC.md`; keep the current fallback state.
