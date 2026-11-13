@@ -1,0 +1,81 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "fresh-live-preflight-and-private-native-delivery-complete; independent-recovery-unverified",
+  "documentation": "docs/ALLOCATION-LIVE-PREFLIGHT.md",
+  "source_commit": "2c26f4deffc4940c1a0a69d9b36c6770191ee0a8",
+  "fresh_live_execution_permission_received": true,
+  "old_M2_or_restart_grants_replayed": false,
+  "live_preflight": {
+    "sudo_uid": 0,
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "architecture": "x86_64",
+    "PhxBringup_services": 1,
+    "PhxBringup_build": 36,
+    "NMXAccel_services": 1,
+    "PhxAMDFB_services": 0,
+    "framebuffer_class": "IONDRVFramebuffer",
+    "nvaccelfb": 0,
+    "nvaccel_iop": 0,
+    "phxfb_hold_value_available": false,
+    "phxagdc_value_available": false,
+    "selected_display_arming_value_present": false,
+    "selected_pending_M2_and_one_shot_markers_present": false,
+    "competing_named_helpers_found": false,
+    "internal_physical_disks": 1,
+    "internal_virtual_disks": 1,
+    "external_physical_disks_observed": 0,
+    "separately_usable_recovery_verified": false,
+    "all_GPU_activity_absent_proven": false
+  },
+  "native_build": {
+    "private_local_build": true,
+    "source_export_files_independently_verified": 41,
+    "SDK_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "SDK_tree": "ef361592c6340fe53560a8aba98619da641ed437",
+    "SDK_files_verified_against_Git_blobs": 1232,
+    "compiler": "Apple clang 21.0.0 (clang-2100.1.1.101)",
+    "host_SDK": "26.5",
+    "recorded_successful_commands": 16,
+    "kernel": {
+      "build": 37,
+      "bytes": 116064,
+      "sha256": "6e59fe0d3a1247b70eae7b1953268a1239c5b5524870fbb9cdfc3e80783203a1",
+      "x86_64_verified": true,
+      "strict_ad_hoc_signature_verified": true
+    },
+    "reader": {
+      "bytes": 35952,
+      "sha256": "1610afb0414caa0f03669fb0e2569de78bf0748388650be9c699699aeb65400a",
+      "x86_64_verified": true,
+      "strict_ad_hoc_signature_verified": true
+    },
+    "root_owned_private_delivery": true,
+    "staged_payload_manifest_files": 57,
+    "staged_signatures_and_architectures_independently_verified": true,
+    "project_source_SDK_notices_and_build_records_retained": true,
+    "public_binary_upload": false,
+    "unchanged_CPU_suite_rerun": false
+  },
+  "execution_limits": {
+    "installed_driver_changed": false,
+    "candidate_kernel_loaded": false,
+    "target_reader_executed": false,
+    "target_snapshot_requests": 0,
+    "old_initializer_or_monitor_executed": false,
+    "GPU_work_requested": false,
+    "EFI_mounted_or_modified": false,
+    "Windows_partition_or_security_changed": false,
+    "arming_or_reboot": false,
+    "real_reboot_resume_verified": false,
+    "allocation_root_cause_confirmed": false
+  },
+  "remaining": [
+    "verified independently usable recovery and exact install/rollback packet",
+    "fresh identity preflight and exact one-use operation before install/load/read",
+    "active Goal-engine admission before relying on automatic reboot continuity",
+    "valid same-boot Phase A baseline and matching second read",
+    "complete startup admission and independent recovery before any later display attempt"
+  ]
+}

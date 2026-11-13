@@ -1,10 +1,13 @@
 # Allocation snapshot execution plan: review before target use
 
-Status on 2026-11-14: **source/design review recorded; target execution is not ready
-or authorized**. This plan makes the next evidence steps reviewable. It is
-not an installer, launcher, arming receipt or hardware result. The consumed
-build-36 M2/reboot grants remain spent. No installation, service open, GPU
-work, startup edit, arming or reboot was performed to prepare this plan.
+Status on 2026-11-14 after fresh live-execution permission: **private native
+build-37 kernel/reader delivery is retained; independent recovery and Phase A
+remain unverified**. The [live preflight and native-build record](ALLOCATION-LIVE-PREFLIGHT.md)
+supplies actual current OS/build metadata and private candidate identities.
+This plan is not an installer, launcher, arming receipt or hardware result.
+The consumed build-36 M2/reboot grants remain spent. No installation, target
+service open, GPU work, startup edit, arming or reboot was performed in the
+preflight/build phase.
 
 The immediate objective is to prove that the reviewed build-37 software
 snapshot can be read on a firmware-desktop boot. A subsequent, separately
@@ -16,23 +19,22 @@ the allocation root cause in advance.
 
 | Input | Reviewed identity or evidence | What it does not supply |
 | --- | --- | --- |
-| Build-37 kernel and standalone reader source | `1c17a1712cb3a64db31148cb33d0c2c9741e7e5d`; [snapshot validation](validation/allocation-snapshot-build37-20261114.json) | A retained installable package, target load or a successful target read |
+| Build-37 kernel and standalone reader | Reviewed snapshot source `1c17a1712cb3a64db31148cb33d0c2c9741e7e5d`; private native build from `2c26f4deffc4940c1a0a69d9b36c6770191ee0a8`; [native validation](validation/allocation-live-preflight-20261114.json) | Target load, recovery acceptance or a successful target read |
 | Capture helper | `e2cb77bc7b1d0ff058744e1b7a1746da32e2a45e`; [capture contract](ALLOCATION-CAPTURE-CANDIDATE.md) | A supervisor, startup sequencing or recovery integration |
 | Independent observer | `25510a8321d45b8223883987c9145652517b4939`; [observer validation](validation/allocation-observer-20261114.json) | Workload admission, proof of report causation or guaranteed completion before recovery |
 | Last verified combined source/documentation | `f3ff243da716ff755433fdb01ac8bb91183682a4` | New target authorization or evidence that build 37 is currently loaded |
 | Installed monitor | Read-only control-point review; its privately retained hash is unchanged | An approved startup modification or a complete execution audit |
 
-The corrected hosted kernel/reader compile retained zero artifacts. Its
-success is not a target package receipt. A later package review must identify
-the exact retained bytes, corresponding source, signatures and delivery path;
-no binary is fetched, built locally, uploaded or installed by this plan.
-The [retained-package review](ALLOCATION-PACKAGE-REVIEW.md) revalidated the old
-build-36 archive and offline build-35 backup, but found no build-37 delivery
-among the six current repository artifacts. Separate bootable recovery media
-also remains unverified. Existing two-kext/RADV publication exceptions do not
-expand to a full stack or the standalone reader. Actual OS build and live
-identities remain future preflight facts, not assumptions taken from the
-repository's target name.
+The corrected hosted kernel/reader compile retained zero artifacts; that
+historical success is still not a package receipt. The new private local
+build separately retains exact kernel/reader bytes, corresponding source,
+SDK, signatures and command records in root-owned storage. It does not expand
+the two-kext/RADV public publication exceptions to a full stack or the reader.
+The earlier [retained-package review](ALLOCATION-PACKAGE-REVIEW.md) remains an
+historical inventory of the old build-36 archive and offline build-35 backup.
+Separately usable recovery is still unverified. The fresh preflight observed
+macOS 26.7.2 build 25G332 with build 36 loaded; identities must be checked
+again immediately before any install/load/read operation.
 
 ## Startup ordering found in source
 
