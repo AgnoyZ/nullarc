@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "scope": "One fresh-boot private IP discovery capture, followed by offline validation only",
+  "hardware": "Radeon 780M, Ryzen 8845H",
+  "os": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "deployed_kernel_source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+  "repository_at_capture": "516a6f23f10a8e1e6d797cbf55a3646dc4d2447e",
+  "capture_transport_source_commit": "853d43c1ab5d25e75b84ad1acabb5022d4445d11",
+  "prototype_reference": "linux-discovery-window-reference.json",
+  "prerequisites": {
+    "fresh_manual_boot_observed": true,
+    "candidate_identity_profile_geometry_and_guards_match": true,
+    "installed_stack_hashes_match": true,
+    "private_binary_and_boot_pinned_plan_hashes_verified": true,
+    "configured_only_kernel_snapshot_gate_passed": true,
+    "no_ring_TMR_queue_or_fault_before_capture": true,
+    "firmware_ready_and_memory_size_gates_passed": true
+  },
+  "capture": {
+    "attempts": 1,
+    "exit_status": 0,
+    "bytes": 10240,
+    "binary_envelope_verified_on_target": true,
+    "write_allowlist": ["MM_INDEX", "MM_INDEX_HI"],
+    "VRAM_data_writes": false,
+    "PSP_firmware_power_GART_MES_queue_or_display_initialization": false,
+    "GPU_register_writes_after_capture": false,
+    "native_diagnostic_installed_or_uploaded": false
+  },
+  "offline_validation": {
+    "binary_version": [1, 1],
+    "declared_binary_size": 1212,
+    "binary_checksum_matches": true,
+    "present_table_checksums_matches": 3,
+    "table_bounds_and_nonoverlap_checked": true,
+    "IP_table_version": 3,
+    "base_address_width_bits": 32,
+    "die_count": 1,
+    "IP_entries": 39,
+    "die_entry_and_base_array_bounds_checked": true,
+    "duplicate_instances_rejected": true,
+    "exact_entry_consumption_checked": true,
+    "private_validator_sha256": "9a914f2789ffe7d87fd394b98fafc9919a5b8c30ec9dd13efed8f9793f4714cc",
+    "private_validator_cases_passed": 31,
+    "malformed_and_independent_v4_64bit_fixture_cases_included": true,
+    "existing_repository_Python_parser_all_39_entries_match": true,
+    "offline_tests_executed_GPU_access": false
+  },
+  "mapping_comparison": {
+    "GC": {
+      "IP_version": [11, 0, 1],
+      "target_bases_compared": 3,
+      "all_match_existing_reference": true,
+      "both_direct_SEG_macros_match": true
+    },
+    "MMHUB": {
+      "IP_version": [3, 0, 1],
+      "target_bases_compared": 3,
+      "all_match_existing_reference": true
+    },
+    "OSSSYS": {
+      "IP_version": [6, 0, 1],
+      "target_bases_compared": 2,
+      "all_match_existing_reference": true
+    },
+    "unused_reference_array_values_are_zero": true,
+    "raw_addresses_published": false
+  },
+  "interpretation_and_limits": {
+    "previously_missing_target_base_comparison_obtained": true,
+    "selector_readback_failure_root_cause_established": false,
+    "actual_GFXOFF_exit_or_GC_power_clock_readiness_verified": false,
+    "complete_hardware_reset_across_reboot_established": false,
+    "selector_write_only_semantics_established": false,
+    "readback_checks_removed": false,
+    "base_constants_changed": false,
+    "GPU_Metal_or_desktop_acceleration_verified": false,
+    "EDID_dimensions_fixed_or_verified": false,
+    "exclusive_memory_ownership_established": false
+  },
+  "post_capture_guards": {
+    "automatic_GPU_initialization_blocked": true,
+    "experimental_display_not_armed": true,
+    "pending_initialization": false,
+    "framebuffer": "IONDRVFramebuffer",
+    "installed_stack_hashes_match": true,
+    "kernel_or_installed_helpers_replaced": false,
+    "automatic_restart": false,
+    "raw_capture_logs_layout_addresses_EFI_or_firmware_published": false
+  },
+  "next_action": "Review a bounded power/access observation plan offline before further target writes or initialization; do not automatically repeat capture or earlier initialization"
+}

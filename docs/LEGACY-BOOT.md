@@ -172,6 +172,11 @@ then the independent selector-only probe received DisallowGfxOff acknowledgement
 but still read zero immediately and subsequently for the first `0x0c` selection.
 It stopped before GART or MES reset; see
 [`validation/mes-selector-target-20261112.json`](validation/mes-selector-target-20261112.json).
-The next diagnostic must capture the target IP mapping on a fresh pristine
-boot, without repeating initialization. The prepared private capture prototype
-is host-tested only; acceleration and display dimensions remain unresolved.
+The next diagnostic captured the target IP mapping on a fresh pristine boot
+on 2026-11-13, without repeating initialization; see
+[`validation/ip-discovery-target-20261113.json`](validation/ip-discovery-target-20261113.json).
+The bounded private capture and offline table checks passed. All target GC,
+MMHUB and OSSSYS bases compared match the existing reference constants, including
+both direct GC segment macros. This does not establish selector access or
+power/clock readiness, and no further initialization followed. Acceleration
+and display dimensions remain unresolved.

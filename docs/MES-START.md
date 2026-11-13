@@ -162,10 +162,11 @@ the probe does not establish a complete hardware reset across reboot. Root
 cause and write-only semantics remain unestablished, so the readback checks
 stay intact.
 
-The remaining GC segment bases still originate from the reference machine,
-not independently captured target IP discovery. No PhxProbe service or already
-published discovery data was found, and the default discovery tail lies outside
-the direct VRAM aperture. Do not scan guessed MMIO bases or initialize another
+At that stop, the remaining GC segment bases originated from the reference
+machine, without independently captured target IP discovery. No PhxProbe
+service or already published discovery data was found, and the default
+discovery tail lies outside the direct VRAM aperture. Do not scan guessed MMIO
+bases or initialize another
 stage to work around this missing evidence.
 
 A private userspace capture prototype is prepared for a **fresh pristine boot
@@ -177,8 +178,43 @@ zero-register-write diagnosis. It never writes MM_DATA or any power, GART,
 MES, queue or display register. It accepts no arbitrary memory address, uses
 no guessed fallback, stops on the first error and retains a private exclusive
 partial file. Binary-envelope validation is not IP-table validation or a
-hardware-ownership proof. The current initialized boot is rejected. Native
-compilation and 58 ASan/UBSan fault cases passed; no target capture has run.
+hardware-ownership proof. The initialized boot is rejected. Native
+compilation and 58 ASan/UBSan fault cases passed before the target capture below.
 Source facts and prototype hashes are in
 `validation/linux-discovery-window-reference.json`. No kext installation,
 kernel build, public diagnostic binary or raw discovery dump is added.
+
+## Target discovery capture, 2026-11-13
+
+A fresh operator-controlled boot passed candidate identity, exact profile,
+geometry, installed-stack hashes and startup guards. The private capture ran
+once before any PSP/firmware/power initialization. Its configured-only snapshot,
+firmware-ready and memory-size gates passed. The bounded memory-window read
+completed with a private 10 KiB output; only MM_INDEX/MM_INDEX_HI address
+selectors were written. No VRAM data, power, GART, MES, queue or display writes
+were made. No further GPU register writes or initialization followed.
+
+Offline validation accepted binary version 1.1, a 1,212-byte declared envelope,
+all three present table checksums, and an IP discovery version 3 table with
+32-bit bases, one die and 39 entries. A separate private validator checked
+table overlap/bounds, die/entry/base-array bounds, duplicate instances and exact
+entry consumption. Its 31 offline cases passed, including malformed structures
+and an independent 64-bit v4 fixture. The repository's existing Python parser
+independently produced matching versions and bases for all 39 target entries.
+These offline tests do not expand the target capture's supported envelope.
+
+All three target GC bases match the current reference array; both direct SEG
+macros match as well. All three MMHUB bases and both OSSSYS bases also match,
+with zero-only unused reference-array slots. This supplies the previously
+missing target mapping comparison; it does not establish selector accessibility,
+actual GFXOFF exit, correct power/clock sequencing or a complete reset across
+reboot. Do not change segment bases or remove readback checks on this evidence.
+
+The capture-only stage is complete. Review a bounded power/access observation
+plan offline before any further target initialization or register writes; do
+not repeat discovery or earlier initialization merely because a new session is
+opened. Startup/display protections remain active and the desktop remains on
+IONDRVFramebuffer. Acceleration and EDID dimensions remain unresolved. The
+sanitized evidence is `validation/ip-discovery-target-20261113.json`; raw data,
+addresses, layouts, EFI and firmware remain private. No kext or installed
+helper was changed.
