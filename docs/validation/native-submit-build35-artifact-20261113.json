@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-13",
+  "source_commit": "2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+  "source_build": 35,
+  "scope": "Native CI review and local verification/staging of the owner-authorized two-kext diagnostic candidate; no installation or target execution",
+  "original_source_checkpoint": "native-submit-diagnostic-20261113.json",
+  "priority_native_validation": {
+    "run_id": 43377876831,
+    "runner": "macos-15-intel",
+    "conclusion": "success",
+    "host_contracts": "success",
+    "native_components": "success",
+    "actual_dispatcher_CPU_cases": 70,
+    "sanitizers": ["AddressSanitizer", "UndefinedBehaviorSanitizer"],
+    "actual_dispatcher_SHA256": "c487d0a998c2ce40a1e9cbfae41eb44ee0820161c21a6fa3175ac38ccac7e38f",
+    "both_kexts_compiled_and_strict_signature_checks_passed": true,
+    "actual_Metal_plugin_compiled_and_signed_without_device_creation": true,
+    "full_RADV_or_LLVM_build_covered_by_this_run": false,
+    "target_GPU_executed": false
+  },
+  "two_kext_artifact": {
+    "run_id": 43378517567,
+    "workflow": "kext-artifacts.yml",
+    "conclusion": "success",
+    "artifact_id": 14015138271,
+    "artifact_name": "experimental-kexts-2a1c771d19893f20f53a54cb1566c376a4c5fbfb",
+    "archive_name": "nullarc-kexts-2a1c771d1989.tar.gz",
+    "GitHub_ZIP_SHA256_verified": "28a07cdd9a399c9a82b0c9da64add99e3bedfb3f7c833feab6337f2b740eeb05",
+    "outer_archive_SHA256_verified": "695490e3503bb147c5a62ec407b6734955a2b3183b00a9b96a31cc195e12df25",
+    "inner_manifest_files_verified": 24,
+    "source_archive_exactly_matches_committed_allowlisted_git_archive": true,
+    "source_build_macro_35_verified": true,
+    "diagnostic_format_string_present_in_source_and_binary": true,
+    "SDK_commit_matches_lock": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "source_archives_checksums_verified": true,
+    "thin_x86_64_kext_structure_and_bundle_identifiers_verified": true,
+    "both_strict_signatures_verified_after_extraction_and_final_local_copy": true,
+    "executables_preserve_execute_permissions": true,
+    "kext_executable_SHA256": {
+      "PhxBringup": "be51307b48f4a047e9f14195899d814e55cc323a6eba88260c16670d7885dedf",
+      "PhxAccel": "4db98733b4dc9098d69938e511a57dc07266d0f6f722fb3c8bf119edc6ef6465"
+    },
+    "original_build_report_notices_licences_and_corresponding_sources_retained": true,
+    "firmware_plugin_runtime_installer_personal_EFI_or_raw_diagnostics_published": false
+  },
+  "separate_cleanup_fix_native_checkpoint": {
+    "source_commit": "4f35a609331752d5e2dcac24f8b878d32aa6f309",
+    "run_id": 43370193766,
+    "source_tests": "success",
+    "macos_kexts": "success",
+    "conclusion": "success",
+    "this_is_full_stack_native_acceptance_for_build_35": false,
+    "rebuilt_userspace_fix_included_in_two_kext_package": false
+  },
+  "preservation_and_acceptance": {
+    "installed_files_compared_before_and_after_staging": 55,
+    "installed_driver_library_helper_or_startup_files_changed": false,
+    "startup_markers_framebuffer_switches_or_boot_changed": false,
+    "EFI_NVRAM_BIOS_partition_or_security_setting_changed": false,
+    "candidate_installed_or_loaded": false,
+    "agent_rearmed_M2_replayed_initialization_or_rebooted": false,
+    "new_GPU_workload_submitted": false,
+    "new_watchdog_created": false,
+    "exact_original_native_refusal_recovered": false,
+    "original_display_failure_cause_established": false,
+    "desktop_acceleration_accepted": false,
+    "physical_display_size_corrected": false,
+    "raw_logs_UUIDs_addresses_personal_paths_or_hardware_dumps_published": false,
+    "next_step": "Separately review candidate deployment, compatible installed stack, rollback and bounded capture plan before a user-controlled hardware session; preserve current fallback"
+  }
+}

@@ -60,7 +60,39 @@ The runner also refuses missing/duplicate extracted definitions and an
 existing output directory. These are CPU tests of the actual dispatcher,
 not executions of the real handlers. They do not validate concurrent kernel
 execution, log persistence, IOKit, GPU submission or desktop stability. The
-native CI build remains necessary; do not build or replace a local kext.
+native CI build was still required at the source-review checkpoint; do not
+build or replace an installed kext as part of this diagnostic work.
+
+### Native build and artifact follow-up
+
+On 2026-11-13, priority run `43377876831` completed successfully for source
+`2a1c771d19893f20f53a54cb1566c376a4c5fbfb`. Its `macos-15-intel` job passed
+the 70 actual-dispatcher CPU cases under ASan/UBSan, compiled and checked
+the signatures of both kexts, and compiled/signed the actual Metal plugin
+without creating a device. This priority run does not cover a full RADV or
+LLVM build and does not exercise the target GPU.
+
+The existing owner-authorized two-kext workflow, run `43378517567`, then
+successfully packaged the same source commit. Local verification checked
+the GitHub ZIP digest, the outer archive checksum, all 24 inner manifest
+entries, both strict signatures after extraction and final copying, and
+the exact committed allowlisted source archive. The candidate was staged
+locally with its original checksums, build report, licences and sources;
+it was not installed. The original source-review JSON remains a historical
+checkpoint; the subsequent results are in
+[the build/artifact record](validation/native-submit-build35-artifact-20261113.json).
+
+The separate cleanup-order fix at source
+`4f35a609331752d5e2dcac24f8b878d32aa6f309` also completed full native CI
+run `43370193766` successfully. That older run is separate evidence for
+that commit, not a full-stack acceptance of build 35. The two-kext package
+does not distribute the rebuilt RADV, translator, LLVM or Metal plugin.
+
+The staging operation compared 55 installed files and retained the same
+boot, startup-marker state and framebuffer switches. No deployment,
+initialization replay, M2 rearming, reboot or new GPU workload was performed.
+Desktop acceleration, the original submission failure and the physical
+display-size issue remain unresolved.
 
 Run the CPU-only check with a fresh output directory:
 
