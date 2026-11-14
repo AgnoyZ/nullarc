@@ -5,10 +5,13 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+import gc_state_compare
 NAMES = [
     "PSP_INITIALIZATION_STATUS", "RCC_CONFIG_MEMSIZE", "GRBM_STATUS", "GRBM_STATUS2",
     "GB_ADDR_CONFIG", "CP_STAT", "GRBM_GFX_CNTL", "CP_MES_CNTL", "RLC_CNTL", "RLC_STAT",
@@ -66,6 +69,9 @@ class GCStateObservationTests(unittest.TestCase):
                                                      data["phase"], data["GPU_register_writes"]))
                 self.assertEqual(NAMES, [item["name"] for item in data["registers"]])
                 self.assertEqual(19, len({item["index"] for item in data["registers"]}))
+                # Cross-check the independently specified file analyzer against actual
+                # collector output, including every index, in both explicit modes.
+                gc_state_compare.validate_observation(data, "baseline" if phase == "configured" else "psp")
                 self.assertNotIn("ready", result.stdout)
                 if fault == "all-zero-gc":
                     self.assertTrue(all(item["value"] == 0 for item in data["registers"][2:]))

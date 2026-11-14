@@ -1,0 +1,102 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "repository_at_validation": "8500ab743952e551b64b09d47c5d60783206f585",
+  "status": "file-only comparison tested with synthetic/fake-IOKit observations; no new target capture",
+  "candidate": {
+    "source": "tools/gc_state_compare.py",
+    "input": "private manifest plus an unrepeated baseline/psp/firmware/power prefix",
+    "fixed_registers_per_observation": 19,
+    "decoded_registers": 5,
+    "decoded_fields": 28,
+    "input_bytes_per_file_limit": 65536,
+    "exact_observation_hashes_and_reported_exit_zero_required": true,
+    "exact_register_identity_order_index_shape_and_controls_required": true,
+    "unknown_bits_preserved": true,
+    "exclusive_synchronized_private_output": true,
+    "partial_phase_input_explicitly_labelled": true,
+    "phase_order_and_exit_status_are_caller_asserted": true,
+    "boot_and_capture_provenance_verified": false,
+    "hardware_readiness_proven": false,
+    "physical_cause_established": false,
+    "hardware_network_or_child_process_execution_backend": false,
+    "source_sha256": "2210f7f6e4b04deee2e7c8ba3b82633b58b21afbcaf7fd160f70d773cdd5ac77"
+  },
+  "source_review": {
+    "Linux_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "manifests": [
+      "linux-mes-selector-reference.json",
+      "linux-mes-queue-reference.json"
+    ],
+    "cached_files_hash_verified": 11,
+    "unused_amdgpu_mes_c_not_in_this_cache_or_count": true,
+    "GC_register_offsets_and_base_indices_checked": 17,
+    "controls_retained_from_prior_review": 2,
+    "field_masks_and_shifts_individually_checked": 28,
+    "Linux_MES_enable_sets_reset_before_ME3_selection": true,
+    "local_mes_start_sets_reset_before_its_ME3_selection": true,
+    "desktop_idle_guard_precedes_local_mes_start": true,
+    "reset_order_difference_establishes_failure_cause": false,
+    "Linux_implementation_bodies_whole_headers_or_binaries_copied": false,
+    "fresh_network_fetch_completed": false,
+    "cached_hash_verified_sources_used": true
+  },
+  "checks": [
+    {
+      "name": "synthetic-file-comparison",
+      "methods": 8,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "coverage": [
+        "all four phase prefixes and valid zero GC observations",
+        "raw deltas, XOR, decoded fields and retained undecoded bits",
+        "each register identity, index, shape, order and value refusal",
+        "schema, mode, positive controls and cross-phase memory-size drift",
+        "phase order, duplicate filename, reported exit and exact-byte refusal",
+        "duplicate/nonfinite JSON, input size, symlinks, directories and FIFO refusal",
+        "main path, private exclusive output and no process/network use",
+        "all completeness/readiness/provenance limitations retained"
+      ],
+      "hardware_access": false
+    },
+    {
+      "name": "actual-collector-to-independent-analyzer-contract",
+      "methods": 7,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "both_explicit_modes_and_both_geometries": true,
+      "backend": "fake IOKit only"
+    },
+    {
+      "name": "desktop-handoff-startup-and-native-include-regressions",
+      "methods": 61,
+      "desktop_handoff_methods": 26,
+      "desktop_startup_methods": 30,
+      "native_include_methods": 5,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "backend": "CPU/file/mock only"
+    }
+  ],
+  "total_focused_methods": 76,
+  "full_suite_rerun": false,
+  "preservation": {
+    "production_mesboot_phxctl_collector_and_kernel_unchanged": true,
+    "installed_driver_helpers_startup_EFI_NVRAM_security_and_proxy_unchanged": true,
+    "native_target_binary_compiled_or_executed_this_change": false,
+    "GPU_commands_or_reboot_requests_this_change": 0,
+    "new_live_scope_created": false,
+    "all_three_historical_scopes_remain_consumed": true,
+    "current_boot_terminal_for_GPU_work": true,
+    "raw_observations_private_identifiers_credentials_or_binaries_published": false
+  },
+  "rollback": "Do not select the file analyzer, or revert this source addition with a normal new commit. No installed component changed.",
+  "next_step": "A hardware observation experiment still needs a verified fresh boot and distinct reviewed bounded request with exact pinned inputs and independent recovery; the analyzer does not grant admission or launch captures."
+}
