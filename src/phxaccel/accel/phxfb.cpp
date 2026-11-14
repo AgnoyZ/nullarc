@@ -29,6 +29,8 @@
 
 void phxAgdcInstall();   // phxagdc.cpp: the AppleGraphicsDeviceControl that reports this panel (debug.phxagdc)
 void phxAgdcRemove();
+void phxDisplayHistoryPrepare(IOService *fb);
+void phxDisplayHistoryServer(bool completed);
 void phxHoldInit(IOService *fb, unsigned bootHoldSec);   // phxagdc.cpp: debug.phxfb_hold keeps this framebuffer (and so the GPU) busy
 
 #define PFBLOG(fmt, ...) IOLog("PhxFB: " fmt "\n", ##__VA_ARGS__)
@@ -368,6 +370,12 @@ public:
     }
     bool start(IOService *provider) override;
     void stop(IOService *provider) override;
+    IOReturn newUserClient(task_t task, void *security, UInt32 type, IOUserClient **client) override {
+        if (type == kIOFBServerConnectType) phxDisplayHistoryServer(false);
+        const IOReturn status = IOFramebuffer::newUserClient(task, security, type, client);
+        if (type == kIOFBServerConnectType && status == kIOReturnSuccess) phxDisplayHistoryServer(true);
+        return status;
+    }
     IOReturn enableController() override { return kIOReturnSuccess; }
     bool isConsoleDevice() override { return !fBeside; }
     IODeviceMemory *getApertureRange(IOPixelAperture aperture) override {
@@ -804,6 +812,7 @@ bool PhxAMDFB::start(IOService *provider)
     else if (!(fBacklight = phxBacklightCreate(this))) PFBLOG("backlight: the handler would not attach");
     else PFBLOG("backlight: PWM at %u of %u", bl, kBlMax);
     loadEdid();   // no callbacks can observe a partial snapshot; immutable for the framebuffer's lifetime
+    phxDisplayHistoryPrepare(this);
     if (!IOFramebuffer::start(provider)) {
         if (fBacklight) { fBacklight->detach(this); OSSafeReleaseNULL(fBacklight); }
         OSSafeReleaseNULL(fMmio); OSSafeReleaseNULL(fSurfMap); return false; }

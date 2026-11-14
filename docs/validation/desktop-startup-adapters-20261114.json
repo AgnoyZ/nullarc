@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "scope": "checked desktop startup source and private native build; no target GPU execution",
+  "tested_base_commit": "9e371304caaa458479b0874f7bcba8a4d8e2dda9",
+  "full_suite": {
+    "python": "3.13.18",
+    "tests": 623,
+    "seconds": 329.561,
+    "skips": 0,
+    "clean_isolated_source": true,
+    "all_tracked_inputs_unchanged": true
+  },
+  "focused_desktop_test_methods": 30,
+  "coordinator_test_methods": 47,
+  "native_display_CPU_harness_cases": 5,
+  "native": {
+    "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "sdk_tree": "ef361592c6340fe53560a8aba98619da641ed437",
+    "sdk_files": 1232,
+    "sdk_verified_before_and_after": true,
+    "components": {
+      "phxctl": {
+        "bytes": 49856,
+        "sha256": "adf6b6ff8d032a2f4adcb0e4e324227ba68a5d6da51480a8b1c29bd64540fcf5"
+      },
+      "mesboot": {
+        "bytes": 148112,
+        "sha256": "2c7c17cf19234373be5c445c42c3d0d9e953c6e8198ebf3fe1a764b978922a2a"
+      },
+      "allocation-snapshot": {
+        "bytes": 35888,
+        "sha256": "a32fbb02c84b57df90bf3cec96280aa43491619c9723a6de53fb661a57b8b959"
+      },
+      "PhxBringup": {
+        "bytes": 120800,
+        "sha256": "9746adb43c9b207d0fd29f8db7ef70116168066ed3fc6022284191953e08ae01"
+      },
+      "PhxAccel": {
+        "bytes": 355216,
+        "sha256": "828d02aed267cd7608b552ab2f37786c863d8bbb18355b987b30fd011ad61170"
+      }
+    },
+    "architecture": "x86_64",
+    "strict_adhoc_signatures_verified": true,
+    "compiler": "Apple Clang 21.0.0 (clang-2100.1.1.101)",
+    "host_SDK": "26.5"
+  },
+  "runtime": {
+    "python": "3.13.18",
+    "private_root_owned_delivery_files": 1656,
+    "bytes": 100750105,
+    "native_clock_brackets_passed": 3,
+    "snapshot_requests": 0,
+    "native_identity_adapter_read_only_checked": true
+  },
+  "source_input_sha256": {
+    ".github/workflows/allocation-capture-check.yml": "df9ef88ba8abe4b2cdffa1b3c13955cc2d9e9c17339c046b66a65653b999b63e",
+    "src/phxaccel/PhxDisplayHistory.h": "c49d6f6bb72cea6c8a1151d76a023e736b091cbe6a94d4bedde142e9e52b729b",
+    "src/phxaccel/accel/phxagdc.cpp": "f5e721bbad805010c33d32ea3bc9ebb5ac92bbd6a2b07c54e30eeb8dd6e42aac",
+    "src/phxaccel/accel/phxfb.cpp": "407332fd821818dc9670f5bfe1c8d4e440b00d8db7e38cb052ed688ba6f14072",
+    "tests/desktop_startup_fixture.py": "3d2059626bcd55eb088094c9930712a6a00d4858a0c33866936b16c99333a095",
+    "tests/test_allocation_coordinator.py": "215725cc1c98d043d85131ce314b7e6fa2116460c98b2f12a78803b351992257",
+    "tests/test_desktop_startup.py": "b4d2a6e6d1da3f9e221b7197789081afcc67fdd18fbc07033c893d29041a8835",
+    "tests/test_display_history.cpp": "772eee9c07a50c2557e851324466a692c764b5585ff19f5ce8aa76cf8383204c",
+    "tools/allocation_startup.py": "aaa621266cf02a0e15e2d48b0375eaca540fc8717628b96d5f5a37ebc788ab5a",
+    "tools/desktop_startup.py": "caca7ad5d7b20391c49ba999dc61b0bc516f7b5513b977bccfdcb188ef931de2"
+  },
+  "development_failures": "Earlier focused fixture failures and intermediate clean-source passes are retained privately; only final matching production inputs are counted here. The native-clock epoch and zero-byte ioreg absence findings were addressed before deployment.",
+  "installed_or_loaded_by_this_source_validation": false,
+  "GPU_executed": false,
+  "desktop_diagnostic_attempt_consumed": false,
+  "actual_desktop_or_allocation_root_cause_proven": false,
+  "hosted_CI_success_inferred": false,
+  "public_binary_artifacts_uploaded": false,
+  "remaining": "finish exact private installer/rollback and kernel-collection admission, synchronize source, then bind and execute the existing one requested diagnostic attempt; no old consumed operation replay"
+}

@@ -1,5 +1,11 @@
 # Allocation startup coordinator source candidate
 
+Later integration: [checked desktop adapters](DESKTOP-STARTUP-ADAPTERS.md)
+provide concrete commands and retained display history as a new source
+candidate. They add an earlier metadata recovery guard, explicit recovery
+handoff with the original absolute deadline, and per-role stage budgets.
+The historical validation below remains distinct from their delivery status.
+
 Status, 2026-11-14: `tools/allocation_startup.py` implements a **source-only
 coordinator and independent recovery dispatcher**. It has no installer, CLI,
 default target commands or native acceptance adapter. Its integration tests

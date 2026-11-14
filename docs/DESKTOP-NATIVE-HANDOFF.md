@@ -95,6 +95,11 @@ The outstanding owner-requested diagnostic desktop attempt is not consumed
 by source tests. The [execution plan](ALLOCATION-EXECUTION-PLAN.md) remains the
 integration boundary.
 
+The later [concrete adapters](DESKTOP-STARTUP-ADAPTERS.md) compose these commands
+with checked firmware/power, display, release, monitoring and independent
+recovery, and add retained hold/server history. That source candidate still
+requires a complete fresh private delivery.
+
 For source rollback, revert this candidate as a normal new commit, retaining
 the build-38 claim guard and build-37 diagnostic history. No installed rollback
 is required for this source milestone. Do not run the new commands against

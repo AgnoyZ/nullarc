@@ -1,5 +1,11 @@
 # Allocation snapshot execution plan: review before target use
 
+Source integration update: [checked startup adapters and retained display
+history](DESKTOP-STARTUP-ADAPTERS.md) now supply the concrete candidate commands.
+Their new complete private delivery, installed rollback and actual target
+acceptance remain separate requirements. The historical gaps and retained
+Phase A boundaries below do not constitute permission to replay old packets.
+
 Latest target update, 2026-11-14: the owner-authorized
 [build-37 installation](ALLOCATION-BUILD37-DEPLOYMENT.md), actual normal
 restart, exact loaded-image verification and

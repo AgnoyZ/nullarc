@@ -10,6 +10,7 @@
 #include <kern/thread_call.h>
 #include <kern/clock.h>
 #include <libkern/OSAtomic.h>
+#include "PhxDisplayHistory.h"
 #include "AppleGraphicsDeviceControl_re.h"
 #include "nvrm-agdc-k5.h"
 
@@ -188,22 +189,55 @@ static IOService *gHoldFB = nullptr;
 static int gHold = 0;
 static IOLock *gHoldLock = nullptr;
 static thread_call_t gHoldTimer = nullptr;
-static void holdSet(bool on, const char *why)
+static PhxDisplayHistory gDisplayHistory = {};
+static uint64_t displayNowNs()
+{
+    uint64_t absolute = 0, ns = 0;
+    clock_get_uptime(&absolute); absolutetime_to_nanoseconds(absolute, &ns);
+    return ns;
+}
+// Called before IOFramebuffer::start can expose a server connection. A failed
+// preparation leaves telemetry unavailable and cannot produce admission proof.
+void phxDisplayHistoryPrepare(IOService *fb)
+{
+    if (!gHoldLock) gHoldLock = IOLockAlloc();
+    if (!gHoldLock || !fb) return;
+    IOLockLock(gHoldLock);
+    phxHistoryPrepare(gDisplayHistory, fb->getRegistryEntryID(), displayNowNs());
+    IOLockUnlock(gHoldLock);
+}
+void phxDisplayHistoryServer(bool completed)
+{
+    if (!gHoldLock) return;
+    IOLockLock(gHoldLock);
+    phxHistoryServer(gDisplayHistory, displayNowNs(), completed);
+    IOLockUnlock(gHoldLock);
+}
+static void holdSet(bool on, const char *why, uint64_t reason = PHX_RELEASE_SYSCTL, uint64_t durationNs = 0)
 {
     if (!gHoldLock || !gHoldFB) return;
     IOLockLock(gHoldLock);
-    if (on && !gHold) { gHold = 1; gHoldFB->adjustBusy(1); AGLOG("busy hold on PhxFB (%s): the GPU stays busy", why); }
-    else if (!on && gHold) { gHold = 0; gHoldFB->adjustBusy(-1); AGLOG("busy hold released (%s): the GPU may go quiet", why); }
+    if (on && !gHold) {
+        const uint64_t now = displayNowNs();
+        phxHistoryHold(gDisplayHistory, now, durationNs ? now + durationNs : now);
+        gHold = 1; gHoldFB->adjustBusy(1); AGLOG("busy hold on PhxFB (%s): the GPU stays busy", why);
+    } else if (!on && gHold) {
+        phxHistoryRelease(gDisplayHistory, displayNowNs(), reason);
+        gHold = 0; gHoldFB->adjustBusy(-1); AGLOG("busy hold released (%s): the GPU may go quiet", why);
+    }
     IOLockUnlock(gHoldLock);
 }
-static void holdExpired(thread_call_param_t, thread_call_param_t) { holdSet(false, "timeout"); }
+static void holdExpired(thread_call_param_t, thread_call_param_t) { holdSet(false, "timeout", PHX_RELEASE_TIMEOUT); }
 void phxHoldInit(IOService *fb, unsigned bootHoldSec)
 {
     if (!gHoldLock) gHoldLock = IOLockAlloc();
     gHoldFB = fb;
     if (!bootHoldSec || !gHoldLock) return;
     if (!gHoldTimer) gHoldTimer = thread_call_allocate(holdExpired, nullptr);
-    holdSet(true, "boot");
+    if (!gHoldTimer) {
+        IOLockLock(gHoldLock); gDisplayHistory.invalid = 1; IOLockUnlock(gHoldLock);
+    }
+    holdSet(true, "boot", 0, (uint64_t)bootHoldSec * 1000000000ull);
     if (gHoldTimer) {
         uint64_t d; clock_interval_to_deadline(bootHoldSec, kSecondScale, &d);
         thread_call_enter_delayed(gHoldTimer, d);
@@ -220,6 +254,18 @@ static int phxhold_sysctl SYSCTL_HANDLER_ARGS
 }
 SYSCTL_PROC(_debug, OID_AUTO, phxfb_hold, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, NULL, 0, phxhold_sysctl, "I",
             "1 = hold PhxFB busy (GPUWrangler waits), 0 = release it");
+static int phxhistory_sysctl SYSCTL_HANDLER_ARGS
+{
+    if (req->newptr) return EPERM;
+    if (!gHoldLock) return ENXIO;
+    PhxDisplayHistory copy;
+    IOLockLock(gHoldLock);
+    copy = gDisplayHistory; copy.readNs = displayNowNs();
+    IOLockUnlock(gHoldLock);
+    return SYSCTL_OUT(req, &copy, sizeof(copy));
+}
+SYSCTL_PROC(_debug, OID_AUTO, phxfb_history, CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_LOCKED | CTLFLAG_KERN,
+            NULL, 0, phxhistory_sysctl, "S,PhxDisplayHistory", "retained display hold/server ordering, version 1");
 
 static bool gSysctls = false;
 void phxAgdcInstall()
@@ -229,6 +275,7 @@ void phxAgdcInstall()
     sysctl_register_oid(&sysctl__debug_phxagdc_fb_replies); sysctl_register_oid(&sysctl__debug_phxagdc_refused);
     sysctl_register_oid(&sysctl__debug_phxagdc_last_refused); sysctl_register_oid(&sysctl__debug_phxagdc_k5);
     sysctl_register_oid(&sysctl__debug_phxfb_hold);
+    sysctl_register_oid(&sysctl__debug_phxfb_history);
     gSysctls = true;
 }
 
@@ -239,8 +286,9 @@ void phxAgdcRemove()
     sysctl_unregister_oid(&sysctl__debug_phxagdc_fb_replies); sysctl_unregister_oid(&sysctl__debug_phxagdc_refused);
     sysctl_unregister_oid(&sysctl__debug_phxagdc_last_refused); sysctl_unregister_oid(&sysctl__debug_phxagdc_k5);
     sysctl_unregister_oid(&sysctl__debug_phxfb_hold);
+    sysctl_unregister_oid(&sysctl__debug_phxfb_history);
     if (gHoldTimer) { thread_call_cancel(gHoldTimer); thread_call_free(gHoldTimer); gHoldTimer = nullptr; }
-    holdSet(false, "stop");
+    holdSet(false, "stop", PHX_RELEASE_STOP);
     gHoldFB = nullptr;
     gSysctls = false;
     if (gCall) {

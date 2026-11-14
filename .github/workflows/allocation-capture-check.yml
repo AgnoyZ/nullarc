@@ -23,6 +23,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_allocation_coordinator.py -v
       - name: Exercise native desktop entrypoint and provider methods with fake IOKit only
         run: python3 -m unittest discover -s tests -p test_desktop_handoff.py -v
+      - name: Exercise checked display adapters and retained history with fake I/O only
+        run: python3 -m unittest discover -s tests -p test_desktop_startup.py -v
       - name: Verify source and execution scope
         run: |
           git diff --exit-code HEAD -- src tools tests

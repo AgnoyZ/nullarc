@@ -201,6 +201,43 @@ class CoordinatorTests(unittest.TestCase):
         self.assertEqual(list(startup.ROLES), self.names())
         self.assert_success(result)
 
+    def test_stage_specific_deadline_allows_longer_monitor_without_changing_other_stages(self):
+        self.stage_commands['monitor'] = self.command('monitor', 'sleep 0.15')
+        timeouts = {role: 1 for role in startup.ROLES}
+        timeouts['monitor'] = 0.5
+        result = self.run_attempt(stage_seconds=0.05, stage_timeouts=timeouts)
+        self.assert_success(result)
+
+    def test_recovery_handoff_callback_runs_before_observer_admission(self):
+        called = []
+        def armed():
+            called.append(True)
+            self.assertFalse((self.root / 'capture/baseline.json').exists())
+            self.assertTrue((self.scope / 'startup.started').exists())
+        self.run_attempt(on_recovery_armed=armed)
+        self.assertEqual([True], called)
+
+    def test_failed_recovery_handoff_does_not_start_observer_or_stages(self):
+        def refused(): raise capture.CaptureError('fixture-handoff-refused')
+        self.assert_refused(expected='fixture-handoff-refused', on_recovery_armed=refused)
+        self.assertFalse((self.root / 'capture').exists())
+        self.assertFalse(any(role in self.names() for role in startup.ROLES))
+
+    def test_metadata_recovery_can_be_bound_to_separate_claim_and_truthful_dismissal(self):
+        alternate = self.scope / 'boot-entry.started'
+        capture.write_json(alternate, {'metadata_pending': True})
+        root = self.scope / 'metadata-recovery'; root.mkdir(mode=0o700)
+        recovery = startup.Recovery(root, self.recovery_commands, 2, {'metadata_pending': True},
+                                    claim_path=alternate, dismissal_outcome='handed-to-coordinator-recovery')
+        try:
+            recovery.arm(time.monotonic() + 1)
+            recovery.dismiss(time.monotonic() + 1)
+            result = json.loads((root / 'recovery.json').read_text())
+            self.assertEqual('handed-to-coordinator-recovery', result['outcome'])
+            self.assertEqual(hashlib.sha256(alternate.read_bytes()).hexdigest(), result['startup_claim_sha256'])
+        finally:
+            recovery.close()
+
     def test_actual_collector_observer_and_coordinator_with_fake_native_commands(self):
         import test_allocation_capture as fixture_module
         fixture = fixture_module.CaptureTests('test_full_sequence_is_two_single_reads_with_private_durable_outputs')

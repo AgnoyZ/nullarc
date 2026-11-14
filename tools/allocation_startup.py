@@ -23,6 +23,7 @@ import allocation_capture as capture
 ROLES = ('initialize', 'claim', 'display', 'release', 'monitor')
 RECOVERY_ROLES = ('disarm', 'display', 'reboot')
 MESSAGE_LIMIT = 4096
+COMMAND_INPUT_LIMIT = 256 * 1024 * 1024
 POLL_SECONDS = 0.02
 _OWNED_PROCESSES = {}
 _OWNED_PIDS = set()
@@ -74,11 +75,16 @@ class Command:
                 capture.require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1
                                 and info.st_uid in (0, os.geteuid())
                                 and not info.st_mode & 0o022
-                                and info.st_size <= capture.READER_LIMIT, 'startup-command-pin')
-                raw = stream.read(capture.READER_LIMIT + 1)
+                                and info.st_size <= COMMAND_INPUT_LIMIT, 'startup-command-pin')
+                digest_observed = hashlib.sha256()
+                count = 0
+                for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+                    count += len(chunk)
+                    capture.require(count <= COMMAND_INPUT_LIMIT, 'startup-command-pin')
+                    digest_observed.update(chunk)
             capture.require(type(digest) is str and re.fullmatch('[0-9a-f]{64}', digest)
-                            and len(raw) <= capture.READER_LIMIT
-                            and hashlib.sha256(raw).hexdigest() == digest, 'startup-command-pin')
+                            and count == info.st_size
+                            and digest_observed.hexdigest() == digest, 'startup-command-pin')
         capture.require(os.stat(self.argv[0]).st_mode & 0o111, 'startup-command-pin')
 
     def start(self, stdout, stderr):
@@ -208,7 +214,7 @@ def recovery_worker(root, control, ready, deadline, commands, state, owned, cont
                 state[0:1] = b'D'
                 capture.publish_json(root / 'recovery.json', {
                     **context, 'recovery_pid': os.getpid(),
-                    'format': 1, 'outcome': 'dismissed-after-monitor',
+                    'format': 1, 'outcome': context.get('dismissal_outcome', 'dismissed-after-monitor'),
                     'monotonic_ns': time.monotonic_ns()})
                 notify(ready, {'recovery': 'dismissed', 'pid': os.getpid()})
                 return
@@ -221,11 +227,21 @@ def recovery_worker(root, control, ready, deadline, commands, state, owned, cont
 
 
 class Recovery:
-    def __init__(self, root, commands, watchdog_seconds, identity):
+    def __init__(self, root, commands, watchdog_seconds, identity, claim_path=None,
+                 dismissal_outcome='dismissed-after-monitor', absolute_deadline=None):
         capture.require(set(commands) == set(RECOVERY_ROLES), 'startup-recovery')
-        self.claim_sha256 = hashlib.sha256(capture.read_file(root.parent / 'startup.started')).hexdigest()
+        self.claim_sha256 = hashlib.sha256(capture.read_file(
+            root.parent / 'startup.started' if claim_path is None else claim_path)).hexdigest()
         context = {'expected_identity': dict(identity), 'startup_claim_sha256': self.claim_sha256}
+        capture.require(dismissal_outcome in ('dismissed-after-monitor', 'handed-to-coordinator-recovery'),
+                        'startup-recovery')
+        if dismissal_outcome != 'dismissed-after-monitor':
+            context['dismissal_outcome'] = dismissal_outcome
         self.deadline = time.monotonic() + seconds(watchdog_seconds)
+        if absolute_deadline is not None:
+            capture.require(type(absolute_deadline) in (int, float) and math.isfinite(absolute_deadline)
+                            and time.monotonic() < absolute_deadline, 'startup-duration')
+            self.deadline = min(self.deadline, absolute_deadline)
         for role in RECOVERY_ROLES:
             commands[role].check()
         self.state = mmap.mmap(-1, 1)
@@ -405,7 +421,7 @@ def stop_child(pid, group=False):
 
 def supervise(scope, spec, expected_identity, current_identity, boundary, observer_job,
               stages, recovery_commands, admission_seconds=10, stage_seconds=60,
-              watchdog_seconds=240):
+              watchdog_seconds=240, stage_timeouts=None, on_recovery_armed=None, watchdog_deadline=None):
     """Run one reviewed attempt. Callbacks do not confer target acceptance.
 
     observer_job(out, on_ready) must call the actual observer; on_ready is a
@@ -422,6 +438,11 @@ def supervise(scope, spec, expected_identity, current_identity, boundary, observ
     seconds(admission_seconds)
     seconds(stage_seconds)
     capture.require(tuple(stages) == ROLES, 'startup-stages')
+    if stage_timeouts is None:
+        stage_timeouts = {role: stage_seconds for role in ROLES}
+    capture.require(type(stage_timeouts) is dict and set(stage_timeouts) == set(ROLES),
+                    'startup-stage-timeouts')
+    stage_timeouts = {role: seconds(stage_timeouts[role]) for role in ROLES}
     stages = dict(stages)
     for command in stages.values():
         command.check()
@@ -440,9 +461,12 @@ def supervise(scope, spec, expected_identity, current_identity, boundary, observ
     writer_fd = None
     observer_reaped = False
     try:
-        recovery = Recovery(root, recovery_commands, watchdog_seconds, expected_identity)
+        recovery = Recovery(root, recovery_commands, watchdog_seconds, expected_identity,
+                            absolute_deadline=watchdog_deadline)
         admission_deadline = time.monotonic() + admission_seconds
         recovery.arm(admission_deadline)
+        if on_recovery_armed is not None:
+            on_recovery_armed()
         trail = Trail(root / 'startup.jsonl', expected_identity)
         trail.emit('recovery-armed', pid=recovery.pid, deadline_monotonic=recovery.deadline,
                    startup_claim_sha256=recovery.claim_sha256)
@@ -523,7 +547,7 @@ def supervise(scope, spec, expected_identity, current_identity, boundary, observ
             prerequisite(released=role == 'monitor')
             trail.emit('stage-request', role=role, baseline_sha256=baseline_hash)
             status = bounded_stage(command, root, role,
-                                   min(time.monotonic() + stage_seconds, recovery.deadline),
+                                   min(time.monotonic() + stage_timeouts[role], recovery.deadline),
                                    recovery.check if role in ('release', 'monitor') else running,
                                    stage_children)
             trail.emit('stage-returned', role=role, returncode=status)
