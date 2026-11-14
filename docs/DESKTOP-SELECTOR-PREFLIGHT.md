@@ -1,12 +1,15 @@
 # Terminal desktop queue-selector preflight
 
-Status, 2026-11-14: **source and CPU validation only; not installed or run on
-the GPU**. The [original build-39 desktop attempt](
+Status, 2026-11-14: **native helper not run on the GPU; a separately scoped
+admission stopped before firmware/power because its watchdog never became
+ready**. A signed helper was privately staged; no driver or startup was
+deployed. See [the later admission result](#later-target-admission-and-launchd-correction).
+The [original build-39 desktop attempt](
 DESKTOP-DEPLOYMENT-ADMISSION.md#observed-reboot-result-and-recovery) stopped at
 queue-selection readback before GART/MES initialization. Its one-attempt
 authorization is consumed. The installed binary did not log which of the four
-selections failed or the immediate/later readback values. No new hardware
-attempt is part of this change, and the physical cause remains unknown.
+selections failed or the immediate/later readback values. The later admission
+added no GPU observations; the physical cause remains unknown.
 
 ## Evidence and retained guards
 
@@ -89,3 +92,66 @@ must be accounted for separately from the command's bounded requests.
 For source rollback, revert the preflight addition as a normal new commit.
 Keep the prior error-detail logging and existing selection guards. There is
 no installed rollback for this uninstalled source change.
+
+## Later target admission and launchd correction
+
+A later owner continuation authorized one separately scoped terminal preflight.
+The original desktop request and all 188 consumed receipt hashes were preserved.
+Admission observed macOS 26.7.2, build 25G332, the same recovery boot and build-39
+provider. PhxAccel and its accelerator service were absent while the firmware
+framebuffer was present. This differs from the original desktop attempt; it
+must not be used to attribute the earlier selector failure to the accelerator.
+
+An independent copy of the validated native helper was ad-hoc signed and passed
+strict signature verification. The unsigned validated bytes were preserved.
+All 43 experiment input pins, ten recovery pins and the complete trusted
+interpreter tree passed verification. Neither signature verification nor this
+private staging is an OS driver approval or driver/startup deployment.
+
+The fresh max-one request was durably consumed. `launchctl submit` returned
+success, but no bound watchdog-ready record appeared within five seconds. The
+runner refused before either firmware/power or `desktop-preflight`: **zero new
+IOKit service opens, snapshots, reservations, selector writes or initialization
+commands**. The refusal completed without a recovery/reboot request. The scope
+was not reset or retried.
+
+Readback found the submitted job in the graphical bootstrap domain despite
+effective UID zero. It was repeatedly failing to spawn with `EX_CONFIG`, with
+no child output or ready record. System-domain lookup alone had missed it.
+The inherited domain is established; the precise underlying spawn permission
+failure is not. The exact graphical-domain job was removed and its absence
+verified. These are launcher observations, not GPU failure evidence.
+
+A separate private launcher candidate now writes a scope-local native plist
+and uses `launchctl bootstrap system` with `UserName=root`, `RunAtLoad=true`
+and `KeepAlive=false`. It retains bootstrap stdout, stderr and status, and
+requires a request-bound ready receipt reporting effective UID zero. It also
+gives recovery/deadline checks priority over late completion records and checks
+the work budget and watchdog again after input hashing. It is not installed as
+a persistent LaunchDaemon or startup caller; the consumed frozen delivery was
+not modified.
+
+Twenty-five file/mock tests passed under the trusted interpreter, including
+five system-launch contracts, deadline races, input drift, duplicate refusal,
+finite failure, timeout and no-later-command behavior. A separate file-only
+host probe used that candidate's actual launch function. Its child reported
+effective UID zero and launchd as parent, survived the submitting process,
+ran exactly once, and exited zero after an explicit file release. The exact
+system job was then removed and absence verified. The probe had no GPU or
+reboot command. This validates the corrected launch path only; **the corrected
+candidate has not run a GPU preflight or proved deadline reboot recovery on
+hardware**.
+
+Final metadata admission retained the same boot/provider identity, firmware
+framebuffer, off marker and absent display arming; all original receipt hashes
+still matched. No driver, installed startup, EFI, security setting or proxy was
+changed. See the [sanitized admission record](
+validation/desktop-selector-preflight-admission-20261114.json).
+
+Any further target experiment must use a fresh independently reviewed max-one
+request and scope, with the system-domain correction and immutable input pins.
+Do not replay either consumed scope or continue to same-boot initialization.
+For the unused candidate, rollback is simply to retain it as private evidence
+and not select it; no installed component needs restoration. Remove only the
+exact experiment-owned launchd label in its verified domain if cleanup is
+needed; never remove unrelated jobs or use a broad process kill.

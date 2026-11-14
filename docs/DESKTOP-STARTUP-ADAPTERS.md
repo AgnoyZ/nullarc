@@ -216,5 +216,12 @@ That change is not deployed and has no new hardware result. The original
 The later [terminal selector preflight](DESKTOP-SELECTOR-PREFLIGHT.md) reuses
 the same checks but returns before GART/MES/queue initialization. It has no
 startup adapter caller and deliberately abandons its reservation even on
-success. Its separate CPU/native validation is uninstalled and unexecuted;
-the consumed desktop attempt is not reopened.
+success. Its separate CPU/native validation did not execute GPU work. A later
+private helper delivery consumed a distinct admission but refused before
+firmware/power because the submitted watchdog landed in the graphical
+bootstrap domain and never became ready. The exact job was removed. An
+explicit system-domain correction passed 25 mock/file tests and one file-only
+host probe; it is not a deployed startup adapter or a target preflight result.
+See the [admission and cleanup evidence](
+validation/desktop-selector-preflight-admission-20261114.json). Neither consumed
+scope is reopened.

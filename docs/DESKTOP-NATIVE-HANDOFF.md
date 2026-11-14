@@ -8,8 +8,11 @@ This supplies concrete `mesboot desktop-init` and
 `mesboot desktop-claim` interfaces for the [startup coordinator](
 ALLOCATION-STARTUP-COORDINATOR.md). It does not establish a working desktop
 or the cause of the earlier allocation refusals. The later [terminal selector
-preflight](DESKTOP-SELECTOR-PREFLIGHT.md) is an uninstalled, unexecuted source
-addition; historical build-37 and Phase A evidence remains unchanged.
+preflight](DESKTOP-SELECTOR-PREFLIGHT.md) has source/CPU validation; a separately
+scoped admission stopped before GPU work when its watchdog was not ready. A
+private system-domain launcher correction passed file-only host validation;
+the native preflight remains target-unexecuted. Historical build-37 and Phase A
+evidence remains unchanged.
 
 ## Native sequence
 
