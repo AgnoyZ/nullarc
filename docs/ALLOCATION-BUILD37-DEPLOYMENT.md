@@ -1,5 +1,10 @@
 # Owner-authorized build-37 deployment
 
+Later target result: the normal restart completed, the exact build-37 image
+loaded, and [Phase A passed](ALLOCATION-PHASE-A.md) with two same-boot passive
+snapshots. The installation/restart checkpoints below retain what was known
+at those times; their unverified-load statements are historical.
+
 On 2026-11-14, the owner approved proceeding with the previously proposed
 PhxBringup-only installation and normal firmware-desktop restart. A fresh
 private operation record covers one installation and one restart with a
@@ -100,11 +105,12 @@ GitHub Git database API with `force=false`. Blob, tree, commit and final
 remote ref identities matched. This is a verified fast-forward, not a
 successful ordinary Git transport push or a history rewrite.
 
-The restart and resulting loaded build have not yet been observed. Continue
-from the retained postboot verifier and fresh receipts; do not replay the
-consumed installation/restart actions or arm M2 automatically.
+At that scheduling checkpoint, the restart and resulting loaded build had
+not yet been observed. They were subsequently verified in the
+[postboot record](ALLOCATION-PHASE-A.md). Do not replay the consumed
+installation/restart or passive-read actions or arm M2 automatically.
 
 The [sanitized deployment record](validation/allocation-build37-deployment-20261114.json)
-separates the installed bytes and read-back from the still-unperformed load,
-passive-read and desktop steps. Raw plans, file manifests, paths, identities
-and command receipts remain in private storage.
+separates the installed bytes and read-back from the later verified load and
+passive reads, and from the still-unperformed diagnostic desktop step. Raw
+plans, file manifests, paths, identities and command receipts remain private.

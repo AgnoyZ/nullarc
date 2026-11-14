@@ -1,10 +1,14 @@
 # Allocation snapshot execution plan: review before target use
 
-Deployment update, 2026-11-14: the owner-authorized
-[build-37 installation](ALLOCATION-BUILD37-DEPLOYMENT.md) and independent EFI
-read-back are complete. The running kernel remained build 36 at that
-checkpoint; the new firmware-desktop load and Phase A remain unverified.
-This supersedes the retained-candidate-only installation status below.
+Latest target update, 2026-11-14: the owner-authorized
+[build-37 installation](ALLOCATION-BUILD37-DEPLOYMENT.md), actual normal
+restart, exact loaded-image verification and
+[two same-boot passive reads](ALLOCATION-PHASE-A.md) are complete. **Phase A
+passed** on macOS 26.7.2 build 25G332. Both snapshots had zero observed
+refusals. They followed inherited initialization; they do not establish a
+pre-initializer baseline or reproduce desktop takeover. Phase B remains
+the next integration boundary. The retained historical status and plan below
+do not supersede that later evidence.
 
 Status on 2026-11-14 after fresh live-execution permission: **private native
 build-37 delivery and an exact rollback packet are retained; the operator

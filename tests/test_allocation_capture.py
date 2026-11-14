@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import shlex
 import signal
 import subprocess
 import sys
@@ -140,8 +141,10 @@ class CaptureTests(unittest.TestCase):
                              'if mode=="fail": sys.stderr.write("PRIVATE_STDERR"); sys.exit(77)\n'
                              'if mode=="large": sys.stdout.buffer.write(b"X"*262144); sys.exit(0)\n'
                              'sys.stdout.buffer.write(pathlib.Path(sys.argv[2]).read_bytes())\n')
-        self.reader.write_text('#!' + sys.executable + '\nimport pathlib,sys\n'
-                               f'sys.stdout.buffer.write(pathlib.Path({str(self.source)!r}).read_bytes())\n')
+        # The real collector shares a five-second budget across nine commands.
+        # Avoid nine Python interpreter startups in this content-only fixture;
+        # the dedicated process-boundary tests below still use fake-process.py.
+        self.reader.write_text('#!/bin/sh\nexec /bin/cat -- ' + shlex.quote(str(self.source)) + '\n')
         self.reader.chmod(0o700)
         self.digest = hashlib.sha256(self.reader.read_bytes()).hexdigest()
         self.calls = []
@@ -165,7 +168,7 @@ class CaptureTests(unittest.TestCase):
             call = args  # This is the fake executable, never the native reader.
         else:
             self.assertEqual(capture.COMMANDS[label.split('-')[0]], tuple(args))
-            call = (sys.executable, str(self.fake), 'ok', str(self.source))
+            call = ('/bin/cat', '--', str(self.source))
         return capture.run_command(call, folder, label, deadline)
 
     def baseline(self):
