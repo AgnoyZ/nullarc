@@ -87,5 +87,30 @@
     "desktop_success_or_acceleration_proven": false,
     "raw_diagnostics_private_paths_identifiers_or_binaries_published": false
   },
-  "rollback": "Before uncertain reboot dispatch, restore exact startup/off-marker bytes and remove only this request's one-shot flag with readback. After dispatch may have occurred, preserve evidence and inspect actual state; never replay. Target failure uses the existing independent disarm/recovery path."
+  "rollback": "Before uncertain reboot dispatch, restore exact startup/off-marker bytes and remove only this request's one-shot flag with readback. After dispatch may have occurred, preserve evidence and inspect actual state; never replay. Target failure uses the existing independent disarm/recovery path.",
+  "subsequent_activation_readback": {
+    "verified_at": "2026-11-15T00:46:48.315300+08:00",
+    "ordinary_reboot_dispatched_once": true,
+    "scheduled_process_independently_verified": true,
+    "approximate_restart_at": "2026-11-15T00:48:38.991407+08:00",
+    "startup_exact_root_owned": true,
+    "one_shot_display_flag_exact_one": true,
+    "off_marker_absent": true,
+    "persistent_markers_absent": true,
+    "startup_not_run_on_preparation_boot": true,
+    "packet_and_complete_runtime_verified": true,
+    "historical_receipt_counts_unchanged": [
+      188,
+      29,
+      97,
+      187,
+      190
+    ],
+    "new_scope_empty": true,
+    "automatic_retry": false,
+    "new_GPU_commands": 0,
+    "reboot_completion_verified": false,
+    "new_desktop_result_available": false,
+    "other_installed_inputs_unchanged": 6
+  }
 }

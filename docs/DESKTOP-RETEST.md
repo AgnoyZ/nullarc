@@ -89,3 +89,18 @@ automatically. On target failure, use the existing independent disarm/recovery
 path. Preserve every consumed scope and native result. A later source rollback
 uses a normal new commit. This record claims neither a collector root cause,
 a desktop fix nor acceleration.
+
+## Subsequent activation readback
+
+The authorized one-shot activation was subsequently dispatched once. Independent
+readback at **2026-11-15 00:46:48 +08:00** verified the exact root-owned startup,
+new packet/runtime, one-shot display flag, absent off/persistent markers and
+one matching root shutdown scheduler. Its approximate restart time is
+**2026-11-15 00:48:39 +08:00**. The other six installed inputs and all five
+historical receipt sets were unchanged. The new scope remained empty and no
+GPU command had run on the preparation boot.
+
+This is verified scheduling and arming, not an observed reboot or a desktop
+result. Durable private continuation records were saved before the scheduled
+restart. After the stable boot identity changes, inspect this new scope and
+its native/recovery receipts first; never re-arm or replay the packet.
