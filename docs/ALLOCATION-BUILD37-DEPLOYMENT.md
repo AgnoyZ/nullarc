@@ -83,6 +83,27 @@ The observer/startup and independent-recovery integration review remains
 necessary before a display attempt. This installation does not establish
 snapshot transport, allocation correctness, desktop liveness or acceleration.
 
+## Normal restart scheduled; load still unverified
+
+After the installation record was synchronized, a final read-only EFI check
+at **11:11:09 +0800** again matched the entire installed manifest. At
+**11:13:07 +0800**, the executor scheduled the single authorized normal
+restart with a three-minute delay, approximately **11:16 +0800 on
+2026-11-14**. A separate process at **11:13:50 +0800** verified the unique
+owned scheduler, unchanged pre-restart boot, absent M2 arming/markers and
+unmounted EFI. No second restart or desktop attempt was scheduled.
+
+The original Git push of the installation record timed out. A fresh remote
+read confirmed the previous parent; the exact same reviewed commit,
+`ce3740eea877a2cac9d3042c3e7cac14557a35bd`, was then synchronized through the
+GitHub Git database API with `force=false`. Blob, tree, commit and final
+remote ref identities matched. This is a verified fast-forward, not a
+successful ordinary Git transport push or a history rewrite.
+
+The restart and resulting loaded build have not yet been observed. Continue
+from the retained postboot verifier and fresh receipts; do not replay the
+consumed installation/restart actions or arm M2 automatically.
+
 The [sanitized deployment record](validation/allocation-build37-deployment-20261114.json)
 separates the installed bytes and read-back from the still-unperformed load,
 passive-read and desktop steps. Raw plans, file manifests, paths, identities
