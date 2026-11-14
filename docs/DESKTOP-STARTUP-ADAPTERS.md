@@ -6,7 +6,8 @@ The one-attempt request is consumed; acceleration remains unvalidated.
 `tools/desktop_startup.py` supplies concrete commands for the [coordinator](
 ALLOCATION-STARTUP-COORDINATOR.md) and [build-39 handoff](DESKTOP-NATIVE-HANDOFF.md).
 There is no default packet, installer, arming command or automatic next attempt.
-Source tests do not consume the outstanding owner's desktop request.
+Source tests did not consume the owner's desktop request; the recorded target
+attempt did.
 
 ## Sequence and delivery contract
 
@@ -211,3 +212,9 @@ The source helper now includes exact selection/readback error details, covered
 by 21 sanitized native CLI/provider CPU tests and a real-framework native build.
 That change is not deployed and has no new hardware result. The original
 623-test source validation is historical; it is not a pass for this later patch.
+
+The later [terminal selector preflight](DESKTOP-SELECTOR-PREFLIGHT.md) reuses
+the same checks but returns before GART/MES/queue initialization. It has no
+startup adapter caller and deliberately abandons its reservation even on
+success. Its separate CPU/native validation is uninstalled and unexecuted;
+the consumed desktop attempt is not reopened.

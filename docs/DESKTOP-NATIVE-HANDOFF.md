@@ -1,12 +1,15 @@
 # Explicit native desktop queue handoff
 
-Status, 2026-11-14: **build-39 source candidate, not installed or hardware
-validated**. This supplies concrete `mesboot desktop-init` and
+Status, 2026-11-14: **build 39 loaded; the original desktop diagnostic stopped
+at queue-selection readback and its one-attempt authorization is consumed**.
+See the [observed reboot result](
+DESKTOP-DEPLOYMENT-ADMISSION.md#observed-reboot-result-and-recovery).
+This supplies concrete `mesboot desktop-init` and
 `mesboot desktop-claim` interfaces for the [startup coordinator](
 ALLOCATION-STARTUP-COORDINATOR.md). It does not establish a working desktop
-or the cause of the earlier allocation refusals. Build 37 remains the last
-verified loaded image; its retained installation and Phase A evidence are
-unchanged.
+or the cause of the earlier allocation refusals. The later [terminal selector
+preflight](DESKTOP-SELECTOR-PREFLIGHT.md) is an uninstalled, unexecuted source
+addition; historical build-37 and Phase A evidence remains unchanged.
 
 ## Native sequence
 
@@ -86,26 +89,26 @@ artifact upload.
 
 Native compile/link and clean committed-source validation are recorded in
 [the validation record](validation/desktop-native-handoff-20261114.json).
-These checks do not supply native acceptance or an installed startup packet.
-The concrete caller must still deliver the complete pinned kernel/helper
+Those source-stage checks did not supply native acceptance or an installed
+startup packet. The concrete caller had to deliver the complete pinned kernel/helper
 closure, checked firmware/power stage, display/release/monitor/disarm adapters,
 startup rollback and same-boot historical hold/panel evidence. Preserve the
 120-second hold and existing three-reports-in-90-seconds monitor policy.
-The outstanding owner-requested diagnostic desktop attempt is not consumed
-by source tests. The [execution plan](ALLOCATION-EXECUTION-PLAN.md) remains the
-integration boundary.
+Source tests did not consume the owner's diagnostic attempt; the later
+hardware attempt did. The [execution plan](ALLOCATION-EXECUTION-PLAN.md) remains
+the integration boundary.
 
 The later [concrete adapters](DESKTOP-STARTUP-ADAPTERS.md) compose these commands
 with checked firmware/power, display, release, monitoring and independent
-recovery, and add retained hold/server history. That source candidate still
-requires a complete fresh private delivery.
+recovery, and add retained hold/server history. Its subsequent private delivery
+and failed target attempt are recorded in the observed reboot result above.
 
 For source rollback, revert this candidate as a normal new commit, retaining
 the build-38 claim guard and build-37 diagnostic history. No installed rollback
-is required for this source milestone. Do not run the new commands against
+was required for that source milestone. Do not run these commands against
 an inherited already-initialized boot or substitute the old installed helper.
 
-## Local verification, 2026-11-14
+## Historical source-stage verification, 2026-11-14
 
 A final clean isolated committed snapshot passed **589 full-suite tests** on
 Python 3.13.18 in 310.084 seconds, with zero skips. All tracked input hashes were

@@ -67,7 +67,8 @@ class DesktopHandoffTests(unittest.TestCase):
         self.assertEqual(1, len(rows), result.stderr)
         data = json.loads(rows[0])
         self.assertTrue(all(type(value) is int and value >= 0 for value in data.values()))
-        self.assertEqual(status == 0, "desktop claim:" in result.stdout if command == "desktop-claim" else "desktop handoff:" in result.stdout)
+        success = {"desktop-claim": "desktop claim:", "desktop-preflight": "desktop preflight:"}.get(command, "desktop handoff:")
+        self.assertEqual(status == 0, success in result.stdout)
         return data
 
     def test_provider_reservation_covers_every_arena_and_doorbell(self):
@@ -179,6 +180,42 @@ class DesktopHandoffTests(unittest.TestCase):
         data = json.loads(re.search(r"^fake-desktop-summary (.*)$", result.stderr, re.M)[1])
         self.assertEqual([0, 0, 0, 0, 0], [data[key] for key in
                          ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals")])
+
+    def test_preflight_success_stops_after_eight_selection_writes_and_closes(self):
+        for variant in ("reference", "relocated"):
+            with self.subTest(variant=variant):
+                data = self.cli_case("ok", 0, command="desktop-preflight", variant=variant)
+                self.assertEqual([1, 1, 1, 8, 14, 1], [data[key] for key in
+                                 ("opens", "snapshots", "reservations", "writes", "reads", "closes")])
+                self.assertEqual([0] * 6, [data[key] for key in
+                                 ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
+
+    def test_preflight_selection_faults_are_terminal_without_later_writes(self):
+        for fault, writes in (("select-kiq", 1), ("select-scheduler", 3), ("select-compute", 5),
+                              ("select-graphics", 7), ("select-immediate-and-readback", 1), ("restore-selection", 2)):
+            with self.subTest(fault=fault):
+                data = self.cli_case(fault, 75, command="desktop-preflight")
+                self.assertEqual(writes, data["writes"])
+                self.assertEqual([0] * 7, [data[key] for key in
+                                 ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims", "closes")])
+
+    def test_preflight_reuses_argument_layout_transport_and_reservation_refusals(self):
+        for fault, status in (("bad-count", 64), ("bad-argument", 64), ("env-override", 64),
+                              ("overlap", 75), ("pre-adopted", 75), ("psp-fault", 75),
+                              ("hello-status", 74), ("snapshot-status", 74), ("snapshot-short", 74),
+                              ("reserve-status", 74), ("read-status", 74), ("write-status", 74),
+                              ("already-mes", 75), ("already-queue", 75)):
+            with self.subTest(fault=fault):
+                data = self.cli_case(fault, status, command="desktop-preflight")
+                self.assertEqual([0] * 6, [data[key] for key in
+                                 ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
+
+    def test_preflight_close_failure_never_reports_success_or_starts_workloads(self):
+        data = self.cli_case("close-status", 74, command="desktop-preflight")
+        self.assertEqual(1, data["closes"])
+        self.assertEqual(8, data["writes"])
+        self.assertEqual([0] * 6, [data[key] for key in
+                         ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
 
     def test_cli_graphics_failures_never_seal_or_claim(self):
         for fault in ("graphics-timeout", "graphics-scratch", "graphics-memory", "graphics-fence-high"):

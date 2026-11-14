@@ -1334,6 +1334,13 @@ static int desktop_command(int argc, char **argv)
    desktop_idle_queue(3, 0, SEG0(0x1fab));
    desktop_idle_queue(1, 0, SEG0(0x1fab));
    desktop_idle_queue(0, 0, SEG0(0x1e80));
+   if (!strcmp(argv[1], "desktop-preflight")) {
+      /* Closing intentionally abandons the reservation; this is a terminal
+       * diagnostic, never a prerequisite to same-boot initialization. */
+      if (IOServiceClose(conn) != KERN_SUCCESS) mes_start_failure(74, "service close failed after desktop preflight");
+      puts("desktop preflight: four queue selection/idle checks passed; no GART/MES/queue initialization; reservation abandoned, same-boot initialization unsupported");
+      return 0;
+   }
    const uint32_t setup[][2] = {{0x0de0, 1}, {SEG1(0x802), 0}, {SEG1(0x803), 0x01000000}};
    for (unsigned i = 0; i < sizeof(setup) / sizeof(setup[0]); ++i)
       if (wr(setup[i][0], setup[i][1]) != setup[i][1] || rd(setup[i][0]) != setup[i][1])
@@ -1367,7 +1374,8 @@ static int desktop_command(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-   if (argc >= 2 && (!strcmp(argv[1], "desktop-init") || !strcmp(argv[1], "desktop-claim")))
+   if (argc >= 2 && (!strcmp(argv[1], "desktop-init") || !strcmp(argv[1], "desktop-claim") ||
+                    !strcmp(argv[1], "desktop-preflight")))
       return desktop_command(argc, argv);
    if (argc >= 2 && (!strcmp(argv[1], "sched-query") || !strcmp(argv[1], "compute-probe") || !strcmp(argv[1], "shader-probe"))) return scheduler_query(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "mes")) return mes_start(argc, argv);

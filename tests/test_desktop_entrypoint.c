@@ -20,7 +20,7 @@ static struct PhxDesktopLayout saved;
 static uint32_t words[0x400000 / 4], registers[0x20000], banks[16][0x20000];
 static unsigned opens, snapshots, reservations, seals, claims, writes, vwrites, reads, scheduler_bells, compute_bells, graphics_bells, closes;
 static unsigned grbm_writes;
-static int terminal;
+static int terminal, preflight;
 static int is(const char *name) { return !strcmp(fault, name); }
 static void summary(void) {
     fprintf(stderr, "fake-desktop-summary {\"opens\":%u,\"snapshots\":%u,\"reservations\":%u,\"seals\":%u,\"claims\":%u,"
@@ -141,6 +141,7 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
     assert(reservations == 1 && !seals && !claims);
     if (selector == SEL_DBG_WRITE_REG) {
         assert(input_count == 2 && output && output_count && *output_count == 1);
+        if (preflight) assert(input[0] == SEG1(0x900));
         ++writes; if (fail("write-status")) return 5;
         *reg((uint32_t)input[0]) = (uint32_t)input[1]; *output = input[1];
         if (input[0] == SEG1(0x900)) {
@@ -153,11 +154,13 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
         return 0;
     }
     if (selector == SEL_DBG_VRAM_WRITE) {
+        assert(!preflight);
         assert(input_count == 2 && !output && !output_count && input[0] + 4 <= sizeof(words));
         assert(!(input[0] & 3)); ++vwrites; if (fail("vwrite-status")) return 5;
         words[input[0] / 4] = (uint32_t)input[1]; return 0;
     }
     assert(selector == SEL_DBG_DOORBELL && input_count == 3 && !output && !output_count && !input[2]);
+    assert(!preflight);
     if (input[0] == saved.scheduler.doorbellIndex * 4) { ++scheduler_bells; scheduler(); }
     else if (input[0] == saved.compute.doorbellIndex * 4) { ++compute_bells; work(0, input[1]); }
     else { assert(input[0] == saved.graphics.doorbellIndex * 4); ++graphics_bells; work(1, input[1]); }
@@ -176,6 +179,7 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
     if (selector == PHX_DESKTOP_SELECTOR) {
         assert(!input && !input_count && input_data && input_size == sizeof(struct PhxDesktopRequest) && !output_data && !output_size);
         const struct PhxDesktopRequest *request = input_data;
+        if (preflight) assert(request->operation == PHX_DESKTOP_RESERVE);
         if (request->operation == PHX_DESKTOP_RESERVE) {
             assert(!writes && !vwrites && !reads && !reservations && phxDesktopLayoutValid(&request->layout, &memory));
             ++reservations; saved = request->layout; return fail("reserve-status");
@@ -193,6 +197,8 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
     assert(reservations && !seals && !claims && input && !input_data && !input_size && output_data && output_size);
     if (selector == SEL_READREGS) {
         assert(input_count == 3 && input[1] == 1 && *output_size == 4); ++reads;
+        if (preflight) assert(input[0] == SEG1(0x900) || input[0] == SEG1(0x2807) ||
+                              input[0] == SEG0(0x1fab) || input[0] == SEG0(0x1e80));
         if (fail("read-status")) return 5;
         uint32_t value = *reg((uint32_t)input[0]);
         if (input[0] == SEG0(0x16bd + 17)) value = is("gart-timeout") ? 0 : 1;
@@ -207,11 +213,13 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
         memcpy(output_data, &value, sizeof(value)); return 0;
     }
     assert(selector == SEL_DBG_VRAM_READ && input_count == 2 && input[0] + *output_size <= sizeof(words));
+    assert(!preflight);
     if (fail("vread-status")) return 5;
     memcpy(output_data, (const char *)words + input[0], *output_size); return 0;
 }
 int main(int argc, char **argv) {
     assert(argc == 4); variant = argv[1]; fault = argv[2]; assert(atexit(summary) == 0);
+    preflight = !strcmp(argv[3], "desktop-preflight");
     memory = (struct PhxBootMemory){1, 7, !strcmp(variant, "relocated") ? 0x6000000000ull : 0x8000000000ull,
         !strcmp(variant, "relocated") ? 0x300000000ull : 0x6a0000000ull, 0x8000000, sizeof(words), 0x1000, 0,
         {1, 0, 0x100000, 0x10000, 0x200000, 0x10000, {0, 0}}};

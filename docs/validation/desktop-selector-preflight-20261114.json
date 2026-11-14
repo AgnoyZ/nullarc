@@ -1,0 +1,191 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "scope": "source-only terminal desktop-selector preflight; original one-attempt desktop diagnostic remains consumed",
+  "source_parent": "e86b51f6475391fea4ad401469bc6eb78af40383",
+  "status": "CPU/native-compile validated; not installed or target-executed; physical cause unconfirmed",
+  "actual_host": {
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "prior_target_record": "desktop-postboot-20261114.json",
+  "prior_target_limits": {
+    "one_attempt_consumed": true,
+    "desktop_init_exit_status": 75,
+    "stopped_before_GART_MES_and_queue_initialization": true,
+    "failed_queue_and_immediate_later_readbacks_not_recorded": true,
+    "recovery_display_all_writes_succeeded": false,
+    "physical_root_cause_established": false
+  },
+  "implemented_boundary": {
+    "command": "mesboot desktop-preflight",
+    "explicit_argument_count_including_program_and_command": 14,
+    "reuses_desktop_init_bootstrap_geometry_environment_and_reservation_checks": true,
+    "kernel_or_ABI_changed": false,
+    "queue_checks": [
+      {
+        "name": "KIQ",
+        "me": 3,
+        "pipe": 1
+      },
+      {
+        "name": "scheduler",
+        "me": 3,
+        "pipe": 0
+      },
+      {
+        "name": "compute",
+        "me": 1,
+        "pipe": 0
+      },
+      {
+        "name": "graphics",
+        "me": 0,
+        "pipe": 0
+      }
+    ],
+    "queue_id": 0,
+    "vmid": 0,
+    "passing_request_counts": {
+      "service_opens": 1,
+      "boot_memory_snapshots": 1,
+      "reservations": 1,
+      "selector_write_requests_with_existing_kernel_readback": 8,
+      "separate_register_read_requests": 14,
+      "checked_service_closes": 1
+    },
+    "register_read_set": [
+      "GRBM_GFX_CNTL",
+      "CP_MES_CNTL",
+      "CP_HQD_ACTIVE",
+      "CP_GFX_HQD_ACTIVE"
+    ],
+    "only_debug_write_register": "GRBM_GFX_CNTL",
+    "stops_before": [
+      "doorbell/CP setup",
+      "GART initialization",
+      "MES initialization",
+      "VRAM access",
+      "queue initialization/submission",
+      "seal",
+      "claim",
+      "display takeover"
+    ],
+    "no_retry_or_failure_restoration_added": true,
+    "selection_failure_exit": 75,
+    "transport_or_close_failure_exit": 74,
+    "success_closes_and_abandons_reservation": true,
+    "same_boot_initialization_after_success_supported": false,
+    "startup_caller_added": false,
+    "firmware_power_or_recovery_part_of_command": false,
+    "diagnostic_is_read_only": false
+  },
+  "checks": [
+    {
+      "name": "actual-native-CLI-provider-CPU-contracts",
+      "tests": 25,
+      "new_test_methods": 4,
+      "new_success_layout_cases": 2,
+      "selection_restore_fault_cases": 6,
+      "argument_layout_transport_state_refusal_cases": 14,
+      "close_failure_case": 1,
+      "returncode": 0,
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "fake_backend_asserts_register_allowlist_reserve_only_and_no_VRAM_or_doorbells": true
+    },
+    {
+      "name": "clean-isolated-committed-snapshot-full-suite",
+      "python": "Python 3.13.18",
+      "tests": 629,
+      "reported_seconds": 209.145,
+      "skipped_tests": 0,
+      "returncode": 0,
+      "tracked_files_verified_unchanged": 844,
+      "candidate_matched_snapshot": true,
+      "snapshot_clean_before_and_after": true,
+      "validation_JSON_added_after_suite": true
+    }
+  ],
+  "prior_rejected_run": {
+    "tests_reported": 541,
+    "errors": 14,
+    "returncode": 1,
+    "all_errors": "source export refused uncommitted checkout",
+    "counted_as_pass": false,
+    "recovery": "reran same candidate in a clean isolated committed snapshot; no guards disabled"
+  },
+  "full_suite_warning_note": "The full suite emitted unclosed SQLite connection ResourceWarnings; no failures or skips. This patch changes no SQLite implementation or fixtures.",
+  "native_compile": {
+    "exit_status": 0,
+    "duration_seconds": 0.523,
+    "architecture": "x86_64",
+    "binary_sha256": "36d6ff696cbf450ed2c737db5b915ff8e48c8801c42ccbc107c5ac370fc573c4",
+    "binary_executed": false,
+    "binary_installed": false,
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "sdk_version": "26.5"
+  },
+  "tested_input_sha256": {
+    "tools/phxctl/mesboot.c": "3eeb13877906a6ee9e8651cfd75093771e51e7ef61b6677ba20e0dd1ac890ea9",
+    "tests/test_desktop_entrypoint.c": "fd451c97ed45c074c89d8df11f3c42b5112919c934d408dfd5e97a446ddb590b",
+    "tests/test_desktop_handoff.py": "fcd4bbe0b8eb2e90e539687a38834abbb3cbaa4a8bfa006f804b0da0a5419b94",
+    "tests/test_desktop_handoff.cpp": "33f6734733443f53adb65953827bd8d6d9dd4a1768c8e686922b4de86d97daad",
+    "src/phxbringup/PhxBringup.cpp": "92ad3f3961de373a35744b5d3f899ee53105251a3769615c4f18d0e2d0c57ce7",
+    "src/phxbringup/PhxDesktopHandoff.h": "6f2566b05e4f2ce3c39d7286400b72a10a6834a9057129c91e27e3d5bde69547",
+    ".github/workflows/allocation-capture-check.yml": "df9ef88ba8abe4b2cdffa1b3c13955cc2d9e9c17339c046b66a65653b999b63e",
+    "docs/DESKTOP-SELECTOR-PREFLIGHT.md": "d9c0e6b12a469d4a7ef8beb9c358339a6b3dfd86873ae5bff0a13e8c5ac3f6e4",
+    "docs/DESKTOP-NATIVE-HANDOFF.md": "03fef3151ad071aea22ef39ff133e045e6ac68fe4c639684d4827e382625ae95",
+    "docs/DESKTOP-STARTUP-ADAPTERS.md": "7d64834f756c28d14b5454745f60342d0682890e254f8f6637702fa7fa951b9c"
+  },
+  "primary_source_review": {
+    "manifest": "linux-mes-selector-reference.json",
+    "source_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "files": [
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/soc21.c",
+        "sha256": "8210b4fd7236f1629655ae2afe38ddcb15ddb1e7f42d25d0147bc42bedf3939d",
+        "cached_bytes_verified": true,
+        "fresh_download_verified": false
+      },
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c",
+        "sha256": "6b3dc555a2587666b46cdade8141966f49eaca71b40ad53b0a45b8624e5aeec9",
+        "cached_bytes_verified": true,
+        "fresh_download_verified": false
+      }
+    ],
+    "license_notices_rechecked": true,
+    "fresh_raw_download": "connection timeout; not verified",
+    "fresh_official_contents_API_download": "HTTP 403 for both files; not verified",
+    "full_upstream_bodies_copied": false,
+    "findings": [
+      "Existing selector field encoding retained.",
+      "Pinned gfx_v11_0 source reads the selector; no write-only assumption established.",
+      "Target IP-discovery bases already matched; no base-address or cache-mapping change justified.",
+      "Acknowledged DisallowGfxOff did not remove the earlier mismatch; historical printed zeros retain their scalar-count qualification."
+    ]
+  },
+  "execution_boundary": {
+    "original_consumed_scope_or_receipts_changed": false,
+    "new_active_target_scope_created": false,
+    "new_target_service_opens": 0,
+    "new_target_snapshots": 0,
+    "new_target_selector_or_GPU_commands": 0,
+    "native_helper_executed": false,
+    "driver_or_helper_deployed": false,
+    "startup_changed": false,
+    "NVRAM_armed": false,
+    "reboot_requested": false,
+    "EFI_mounted_or_modified": false,
+    "OS_security_changed": false,
+    "proxy_or_existing_application_changed": false,
+    "binary_artifacts_uploaded": false,
+    "raw_logs_dumps_identifiers_or_personal_configuration_published": false
+  },
+  "rollback": "Revert only this source preflight addition in a normal new commit; retain prior detailed error logging and readback guards. No installed rollback is needed for this source-only change.",
+  "next_target_boundary": "Separate explicit one-attempt scope and byte-pinned delivery with fresh boot/prerequisite/recovery admission. Stop at the first failure or passing preflight; never continue initialization on that boot or replay the consumed desktop packet."
+}
