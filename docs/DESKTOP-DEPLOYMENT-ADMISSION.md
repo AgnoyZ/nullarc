@@ -2,8 +2,9 @@
 
 Status, 2026-11-14, after the owner's manual grants and a host reboot:
 **build-39 candidate installed for the next boot in the tenth admission;
-exact candidate AuxKC published and independently verified; no desktop diagnostic
-executed**. The actual host is macOS 26.7.2, build 25G332, x86_64.
+exact candidate AuxKC published and independently verified; one original-request
+reboot diagnostic armed and scheduled, with no post-reboot result yet**.
+The actual host is macOS 26.7.2, build 25G332, x86_64.
 PhxBringup build 37 remains loaded on the current boot. The build-39 delivery
 for the [checked startup adapter](DESKTOP-STARTUP-ADAPTERS.md) is installed,
 with complete original rollback copies retained. This record concerns deployment admission, not the cause
@@ -422,7 +423,7 @@ staging remained exact. Live EFI matched the expected 343-file manifest,
 including the retained three-file original driver; its original 340-file backup
 was unchanged. EFI was unmounted. No other EFI content was changed.
 
-### Continuation after installation
+### State after installation, before one-shot arming
 
 Build 39 is installed for the next boot; build 37 remains loaded. The installed
 startup job was not launched. Display arming is absent, both checked display
@@ -443,3 +444,45 @@ The earlier [623-test source validation](validation/desktop-startup-adapters-202
 is unchanged; it is not a successful installation or a hardware result.
 Raw diagnostic material and user configuration remain ignored locally.
 Existing license and public binary publication limits are unchanged.
+
+### Original single-request reboot admission
+
+The owner's original request explicitly included one reboot to test desktop
+takeover. On 2026-11-14, a separate preparation checked that same request and
+its still-empty, original one-attempt diagnostic scope; no new scope or retry
+authorization was created. The ten consumed installers remain unchanged.
+
+Fresh read-only admission verified installed build 39 versus currently loaded
+build 37, the exact cached candidate and all 415 unrelated cached records,
+startup bytes and root ownership, all 37 packet pins, seven recovery pins,
+ten unchanged production hashes, the complete Python runtime and alias trees,
+all original rollback copies, and the complete expected 343-file live EFI.
+EFI was unmounted. The next-boot job is enabled but was not loaded or run on
+this already-initialized boot. The competing continuation remains disabled.
+Ten inert tests covered known/unknown arming states, scheduler identity,
+exclusive receipts, non-replay and cancellation boundaries; no host GPU I/O
+was used by these tests.
+
+At **2026-11-14T19:45:22.250575+08:00**, the frozen executor set only the one-shot
+`phxfb-boot=1` display flag, forced its NVRAM synchronization and read it back,
+then dispatched one identified five-minute restart scheduler. Expected restart
+time is approximately **2026-11-14T19:50:22.250575+08:00**. Independent readback at
+**2026-11-14T19:45:53.509957+08:00** verified that exact scheduler, the armed state,
+unchanged inputs, unmounted EFI and the still-empty original diagnostic scope.
+The restart was scheduled; neither the reboot nor its desktop result had yet
+been observed when this record was written.
+
+On the next boot, only the already-installed byte-pinned entry may claim
+the original diagnostic. It provides one pre-initializer baseline, at most one
+failure snapshot, the bounded initialize/claim/display/release/monitor sequence,
+and an independent recovery watchdog with the original 240-second deadline.
+The framebuffer consumes the one-shot NVRAM flag before takeover. No persistent
+M2 marker was created and success does not automatically rearm the system.
+Recovery attempts disarming, display recovery and reboot; it cannot guarantee
+recovery from a kernel or bus hard hang. The verified operator rollback remains
+necessary. No global security setting, Windows EFI, partition or BIOS changed.
+
+After reboot, inspect the original scope and recovery receipts before any other
+action. Do not replay this scheduler, any installer, the initializer or a
+consumed diagnostic. An armed scheduled test remains pending hardware evidence;
+it is not an acceleration claim or proof of the earlier failure's cause.

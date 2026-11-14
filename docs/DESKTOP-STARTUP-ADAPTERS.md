@@ -1,7 +1,8 @@
 # Checked desktop startup and retained display ordering
 
-Status, 2026-11-14: **build-39 candidate installed for the next boot; not hardware
-validated**. Build 37 remains loaded on the current boot.
+Status, 2026-11-14: **build-39 candidate installed; original single-request reboot
+diagnostic armed and scheduled; hardware result pending**. Build 37 remains
+loaded on the current boot.
 `tools/desktop_startup.py` supplies concrete commands for the [coordinator](
 ALLOCATION-STARTUP-COORDINATOR.md) and [build-39 handoff](DESKTOP-NATIVE-HANDOFF.md).
 There is no default packet, installer, arming command or automatic next attempt.
@@ -185,3 +186,14 @@ settings were unchanged. This is successful next-boot installation, not normal
 `rebuild` authentication or hardware validation. Build 37 is still loaded; no
 arming, diagnostic, initialization, reader or reboot was executed, and the
 original diagnostic scope remains empty.
+
+The later [single-request reboot admission](DESKTOP-DEPLOYMENT-ADMISSION.md#original-single-request-reboot-admission)
+rechecked the full installed packet, trusted runtime and alias trees, complete
+EFI and recovery state. It armed one one-shot display flag and scheduled one
+identified restart under the original one-attempt authorization; no persistent
+M2 flag was created. The original scope was still empty at independent readback.
+The entry was not run on the initialized current boot. Reboot and desktop
+results remain unobserved in this record; inspect the original scope first on
+resumption and never silently repeat the attempt. Ten inert operational tests
+passed without GPU I/O. The unchanged 623-test source result remains CPU/source
+evidence only; independent recovery cannot cover every kernel or bus hard hang.
