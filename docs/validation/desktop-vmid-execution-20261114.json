@@ -31,5 +31,46 @@
     "Authorization is not evidence of a reboot, fresh-boot admission, selector result, watchdog recovery or desktop success.",
     "The prior preparation record remains historical; target results must be recorded separately after execution."
   ],
-  "rollback": "Before dispatch, leave the max-one diagnostic request unconsumed. After any diagnostic result, preserve its receipts and stop GPU work for that boot. No installed component is changed by this authorization record."
+  "rollback": "Preserve the off state, refused metadata and all historical receipts. No new target request or scope exists and no diagnostic recovery is armed. Do not unload/reload drivers or initiate another reboot under the consumed ordinary-reboot authorization.",
+  "postboot_metadata_admission": {
+    "ordinary_reboot_dispatched_once": true,
+    "ordinary_reboot_completion_verified_by_changed_stable_session": true,
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "admission_passed": false,
+    "refusal": "accelerator-present",
+    "loaded_accel_identifier": "com.luuumi.PhxAccel",
+    "loaded_accel_version": "0.1",
+    "PhxAMDFB_instances": 0,
+    "NMXAccel_instances": 0,
+    "IONDRVFramebuffer_instances": 1,
+    "phxboot_off_unchanged": true,
+    "prepared_input_pins_verified": 14,
+    "historical_receipt_counts_verified_unchanged": [
+      188,
+      29,
+      97,
+      187
+    ],
+    "root_delivery_scope_and_request_created": false,
+    "runner_dispatched": false,
+    "GPU_commands": 0,
+    "watchdog_job_absent": true,
+    "recovery_reboot_requested": false,
+    "driver_unloaded_or_installed": false,
+    "startup_EFI_NVRAM_or_security_changed": false,
+    "planned_55_input_and_14_recovery_pin_delivery_not_reached": true
+  },
+  "installer_source_review": {
+    "files": [
+      "install/install.sh",
+      "tools/phxctl/kinst.sh",
+      "tools/phxctl/phxboot.sh",
+      "src/phxaccel/Info.plist"
+    ],
+    "finding": "The reference installer places PhxAccel in the Auxiliary kernel collection. The phxboot-off marker gates the bring-up script, not kernel-module loading. A loaded module alone does not establish an active framebuffer or accelerator instance.",
+    "actual_loaded_collection_origin_independently_proven": false,
+    "reference_installer_executed": false
+  },
+  "next_step": "Do not rerun the refused admission, alter its guard or schedule another ordinary reboot. A proposed one-time runtime unload of PhxAccel needs separate owner authorization because the approved diagnostic excluded driver changes. Preserve on-disk installation, kernel collections, startup controls and historical evidence. After an authorized successful unload and fresh metadata review, use a separately reviewed continuation admission before the still-unconsumed max-one diagnostic."
 }

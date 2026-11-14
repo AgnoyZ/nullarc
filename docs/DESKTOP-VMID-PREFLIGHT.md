@@ -171,3 +171,22 @@ validation/desktop-vmid-execution-20261114.json), neither the ordinary reboot
 nor the diagnostic had been dispatched for this authorization. The earlier
 preparation record is retained as historical evidence. Authorization alone
 establishes no selector result, deadline recovery or desktop success.
+
+The ordinary reboot subsequently completed: the stable boot-session identity
+changed, and the target remained on macOS 26.7.2 / build 25G332. The metadata-only
+admission then refused with `accelerator-present` because `com.luuumi.PhxAccel`
+0.1 was loaded. Independent metadata readback found no `PhxAMDFB` or `NMXAccel`
+instances and one `IONDRVFramebuffer`; the off marker was unchanged. All 14
+prepared input pins and the four historical receipt sets still matched. No new
+root delivery, target scope, request, runner or watchdog was created, and no GPU
+command ran. The proposed 55/14-pin delivery was not reached.
+
+The reference installer adds PhxAccel to the Auxiliary kernel collection, while
+the off marker only gates the bring-up script. This explains why the off marker
+does not imply module absence; the actual collection origin of this loaded
+module was not independently established. The installer was not executed here.
+Do not bypass the guard, replay the refused admission or repeat the consumed
+ordinary reboot. A proposed single runtime unload requires separate owner
+authorization because the diagnostic excluded driver changes. Keep installed
+files and all refusal evidence intact. This refusal supplies no VMID result and
+does not establish the cause of the earlier selector mismatch.
