@@ -47,12 +47,32 @@ no whole reference script or installed helper is executed.
 
 The pipeline regression executes the exact extracted status guard with five
 helper/filter combinations, including simultaneous helper and filter failure.
-The actual fake-I/O C handoff harness is extended to run the six existing
-compute/graphics outcomes through the extracted caller guards as well as the
-filter-only negative control. Its completed clean-source/full-suite result
-will be recorded in the [validation record](validation/allocation-startup-status-fix-20261114.json).
-At this source checkpoint that clean-source run is pending; it is not counted
-as a pass in advance.
+The completed fake-I/O C harness passed 52 transport, 20 completion, 16
+submission-boundary and six compute/graphics handoff cases. The six handoff
+outcomes run through both the extracted caller guards and the filter-only
+negative control. Failed outcomes retain 74/75 and request no claim hook in
+the checked composition.
+
+The clean committed source `ae23e2d0bf6e07415ff7f7fa6a94296be562f9a2`
+passed all **523 unit tests in 280.473 seconds** with Python 3.13.18, without
+skips. Separate startup and transport runners also passed on that interpreter.
+All 812 tracked input-file hashes matched before and after the run and in an
+independent read-back; the checkout remained clean. The
+[validation record](validation/allocation-startup-status-fix-20261114.json)
+retains source identities and aggregate outcomes. Only this documentation and
+that record change after the tested source checkpoint.
+
+An initial run accidentally used the unsupported system Python 3.9.6. It
+completed 523 tests with two errors: an unsupported `Path.write_text(newline=)`
+argument and a capture-command timeout. That failed attempt is retained
+privately and is not counted as a pass. The supported-interpreter run passed
+the same source and assertions; no test, production deadline or guard was
+relaxed. The timeout's deeper cause is not assigned by this comparison.
+
+A requested read-only Claude review of the public script sources and diff
+reported no blocking regression. It used no tools or plugins and supplies
+advisory review, not execution evidence. Its implication that successful
+background launch proves watchdog readiness is not adopted.
 
 The filter-only negative control intentionally still demonstrates why grep
 and tail cannot establish success. The checked composition must preserve
@@ -65,7 +85,9 @@ Both scripts retain their **NOT RUN BY THIS REPOSITORY** banner. In particular,
 the reference initializer still has bare GART/MES arguments, fixed-layout
 assumptions, nested unaudited preparation and a global shutdown-process kill
 on its successful path. A command reporting zero does not validate those
-transitive operations. Its incompatible GART invocation should now stop
+transitive operations. In particular, the shell starting asynchronous
+`nohup shutdown` can return zero before the background child fails; actual
+watchdog readiness is unproven. Its incompatible GART invocation should now stop
 instead of allowing later commands to run. Do not deploy or execute this
 patched legacy workflow as a replacement initializer.
 

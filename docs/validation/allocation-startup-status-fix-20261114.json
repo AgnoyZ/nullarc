@@ -1,7 +1,7 @@
 {
   "format": 1,
   "date": "2026-11-14",
-  "status": "reference-caller-status-fix; focused-fragments-passed; clean-source-full-suite-pending",
+  "status": "reference-caller-status-fix; supported-clean-source-runners-and-full-suite-passed; not-installed",
   "documentation": "docs/ALLOCATION-STARTUP-STATUS-FIX.md",
   "base_commit": "c65bb34e56ca5a2d8f926ce01c1e28fb7e89bc5b",
   "correction": {
@@ -23,13 +23,39 @@
     "both_reference_Bash_syntax_checks_passed": true
   },
   "clean_source_validation": {
-    "actual_fake_IO_C_guard_compositions_completed": false,
-    "full_suite_completed": false,
-    "status": "pending; no pass claimed"
+    "actual_fake_IO_C_guard_compositions_completed": true,
+    "full_suite_completed": true,
+    "status": "passed on clean committed source; no target execution",
+    "python_version": "3.13.18",
+    "supported_minimum_python": "3.10",
+    "completed_at": "2026-11-14T09:13:11.737647+08:00",
+    "startup_fragment_cases_passed": 12,
+    "transport_cases_passed": 52,
+    "completion_cases_passed": 20,
+    "submission_boundary_cases_passed": 16,
+    "actual_two_engine_handoff_cases_passed": 6,
+    "failed_checked_handoffs_request_no_claim": true,
+    "unit_tests_passed": 523,
+    "unit_test_reported_seconds": 280.473,
+    "unit_tests_skipped": 0,
+    "unit_test_returncode": 0,
+    "tracked_input_file_count": 812,
+    "tracked_input_hashes_identical_before_after_and_independent_readback": true,
+    "checkout_clean_before_and_after": true,
+    "source_subtrees": {
+      "tools": "ab52b5300de70ef466f77069bf7e13e1b9e1e728",
+      "tests": "a351c3a779c2b24cdf67d2abbbe62769787a717b",
+      "src": "a6ad54b6a426f09aa8a5bf44395f6765bcbfad64"
+    },
+    "raw_logs_private": true,
+    "full_suite_stderr_sha256": "cdd7048e2c81f746bb5519ef725916c7c973c1a7c939ef60099458a27e043f8d",
+    "existing_C_unused_variable_warning_retained": true
   },
   "source_hashes": {
     "tools/phxctl/full.sh": "6a40269868053415e6c3299c109684590fb863b8f472a9aea5f50a69b57bfe7b",
-    "tools/phxctl/phxboot.sh": "fb8c0e966986a7870683726737a2355fe8de2de6f049ab11c74e6759c58aace3"
+    "tools/phxctl/phxboot.sh": "fb8c0e966986a7870683726737a2355fe8de2de6f049ab11c74e6759c58aace3",
+    "tools/phxctl/mesboot.c": "d734d4d7d07c745cb4b26a7b5954d522facfd08645a3f3fbb193c3b5b2ed4917",
+    "src/phxbringup/PhxBringup.cpp": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8"
   },
   "limits": {
     "whole_reference_or_installed_workflow_executed": false,
@@ -43,5 +69,30 @@
     "GPU_work_arming_or_reboot": false,
     "allocation_root_cause_confirmed": false,
     "actual_reboot_session_resume_verified": false
+  },
+  "source_commit": "ae23e2d0bf6e07415ff7f7fa6a94296be562f9a2",
+  "unsupported_interpreter_attempt": {
+    "python_version": "3.9.6",
+    "supported": false,
+    "unit_tests_run": 523,
+    "errors": 2,
+    "returncode": 1,
+    "observations": [
+      "Path.write_text newline argument unsupported",
+      "capture command timed out"
+    ],
+    "timeout_deeper_cause_assigned": false,
+    "retained_privately": true,
+    "counted_as_pass": false,
+    "tests_production_deadlines_and_guards_relaxed": false
+  },
+  "supplemental_review": {
+    "reviewer": "Claude via local CLI",
+    "public_source_and_diff_only": true,
+    "tools_and_plugins_disabled": true,
+    "completed": true,
+    "blocking_regressions_reported": 0,
+    "advisory_not_execution_evidence": true,
+    "reviewer_watchdog_readiness_implication_not_adopted": true
   }
 }
