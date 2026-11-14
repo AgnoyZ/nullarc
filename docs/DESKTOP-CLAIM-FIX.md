@@ -60,12 +60,35 @@ updated or relabelled.
 
 ## Validation and target boundary
 
-Precommit and committed-source results are recorded in
-`docs/validation/desktop-claim-fix-20261114.json` after completion. CPU and
-native compile/link checks cannot establish a successful kernel load or
-desktop takeover. The local host reports macOS 26.7.2 build 25G332; no target
-service open, GPU workload, installed helper change, EFI operation, M2
-arming or reboot is part of this correction.
+Source commit `33fafc26998a384e6c33170c8dd03ef12e076219` passed all **524 Python
+tests in 305.083 seconds**, without skips, on Python 3.13.18. All **815 tracked
+input hashes** matched before and after the run, and the checkout remained
+clean. The full suite includes the actual-method queue harness; a separate
+working-tree precheck passed all **88 ASan/UBSan queue/readiness/claim cases**
+and all **17 source-exporter tests**. The precheck's kernel hash matches the
+committed source.
+
+An isolated clean source export compiled and linked PhxBringup on the local
+Apple Clang 21.0.0 toolchain with host SDK 26.5. All 1,232 cached MacKernelSDK
+files matched the official pinned Git tree, including its exact file set.
+Six native build/verification commands passed, including strict ad-hoc
+signature verification and the x86_64 architecture check. Compilation emitted
+three shadow-declaration warnings at statements also present in the parent
+source; those unrelated statements were not changed. The private build-38
+executable is 116,080 bytes; its hash and sanitized results are retained in
+[the validation record](validation/desktop-claim-fix-20261114.json). No binary
+was uploaded.
+
+The real build-37 exporter also refused this committed build-38 source before
+creating output. The source push and its exact remote SHA/tree/parent were
+independently verified. No hosted CI result is claimed.
+
+CPU and native compile/link checks cannot establish a successful kernel load
+or desktop takeover. The local host reports macOS 26.7.2 build 25G332. An
+optional read-only registry archive query was not accepted because its output
+could not be decoded as a plist; no current driver/display state is inferred
+from it. No native user-client method, GPU workload, installed helper change,
+EFI operation, M2 arming or reboot is part of this correction.
 
 The [allocation execution plan](ALLOCATION-EXECUTION-PLAN.md) remains the
 target validation path. Its passive snapshot, initializer compatibility,
@@ -77,6 +100,6 @@ change.
 
 For source rollback, revert the build-38 claim correction and its associated
 tests as a normal new commit. No installed rollback is needed for this
-source-only work; preserve the existing firmware-desktop fallback and exact
+repository/build work; preserve the existing firmware-desktop fallback and exact
 private rollback packet. A later deployment needs a separate build-38
 package identity, reviewed rollback and scoped target validation.

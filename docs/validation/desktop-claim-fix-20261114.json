@@ -1,0 +1,131 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "build-38 source/native-build candidate; not installed or hardware validated",
+  "source_commit": "33fafc26998a384e6c33170c8dd03ef12e076219",
+  "parent_commit": "16ca1fbca189d518165f23cd7b8338e076a27695",
+  "branch": "downstream/780m-tahoe",
+  "candidate_build": 38,
+  "correction": {
+    "claim_requires_compute_and_graphics_adoption": true,
+    "readiness_checked_under_gpu_lock": true,
+    "matching_runs_outside_gpu_lock": true,
+    "aggregate_gpuReady_unchanged": true,
+    "abi_unchanged": true,
+    "allocation_policy_unchanged": true,
+    "recovery_policy_unchanged": true
+  },
+  "regression_reproduction": {
+    "kind": "CPU actual-method assertions with fake memory/locks/PCI",
+    "old_source_failed_cases": [
+      "readiness-compute-only",
+      "readiness-graphics-only",
+      "claim-compute-adoption-refused",
+      "claim-graphics-adoption-refused",
+      "claim-stop-at-lock"
+    ],
+    "old_case_exit_codes": [
+      -6,
+      -6,
+      -6,
+      -6,
+      -6
+    ],
+    "old_target_failure_reproduced": false
+  },
+  "precommit_checks": {
+    "actual_method_queue_cases_passed": 88,
+    "retained_adoption_cases": 73,
+    "readiness_cases": 8,
+    "new_claim_cases": 7,
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "source_exporter_tests_passed": 17,
+    "kernel_hash_matches_committed_source": true
+  },
+  "committed_source_checks": {
+    "unit_tests_passed": 524,
+    "runner_seconds": 305.083,
+    "python": "3.13.18",
+    "skipped": 0,
+    "tracked_input_hashes_verified": 815,
+    "all_tracked_inputs_unchanged": true,
+    "checkout_clean_after_run": true,
+    "git_diff_check_passed": true
+  },
+  "native_build": {
+    "source_commit": "33fafc26998a384e6c33170c8dd03ef12e076219",
+    "candidate_build": 38,
+    "commands_passed": 6,
+    "architecture": "x86_64",
+    "adhoc_signature_verified": true,
+    "executable_bytes": 116080,
+    "executable_sha256": "078eb1c62e815fbc1a86e3a2565823b95de187b5016a46856f4df52521a52b90",
+    "sdk": {
+      "pin": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "tree": "ef361592c6340fe53560a8aba98619da641ed437",
+      "regular_files_verified": 1232,
+      "exact_file_set": true
+    },
+    "kernel_loaded": false,
+    "gpu_executed": false,
+    "binary_uploaded": false,
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "host_sdk": "26.5",
+    "shadow_warning_count": 3,
+    "warning_statements_present_in_parent": true,
+    "isolated_clean_source_export": true
+  },
+  "historical_build37_export_gate": {
+    "source_commit": "33fafc26998a384e6c33170c8dd03ef12e076219",
+    "build37_export_refused": true,
+    "output_created": false
+  },
+  "code_and_test_inputs_sha256": {
+    "src/phxbringup/PhxBringup.cpp": "cec9f47377bbd40c46a307fa381b5844460b92817c4e02a80724547630239d70",
+    "tests/test_queue_adoption.cpp": "14f234dc936d95a7f62f0c6c18e2a38621548d729b880cb33e8ba60863d62904",
+    "tools/test_queue_adoption.py": "0ae37f4b507a97d1115e93b2cc7f3f3a478c7faf453da70f248824acc5bcd4e6",
+    "tests/test_queue_adoption_runner.py": "f511bcb6406b5066b97c43045a962c7eec698e1523fe34434f124fd0ed7902d2",
+    "tests/test_allocation_source_packet.py": "26b0ee52b098637c5b2c07f88ee869607a36bf3a253c6b745a7e3eb45aea6722"
+  },
+  "source_remote_verification": {
+    "sha": "33fafc26998a384e6c33170c8dd03ef12e076219",
+    "tree": "2e6f0574492c2e5a75d39659148bcb1bdbc30921",
+    "parent": "16ca1fbca189d518165f23cd7b8338e076a27695",
+    "changed_files": 9,
+    "git_remote_ref_verified": true,
+    "github_commit_tree_parent_and_file_list_verified": true,
+    "first_http2_push_failed": true,
+    "http1_retry_succeeded": true,
+    "force_push": false
+  },
+  "local_os": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "optional_live_registry_metadata": {
+    "validated": false,
+    "reason": "Archive output could not be decoded as a plist; no live driver/framebuffer state inferred",
+    "raw_output_published": false
+  },
+  "limits": {
+    "kernel_loaded": false,
+    "native_user_client_method_called": false,
+    "phase_a_passive_read_executed": false,
+    "gpu_workload_executed": false,
+    "desktop_takeover_validated": false,
+    "allocation_root_cause_confirmed": false,
+    "claim_stop_lifecycle_proven": false,
+    "hardware_queue_ownership_proven": false,
+    "installed_driver_or_runtime_changed": false,
+    "startup_helper_changed": false,
+    "efi_modified": false,
+    "m2_armed": false,
+    "reboot_requested": false,
+    "public_binary_uploaded": false,
+    "hosted_ci_pass_claimed": false
+  },
+  "rollback": "No installed change. Revert the source correction and its tests through a new normal commit if required; preserve existing fallback and retained private rollback inputs."
+}
