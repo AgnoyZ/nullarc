@@ -1,0 +1,133 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "repository_at_validation": "f319ac052c111eddf5097421a107e0199f2d4903",
+  "status": "source/CPU-only observation candidate; native binary compiled but not executed, installed or uploaded",
+  "motivation_record": "desktop-selector-preflight-target-20261114.json",
+  "latest_verified_target_OS_from_prior_record": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "not_newly_probed_by_this_change": true
+  },
+  "source_review": {
+    "Linux_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "manifests": [
+      "linux-mes-selector-reference.json",
+      "linux-mes-queue-reference.json"
+    ],
+    "cached_selector_files_hash_verified": 8,
+    "cached_register_headers_hash_verified": 2,
+    "fixed_registers": 19,
+    "GC_register_offsets_and_base_indices_checked": 17,
+    "PSP_and_RCC_controls_retained_from_prior_reviewed_observer": 2,
+    "GRBM_CNTL": {
+      "offset": 3488,
+      "base_index": 0,
+      "READ_TIMEOUT_shift": 0,
+      "READ_TIMEOUT_mask": 255,
+      "Linux_constants_stage_field_value": 255
+    },
+    "READ_TIMEOUT_programming_precedes_constants_stage_VMID_loop": true,
+    "target_GRBM_CNTL_value_known": false,
+    "causal_relation_to_selector_failure_established": false,
+    "Linux_bodies_whole_headers_or_binaries_copied": false,
+    "fresh_network_fetch_completed": false,
+    "cached_hash_verified_sources_used": true
+  },
+  "candidate": {
+    "source": "tools/phxctl/gc_state_observe.c",
+    "source_sha256": "6de88228396bfc80fbc20930feb8d81f39af57725ff20d8dc22bd24f282b6889",
+    "explicit_modes": [
+      "configured",
+      "tmr-ready"
+    ],
+    "fixed_register_reads": 19,
+    "bootstrap_metadata_reads": 2,
+    "read_only_ABI_handshake": true,
+    "allowed_IOKit_selectors": [
+      0,
+      2,
+      116
+    ],
+    "register_writes": 0,
+    "desktop_reservations": 0,
+    "VRAM_access": 0,
+    "SMU_or_firmware_requests": 0,
+    "doorbells_seals_claims_or_initialization": 0,
+    "arbitrary_register_or_automatic_phase_interface": false,
+    "full_numeric_PSP_layout_validation": true,
+    "metadata_compared_before_and_after": true,
+    "positive_controls_required": true,
+    "zero_GC_fields_treated_as_observations_not_readiness": true,
+    "private_exclusive_partial_output_mode": "0600",
+    "successful_exit_requires_checked_close_and_output_sync": true,
+    "raw_output_publication_allowed": false,
+    "standalone_boot_admission_or_wall_clock_watchdog_supplied": false
+  },
+  "checks": [
+    {
+      "name": "actual-fixed-observer-fake-IOKit",
+      "methods": 7,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "coverage": [
+        "both explicit phases",
+        "reference and relocated geometry",
+        "every read position status, short, long and all-ones faults",
+        "metadata shape, numeric layout, flags and drift",
+        "positive controls and zero GC observations",
+        "privilege, exclusive output and symlink refusal",
+        "service, ABI and checked close failures"
+      ],
+      "unexpected_IOKit_mutation_calls_assert_fail": true,
+      "target_driver_or_GPU_calls": 0
+    },
+    {
+      "name": "existing-desktop-and-native-include-contracts",
+      "methods": 31,
+      "desktop_methods": 26,
+      "native_include_methods": 5,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "target_driver_or_GPU_calls": 0
+    },
+    {
+      "name": "native-IOKit-compile-link",
+      "architecture": "x86_64",
+      "warnings_as_errors": true,
+      "shared_legacy_unused_variable_warning_scoped_out": true,
+      "passed": true,
+      "binary_sha256": "51b66d4497d4c692aa929640f968ba171491e94aa7df071ee1e5f6b456b92f9d",
+      "binary_executed": false
+    },
+    {
+      "name": "earlier-full-source-regression",
+      "tests": 629,
+      "historical_only": true,
+      "rerun_for_this_change": false
+    }
+  ],
+  "preservation": {
+    "production_mesboot_phxctl_and_kernel_unchanged": true,
+    "installed_helpers_startup_driver_EFI_NVRAM_security_and_proxy_unchanged": true,
+    "new_target_scope_or_authorization_created": false,
+    "all_three_historical_scopes_remain_consumed": true,
+    "current_boot_terminal_for_GPU_work": true,
+    "GPU_commands_and_reboot_requests_this_change": 0,
+    "native_binary_uploaded": false,
+    "raw_output_addresses_private_identifiers_credentials_or_diagnostics_published": false
+  },
+  "next_step": "Offline source candidate only. A future phase-observation experiment requires fresh-boot identity, distinct reviewed bounded request, exact pinned inputs and independent recovery; do not select this binary or repeat firmware/power on the current stopped boot.",
+  "limits": [
+    "Neither source comparison nor CPU fakes establish the physical cause or a working desktop.",
+    "The collector observes values without clearing reset/halt bits, changing timeouts, disabling GFXOFF or probing selectors.",
+    "The fixed read count cannot interrupt a blocked synchronous driver call.",
+    "A fresh native compile is not target execution evidence."
+  ]
+}

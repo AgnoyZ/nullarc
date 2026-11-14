@@ -229,3 +229,8 @@ offline before selecting another experiment. No recovery rollback was needed
 for this finite failure; no persistent launcher or installed component was
 changed. Revert only the new fake-test case as a normal commit if necessary,
 retaining the hardware evidence and existing guards.
+
+The subsequent [fixed GC observer](GC-STATE-OBSERVATION.md) is a source/CPU-only
+candidate for measuring initialization, reset/halt and GRBM read-timeout state
+on a separately admitted fresh boot. It has not run on the GPU and adds no
+same-boot continuation, selector bypass or automatic retry.

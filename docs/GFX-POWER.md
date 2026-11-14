@@ -3,7 +3,12 @@
 Patch `0012-checked-gfx-power-sequence.patch` extends the actual research
 `phxctl` with a separate `gfx-power-sequence` command. It performs the complete
 profile-driven firmware sequence and then requests IMU power-up and observes
-GFX boot status. It has not run on the target GPU. It does not set up GART,
+GFX boot status. Later target runs, including the [2026-11-14 selector preflight](
+DESKTOP-SELECTOR-PREFLIGHT.md#system-domain-target-result), completed this step;
+the first KIQ selector still failed. Completion is not full GC initialization
+or GPU-execution evidence. The [fixed GC observation candidate](
+GC-STATE-OBSERVATION.md) records missing state for a future bounded experiment.
+The command does not set up GART,
 bootstrap MES queues, execute shaders or enable display acceleration.
 
 ## Fixed-source review
@@ -102,7 +107,8 @@ PSP method hashes match freshly staged LF source; patch and header hashes
 match the code commit's Git objects. See `validation/ci-652a6fa-gfx-power.json`.
 Native job `124378993165` has passed compilation/tool preflight, but the full
 native build is not recorded as complete. Native execution remains
-limited to hardware-free verification paths; no target GFX readiness was observed.
+limited to hardware-free verification paths at that source milestone; later
+target observations are recorded separately above and do not change that CI result.
 
 The initial implementation `e873835` passed 157 GFX cases in source job
 `124377804435` (run `41148090561`). Subsequent review found that the all-ones
