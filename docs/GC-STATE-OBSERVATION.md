@@ -248,3 +248,8 @@ No additional hardware work is authorized by the result. Continue interpretation
 offline and preserve the terminal boot until a separately reviewed next
 experiment. See the [sanitized target record](
 validation/gc-phase-observation-target-20261114.json).
+
+The subsequent [VMID-only control candidate](DESKTOP-VMID-PREFLIGHT.md) tests
+a separate selector field without changing timeout/reset/halt state. It is
+source/CPU-only and has not been run on this terminal boot. A future result
+must not be conflated with these completed read-only observations.

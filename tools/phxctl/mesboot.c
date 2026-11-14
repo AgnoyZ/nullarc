@@ -1276,6 +1276,27 @@ static void desktop_idle_queue(uint32_t me, uint32_t pipe, uint32_t active_regis
    }
 }
 
+/* Terminal control probe: exercise only VMID, without selecting MES or touching
+ * a banked register. The existing reservation remains abandoned after close.
+ * Success is not queue readiness or permission for same-boot initialization.
+ */
+static int desktop_vmid_preflight(void)
+{
+   for (unsigned phase = 0; phase < 2; ++phase) {
+      const uint32_t vmid = phase ? 0 : 1;
+      const uint32_t requested = vmid << 4;
+      const uint32_t immediate = grbm_select(0, 0, 0, vmid);
+      const uint32_t observed = rd(SEG1(0x900));
+      fprintf(stderr, "mesboot desktop-vmid-select: phase=%s me=0 pipe=0 queue=0 vmid=%u requested=0x%08x write-readback=0x%08x readback=0x%08x\n",
+              phase ? "restore" : "select", vmid, requested, immediate, observed);
+      if (immediate != requested || observed != requested)
+         gpu_failure(phase ? "desktop VMID idle selection" : "desktop VMID selection");
+   }
+   if (IOServiceClose(conn) != KERN_SUCCESS) mes_start_failure(74, "service close failed after desktop VMID preflight");
+   puts("desktop VMID preflight: VMID 1 and idle selector readbacks matched; no banked access or initialization; reservation abandoned, same-boot initialization unsupported");
+   return 0;
+}
+
 /* No shell, watchdog, output filter, environment-selected engine or implicit layout.
  * Firmware/power completion precedes this stage. Display/recovery belong to the coordinator.
  */
@@ -1330,6 +1351,7 @@ static int desktop_command(int argc, char **argv)
    uint32_t mes = rd(SEG1(0x2807));
    if (mes == UINT32_MAX || (mes & 0x3c000000u) || rd(SEG1(0x900)))
       gpu_failure("inactive MES and idle selection preconditions");
+   if (!strcmp(argv[1], "desktop-vmid-preflight")) return desktop_vmid_preflight();
    desktop_idle_queue(3, 1, SEG0(0x1fab));
    desktop_idle_queue(3, 0, SEG0(0x1fab));
    desktop_idle_queue(1, 0, SEG0(0x1fab));
@@ -1375,7 +1397,7 @@ static int desktop_command(int argc, char **argv)
 int main(int argc, char **argv)
 {
    if (argc >= 2 && (!strcmp(argv[1], "desktop-init") || !strcmp(argv[1], "desktop-claim") ||
-                    !strcmp(argv[1], "desktop-preflight")))
+                    !strcmp(argv[1], "desktop-preflight") || !strcmp(argv[1], "desktop-vmid-preflight")))
       return desktop_command(argc, argv);
    if (argc >= 2 && (!strcmp(argv[1], "sched-query") || !strcmp(argv[1], "compute-probe") || !strcmp(argv[1], "shader-probe"))) return scheduler_query(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "mes")) return mes_start(argc, argv);

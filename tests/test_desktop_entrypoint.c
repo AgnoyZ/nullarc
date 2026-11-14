@@ -20,8 +20,12 @@ static struct PhxDesktopLayout saved;
 static uint32_t words[0x400000 / 4], registers[0x20000], banks[16][0x20000];
 static unsigned opens, snapshots, reservations, seals, claims, writes, vwrites, reads, scheduler_bells, compute_bells, graphics_bells, closes;
 static unsigned grbm_writes;
-static int terminal, preflight;
+static int terminal, preflight, vmid_preflight;
 static int is(const char *name) { return !strcmp(fault, name); }
+static int ordinal_fault(const char *name, unsigned ordinal) {
+    char value[80]; assert(snprintf(value, sizeof(value), "%s-%u", name, ordinal) > 0);
+    return vmid_preflight && is(value);
+}
 static void summary(void) {
     fprintf(stderr, "fake-desktop-summary {\"opens\":%u,\"snapshots\":%u,\"reservations\":%u,\"seals\":%u,\"claims\":%u,"
         "\"writes\":%u,\"vwrites\":%u,\"reads\":%u,\"scheduler_bells\":%u,\"compute_bells\":%u,\"graphics_bells\":%u,\"closes\":%u}\n",
@@ -142,8 +146,17 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
     if (selector == SEL_DBG_WRITE_REG) {
         assert(input_count == 2 && output && output_count && *output_count == 1);
         if (preflight) assert(input[0] == SEG1(0x900));
+        if (vmid_preflight) {
+            assert(writes < 2 && input[1] == (writes ? 0 : 0x10));
+        }
         ++writes; if (fail("write-status")) return 5;
+        if (ordinal_fault("vmid-write-status", writes)) { terminal = 1; return 5; }
         *reg((uint32_t)input[0]) = (uint32_t)input[1]; *output = input[1];
+        if (ordinal_fault("vmid-write-short", writes)) --*output_count;
+        if (ordinal_fault("vmid-write-long", writes)) ++*output_count;
+        if ((is("vmid-select-immediate") && writes == 1) ||
+            (is("vmid-restore-immediate") && writes == 2)) *output ^= 1;
+        if (ordinal_fault("vmid-write-all-ones", writes)) *output = UINT32_MAX;
         if (input[0] == SEG1(0x900)) {
             ++grbm_writes;
             if (is("select-immediate-and-readback") && grbm_writes == 1) {
@@ -202,11 +215,19 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
         assert(input_count == 3 && input[1] == 1 && *output_size == 4); ++reads;
         if (preflight) assert(input[0] == SEG1(0x900) || input[0] == SEG1(0x2807) ||
                               input[0] == SEG0(0x1fab) || input[0] == SEG0(0x1e80));
+        if (vmid_preflight) assert(input[0] == SEG1(0x900) || input[0] == SEG1(0x2807));
         if (fail("read-status")) return 5;
+        if (ordinal_fault("vmid-read-status", reads)) { terminal = 1; return 5; }
         uint32_t value = *reg((uint32_t)input[0]);
+        if (ordinal_fault("vmid-read-short", reads)) --*output_size;
+        if (ordinal_fault("vmid-read-long", reads)) ++*output_size;
+        if (ordinal_fault("vmid-read-all-ones", reads)) value = UINT32_MAX;
         if (input[0] == SEG0(0x16bd + 17)) value = is("gart-timeout") ? 0 : 1;
         if (is("already-mes") && input[0] == SEG1(0x2807)) value = 0x0c000000;
+        if (is("already-selected") && input[0] == SEG1(0x900) && !grbm_writes) value = 0x10;
         if (is("already-queue") && input[0] == SEG0(0x1fab)) value = 1;
+        if ((is("vmid-select-readback") && reads == 3) ||
+            (is("vmid-restore-readback") && reads == 4)) value ^= 1;
         if (input[0] == SEG1(0x900)) {
             const char *select_faults[] = {"select-kiq", "select-scheduler", "select-compute", "select-graphics"};
             for (unsigned i = 0; i < 4; ++i)
@@ -222,7 +243,8 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
 }
 int main(int argc, char **argv) {
     assert(argc == 4); variant = argv[1]; fault = argv[2]; assert(atexit(summary) == 0);
-    preflight = !strcmp(argv[3], "desktop-preflight");
+    vmid_preflight = !strcmp(argv[3], "desktop-vmid-preflight");
+    preflight = vmid_preflight || !strcmp(argv[3], "desktop-preflight");
     memory = (struct PhxBootMemory){1, 7, !strcmp(variant, "relocated") ? 0x6000000000ull : 0x8000000000ull,
         !strcmp(variant, "relocated") ? 0x300000000ull : 0x6a0000000ull, 0x8000000, sizeof(words), 0x1000, 0,
         {1, 0, 0x100000, 0x10000, 0x200000, 0x10000, {0, 0}}};

@@ -67,7 +67,8 @@ class DesktopHandoffTests(unittest.TestCase):
         self.assertEqual(1, len(rows), result.stderr)
         data = json.loads(rows[0])
         self.assertTrue(all(type(value) is int and value >= 0 for value in data.values()))
-        success = {"desktop-claim": "desktop claim:", "desktop-preflight": "desktop preflight:"}.get(command, "desktop handoff:")
+        success = {"desktop-claim": "desktop claim:", "desktop-preflight": "desktop preflight:",
+                   "desktop-vmid-preflight": "desktop VMID preflight:"}.get(command, "desktop handoff:")
         self.assertEqual(status == 0, success in result.stdout)
         return data
 
@@ -234,6 +235,74 @@ class DesktopHandoffTests(unittest.TestCase):
         data = self.cli_case("close-status", 74, command="desktop-preflight")
         self.assertEqual(1, data["closes"])
         self.assertEqual(8, data["writes"])
+        self.assertEqual([0] * 6, [data[key] for key in
+                         ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
+
+    def test_vmid_control_success_has_only_two_fixed_writes_four_reads_and_checked_close(self):
+        for variant in ("reference", "relocated"):
+            with self.subTest(variant=variant):
+                data = self.cli_case("ok", 0, command="desktop-vmid-preflight", variant=variant)
+                self.assertEqual([1, 1, 1, 2, 4, 1], [data[key] for key in
+                                 ("opens", "snapshots", "reservations", "writes", "reads", "closes")])
+                self.assertEqual([0] * 6, [data[key] for key in
+                                 ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
+
+    def test_vmid_control_checks_both_readbacks_and_never_restores_after_selection_failure(self):
+        for fault, writes, vmid, immediate, observed in (
+            ("select-zero-readbacks", 1, 1, 0, 0),
+            ("vmid-select-immediate", 1, 1, 17, 16),
+            ("vmid-select-readback", 1, 1, 16, 17),
+            ("vmid-write-all-ones-1", 1, 1, 0xffffffff, 16),
+            ("vmid-read-all-ones-3", 1, 1, 16, 0xffffffff),
+            ("vmid-restore-immediate", 2, 0, 1, 0),
+            ("vmid-restore-readback", 2, 0, 0, 1),
+            ("vmid-write-all-ones-2", 2, 0, 0xffffffff, 0),
+            ("vmid-read-all-ones-4", 2, 0, 0, 0xffffffff),
+        ):
+            for variant in ("reference", "relocated"):
+                with self.subTest(fault=fault, variant=variant):
+                    result = subprocess.run([str(self.entrypoint), variant, fault, "desktop-vmid-preflight"],
+                                            capture_output=True, text=True, timeout=15,
+                                            env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+                    self.assertEqual(75, result.returncode, result.stderr)
+                    phase = "select" if vmid else "restore"
+                    self.assertIn(f"desktop-vmid-select: phase={phase} me=0 pipe=0 queue=0 vmid={vmid} "
+                                  f"requested=0x{vmid << 4:08x} write-readback=0x{immediate:08x} "
+                                  f"readback=0x{observed:08x}", result.stderr)
+                    self.assertNotIn("desktop VMID preflight:", result.stdout)
+                    data = json.loads(re.search(r"^fake-desktop-summary (.*)$", result.stderr, re.M)[1])
+                    self.assertEqual([writes, writes + 2, 0], [data[key] for key in ("writes", "reads", "closes")])
+                    self.assertEqual([0] * 6, [data[key] for key in
+                                     ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
+
+    def test_vmid_control_each_transport_position_stops_without_later_IO_or_close(self):
+        for operation, count in (("read", 4), ("write", 2)):
+            for ordinal in range(1, count + 1):
+                for failure in ("status", "short", "long"):
+                    with self.subTest(operation=operation, ordinal=ordinal, failure=failure):
+                        data = self.cli_case(f"vmid-{operation}-{failure}-{ordinal}", 74,
+                                             command="desktop-vmid-preflight")
+                        expected_reads = ordinal if operation == "read" else ordinal + 1
+                        expected_writes = max(0, ordinal - 2) if operation == "read" else ordinal
+                        self.assertEqual([expected_reads, expected_writes, 0],
+                                         [data[key] for key in ("reads", "writes", "closes")])
+                        self.assertEqual([0] * 6, [data[key] for key in
+                                         ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
+
+    def test_vmid_control_reuses_admission_and_refuses_nonidle_or_all_ones_before_writes(self):
+        for fault, status in (("bad-count", 64), ("bad-argument", 64), ("env-override", 64),
+                              ("overlap", 75), ("pre-adopted", 75), ("psp-fault", 75),
+                              ("hello-status", 74), ("snapshot-status", 74), ("snapshot-short", 74),
+                              ("reserve-status", 74), ("already-mes", 75), ("already-selected", 75),
+                              ("vmid-read-all-ones-1", 75), ("vmid-read-all-ones-2", 75)):
+            with self.subTest(fault=fault):
+                data = self.cli_case(fault, status, command="desktop-vmid-preflight")
+                self.assertEqual([0] * 7, [data[key] for key in
+                                 ("writes", "vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
+
+    def test_vmid_control_close_failure_cannot_report_success(self):
+        data = self.cli_case("close-status", 74, command="desktop-vmid-preflight")
+        self.assertEqual([2, 4, 1], [data[key] for key in ("writes", "reads", "closes")])
         self.assertEqual([0] * 6, [data[key] for key in
                          ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims")])
 

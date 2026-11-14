@@ -6,6 +6,9 @@ readback both zero; exit 75**. Firmware/power returned zero. The corrected
 system-domain watchdog became ready, dismissed after the finite diagnostic
 and was removed. No GART/MES/queue initialization or desktop takeover followed.
 See [the target result](#system-domain-target-result).
+An additional [VMID-only control candidate](DESKTOP-VMID-PREFLIGHT.md) now
+exists in source for a separate future experiment. It does not replace these
+queue checks or change their order and has not been target-executed.
 The [original build-39 desktop attempt](
 DESKTOP-DEPLOYMENT-ADMISSION.md#observed-reboot-result-and-recovery) stopped at
 queue-selection readback before GART/MES initialization. Its one-attempt

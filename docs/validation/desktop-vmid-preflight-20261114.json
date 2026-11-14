@@ -1,0 +1,215 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "source_parent": "73210bcad3fa1955d18a91ecaa08c89f3559ea52",
+  "status": "source/CPU-only terminal VMID selector control candidate; no target execution or deployment; physical cause unconfirmed",
+  "motivation_records": [
+    "desktop-selector-preflight-target-20261114.json",
+    "gc-phase-observation-target-20261114.json"
+  ],
+  "latest_target_OS_from_prior_record": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "new_OS_probe_for_this_change": false
+  },
+  "source_review": {
+    "Linux_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "files": [
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/soc21.c",
+        "sha256": "8210b4fd7236f1629655ae2afe38ddcb15ddb1e7f42d25d0147bc42bedf3939d",
+        "cache_verified": true,
+        "notice_reviewed": true
+      },
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c",
+        "sha256": "6b3dc555a2587666b46cdade8141966f49eaca71b40ad53b0a45b8624e5aeec9",
+        "cache_verified": true,
+        "notice_reviewed": true
+      },
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/mes_v11_0.c",
+        "sha256": "cf7c661ecdd6c69b11d2884abc24065e4a059ef3e76da574966b01e155d06122",
+        "cache_verified": true,
+        "notice_reviewed": true
+      },
+      {
+        "path": "drivers/gpu/drm/amd/include/asic_reg/gc/gc_11_0_0_offset.h",
+        "sha256": "a2394677509a3415a9e6307d876cae9cd654a99275ab40b3027d983da26801f2",
+        "cache_verified": true,
+        "notice_reviewed": true
+      },
+      {
+        "path": "drivers/gpu/drm/amd/include/asic_reg/gc/gc_11_0_0_sh_mask.h",
+        "sha256": "83dd0060886da2927e3f722b992af208e4d41999b0740123a770a6561f060c94",
+        "cache_verified": true,
+        "notice_reviewed": true
+      }
+    ],
+    "fresh_C_downloads_completed": 0,
+    "fresh_C_downloads_attempted": 3,
+    "fresh_download_failure": "URL/network timeout; not counted as verification",
+    "VMID_shift": 4,
+    "VMID_mask": 240,
+    "constants_VMID_selection_precedes_RLC_and_CP_resume": true,
+    "MES_enable_reset_precedes_its_ME3_selection": true,
+    "CP_halt_or_timeout_cause_proven": false,
+    "Linux_bodies_whole_headers_or_binaries_copied": false
+  },
+  "candidate": {
+    "command": "mesboot desktop-vmid-preflight",
+    "argc_including_program_and_command": 14,
+    "existing_geometry_layout_environment_and_exclusive_reservation_gates_retained": true,
+    "new_kernel_or_ABI": false,
+    "firmware_power_prerequisites_external": true,
+    "mutating_diagnostic": true,
+    "fixed_selector_values": [
+      16,
+      0
+    ],
+    "selector_register": "GRBM_GFX_CNTL",
+    "ME_pipe_queue_all_zero": true,
+    "register_reads": [
+      "CP_MES_CNTL",
+      "GRBM_GFX_CNTL"
+    ],
+    "passing_request_counts_from_source_and_fakes": {
+      "service_opens": 1,
+      "ABI_handshakes": 1,
+      "bootstrap_snapshots": 1,
+      "desktop_reservations": 1,
+      "selector_write_requests_with_kernel_readbacks": 2,
+      "separate_register_reads": 4,
+      "checked_service_closes": 1
+    },
+    "independent_live_request_tracing": false,
+    "both_readbacks_checked_for_each_write": true,
+    "mismatch_exit": 75,
+    "transport_shape_or_close_failure_exit": 74,
+    "failure_retry_restoration_or_later_writes": false,
+    "checked_close_required_for_success": true,
+    "banked_reads_queue_checks_initialization_VRAM_doorbells_seal_claim_or_display": false,
+    "timeout_reset_halt_or_power_changes": false,
+    "existing_initializer_queue_preflight_or_startup_order_changed": false,
+    "same_boot_initialization_supported": false,
+    "standalone_boot_admission_or_watchdog_in_command": false
+  },
+  "CPU_checks": {
+    "python": "Python 3.13.18",
+    "methods": 91,
+    "new_methods": 5,
+    "new_VMID_subcases": 53,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "checks": [
+      {
+        "test_file": "test_desktop_handoff.py",
+        "returncode": 0,
+        "seconds": 36.362,
+        "methods": 31,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0
+      },
+      {
+        "test_file": "test_gc_state_observe.py",
+        "returncode": 0,
+        "seconds": 53.555,
+        "methods": 7,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0
+      },
+      {
+        "test_file": "test_gc_state_compare.py",
+        "returncode": 0,
+        "seconds": 0.162,
+        "methods": 8,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0
+      },
+      {
+        "test_file": "test_native_include_graph.py",
+        "returncode": 0,
+        "seconds": 0.059,
+        "methods": 5,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0
+      },
+      {
+        "test_file": "test_desktop_startup.py",
+        "returncode": 0,
+        "seconds": 5.719,
+        "methods": 30,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0
+      },
+      {
+        "test_file": "test_mes_layout_gate.py",
+        "returncode": 0,
+        "seconds": 9.022,
+        "methods": 10,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0
+      }
+    ],
+    "actual_native_CLI_and_collector_sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "full_suite_rerun": false,
+    "fake_enforces_fixed_writes_register_allowlist_reserve_only_and_no_VRAM_or_doorbells": true
+  },
+  "native_compile": {
+    "returncode": 0,
+    "sha256": "4255883c0f2d45c0a7a8438a90fbb384341a1867f97f9c965968f5906402af32",
+    "architecture": "Mach-O 64-bit executable x86_64",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "SDK_version": "26.5",
+    "executed": false,
+    "installed": false,
+    "known_legacy_unused_variable_warning_excluded": true
+  },
+  "initial_strict_compile": {
+    "returncode": 1,
+    "reason": "existing legacy unused val variable under -Wunused-variable",
+    "counted_as_pass": false
+  },
+  "tested_input_sha256": {
+    "tools/phxctl/mesboot.c": "150086f697f2fedee1d61ce85db3a51125ce762286581933a079a2df5077a847",
+    "tests/test_desktop_entrypoint.c": "ec9ae6dc4880b8096b50c84a60549c598e2331c025420ae57f64cd123b5ccb0a",
+    "tests/test_desktop_handoff.py": "78de4946223f1dc77b700505c8b245c616c57601e7d5c745981bb677416c3488",
+    "tests/test_desktop_handoff.cpp": "33f6734733443f53adb65953827bd8d6d9dd4a1768c8e686922b4de86d97daad",
+    "src/phxbringup/PhxBringup.cpp": "92ad3f3961de373a35744b5d3f899ee53105251a3769615c4f18d0e2d0c57ce7",
+    "src/phxbringup/PhxDesktopHandoff.h": "6f2566b05e4f2ce3c39d7286400b72a10a6834a9057129c91e27e3d5bde69547",
+    "docs/DESKTOP-VMID-PREFLIGHT.md": "7c44968407715c02538619dfa9b1b707bcc01b48b9b6b9bcf355ed923d9131f6",
+    "docs/DESKTOP-SELECTOR-PREFLIGHT.md": "52f3435b6482a76cd12b2fe5afec401f70ec9f5f9e7e91c572f6c2b9f3cdc8d5",
+    "docs/GC-STATE-OBSERVATION.md": "a39970257bde3cff7ccd37700068bc7cf8738796470e3990d135981e1b9fa583"
+  },
+  "execution_boundary": {
+    "new_target_service_opens": 0,
+    "new_target_snapshots": 0,
+    "new_GPU_selector_power_or_initialization_commands": 0,
+    "consumed_requests_or_receipts_modified": false,
+    "new_live_target_scope_created": false,
+    "installed_tool_driver_startup_EFI_NVRAM_security_or_proxy_changes": false,
+    "reboot_requested": false,
+    "native_binary_uploaded": false,
+    "raw_logs_addresses_private_identifiers_or_credentials_published": false,
+    "current_boot_terminal_for_GPU_work": true,
+    "same_boot_identity_verified_via_kern_bootsessionuuid": true
+  },
+  "limits": [
+    "VMID selector readbacks alone do not prove bank routing, VM isolation, queue readiness, GPU execution or desktop success.",
+    "A later VMID result and an earlier KIQ failure on a different boot cannot alone isolate the physical cause.",
+    "Current measured 0x30 timeout and halt fields do not justify a timeout or reset/halt patch.",
+    "A source/CPU pass and native compile are not target execution evidence."
+  ],
+  "next_step": "Any target control probe requires another verified fresh boot, a distinct reviewed max-one request, pinned inputs and independent recovery. Do not execute it, replay old scopes, initialize or automatically reboot on the current terminal boot.",
+  "rollback": "Revert only the source diagnostic addition in a normal new commit; no installed component changed."
+}
