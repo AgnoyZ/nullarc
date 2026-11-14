@@ -1,8 +1,8 @@
 # Desktop deployment admission: KDK and AuxKC approval
 
 Status, 2026-11-14, after the owner's manual grants and a host reboot:
-**candidate not installed; normal AuxKC replacement approval still unproven;
-desktop capture restored; no desktop diagnostic executed**. The actual host is macOS 26.7.2,
+**candidate not installed; normal GUI driver approval completed, candidate AuxKC
+replacement still unproven; no desktop diagnostic executed**. The actual host is macOS 26.7.2,
 build 25G332, x86_64. PhxBringup build 37 remains loaded and installed. The
 build-39 delivery for the [checked startup adapter](DESKTOP-STARTUP-ADAPTERS.md)
 is staged privately. This record concerns deployment admission, not the cause
@@ -34,7 +34,7 @@ application and core exited, and effective HTTP, HTTPS, SOCKS and PAC proxies
 were independently read back as disabled, matching the original effective
 state. Other current application preferences were preserved.
 
-## Three separate cache admissions
+## Four separate cache admissions
 
 Each admission had its own private exclusive records. None consumed the
 outstanding single desktop-diagnostic request.
@@ -44,6 +44,7 @@ outstanding single desktop-diagnostic request.
 | Before KDK installation | `kmutil install --volume-root / --update-all` | Exact-build 25G332 KDK missing. |
 | After verified KDK installation | Same operation with the exact `--kdk` path | This was too broad: it attempted Boot/System collections for several variants. Variant kernels were missing and the release operation met the read-only system filesystem. |
 | AuxKC-specific admission | `kmutil rebuild` | Detected one PhxAccel replacement, requested user approval, then returned `Biometry is not available.` |
+| Fresh current-boot admission after the owner's grants | `kmutil rebuild` from the ordinary owner Terminal, effective UID 501, with a real PTY | Returned `Operation not permitted` before driver approval; no existing sudo ticket was available. |
 
 The broad second operation was a deployment-command error, not a GPU result.
 The local `kmutil(8)` manual describes `install` as updating Boot/System
@@ -59,7 +60,7 @@ were never reached. EFI was unmounted after each verification. No collection
 needed to be restored from backup because its original hashes still matched.
 Candidate kext bundles and source modules remain staged and unchanged.
 
-The final metadata/hash-only readback at 15:49 +08:00 confirmed the same boot,
+The earlier metadata/hash-only readback at 15:49 +08:00 confirmed the same boot,
 loaded build 37, the old installed accelerator and original startup inputs,
 all 24 cache hashes, no added collection files, unchanged staging and intact
 rollback backups. EFI remained unmounted; that last readback did not remount
@@ -131,9 +132,9 @@ other pinned installed inputs, both candidate bundles, all four staged source
 modules against the checkout, all nine firmware pins, and every packet pin
 other than the intentionally future installed-candidate entries. The complete
 340-file EFI backup still matches; live EFI was not remounted or revalidated in
-this review. No fourth deployment admission, cache rebuild, GPU operation,
-arming or agent-requested reboot occurred. The old packet's preparation boot
-remains deliberately unchanged and differs from the current boot.
+this review. By that review, no fourth deployment admission, cache rebuild,
+GPU operation, arming or agent-requested reboot had occurred. The old packet's
+preparation boot remains deliberately unchanged and differs from the current boot.
 
 At the owner's subsequent request to disable automatic locking, automatic
 display sleep and idle system sleep were set to zero for both battery and AC
@@ -148,12 +149,99 @@ replacement approval. A subsequent Terminal screen-capture consent alert was
 accepted with its uniquely matched standard Allow button through Accessibility;
 this was a capture-permission action, not driver-replacement approval.
 
-Continuation needs a new review of the then-current source, boot, live EFI and
+### Fourth admission and independent recovery
+
+At 17:07 +08:00, the ordinary Terminal again completed an actual screenshot
+and Accessibility readback. Its category tab was then uniquely identified and
+selected normally. The visible extension categories did not expose a Phx
+approval control; no driver approval button was clicked.
+
+A separate delivery was prepared for the current boot and synchronized source
+commit `b29e09d21aefce9c912fb86ec382e985456518d7`. All ten tested production
+input hashes were unchanged. Both candidate bundles, three native helpers,
+nine firmware files, a fresh complete 340-file live EFI backup and all 24
+cache-file backups were verified. The fresh packet has 37 input pins and seven
+recovery pins. The original diagnostic scope remained empty. No old delivery,
+preparation, packet or consumed admission was modified or replayed.
+
+The fourth installer passed eight isolated CPU cases covering bundle
+replacement/recovery, refusal, preservation of unknown content, Terminal
+delegation, UID checking, timeout and blocked redispatch. In the real admission,
+the root worker temporarily replaced PhxAccel and opened the owner's ordinary
+Terminal. No existing sudo ticket was available, so the actual rebuild ran
+with UID and effective UID 501. It finished between 17:16:57 and 17:17:01,
+returning status 1 and `Operation not permitted`; it did not time out or reach
+driver approval. This does not test whether an administrator operation in that
+Terminal can complete the candidate's normal OS approval.
+
+The worker recorded the refusal and completed rollback at 17:17:12. A separate
+verifier checked the complete original accelerator, startup, live EFI manifest,
+all 24 cache hashes, absence of extra collections, unchanged protected staging
+and empty original diagnostic scope. EFI was unmounted afterward. No cache
+backup restoration was needed. A further metadata/hash readback at 17:31:16
+confirmed loaded build 37, the original cached accelerator using unfiltered
+inspection, unchanged candidate inputs and backups, zero display gates, no
+arming, and the competing continuation absent and disabled. This last readback
+did not remount EFI or repeat the independent verifier's live EFI scan.
+
+Read-only probes compared direct root, root in the owner's graphical bootstrap,
+root with a PTY, and the combined context. All shared the same security session;
+the PTY changed the actual terminal availability but did not change the public
+authentication-policy availability results. A separate login-identity probe
+found that those privileged contexts retained root as the login identity,
+whereas the ordinary Terminal had the console owner's login identity. That
+difference is a continuation hypothesis, not a demonstrated cause or approval
+route. These probes did not evaluate authentication, supply credentials or
+rebuild a collection. No fifth deployment was attempted.
+
+### Direct operation of the PhxAccel approval UI
+
+After the owner explicitly reiterated permission to use sudo and desktop
+control, a normal Terminal-launched UI readback found a retained notification:
+the PhxAccel system extension had been updated and required approval in
+**Privacy & Security**. Its uniquely matched Open System Settings button led
+to that pane, which displayed an updated-software row naming
+`Unidentified - PhxAccel`. This was a different pane from the earlier extension
+category view.
+
+The exact row's standard Allow button was pressed successfully through
+Accessibility, followed by one press of the resulting sheet's Unlock button.
+Both actions had one uniquely matched target and returned AX success. The
+subsequent readback and screenshot still showed the normal OS account-password
+sheet; approval had not completed. Sudo execution was available, but no
+credential was read, guessed or supplied to the sheet. A separate generic
+administrator probe was cancelled without executing its read-only helper.
+Screenshots and UI trees remain private.
+
+At 17:40:39 +08:00, independent readback confirmed the original installed and
+cached accelerator, original startup and other installed inputs, all 24
+original cache files and backups, no added collections, unchanged staging,
+loaded build 37, no display arming, zero checked display gates and the original
+empty diagnostic scope. EFI remained unmounted and was not remounted in this
+readback. The retained notification and Allow click do not establish that the
+candidate is installed or approved. No fifth deployment, GPU diagnostic or
+reboot followed these UI actions. At that stage the real driver-approval
+password sheet was left open for normal account authentication.
+
+The owner subsequently supplied the account password and explicitly requested
+entry into that sheet. A one-use same-user local socket delivered it in memory
+to the ordinary Terminal's Accessibility helper, which set only the uniquely
+matched secure field and pressed Unlock. No password was written to a script,
+file or application log. The sheet closed, and Settings changed the PhxAccel
+row to a restart-required message. Independent readback at 17:46:34 confirmed
+that normal GUI authentication completed while the original accelerator was
+still installed and cached, all 24 cache hashes remained unchanged, and the
+candidate remained absent. The policy row was allowed with flags zero. No
+restart or GPU diagnostic was requested. This establishes a working normal GUI
+approval route, not a successful candidate installation.
+
+Continuation can use that demonstrated normal GUI route after a review of the
+then-current source, boot, live EFI and
 rollback state, with graphical-session availability rechecked. The next deployment
 admission requires a normal OS approval path that actually succeeds. Do not
 substitute approval-skipping flags, raw-cache activation,
 security changes or a live driver load on the already-initialized current boot.
-Do not replay any of the three consumed installers or the earlier build-37
+Do not replay any of the four consumed installers or the earlier build-37
 operations. A future admission must be newly reviewed against the then-current
 source, installed inputs and rollback state; the consumed installers also pin
 their original source HEAD.

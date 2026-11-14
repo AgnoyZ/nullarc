@@ -133,7 +133,7 @@ Python/native-clock brackets passed. None of this installs/loads a driver,
 arms display takeover, invokes a target snapshot selector or proves a desktop.
 
 The subsequent [deployment-admission record](DESKTOP-DEPLOYMENT-ADMISSION.md)
-separately records installation of the matching KDK and three unsuccessful,
+separately records installation of the matching KDK and four unsuccessful,
 rolled-back kernel-collection admissions. The current installed driver remains
 build 37; normal AuxKC approval has not passed and the requested desktop
 diagnostic remains unconsumed. Later readbacks confirmed the owner's Terminal
@@ -142,4 +142,13 @@ but the new candidate is not cached. A host reboot invalidated the old
 preparation's boot match. After a locked-console interval, desktop capture
 recovered following the owner's request to disable automatic display and idle
 system sleep. These observations and the newly verified rollback hashes are
-recorded there; none is a successful candidate installation or desktop test.
+recorded there. A separately prepared current-boot delivery then reached an
+ordinary Terminal rebuild under the owner's nonprivileged UID and was refused
+with `Operation not permitted`. Independent readback verified complete rollback;
+the original diagnostic scope remains empty. The fresh delivery did not modify
+or replay old boot-bound records. Subsequent direct operation of the PhxAccel
+Allow row in Privacy & Security, including owner-authorized password entry,
+completed normal GUI authentication and produced a restart-required message.
+Readback still found the original accelerator installed and cached. That route
+can inform a separate reviewed candidate admission; these observations are not
+a successful candidate installation or desktop test.
