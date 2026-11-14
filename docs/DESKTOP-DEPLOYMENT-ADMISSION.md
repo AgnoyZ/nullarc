@@ -1,12 +1,12 @@
-# Desktop deployment admission: KDK and AuxKC approval
+# Desktop deployment admission: KDK and AuxKC publication
 
 Status, 2026-11-14, after the owner's manual grants and a host reboot:
-**candidate not installed; normal GUI driver approval completed, but the seventh
-admission with manual password entry and all streams on native Terminal still met the biometric refusal;
-no desktop diagnostic executed**. The actual host is macOS 26.7.2,
-build 25G332, x86_64. PhxBringup build 37 remains loaded and installed. The
-build-39 delivery for the [checked startup adapter](DESKTOP-STARTUP-ADAPTERS.md)
-is staged privately. This record concerns deployment admission, not the cause
+**build-39 candidate installed for the next boot in the tenth admission;
+exact candidate AuxKC published and independently verified; no desktop diagnostic
+executed**. The actual host is macOS 26.7.2, build 25G332, x86_64.
+PhxBringup build 37 remains loaded on the current boot. The build-39 delivery
+for the [checked startup adapter](DESKTOP-STARTUP-ADAPTERS.md) is installed,
+with complete original rollback copies retained. This record concerns deployment admission, not the cause
 of the earlier desktop failure or evidence of acceleration.
 
 ## Matching KDK
@@ -35,7 +35,7 @@ application and core exited, and effective HTTP, HTTPS, SOCKS and PAC proxies
 were independently read back as disabled, matching the original effective
 state. Other current application preferences were preserved.
 
-## Seven separate cache admissions
+## Ten separate cache admissions
 
 Each admission had its own private exclusive records. None consumed the
 outstanding single desktop-diagnostic request.
@@ -49,6 +49,9 @@ outstanding single desktop-diagnostic request.
 | After normal Settings approval, with a separately reviewed admission | Fixed `sudo /usr/bin/kmutil rebuild` from the ordinary owner's Terminal, preserving the owner's login identity and controlling terminal | Normal sudo password authentication passed; the candidate replacement was detected, but the subsequent OS authentication request returned `Biometry is not available.` with status 250. |
 | First fully manual admission | Fixed `sudo -- /usr/bin/kmutil rebuild`, with all three standard streams attached directly to native owner Terminal | The bounded 480-second owner runner expired without a successful result; the consumed admission was rolled back and independently verified. |
 | Fresh fully manual admission after the owner requested reopening | Same fixed command, in a distinct native Terminal window with direct owner password entry | Sudo authentication passed and the candidate replacement was detected; the subsequent OS authentication again returned `Biometry is not available.` with status 250. |
+| Eighth, after the owner selected the upstream installer route | Private `kmutil create -n aux` with matching KDK and explicitly authorized `-z` | Status 71: `AppleCentauriManager` depends on unavailable x86_64 `AppleEmbeddedPCIE`; no cache published, complete rollback independently verified. |
+| Ninth, with only the existing auxiliary identifiers selected | Same create route with `--explicit-only` and an identifier list for the other three AuxKC extensions | Create returned zero, but the candidate omitted PhxAccel. Exact inspection refused publication; complete rollback independently verified. |
+| Tenth, with PhxAccel also in the explicit identifier list | Same private create, explicit Boot/System/Aux inspection, backup verification and atomic publication | Status zero; exact candidate and all 415 unrelated cached extensions verified. AuxKC, candidate EFI driver and next-boot startup entry installed and independently read back. |
 
 The broad second operation was a deployment-command error, not a GPU result.
 The local `kmutil(8)` manual describes `install` as updating Boot/System
@@ -56,7 +59,7 @@ collections and `rebuild` as requesting an Auxiliary collection rebuild and
 authorization. The latter reached approval but did not complete it. The
 presence of a matching KDK does not resolve that authorization failure.
 
-Each failure restored the entire original PhxAccel bundle. Separate readbacks
+Each of the first nine failures restored the entire original PhxAccel bundle. Separate readbacks
 verified the original startup plist, the full original 340-file EFI manifest,
 all 24 original cache-related files, no additional collection files and
 unchanged protected staging. EFI PhxBringup replacement and startup replacement
@@ -355,29 +358,87 @@ Settings still showed the existing restart-required row, with no approval
 sheet or new Allow control. No restart was clicked. Raw system logs,
 screenshots, UI trees and account identifiers remain private and ignored.
 
-### Continuation after seven admissions
+### Owner-selected upstream route: admissions eight through ten
 
-Any further deployment admission requires a normal OS approval path that
-actually succeeds, reviewed against then-current source, boot, GUI, live EFI,
-cache and rollback state. Do not
-substitute approval-skipping flags, raw-cache activation,
-security changes or a live driver load on the already-initialized current boot.
-Do not replay any of the seven consumed installers or the earlier build-37
-operations. A future admission must be newly reviewed against the then-current
-source, installed inputs and rollback state; the consumed installers also pin
-their original source HEAD.
+After the seventh refusal, the owner requested inspection of the upstream
+installer and then explicitly instructed continuation using that route. Before
+that instruction, the owner was told that `kinst.sh` uses `-z`, documented by
+the installed `kmutil` as skipping approval checks for this action, and directly
+replaces the AuxKC. This is an explicit action-approval exception for this local
+deployment. Global SIP, authenticated-root and boot arguments were not changed.
+It does not establish that normal `kmutil rebuild` authentication was repaired.
 
-After successful installation, verify the complete installed packet, the exact
-candidate in the applicable kernel collection, EFI/startup replacements and
-rollback before one-shot arming and a fresh boot. Full packet verification
-currently expects future candidate PhxAccel bytes and should refuse the
-restored old installation. Never run the staged entry's `run` role on this
-initialized boot. Preserve the existing empty diagnostic scope rather than
-creating a replacement to obtain another attempt.
+The checked upstream chain is `install/install.sh` to `tools/phxctl/kinst.sh`:
+create an auxiliary collection, inspect it, back up the old collection and
+publish the new one. The full installer was not executed: its unrelated helper,
+firmware, plugin and startup-marker changes were outside this adaptation.
+The bounded local executor required the installed matching KDK rather than
+`--allow-missing-kdk`, exact image identity and all unrelated cached records,
+successful backup verification before publication, and checked rollback.
+Production source and the original diagnostic packet were unchanged.
 
-No new target snapshot, initialization, desktop claim, display release,
-arming or reboot occurred during these admissions. The diagnostic request
-remains unconsumed, and desktop behavior and its root cause remain unproven.
+Two preparation-only refusals preceded the eighth admission. The first rejected
+the original AuxKC's `SF_RESTRICTED` flag; the second found that system Python
+lacked the xattr APIs. Neither replaced a driver or claimed deployment. The
+reviewed fix accepts only zero or the original restricted flag, preserves the
+original flags, owner, mode and extended attributes, and uses macOS `xattr`.
+A private file round trip verified this metadata handling before deployment.
+Immutable, nounlink and unknown flags remain refused. Both failed preparation
+directories were retained, and fresh exclusive evidence was used.
+
+The eighth executor passed 35 CPU cases. Its create operation returned 71:
+the KDK's `AppleCentauriManager` has an x86_64 slice but depends on
+`AppleEmbeddedPCIE`, which has only arm64e. The former is absent from the
+original cache. Independent rollback at 19:15:16 +08:00 verified all 416
+original cached records, 24 original cache files and backups, original bundles
+and startup, full 340-file live EFI and backup, unchanged staging and metadata.
+
+The ninth executor passed 37 CPU cases and restricted selection to the four
+existing auxiliary extensions. Its mixed path/identifier arguments listed only
+the other three identifiers. Create returned zero, but inspection found only
+those three extensions. A separate read-only inspection with explicit Boot,
+System and candidate Aux paths found 415 unchanged unrelated records and no
+PhxAccel. Publication was refused. Independent rollback at 19:20:40 verified
+the complete original state again. Read-only `kmutil find` comparisons reproduced
+the identifier-selection behavior; the next selection explicitly named all
+four identifiers, including PhxAccel, and returned exactly the expected bundles.
+
+The tenth executor passed 37 CPU cases. It pinned synchronized source record
+`122dfe0fd1799d4a72d95d82759e1512a4ebf89f` and rechecked the current boot,
+matching KDK, full EFI, repositories, caches, candidates, packet and backups.
+Create returned zero. Explicit three-collection inspection verified all 416
+identifiers, the exact candidate image and unchanged version/path/image data
+for all 415 unrelated extensions. At 19:23:41 it atomically published the
+1,277,952-byte AuxKC after verifying the original and its backup. Candidate EFI
+and next-boot startup replacement then completed at 19:24:06. All ten consumed
+admissions and their original source bindings remain preserved.
+
+Independent readback at **19:25:23 +08:00** verified the complete installed
+candidate and retained original accelerator, startup bytes/ownership, all 37
+packet pins, seven recovery pins and ten unchanged production hashes. Exactly
+one of the 24 active cache-related files changed: the verified AuxKC. The
+other 23 files, all 24 original backups, cache file set, metadata and protected
+staging remained exact. Live EFI matched the expected 343-file manifest,
+including the retained three-file original driver; its original 340-file backup
+was unchanged. EFI was unmounted. No other EFI content was changed.
+
+### Continuation after installation
+
+Build 39 is installed for the next boot; build 37 remains loaded. The installed
+startup job was not launched. Display arming is absent, both checked display
+gates are zero, the competing continuation remains absent and disabled, and
+all recorded installer workers have exited. The original single-diagnostic
+scope remains empty. Global security settings are unchanged; the authorized
+action-specific approval skip is recorded explicitly rather than called normal
+approval. No initializer, reader, target snapshot, desktop claim, display
+release, arming or agent-requested reboot occurred in these three admissions.
+
+Do not replay any consumed installer or run the staged entry's `run` role on
+this initialized boot. A subsequent one-shot arming/fresh-boot stage must first
+recheck the installed packet, current source, boot, caches, EFI/startup and
+rollback state. Preserve the original diagnostic scope and its one-attempt
+limit. Installed and cached bytes are not loaded-driver or acceleration evidence;
+desktop behavior and its root cause remain unproven.
 The earlier [623-test source validation](validation/desktop-startup-adapters-20261114.json)
 is unchanged; it is not a successful installation or a hardware result.
 Raw diagnostic material and user configuration remain ignored locally.

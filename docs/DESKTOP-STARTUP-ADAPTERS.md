@@ -1,6 +1,7 @@
 # Checked desktop startup and retained display ordering
 
-Status, 2026-11-14: **source candidate, not installed or hardware validated**.
+Status, 2026-11-14: **build-39 candidate installed for the next boot; not hardware
+validated**. Build 37 remains loaded on the current boot.
 `tools/desktop_startup.py` supplies concrete commands for the [coordinator](
 ALLOCATION-STARTUP-COORDINATOR.md) and [build-39 handoff](DESKTOP-NATIVE-HANDOFF.md).
 There is no default packet, installer, arming command or automatic next attempt.
@@ -133,12 +134,12 @@ Python/native-clock brackets passed. None of this installs/loads a driver,
 arms display takeover, invokes a target snapshot selector or proves a desktop.
 
 The subsequent [deployment-admission record](DESKTOP-DEPLOYMENT-ADMISSION.md)
-separately records installation of the matching KDK and seven unsuccessful,
-rolled-back kernel-collection admissions. The current installed driver remains
-build 37; normal AuxKC approval has not passed and the requested desktop
-diagnostic remains unconsumed. Later readbacks confirmed the owner's Terminal
+separately records installation of the matching KDK and the first seven
+unsuccessful, rolled-back kernel-collection admissions. At that point the
+installed driver remained build 37; normal AuxKC approval had not passed and
+the requested desktop diagnostic remained unconsumed. Later readbacks confirmed the owner's Terminal
 Accessibility and Screen Recording grants and an allowed PhxAccel policy row,
-but the new candidate is not cached. A host reboot invalidated the old
+but the new candidate was not cached at that point. A host reboot invalidated the old
 preparation's boot match. After a locked-console interval, desktop capture
 recovered following the owner's request to disable automatic display and idle
 system sleep. These observations and the newly verified rollback hashes are
@@ -168,3 +169,19 @@ rollback was independently verified after each, including all 24 caches and
 the 340-file live EFI. All ten production hashes remain unchanged; the original
 diagnostic scope remains empty. Neither manual input nor native standard
 streams has established a successful AuxKC approval route.
+
+The owner then explicitly selected the upstream `create`/inspect/backup/publish
+route after its action-specific `-z` approval skip was explained. The eighth
+admission failed on a KDK dependency; the ninth created a collection but omitted
+PhxAccel and was refused before publication. Both were independently rolled
+back. The tenth explicitly selected all four existing auxiliary identifiers and
+checked Boot/System/Aux together: create succeeded, all 416 identifiers matched,
+and the exact candidate replaced only PhxAccel while all 415 unrelated cached
+records stayed exact. The candidate AuxKC, build-39 EFI driver and next-boot
+startup entry were installed. Independent readback at 19:25:23 +08:00 verified
+all 37 packet pins, seven recovery pins, unchanged production hashes, original
+backups and the entire expected live EFI; EFI was unmounted. Global security
+settings were unchanged. This is successful next-boot installation, not normal
+`rebuild` authentication or hardware validation. Build 37 is still loaded; no
+arming, diagnostic, initialization, reader or reboot was executed, and the
+original diagnostic scope remains empty.
