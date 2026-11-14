@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "source_candidate_commit": "da7ea171091cb5ce6fb2fcf4a3a0840205310eec",
+  "preparation_record_commit": "03a4b8123dbf4e9614378eb9a3afb33a05dfba98",
+  "status_at_record_creation": "Owner authorized one ordinary reboot and one fresh-boot terminal VMID diagnostic; neither has been dispatched for this authorization at record creation.",
+  "owner_authorized_limits": {
+    "normal_reboot_maximum": 1,
+    "terminal_VMID_test_maximum": 1,
+    "work_budget_seconds": 120,
+    "independent_watchdog_seconds": 150,
+    "timeout_recovery_reboot_maximum": 1,
+    "automatic_retry": false,
+    "driver_startup_EFI_NVRAM_or_security_changes": false,
+    "queue_initialization_claim_or_display": false
+  },
+  "execution_order": [
+    "Schedule the separately claimed ordinary reboot once; verify a new stable boot-session identity before admission.",
+    "Recheck metadata, provider, framebuffer, off state, pinned inputs, runtime closure and historical receipts; freeze the distinct max-one request only after admission passes.",
+    "Explicitly dispatch the prepared runner once, with the independent watchdog ready before native work.",
+    "Stop after the first finite result or failure; unknown results or a timeout may use the one independent recovery reboot. Never continue to initialization in that boot."
+  ],
+  "preservation": {
+    "historical_preparation_record_retained": true,
+    "prior_consumed_scopes_reused": false,
+    "automatic_boot_time_dispatch_installed": false,
+    "GPU_commands_at_record_creation": 0,
+    "binaries_raw_logs_layouts_identifiers_or_credentials_published": false
+  },
+  "limits": [
+    "Authorization is not evidence of a reboot, fresh-boot admission, selector result, watchdog recovery or desktop success.",
+    "The prior preparation record remains historical; target results must be recorded separately after execution."
+  ],
+  "rollback": "Before dispatch, leave the max-one diagnostic request unconsumed. After any diagnostic result, preserve its receipts and stop GPU work for that boot. No installed component is changed by this authorization record."
+}

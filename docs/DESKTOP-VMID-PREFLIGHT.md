@@ -155,3 +155,19 @@ Fresh-boot admission and execution remain pending a separate owner instruction.
 See the [sanitized preparation record](
 validation/desktop-vmid-preparation-20261114.json). Rollback is to leave this
 private candidate unselected and preserve all prior consumed scopes.
+
+## Subsequent owner authorization
+
+After the inert preparation record, the owner authorized one ordinary reboot
+and one fresh-boot terminal VMID diagnostic, with the existing 120-second work
+budget, 150-second independent watchdog and at most one timeout-recovery reboot.
+This authorization does not extend to automatic retry, startup deployment,
+driver replacement, initialization or display. The ordinary reboot gets its own
+exclusive claim; the diagnostic still requires fresh metadata/file admission
+and an explicit single dispatch after the stable boot-session identity changes.
+
+At creation of the [execution record](
+validation/desktop-vmid-execution-20261114.json), neither the ordinary reboot
+nor the diagnostic had been dispatched for this authorization. The earlier
+preparation record is retained as historical evidence. Authorization alone
+establishes no selector result, deadline recovery or desktop success.
