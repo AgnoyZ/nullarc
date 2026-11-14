@@ -190,3 +190,50 @@ ordinary reboot. A proposed single runtime unload requires separate owner
 authorization because the diagnostic excluded driver changes. Keep installed
 files and all refusal evidence intact. This refusal supplies no VMID result and
 does not establish the cause of the earlier selector mismatch.
+
+## Terminal VMID control result
+
+The owner subsequently authorized one runtime unload of PhxAccel while retaining
+the installed files and startup configuration. At the actual preflight, however,
+the module was already absent on the same boot. No unload command was invoked;
+the cause and timing of its absence remain unknown. The off state and firmware
+framebuffer preconditions still passed. Pinned installed, collection and startup
+file hashes were unchanged.
+
+A separate metadata directory preserved the earlier refusal. The continuation
+retained every original admission guard and added eight file pins plus explicit
+boot/absence proof checks. Seven existing admission/launcher file/mock methods
+passed again; these are not additional methods to add to the historical 88.
+Actual fresh admission then fixed 55 execution inputs, 14 recovery inputs and
+the distinct max-one request before its single explicit dispatch.
+
+Both read-only observers and the unchanged firmware/power command returned
+zero. Baseline idle controls, unchanged memory-size control, post-power CP_STAT
+zero, RLC bootload completion, inactive MES and idle selection passed. The VMID
+command then failed on its first selection:
+
+```text
+ME=0 pipe=0 queue=0 VMID=1
+requested=0x00000010 write-readback=0x00000000 readback=0x00000000
+exit=75
+```
+
+The one trace was independently reparsed from retained native output and status.
+No restore phase, checked-close completion, banked access, GART/MES/queue
+initialization, VRAM operation, doorbell, claim or display step followed. Failure
+before checked close does not independently demonstrate reservation abandonment
+on hardware. Native request counts remain source/runner-derived, not live traced.
+
+Completion preceded the 120-second work deadline. The independently ready
+150-second watchdog ran once, exited zero and recorded dismissal. Its exact
+verified exited job was removed, and absence was checked. No recovery reboot
+was requested; hardware deadline recovery was not exercised. The four historical
+receipt sets were unchanged, and the new terminal scope has 190 file receipts.
+
+The VMID-only request therefore also exhibited dual-zero readback; the observed
+mismatch is not limited to the earlier ME3/pipe1 request. Separate boot-scoped
+results still do not isolate a shared cause or prove an MMIO, timeout or halt
+defect. No acceleration or desktop success is established. Preserve this consumed
+scope and stop all further GPU work on this boot; continue with source/fake
+review only. Any further physical experiment needs a separate reviewed request
+and a verified fresh boot.
