@@ -131,3 +131,9 @@ staged. A fresh full 340-file EFI backup and old PhxAccel backup were verified,
 and EFI was unmounted. Read-only native metadata adapters and three
 Python/native-clock brackets passed. None of this installs/loads a driver,
 arms display takeover, invokes a target snapshot selector or proves a desktop.
+
+The subsequent [deployment-admission record](DESKTOP-DEPLOYMENT-ADMISSION.md)
+separately records installation of the matching KDK and three unsuccessful,
+rolled-back kernel-collection admissions. The current installed driver remains
+build 37; normal AuxKC approval has not passed and the requested desktop
+diagnostic remains unconsumed.

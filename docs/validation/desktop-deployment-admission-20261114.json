@@ -1,0 +1,138 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "scope": "matching KDK installation and three rolled-back desktop deployment admissions; no GPU diagnostic",
+  "candidate_source_commit": "52188bb7c4e27559dcf4e0aec3318f067f908c57",
+  "host": {
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64",
+    "loaded_PhxBringup_build_after_rollback": 37,
+    "candidate_PhxBringup_build": 39,
+    "candidate_currently_installed": false
+  },
+  "KDK": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "mirror": "dortania/KdkSupportPkg release 25G332",
+    "downloaded_via_FlClash": true,
+    "image_bytes": 1181052767,
+    "image_sha256": "9490bd9b5e16ff5cee8b7330c498d64f27a008aa91c5c70d686a00dc5978c555",
+    "release_asset_digest_and_checksum_matched": true,
+    "hdiutil_verify_passed": true,
+    "package_bytes": 1172632152,
+    "package_sha256": "992e35701eb041c6ff3f8cf030be4a7309b0b94cb0c40519ff7b1d925b1b880d",
+    "package_signature": "signed Apple Software",
+    "package_trust_chain": [
+      "Software Update",
+      "Apple Software Update Certification Authority",
+      "Apple Root CA"
+    ],
+    "installer_policy_assessment": "accepted; source Apple Installer",
+    "package_install_scripts_found": false,
+    "component_payload_locations_match_exact_KDK_directory": true,
+    "installed_successfully_at": "2026-11-14T15:28:01+08:00",
+    "component_receipts_verified": 2,
+    "x86_64_kernel_matches_live_and_BootKC_kernel_entry": true,
+    "root_owned_package_copy_retained_and_hash_reverified": true,
+    "download_image_detached": true,
+    "raw_identifiers_published": false
+  },
+  "deployment_admissions": [
+    {
+      "sequence": 1,
+      "error_recorded_at": "2026-11-14T14:54:12+08:00",
+      "cache_command": "kmutil install --volume-root / --update-all",
+      "failure": "exact-build KDK missing",
+      "original_PhxAccel_restored": true,
+      "rollback_independently_verified": true
+    },
+    {
+      "sequence": 2,
+      "error_recorded_at": "2026-11-14T15:30:42+08:00",
+      "cache_command": "kmutil install --volume-root / --update-all --kdk /Library/Developer/KDKs/KDK_26.7.2_25G332.kdk",
+      "failure": "overbroad Boot/System rebuild; missing variant kernels and read-only system filesystem",
+      "original_PhxAccel_restored": true,
+      "rollback_independently_verified": true
+    },
+    {
+      "sequence": 3,
+      "error_recorded_at": "2026-11-14T15:36:18+08:00",
+      "cache_command": "kmutil rebuild",
+      "replacement_detected": "one PhxAccel removal and one addition",
+      "user_approval_requested": true,
+      "failure": "Biometry is not available.",
+      "original_PhxAccel_restored": true,
+      "rollback_independently_verified": true
+    }
+  ],
+  "common_post_failure_readbacks": {
+    "original_complete_PhxAccel_bundle": true,
+    "original_startup_plist": true,
+    "original_live_EFI_files": 340,
+    "original_cache_related_files": 24,
+    "additional_collection_files": 0,
+    "protected_staging_unchanged": true,
+    "candidate_delivery_unchanged": true,
+    "EFI_unmounted": true,
+    "EFI_candidate_and_startup_replacement_reached": false,
+    "collection_backup_restoration_needed": false
+  },
+  "final_current_state_readback": {
+    "at": "2026-11-14T15:49:37+08:00",
+    "method": "metadata and hashes; no GPU selector",
+    "same_boot_as_all_three_admissions": true,
+    "loaded_build": 37,
+    "old_accelerator_and_other_installed_inputs_exact": true,
+    "original_cache_hashes_exact": 24,
+    "additional_collection_files": 0,
+    "protected_staging_exact": true,
+    "candidate_bundles_and_modules_exact": true,
+    "EFI_backup_files_exact": 340,
+    "EFI_unmounted": true,
+    "live_EFI_remounted_or_full_manifest_repeated_in_final_readback": false,
+    "display_arming_absent": true,
+    "checked_display_gates_zero": true,
+    "competing_continuation_absent_and_disabled": true,
+    "legacy_startup_job_absent": true,
+    "competing_GPU_helpers_and_reboot_processes_absent": true,
+    "existing_diagnostic_scope_empty": true
+  },
+  "authentication_availability_probe": {
+    "API": "LAContext.canEvaluatePolicy",
+    "contexts": ["ordinary user", "privileged"],
+    "graphical_session_access_in_both": true,
+    "device_owner_authentication_available_in_both": true,
+    "biometric_authentication_available_in_both": false,
+    "biometric_error_code_in_both": -6,
+    "authentication_attempted_or_credentials_supplied": false,
+    "working_kmutil_approval_route_confirmed": false
+  },
+  "proxy_cleanup": {
+    "temporary_autoRun_preference_restored": true,
+    "other_current_preferences_preserved": true,
+    "agent_opened_app_and_core_exited": true,
+    "effective_HTTP_HTTPS_SOCKS_PAC_proxies_disabled": true,
+    "original_effective_proxy_state_restored": true,
+    "verified_at": "2026-11-14T15:47:30+08:00"
+  },
+  "validation_boundary": {
+    "original_installer_CPU_cases_passed": 4,
+    "post_KDK_installer_CPU_cases_passed": 4,
+    "native_availability_probe_compiled_with_warnings_as_errors": true,
+    "production_source_changed_by_this_record": false,
+    "prior_623_test_source_validation_rerun_for_documentation": false,
+    "prior_source_validation": "desktop-startup-adapters-20261114.json",
+    "new_target_snapshot_requests": 0,
+    "new_GPU_initialization_or_workload": false,
+    "display_armed": false,
+    "rebooted": false,
+    "desktop_diagnostic_attempt_consumed": false,
+    "desktop_or_acceleration_validated": false,
+    "desktop_root_cause_confirmed": false,
+    "OS_security_or_approval_bypass_used": false,
+    "public_binary_uploads": false
+  },
+  "blocker": "normal OS approval of Auxiliary kernel collection replacement",
+  "continuation": "Establish a successful normal approval route before a new reviewed deployment admission. Preserve the consumed installers and original empty diagnostic scope; verify installed packet, candidate cache, EFI, startup and rollback before any one-shot arming and fresh boot. Never run the staged entry on the current initialized boot."
+}
