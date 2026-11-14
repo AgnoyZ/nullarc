@@ -1,5 +1,12 @@
 # Private PhxBringup-only install and rollback packet
 
+Later state, 2026-11-14: the owner-authorized
+[build-37 deployment](ALLOCATION-BUILD37-DEPLOYMENT.md) completed the exact
+PhxBringup-only replacement and independent live EFI read-back. Build 36 is
+retained for rollback. The preparation-only and uninstalled statements below
+are historical; candidate loading and Phase A are still unverified at that
+deployment checkpoint.
+
 On 2026-11-14, the operator confirmed having an independently usable boot and
 EFI-restoration route. This is **operator attestation**, not a recovery-media
 boot test performed by the agent. The earlier observation of no connected

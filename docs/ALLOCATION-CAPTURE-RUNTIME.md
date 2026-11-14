@@ -1,5 +1,11 @@
 # Allocation capture runtime delivery
 
+Later on 2026-11-14, the owner-authorized
+[build-37 deployment](ALLOCATION-BUILD37-DEPLOYMENT.md) installed the retained
+candidate and independently verified it on EFI. The no-install statements
+below describe this earlier runtime-preparation pass; target loading and
+passive collection remain separate subsequent evidence.
+
 On 2026-11-14, after the request for a single desktop reproduction with
 collection, a fresh read-only target check still found **PhxBringup build
 36** on macOS **26.7.2, build 25G332**. Its loaded-image identity matched the

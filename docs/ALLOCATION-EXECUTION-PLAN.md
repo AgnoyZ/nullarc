@@ -1,5 +1,11 @@
 # Allocation snapshot execution plan: review before target use
 
+Deployment update, 2026-11-14: the owner-authorized
+[build-37 installation](ALLOCATION-BUILD37-DEPLOYMENT.md) and independent EFI
+read-back are complete. The running kernel remained build 36 at that
+checkpoint; the new firmware-desktop load and Phase A remain unverified.
+This supersedes the retained-candidate-only installation status below.
+
 Status on 2026-11-14 after fresh live-execution permission: **private native
 build-37 delivery and an exact rollback packet are retained; the operator
 confirms an independent recovery route; Phase A remains unperformed**.
