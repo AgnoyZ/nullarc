@@ -1,7 +1,7 @@
 {
   "format": 1,
   "date": "2026-11-14",
-  "scope": "matching KDK installation, five rolled-back desktop deployment admissions, normal Settings and sudo password approval, and independent recovery/authentication readbacks; no GPU diagnostic",
+  "scope": "matching KDK installation, seven rolled-back desktop deployment admissions, normal Settings and sudo password approval including direct manual native-Terminal input, and independent recovery/authentication readbacks; no GPU diagnostic",
   "candidate_source_commit": "52188bb7c4e27559dcf4e0aec3318f067f908c57",
   "host": {
     "os_version": "26.7.2",
@@ -108,6 +108,65 @@
       "independent_rollback_verified_at": "2026-11-14T17:57:42.376025+08:00",
       "original_diagnostic_scope_preserved_and_empty": true,
       "prior_preparation_packet_and_four_consumed_installers_replayed_or_modified": false
+    },
+    {
+      "sequence": 6,
+      "source_record_commit": "04efe7f17aa5ab0156a09fbe0d5a79dbe7063637",
+      "source_record_push_and_remote_SHA_verified_before_preparation": true,
+      "error_recorded_at": "2026-11-14T18:28:58.182239+08:00",
+      "cache_command": "sudo -- /usr/bin/kmutil rebuild",
+      "route": "ordinary owner Terminal; manual owner authentication; all three standard streams attached directly to native TTY",
+      "started_at": "2026-11-14T18:20:46.871207+08:00",
+      "finished_at": "2026-11-14T18:28:47.002588+08:00",
+      "runner_uid": 501,
+      "runner_euid": 501,
+      "runner_login_uid": 501,
+      "all_standard_streams_native_TTY": true,
+      "manual_authentication_requested": true,
+      "agent_supplied_credentials": false,
+      "password_recorded_in_scripts_files_arguments_or_application_logs": false,
+      "returncode": 124,
+      "timed_out": true,
+      "original_PhxAccel_restored": true,
+      "rollback_independently_verified": true,
+      "independent_rollback_verified_at": "2026-11-14T18:34:21.530065+08:00",
+      "original_diagnostic_scope_preserved_and_empty": true,
+      "all_prior_admissions_preserved_and_not_replayed": true,
+      "installer_CPU_cases_passed": 16,
+      "maximum_owner_wait_seconds": 480,
+      "failure": "bounded owner runner timed out without a successful rebuild result",
+      "successful_sudo_or_driver_approval_not_established": true
+    },
+    {
+      "sequence": 7,
+      "source_record_commit": "04efe7f17aa5ab0156a09fbe0d5a79dbe7063637",
+      "source_record_push_and_remote_SHA_verified_before_preparation": true,
+      "error_recorded_at": "2026-11-14T18:38:19.523407+08:00",
+      "cache_command": "sudo -- /usr/bin/kmutil rebuild",
+      "route": "ordinary owner Terminal; manual owner authentication; all three standard streams attached directly to native TTY",
+      "started_at": "2026-11-14T18:35:51.566283+08:00",
+      "finished_at": "2026-11-14T18:38:13.627663+08:00",
+      "runner_uid": 501,
+      "runner_euid": 501,
+      "runner_login_uid": 501,
+      "all_standard_streams_native_TTY": true,
+      "manual_authentication_requested": true,
+      "agent_supplied_credentials": false,
+      "password_recorded_in_scripts_files_arguments_or_application_logs": false,
+      "returncode": 250,
+      "timed_out": false,
+      "original_PhxAccel_restored": true,
+      "rollback_independently_verified": true,
+      "independent_rollback_verified_at": "2026-11-14T18:39:41.987818+08:00",
+      "original_diagnostic_scope_preserved_and_empty": true,
+      "all_prior_admissions_preserved_and_not_replayed": true,
+      "installer_CPU_cases_passed": 16,
+      "normal_sudo_password_authentication_passed": true,
+      "replacement_detected": "one PhxAccel removal and one addition",
+      "user_approval_requested": true,
+      "failure": "Biometry is not available.",
+      "OS_authentication_error": -6,
+      "native_prompt_and_actual_refusal_verified_by_private_screenshots": true
     }
   ],
   "common_post_failure_readbacks": {
@@ -123,7 +182,7 @@
     "collection_backup_restoration_needed": false
   },
   "final_current_state_readback": {
-    "at": "2026-11-14T17:57:42.376025+08:00",
+    "at": "2026-11-14T18:39:41.987818+08:00",
     "method": "metadata and hashes; no GPU selector",
     "same_boot_as_fresh_fourth_admission_preparation": true,
     "loaded_build": 37,
@@ -144,7 +203,11 @@
     "legacy_startup_job_absent": true,
     "competing_GPU_helpers_and_reboot_processes_absent": true,
     "existing_diagnostic_scope_empty": true,
-    "complete_live_EFI_manifest_independently_verified_after_fifth_rollback": true
+    "complete_live_EFI_manifest_independently_verified_after_fifth_rollback": true,
+    "complete_live_EFI_manifest_independently_verified_after_sixth_rollback": true,
+    "complete_live_EFI_manifest_independently_verified_after_seventh_rollback": true,
+    "owner_and_root_workers_from_last_admission_absent": true,
+    "later_hash_and_job_state_verified_at": "2026-11-14T18:41:50.673665+08:00"
   },
   "authentication_availability_probe": {
     "API": "LAContext.canEvaluatePolicy",
@@ -234,10 +297,12 @@
     "public_binary_uploads": false,
     "fresh_fourth_installer_CPU_cases_passed": 8,
     "tested_production_hashes_reverified_unchanged": 10,
-    "fresh_fifth_installer_and_credential_channel_CPU_cases_passed": 13
+    "fresh_fifth_installer_and_credential_channel_CPU_cases_passed": 13,
+    "fresh_sixth_manual_installer_CPU_cases_passed": 16,
+    "fresh_seventh_manual_installer_CPU_cases_passed": 16
   },
-  "blocker": "Normal Settings password approval and ordinary Terminal sudo authentication both passed. The fifth fixed kmutil rebuild detected the candidate replacement but its actual owner-bound OS authentication request still returned Biometry is not available (error -6). Complete rollback was independently verified; build 37 and the original cache remain, candidate build 39 is not installed.",
-  "continuation": "Do not replay any of the five consumed installers or blindly repeat the same sudo rebuild. A further separately reviewed admission needs a normal OS approval route that completes candidate cache replacement, with then-current source, boot, live EFI, caches, packet and rollback verified. Preserve the original empty single-diagnostic scope and do not run the staged entry on the current initialized boot. A restart-required Settings row alone is insufficient candidate cache evidence.",
+  "blocker": "Normal Settings password approval and normal sudo authentication passed, including direct owner password entry with all streams on native Terminal in the seventh admission. The actual kmutil owner-bound OS authentication request still returned Biometry is not available (error -6), status 250. Complete rollback was independently verified; build 37 and the original cache remain, candidate build 39 is not installed.",
+  "continuation": "Do not replay any of the seven consumed installers or blindly repeat the same sudo rebuild. A further separately reviewed admission needs a normal OS approval route that completes candidate cache replacement, with then-current source, boot, live EFI, caches, packet and rollback verified. Preserve the original empty single-diagnostic scope and do not run the staged entry on the current initialized boot. A restart-required Settings row alone is insufficient candidate cache evidence.",
   "owner_requested_idle_power_changes": {
     "verified_at": "2026-11-14T16:54:48.358089+08:00",
     "battery_displaysleep_minutes": 0,
@@ -443,5 +508,38 @@
     "Settings_still_reports_restart_required": true,
     "new_candidate_specific_Allow_control_observed": false,
     "restart_clicked": false
+  },
+  "seventh_actual_OS_authentication_trace": {
+    "bounded_read_only_system_log_review": true,
+    "actual_request_used_owner_identity": true,
+    "request_name_observed": "HumanPresence",
+    "OS_authentication_error": -6,
+    "error_text": "Biometry is not available on this device.",
+    "host_internal_policy_details_treated_as_stable_public_API": false,
+    "direct_manual_password_and_native_standard_streams_resolved_failure": false,
+    "desktop_failure_root_cause_inferred": false,
+    "raw_logs_or_account_identifiers_published": false
+  },
+  "after_seventh_final_input_hash_review": {
+    "at": "2026-11-14T18:41:50.673665+08:00",
+    "tested_production_hashes_unchanged": 10,
+    "packet_pins_verified_except_future_installed_accelerator": 34,
+    "future_installed_accelerator_pins_not_treated_as_passing": 3,
+    "recovery_pins_verified": 7,
+    "packet_unchanged": true,
+    "all_four_current_delivery_consumed_installers_unchanged": true,
+    "original_diagnostic_scope_empty": true,
+    "GPU_selector_or_Native_constructor_executed": false,
+    "competing_continuation_absent_and_disabled": true,
+    "legacy_startup_job_absent": true,
+    "competing_GPU_helpers_and_reboot_processes_absent": true
+  },
+  "after_seventh_GUI_readback": {
+    "ordinary_Terminal_AX_and_desktop_screenshot_succeeded": true,
+    "Settings_still_reports_restart_required": true,
+    "new_candidate_specific_Allow_control_observed": false,
+    "normal_OS_password_sheet_present": false,
+    "restart_clicked": false,
+    "native_Terminal_actual_candidate_check_approval_request_and_biometric_refusal_screenshot_verified": true
   }
 }

@@ -133,7 +133,7 @@ Python/native-clock brackets passed. None of this installs/loads a driver,
 arms display takeover, invokes a target snapshot selector or proves a desktop.
 
 The subsequent [deployment-admission record](DESKTOP-DEPLOYMENT-ADMISSION.md)
-separately records installation of the matching KDK and five unsuccessful,
+separately records installation of the matching KDK and seven unsuccessful,
 rolled-back kernel-collection admissions. The current installed driver remains
 build 37; normal AuxKC approval has not passed and the requested desktop
 diagnostic remains unconsumed. Later readbacks confirmed the owner's Terminal
@@ -159,3 +159,12 @@ Independent readback again verified the original accelerator, startup, all 24
 caches and complete 340-file live EFI after rollback. Thirteen local
 installer/channel CPU cases passed; the original one-diagnostic scope remained
 empty. The owner-login context alone has therefore not resolved cache admission.
+Two later admissions attached all standard streams directly to native owner
+Terminal for manual authentication. The sixth timed out and was independently
+rolled back. In the seventh, the owner entered the password directly; sudo
+passed, but the subsequent OS authentication again returned the biometric
+refusal with status 250. Both installers passed 16 local CPU cases. Complete
+rollback was independently verified after each, including all 24 caches and
+the 340-file live EFI. All ten production hashes remain unchanged; the original
+diagnostic scope remains empty. Neither manual input nor native standard
+streams has established a successful AuxKC approval route.

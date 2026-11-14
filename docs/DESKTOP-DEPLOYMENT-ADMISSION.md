@@ -1,8 +1,8 @@
 # Desktop deployment admission: KDK and AuxKC approval
 
 Status, 2026-11-14, after the owner's manual grants and a host reboot:
-**candidate not installed; normal GUI driver approval completed, but a fifth
-admission through ordinary Terminal sudo still met the biometric refusal;
+**candidate not installed; normal GUI driver approval completed, but the seventh
+admission with manual password entry and all streams on native Terminal still met the biometric refusal;
 no desktop diagnostic executed**. The actual host is macOS 26.7.2,
 build 25G332, x86_64. PhxBringup build 37 remains loaded and installed. The
 build-39 delivery for the [checked startup adapter](DESKTOP-STARTUP-ADAPTERS.md)
@@ -35,7 +35,7 @@ application and core exited, and effective HTTP, HTTPS, SOCKS and PAC proxies
 were independently read back as disabled, matching the original effective
 state. Other current application preferences were preserved.
 
-## Five separate cache admissions
+## Seven separate cache admissions
 
 Each admission had its own private exclusive records. None consumed the
 outstanding single desktop-diagnostic request.
@@ -47,6 +47,8 @@ outstanding single desktop-diagnostic request.
 | AuxKC-specific admission | `kmutil rebuild` | Detected one PhxAccel replacement, requested user approval, then returned `Biometry is not available.` |
 | Fresh current-boot admission after the owner's grants | `kmutil rebuild` from the ordinary owner Terminal, effective UID 501, with a real PTY | Returned `Operation not permitted` before driver approval; no existing sudo ticket was available. |
 | After normal Settings approval, with a separately reviewed admission | Fixed `sudo /usr/bin/kmutil rebuild` from the ordinary owner's Terminal, preserving the owner's login identity and controlling terminal | Normal sudo password authentication passed; the candidate replacement was detected, but the subsequent OS authentication request returned `Biometry is not available.` with status 250. |
+| First fully manual admission | Fixed `sudo -- /usr/bin/kmutil rebuild`, with all three standard streams attached directly to native owner Terminal | The bounded 480-second owner runner expired without a successful result; the consumed admission was rolled back and independently verified. |
+| Fresh fully manual admission after the owner requested reopening | Same fixed command, in a distinct native Terminal window with direct owner password entry | Sudo authentication passed and the candidate replacement was detected; the subsequent OS authentication again returned `Biometry is not available.` with status 250. |
 
 The broad second operation was a deployment-command error, not a GPU result.
 The local `kmutil(8)` manual describes `install` as updating Boot/System
@@ -287,12 +289,80 @@ Allow control. The successful password-based Settings approval and the refused
 `kmutil` authentication remain distinct observations. Repeating the same sudo
 command is not an established continuation route.
 
+### Sixth and seventh admissions with direct manual authentication
+
+The owner requested a manual authorization window. A separate sixth installer
+was prepared against synchronized source record
+`04efe7f17aa5ab0156a09fbe0d5a79dbe7063637`, preserving all previous admissions
+and the original empty diagnostic scope. All three standard streams of its
+one fixed `sudo -- /usr/bin/kmutil rebuild` command were attached directly to
+the ordinary owner's native Terminal. No agent supplied or recorded the
+password, and no command output was redirected or recorded by the runner.
+
+Sixteen isolated CPU cases passed before deployment. In addition to bundle
+replacement, verification refusal and unknown-content preservation, these
+checked fixed-command/result/identity validation, one-use dispatch, timeout,
+identity-checked child cancellation, refusal of unknown descendants, and the
+actual manual runner with inert child fixtures. They do not exercise a GPU.
+
+The sixth owner runner started at 18:20:46 +08:00 and recorded a timeout with
+status 124 at 18:28:47. The root worker completed rollback at 18:28:58. After
+the owner requested reopening the window, an independent verifier at 18:34:21
+checked the complete original accelerator and installed inputs, all 24 cache
+files and backups, no extra collections, unchanged protected staging, and
+the entire 340-file live EFI against its backup. EFI was unmounted afterward.
+The original accelerator remained cached; build 37, the boot identity, zero
+display gates, absent arming and the empty original diagnostic scope were
+unchanged. The root worker, owner runner and recorded sudo child had exited.
+The expired command and installer were not replayed.
+
+A distinct seventh admission was then prepared, with another 16 CPU cases
+passing and all deployment preconditions rechecked. Its separate native
+Terminal window was raised through a unique Accessibility target, and an
+actual screenshot verified the active `Password:` prompt. Independent
+handoff readback confirmed the temporary complete candidate accelerator,
+exact retained original bundle, original startup, empty diagnostic scope and
+live bounded root worker.
+
+The seventh command ran from 18:35:51 to 18:38:13 +08:00. The owner entered
+the password directly and reported authorization. The Terminal screenshot
+confirmed that normal sudo authentication passed: `kmutil` checked the
+AuxKC, detected one PhxAccel addition and removal, and requested user approval.
+It then returned status 250 and `Biometry is not available.` without timing
+out. A bounded read-only review of this actual request again found the
+owner's identity, the host-internal request name `HumanPresence`, and OS
+authentication error -6. These observations do not identify a stable public
+API or establish the cause of the earlier desktop failure. Direct manual
+input and native standard streams have therefore not established a working
+cache-admission route.
+
+The worker completed seventh rollback at 18:38:19. Independent readback at
+18:39:41 again verified the complete original accelerator, original installed
+inputs, all 24 cache files and backups, no additional collections, unchanged
+protected staging and the complete 340-file live EFI and backup. EFI was
+unmounted. Unfiltered cache inspection found the original accelerator and no
+candidate. Build 37 and the same boot remained active, display gates were
+zero, arming was absent, the recorded workers were gone, and the original
+diagnostic scope was still empty. No cache backup restoration was necessary.
+
+A final read-only review at 18:41:50 checked all ten tested production hashes,
+34 current packet pins and seven recovery pins. The three future installed
+candidate pins were deliberately excluded rather than reported as passing.
+The packet and all four consumed installers in the current-boot delivery were
+unchanged. The competing continuation remained absent and disabled, the
+legacy startup job was absent, and no GPU helper or reboot process was running.
+Settings still showed the existing restart-required row, with no approval
+sheet or new Allow control. No restart was clicked. Raw system logs,
+screenshots, UI trees and account identifiers remain private and ignored.
+
+### Continuation after seven admissions
+
 Any further deployment admission requires a normal OS approval path that
 actually succeeds, reviewed against then-current source, boot, GUI, live EFI,
 cache and rollback state. Do not
 substitute approval-skipping flags, raw-cache activation,
 security changes or a live driver load on the already-initialized current boot.
-Do not replay any of the five consumed installers or the earlier build-37
+Do not replay any of the seven consumed installers or the earlier build-37
 operations. A future admission must be newly reviewed against the then-current
 source, installed inputs and rollback state; the consumed installers also pin
 their original source HEAD.
