@@ -1,5 +1,11 @@
 # Authorized single desktop retest
 
+Target follow-up, 2026-11-15: **the one-shot desktop test ran and failed at its
+first native queue selection; failure recovery and a subsequent firmware-
+framebuffer boot were observed**. Both native readbacks were zero again. See
+the [target result](validation/desktop-retest-target-20261115.json) and
+[interpretation below](#target-result-and-recovery). This request is consumed.
+
 Status at preparation, 2026-11-15: **prepared and CPU-checked; activation and
 reboot not yet dispatched**. The owner requested a new desktop takeover boot
 test while questioning whether collection caused the earlier dual-zero result.
@@ -104,3 +110,62 @@ This is verified scheduling and arming, not an observed reboot or a desktop
 result. Durable private continuation records were saved before the scheduled
 restart. After the stable boot identity changes, inspect this new scope and
 its native/recovery receipts first; never re-arm or replay the packet.
+
+## Target result and recovery
+
+The scheduled ordinary reboot completed, and the installed one-shot startup
+automatically admitted the new request. Preparation, test and current boot
+identities are all distinct. The target remained on macOS 26.7.2 / build 25G332
+with bring-up build 39. The observer's one baseline snapshot returned zero,
+with `observed=0`, before firmware/power and desktop initialization. No failure
+snapshot was recorded. The baseline hash, observer-ready receipt and all four
+hash-linked coordinator journal records were independently checked.
+
+Firmware/power returned zero. The new detailed native helper then stopped at
+the first selection in the actual `desktop-init` path:
+
+```text
+ME=3 pipe=1 queue=0 VMID=0
+requested=0x0000000d write-readback=0x00000000 readback=0x00000000
+native exit=75; timed_out=false
+```
+
+The initializer adapter returned 74 to the coordinator because its native
+command failed. No later claim, display, release or monitor stage started.
+The single selector trace and helper invocation counts come from retained
+native/process records; they are not independent hardware request tracing.
+Failure does not demonstrate a checked service close or successful GPU work.
+
+The early metadata recovery worker handed off to the coordinator's armed
+worker. The coordinator requested recovery after the finite initialization
+failure, and recovery was recorded about 0.69 seconds after the failed stage
+returned, about 6.60 seconds after boot-entry admission. The 240-second
+watchdog did not expire, so this does not exercise hardware deadline recovery.
+Disarming completed, and the one recorded fallback reboot command returned
+zero. Two display cleanup writes reported unknown OIDs; AGDC and framebuffer-
+hold writes returned zero. The display cleanup process returning zero must not
+be interpreted as all four writes succeeding.
+
+Independent postboot readback observed the subsequent boot, one firmware
+framebuffer, no PhxAMDFB or accelerator instance, the exact restored off marker,
+absent one-shot/persistent markers, and no remaining startup, native helper or
+reboot job. The 188 new scope receipts were stable and their private copies
+matched. All five earlier receipt sets, 39 execution pins, eight recovery pins,
+the complete trusted runtime and six other installed inputs were unchanged.
+The selected startup file also remained exact. No driver, collection or startup
+change, extra GPU operation, rearming or reboot was performed during readback.
+
+This actual desktop path reproduced dual-zero native readback on a separate
+boot. Together with the earlier VMID result, it excludes summary parsing as
+the source of those recorded zeros. It does not exclude a native access-path
+defect, observer interference or an initialization prerequisite. The baseline
+collector ran before initialization, and the observer remained active; this
+was not a collector-free comparison. No physical cause, accelerated desktop
+or fix is established.
+
+Preserve this consumed request, its boot/stage/reboot claims and all receipts.
+Do not re-arm or replay it. Continue with offline analysis; any further target
+experiment needs its own reviewed authorization and fresh-boot/recovery plan.
+The preparation's 120 passing CPU methods are historical and were not rerun
+for this documentation-only result record. Result checks reparsed the retained
+native statuses, trace, journal chain and recovery receipts without GPU calls.
