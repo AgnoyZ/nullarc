@@ -1,7 +1,7 @@
 {
   "format": 1,
   "date": "2026-11-14",
-  "scope": "matching KDK, ten separately claimed local desktop deployment admissions, nine recoveries and independently verified next-boot build-39 installation using owner-authorized upstream create/inspect/backup/publication; no GPU diagnostic; original single-request reboot diagnostic freshly admitted, armed and scheduled with hardware result pending",
+  "scope": "matching KDK, ten local deployment admissions with nine recoveries, verified build-39 installation, and observed original single-request reboot diagnostic: initializer stopped at queue-selection readback; recovery disarmed and requested reboot, subsequent boot observed; diagnostic-detail source candidate tested but not deployed",
   "candidate_source_commit": "52188bb7c4e27559dcf4e0aec3318f067f908c57",
   "host": {
     "os_version": "26.7.2",
@@ -11,7 +11,9 @@
     "candidate_PhxBringup_build": 39,
     "candidate_currently_installed": true,
     "installed_candidate_build": 39,
-    "loaded_build_after_tenth_installation": 37
+    "loaded_build_after_tenth_installation": 37,
+    "loaded_build_after_recovery": 39,
+    "candidate_accelerator_loaded_after_recovery": true
   },
   "KDK": {
     "version": "26.7.2",
@@ -416,14 +418,14 @@
     "original_installer_CPU_cases_passed": 4,
     "post_KDK_installer_CPU_cases_passed": 4,
     "native_availability_probe_compiled_with_warnings_as_errors": true,
-    "production_source_changed_by_this_record": false,
+    "production_source_changed_by_this_record": true,
     "prior_623_test_source_validation_rerun_for_documentation": false,
     "prior_source_validation": "desktop-startup-adapters-20261114.json",
-    "new_target_snapshot_requests": 0,
-    "new_GPU_initialization_or_workload": false,
-    "display_armed": true,
+    "new_target_snapshot_requests": 1,
+    "new_GPU_initialization_or_workload": true,
+    "display_armed": false,
     "agent_requested_reboot": true,
-    "desktop_diagnostic_attempt_consumed": false,
+    "desktop_diagnostic_attempt_consumed": true,
     "desktop_or_acceleration_validated": false,
     "desktop_root_cause_confirmed": false,
     "OS_security_or_approval_bypass_used": true,
@@ -440,11 +442,12 @@
     "action_specific_no_authorization_flag_used": true,
     "action_specific_approval_skip_explicitly_authorized_by_owner": true,
     "reboot_scheduled": true,
-    "reboot_observed": false,
-    "single_boot_operational_inert_tests_passed": 10
+    "reboot_observed": true,
+    "single_boot_operational_inert_tests_passed": 10,
+    "later_diagnostic_detail_patch_native_CPU_test_methods_passed": 21
   },
-  "blocker": "One original-request reboot diagnostic is armed and scheduled; reboot and desktop results have not yet been observed. Build 39 is installed and cached, build 37 is still loaded. Acceleration and the earlier failure root cause remain unproven.",
-  "continuation": "Inspect only the original single diagnostic scope and recovery receipts after the scheduled reboot. Never replay consumed installers, this one scheduler or an already-claimed diagnostic, and never run the entry on the current initialized boot. Preserve the independent 240-second recovery deadline and operator rollback. No automatic retry.",
+  "blocker": "Original one-attempt diagnostic consumed. Build 39 and exact candidate accelerator loaded; firmware/power command returned zero, desktop-init returned 75 at queue-selection readback, before claim/display/release. Existing log lacks specific queue/readback values. A compiled but undeployed source candidate adds those details; hardware cause and repair remain unproven.",
+  "continuation": "Preserve the consumed original scope, receipts and off marker. The source change improves error detail only; it does not establish the physical cause or repair. A future target test needs a separate explicitly authorized, byte-bound one-attempt delivery with recovery review. Never replay the consumed packet or rearm automatically.",
   "owner_requested_idle_power_changes": {
     "verified_at": "2026-11-14T16:54:48.358089+08:00",
     "battery_displaysleep_minutes": 0,
@@ -767,13 +770,30 @@
     "expected_restart_approximately": "2026-11-14T19:50:22.250575+08:00",
     "scheduler_identity_independently_verified": true,
     "independent_readback_at": "2026-11-14T19:45:53.509957+08:00",
-    "restart_observed": false,
-    "desktop_diagnostic_claimed": false,
+    "restart_observed": true,
+    "desktop_diagnostic_claimed": true,
     "GPU_or_reader_run_on_current_boot": false,
     "automatic_retry": false,
     "recovery_deadline_seconds": 240,
     "kernel_or_bus_hang_recovery_guaranteed": false,
     "global_security_changed": false,
-    "public_binary_upload": false
+    "public_binary_upload": false,
+    "diagnostic_result": "initialize failed at desktop queue selection; recovery requested and a subsequent boot observed",
+    "postboot_record": "desktop-postboot-20261114.json",
+    "current_arming_absent": true,
+    "GPU_or_reader_executed_during_diagnostic_boot": true
+  },
+  "post_reboot_result": {
+    "record": "desktop-postboot-20261114.json",
+    "verified_at": "2026-11-14T19:58:45.871099+08:00",
+    "diagnostic_consumed": true,
+    "loaded_build": 39,
+    "initializer_returncode": 74,
+    "desktop_init_returncode": 75,
+    "desktop_claim_or_display_started": false,
+    "recovery_disarm_completed": true,
+    "subsequent_boot_observed": true,
+    "new_retry_or_arming": false,
+    "hardware_root_cause_or_acceleration_confirmed": false
   }
 }

@@ -1,8 +1,8 @@
 # Checked desktop startup and retained display ordering
 
-Status, 2026-11-14: **build-39 candidate installed; original single-request reboot
-diagnostic armed and scheduled; hardware result pending**. Build 37 remains
-loaded on the current boot.
+Status, 2026-11-14: **build 39 loaded; original single-request diagnostic failed
+at queue-selection readback; recovery disarmed it and a later boot is observed**.
+The one-attempt request is consumed; acceleration remains unvalidated.
 `tools/desktop_startup.py` supplies concrete commands for the [coordinator](
 ALLOCATION-STARTUP-COORDINATOR.md) and [build-39 handoff](DESKTOP-NATIVE-HANDOFF.md).
 There is no default packet, installer, arming command or automatic next attempt.
@@ -197,3 +197,17 @@ results remain unobserved in this record; inspect the original scope first on
 resumption and never silently repeat the attempt. Ten inert operational tests
 passed without GPU I/O. The unchanged 623-test source result remains CPU/source
 evidence only; independent recovery cannot cover every kernel or bus hard hang.
+
+The [observed reboot result](DESKTOP-DEPLOYMENT-ADMISSION.md#observed-reboot-result-and-recovery)
+supersedes that scheduled state. Build 39 and the candidate accelerator were
+loaded for the actual attempt. One baseline completed before initialization;
+firmware/power returned zero, then `desktop-init` returned 75 at the queue-select
+readback check. Claim/display/release/monitor were not started. Recovery disarmed
+and requested reboot; a different subsequent boot is observed. Two display
+recovery sysctls failed, so full display teardown is not inferred. No second
+target request was dispatched. The original diagnostic scope stays consumed.
+
+The source helper now includes exact selection/readback error details, covered
+by 21 sanitized native CLI/provider CPU tests and a real-framework native build.
+That change is not deployed and has no new hardware result. The original
+623-test source validation is historical; it is not a pass for this later patch.

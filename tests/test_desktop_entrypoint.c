@@ -19,6 +19,7 @@ static struct PhxBootMemory memory;
 static struct PhxDesktopLayout saved;
 static uint32_t words[0x400000 / 4], registers[0x20000], banks[16][0x20000];
 static unsigned opens, snapshots, reservations, seals, claims, writes, vwrites, reads, scheduler_bells, compute_bells, graphics_bells, closes;
+static unsigned grbm_writes;
 static int terminal;
 static int is(const char *name) { return !strcmp(fault, name); }
 static void summary(void) {
@@ -142,6 +143,12 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
         assert(input_count == 2 && output && output_count && *output_count == 1);
         ++writes; if (fail("write-status")) return 5;
         *reg((uint32_t)input[0]) = (uint32_t)input[1]; *output = input[1];
+        if (input[0] == SEG1(0x900)) {
+            ++grbm_writes;
+            if (is("select-immediate-and-readback") && grbm_writes == 1) {
+                *reg((uint32_t)input[0]) ^= 1; *output ^= 1;
+            }
+        }
         if (is("setup-readback") && input[0] == 0xde0) *output ^= 1;
         return 0;
     }
@@ -191,6 +198,12 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
         if (input[0] == SEG0(0x16bd + 17)) value = is("gart-timeout") ? 0 : 1;
         if (is("already-mes") && input[0] == SEG1(0x2807)) value = 0x0c000000;
         if (is("already-queue") && input[0] == SEG0(0x1fab)) value = 1;
+        if (input[0] == SEG1(0x900)) {
+            const char *select_faults[] = {"select-kiq", "select-scheduler", "select-compute", "select-graphics"};
+            for (unsigned i = 0; i < 4; ++i)
+                if (is(select_faults[i]) && grbm_writes == 1 + 2 * i) value ^= 1;
+            if (is("restore-selection") && grbm_writes == 2) value = 13;
+        }
         memcpy(output_data, &value, sizeof(value)); return 0;
     }
     assert(selector == SEL_DBG_VRAM_READ && input_count == 2 && input[0] + *output_size <= sizeof(words));

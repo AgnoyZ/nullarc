@@ -1,13 +1,13 @@
 # Desktop deployment admission: KDK and AuxKC publication
 
-Status, 2026-11-14, after the owner's manual grants and a host reboot:
-**build-39 candidate installed for the next boot in the tenth admission;
-exact candidate AuxKC published and independently verified; one original-request
-reboot diagnostic armed and scheduled, with no post-reboot result yet**.
+Status, 2026-11-14, after the original single-request reboot diagnostic:
+**build 39 and the exact candidate accelerator loaded; initializer stopped at
+queue-selection readback; recovery disarmed the test and a later boot is observed**.
 The actual host is macOS 26.7.2, build 25G332, x86_64.
-PhxBringup build 37 remains loaded on the current boot. The build-39 delivery
+PhxBringup build 39 is loaded on the current boot. The build-39 delivery
 for the [checked startup adapter](DESKTOP-STARTUP-ADAPTERS.md) is installed,
-with complete original rollback copies retained. This record concerns deployment admission, not the cause
+with complete original rollback copies retained. The original one-attempt
+request is consumed. This identifies the failing check, not the physical cause
 of the earlier desktop failure or evidence of acceleration.
 
 ## Matching KDK
@@ -486,3 +486,60 @@ After reboot, inspect the original scope and recovery receipts before any other
 action. Do not replay this scheduler, any installer, the initializer or a
 consumed diagnostic. An armed scheduled test remains pending hardware evidence;
 it is not an acceleration claim or proof of the earlier failure's cause.
+
+### Observed reboot result and recovery
+
+The owner reported the reboot. Read-only verification at 19:58:45 +08:00 found
+the original request's durable boot and startup claims, diagnostic identity for
+build 39, and the exact candidate accelerator image. Four startup journal
+records passed their hash-chain and identity checks. The pre-initializer
+baseline completed at **19:50:56 +08:00**, was bound to observer readiness and
+admission, and had zero observations across its seven allocation reason counts.
+This earlier baseline does not describe or explain the later failure. There
+was one snapshot invocation; no failure snapshot was saved. No replacement
+snapshot was requested during this review.
+
+The firmware/power helper returned zero and reported GFX boot readiness. The
+next `mesboot desktop-init` returned **75** with
+`desktop queue selection not confirmed; stopping (no rollback)`. Its wrapper
+returned 74, recorded `startup-stage-failed`, and requested recovery. The failing
+`desktop_idle_queue` check precedes GART/MES initialization and queue submission.
+There are no claim, display, release or monitor stage claims. The retained
+pre-initializer display history still showed the panel held, no release and
+no framebuffer server request. These are admission/failure observations, not
+executed compute or graphics completion evidence.
+
+The independent recovery had been handed from metadata discovery to the
+coordinator. Recovery was requested before watchdog expiry, completed disarming,
+and requested reboot with command status zero. Two display-recovery writes
+(`nvaccel_iop` and `nvaccelfb`) returned 1; the other two returned zero. This is
+not a claim that every display-recovery operation succeeded. A subsequent boot
+began at **19:51:20 +08:00**, with a boot identity different from the diagnostic's.
+That observation is not proof of the configured firmware fallback route.
+
+Current metadata verifies loaded build 39 and the candidate accelerator,
+absent one-shot arming, the recovery off marker present, no persistent M2 flag,
+no candidate framebuffer service, no active startup job and no GPU helper. Display sysctls
+are unavailable on this boot; they are not reported as zero. All 37 packet pins,
+seven recovery pins, the full trusted runtime, installed candidate/startup,
+retained original accelerator, exact candidate cache and all 415 unrelated
+cached records were reverified. EFI remained unmounted and was not remounted.
+The original consumed scope and all ten consumed installers remain intact.
+
+The installed error omits which of the four queue selections failed and both
+actual readbacks, so it cannot distinguish a rejected write from a later changed
+selection. A source-only diagnostic change now logs the exact ME/pipe, requested
+selection, already-returned write readback and existing later readback when
+selection or idle restoration fails. It adds no hardware I/O calls and preserves
+the existing comparison and exit 75. Twenty-one native CLI/provider test methods
+passed with address/undefined-behavior sanitizers, including six new fault cases
+in two methods. The changed helper compiled and linked against the real macOS
+IOKit/CoreFoundation frameworks. That binary was neither run nor installed;
+the deployed byte-pinned delivery remains unchanged. This improves failure
+evidence; it does not establish a hardware fix.
+
+The [sanitized postboot record](validation/desktop-postboot-20261114.json)
+records these limits and source hashes. Do not replay this consumed diagnostic,
+rearm it or reset its claims. Preserve the off marker and recovery records.
+A future target test needs a separate explicit one-attempt authorization and
+reviewed byte-bound delivery; this review dispatched no new target work or reboot.

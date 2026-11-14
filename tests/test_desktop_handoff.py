@@ -148,6 +148,38 @@ class DesktopHandoffTests(unittest.TestCase):
                 data = self.cli_case(fault, 75)
                 self.assertEqual([1, 0, 0, 0], [data[key] for key in ("compute_bells", "graphics_bells", "seals", "claims")])
 
+    def test_cli_selection_failures_report_exact_queue_and_both_readbacks(self):
+        for fault, me, pipe, requested, immediate, observed in (
+            ("select-kiq", 3, 1, 13, 13, 12),
+            ("select-scheduler", 3, 0, 12, 12, 13),
+            ("select-compute", 1, 0, 4, 4, 5),
+            ("select-graphics", 0, 0, 0, 0, 1),
+            ("select-immediate-and-readback", 3, 1, 13, 12, 12),
+        ):
+            with self.subTest(fault=fault):
+                result = subprocess.run([str(self.entrypoint), "relocated", fault, "desktop-init"],
+                                        capture_output=True, text=True, timeout=15,
+                                        env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+                self.assertEqual(75, result.returncode, result.stderr)
+                self.assertIn(f"phase=select me={me} pipe={pipe} queue=0 vmid=0 requested=0x{requested:08x} "
+                              f"write-readback=0x{immediate:08x} readback=0x{observed:08x}", result.stderr)
+                self.assertIn("desktop queue selection not confirmed", result.stderr)
+                data = json.loads(re.search(r"^fake-desktop-summary (.*)$", result.stderr, re.M)[1])
+                self.assertEqual([1, 0, 0, 0, 0, 0], [data[key] for key in
+                                 ("reservations", "vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals")])
+
+    def test_cli_restore_failure_reports_values_before_any_queue_submission(self):
+        result = subprocess.run([str(self.entrypoint), "relocated", "restore-selection", "desktop-init"],
+                                capture_output=True, text=True, timeout=15,
+                                env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+        self.assertEqual(75, result.returncode, result.stderr)
+        self.assertIn("phase=restore me=0 pipe=0 queue=0 vmid=0 requested=0x00000000 "
+                      "write-readback=0x00000000 readback=0x0000000d", result.stderr)
+        self.assertIn("desktop GRBM idle selection not confirmed", result.stderr)
+        data = json.loads(re.search(r"^fake-desktop-summary (.*)$", result.stderr, re.M)[1])
+        self.assertEqual([0, 0, 0, 0, 0], [data[key] for key in
+                         ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals")])
+
     def test_cli_graphics_failures_never_seal_or_claim(self):
         for fault in ("graphics-timeout", "graphics-scratch", "graphics-memory", "graphics-fence-high"):
             with self.subTest(fault=fault):

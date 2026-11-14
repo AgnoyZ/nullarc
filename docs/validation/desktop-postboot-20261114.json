@@ -1,0 +1,132 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "scope": "read-only post-reboot receipt verification and undeployed error-detail source candidate; original one-attempt diagnostic consumed",
+  "scheduled_source_record_commit": "8a986e8f60b57e81aff56dc42a57c6ec6339d0b4",
+  "actual_host": {
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64",
+    "current_boot_began_at": "2026-11-14T19:51:20+08:00"
+  },
+  "verified_observations": {
+    "verified_at": "2026-11-14T19:58:45.871099+08:00",
+    "attempt_consumed": true,
+    "maximum_authorized_attempts": 1,
+    "original_request_and_claim_hash_bound": true,
+    "diagnostic_build": 39,
+    "loaded_build_after_recovery": 39,
+    "OS_build": "25G332",
+    "candidate_accelerator_loaded": true,
+    "journal_records_hash_chain_verified": 4,
+    "baseline_completed_at": "2026-11-14T11:50:56.025921+00:00",
+    "baseline_observed": 0,
+    "baseline_reason_counts": {
+      "map-retirement-pending": 0,
+      "map-retirement-invalid": 0,
+      "unmap-retirement-pending": 0,
+      "unmap-retirement-invalid": 0,
+      "map-pending-overlap": 0,
+      "host-descriptor": 0,
+      "host-prepare": 0
+    },
+    "baseline_before_initializer_verified": true,
+    "snapshot_invocations": 1,
+    "failure_snapshot_invocations": 0,
+    "firmware_power_returncode": 0,
+    "desktop_init_returncode": 75,
+    "initializer_adapter_returncode": 74,
+    "failure": "desktop queue selection not confirmed",
+    "exact_queue_and_readback_values_available": false,
+    "claim_display_release_monitor_started": false,
+    "metadata_watchdog_handed_to_coordinator": true,
+    "recovery_requested_before_watchdog_expiry": true,
+    "recovery_disarm_completed": true,
+    "recovery_display_sysctl_returncodes": {
+      "nvaccel_iop": 1,
+      "nvaccelfb": 1,
+      "phxagdc": 0,
+      "phxfb_hold": 0
+    },
+    "recovery_display_success_inferred": false,
+    "fallback_reboot_command_returncode": 0,
+    "subsequent_boot_observed": true,
+    "current_boot_differs_from_attempt": true,
+    "one_shot_display_arming_absent": true,
+    "off_marker_present": true,
+    "persistent_M2_present": false,
+    "current_framebuffer_present": false,
+    "current_display_gates": "unavailable; not treated as zero",
+    "startup_job_active": false,
+    "GPU_helpers_active": false,
+    "packet_pins_reverified": 37,
+    "recovery_pins_reverified": 7,
+    "full_runtime_verified": true,
+    "candidate_and_unrelated_cached_records_exact": {
+      "candidate_image_exact": true,
+      "unrelated_extensions_exact": 415
+    },
+    "installed_candidate_startup_and_original_rollback_exact": true,
+    "EFI_unmounted": true,
+    "live_EFI_remounted": false,
+    "new_GPU_selector_reader_initializer_or_retry_dispatched": false,
+    "desktop_acceleration_or_original_root_cause_proven": false
+  },
+  "interpretation": {
+    "stopped_at": "desktop_idle_queue GRBM selection readback precondition before GART/MES initialization and queue submissions",
+    "specific_queue_and_expected_immediate_later_values_not_logged_by_installed_binary": true,
+    "baseline_zero_counts_do_not_explain_or_exonerate_later_failure": true,
+    "failure_snapshot_absent_not_synthesized_or_repeated": true,
+    "successful_firmware_command_is_not_acceleration_evidence": true,
+    "two_display_recovery_writes_failed_not_all_recovery_steps_claimed_successful": true,
+    "subsequent_boot_observed_not_equated_to_verified_firmware_fallback": true,
+    "original_desktop_failure_root_cause_confirmed": false
+  },
+  "source_candidate": {
+    "purpose": "retain exact selector arguments and existing immediate/later readbacks on selection or idle-restore failure",
+    "hardware_IO_calls_added": 0,
+    "original_readback_condition_and_exit_75_preserved": true,
+    "kernel_driver_changed": false,
+    "compiled_native_x86_64": true,
+    "real_IOKit_and_CoreFoundation_link_passed": true,
+    "native_candidate_executed": false,
+    "source_candidate_installed": false,
+    "installed_packet_binaries_modified": false,
+    "CPU_tests": 21,
+    "new_test_methods": 2,
+    "new_injected_fault_cases": 6,
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "source_sha256": {
+      "tools/phxctl/mesboot.c": "e15f061fd68b9a4dac166e9da6fda2731f67567542f32d07a73cfb22fb5b4380",
+      "tests/test_desktop_entrypoint.c": "22960c4e8f0c5f04097f7fc56d43d8e3217735e7a399cdfac94e79fa9c7ed2b7",
+      "tests/test_desktop_handoff.py": "c91d813fe39c0c06eac538e609c33743e57ceba1b234aa079f8d900547b60eeb"
+    }
+  },
+  "validation_boundary": {
+    "prior_623_test_result_historical_not_rerun_or_relabelled": true,
+    "new_live_snapshot_requests_by_postboot_review": 0,
+    "new_GPU_initialization_or_target_execution_by_postboot_review": false,
+    "original_scope_or_consumed_claims_modified": false,
+    "NVRAM_rearmed": false,
+    "reboot_requested_by_postboot_review": false,
+    "EFI_mounted_or_modified": false,
+    "OS_security_changed": false,
+    "binary_publication": false,
+    "raw_logs_identifiers_addresses_or_personal_configuration_published": false
+  },
+  "continuation": "Preserve the consumed original scope, receipts and off marker. The source change improves error detail only; it does not establish the physical cause or repair. A future target test needs a separate explicitly authorized, byte-bound one-attempt delivery with recovery review. Never replay the consumed packet or rearm automatically.",
+  "synchronization_proxy": {
+    "at": "2026-11-14T20:03:28.310941+08:00",
+    "preexisting_FlClash_application": true,
+    "preexisting_FlClash_core": false,
+    "temporary_proxy_helper_refused_before_preferences_or_process_changes": true,
+    "local_proxy_listener_available": false,
+    "direct_repository_connection_verified": true,
+    "synchronization_route": "direct git HTTPS; no application or proxy changes",
+    "application_preferences_or_system_proxy_changed": false,
+    "existing_application_started_or_stopped": false
+  }
+}
