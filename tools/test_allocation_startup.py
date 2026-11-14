@@ -9,7 +9,7 @@ import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-REFERENCE_SHA256 = '6c0271c306b8edbe0bc5b294794a8f47480a6bd25eae9c0a9207471f8fd794d8'
+REFERENCE_SHA256 = 'fb8c0e966986a7870683726737a2355fe8de2de6f049ab11c74e6759c58aace3'
 START = 'touch "$MARK"; sync\napps_only\n'
 END = 'for i in $(seq 1 20); do ioreg -rc NMXAccel'
 
@@ -22,6 +22,7 @@ event() { printf '%s\n' "$1" >&9; }
 touch() { event marker-touch; }
 sync() { event sync; }
 apps_only() { event apps-only; }
+release() { event release-fake; }
 nvram() { event nvram-fake; }
 nv_commit() { event nvram-commit-fake; }
 rm() { event remove-marker-fake; }
@@ -68,7 +69,12 @@ def extract(raw):
     recovery_end = text.index('\n}\n', recovery_start) + 3
     require(text.rindex('[ $M2 = 1 ] && watch_hangs') > end and
             text.index('watch_hangs() {') > end, 'Review changed recovery control flow')
-    return {'startup.inc': text[start:end], 'recovery.inc': text[recovery_start:recovery_end]}
+    failure_opening = 'startup_fail() {\n'
+    require(text.count(failure_opening) == 1, 'Failure extraction anchor')
+    failure_start = text.index(failure_opening)
+    failure_end = text.index('\n}\n', failure_start) + 3
+    return {'startup.inc': text[start:end], 'recovery.inc': text[recovery_start:recovery_end],
+            'failure.inc': text[failure_start:failure_end]}
 
 
 def write_private(path, content, executable=False):
@@ -81,7 +87,7 @@ def events(path):
     return path.read_text().splitlines() if path.exists() else []
 
 
-def run_case(root, name, fragment, *, initializer=0, claim=0, matching=True, block=''):
+def run_case(root, name, fragment, *, initializer=0, claim=0, matching=True, block='', m2=False):
     folder = root / name
     folder.mkdir(mode=0o700)
     gpu = folder / 'fake-inputs'
@@ -99,7 +105,8 @@ def run_case(root, name, fragment, *, initializer=0, claim=0, matching=True, blo
     env = {'SAFE_TEST': 'allocation-startup-cpu-only', 'SAFE_ROOT': str(gpu), 'G': str(gpu),
            'TRACE': str(trace), 'PATH': str(empty_path), 'HOME': str(folder), 'LC_ALL': 'C',
            'MARK': str(folder / 'unused-marker'), 'INIT_STATUS': str(initializer),
-           'CLAIM_STATUS': str(claim), 'EMIT_MATCH': '1' if matching else '0', 'BLOCK': block}
+           'CLAIM_STATUS': str(claim), 'EMIT_MATCH': '1' if matching else '0', 'BLOCK': block,
+           'M2': '1' if m2 else '0'}
     child = subprocess.Popen(['/bin/bash', '--noprofile', '--norc', str(script)],
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                              env=env, start_new_session=True)
@@ -127,17 +134,28 @@ def run_case(root, name, fragment, *, initializer=0, claim=0, matching=True, blo
     write_private(folder / 'stderr-private.log', stderr)
     trace.chmod(0o600)
     trail = events(trace)
-    require(child.returncode == 0 and 'unsafe-call' not in trail and not stderr, 'Unexpected fake fragment result')
+    expected_status = initializer or claim
+    require(child.returncode == expected_status and 'unsafe-call' not in trail and not stderr,
+            'Unexpected fake fragment status/command')
     if name == 'blocked-recovery-sysctl':
         require('shutdown-fake' not in before_release and 'nvram-fake' not in before_release,
                 'Recovery advanced past blocked fake sysctl')
         require(trail[-1] == 'shutdown-fake', 'Fake recovery did not complete after release')
     else:
         require('initializer-exit:' + str(initializer) in trail and
-                'claim-exit:' + str(claim) in trail and
-                ('grep-exit:0' if matching else 'grep-exit:1') in trail and
-                trail[-1] == 'sysctl-exit',
-                'Expected current source continuation')
+                ('grep-exit:0' if matching else 'grep-exit:1') in trail, 'Initializer/filter evidence missing')
+        require(('claim-enter' in trail) == (initializer == 0), 'Claim reached after failed initializer')
+        if not initializer:
+            require('claim-exit:' + str(claim) in trail, 'Claim status missing')
+        if expected_status:
+            if m2:
+                require(trail[-1] == 'shutdown-fake' and trail.count('sysctl-enter') == 1,
+                        'M2 failure did not take only existing fake recovery')
+            else:
+                require('sysctl-enter' not in trail and trail[-2:] == ['release-fake', 'remove-marker-fake'],
+                        'Firmware failure continued setup or skipped cleanup')
+        else:
+            require(trail[-1] == 'sysctl-exit', 'Successful source did not reach later setup')
         if block == 'initializer':
             require('claim-enter' not in before_release and 'sysctl-enter' not in before_release,
                     'Initializer block did not serialize startup')
@@ -159,12 +177,17 @@ def exercise(out, source=ROOT / 'tools/phxctl/phxboot.sh'):
     out.mkdir(mode=0o700, parents=True)
     for name, text in fragments.items():
         write_private(out / name, text.encode())
-    startup = fragments['startup.inc']
+    startup = fragments['recovery.inc'] + fragments['failure.inc'] + fragments['startup.inc']
     cases = [
         run_case(out, 'successful-stubs', startup),
+        run_case(out, 'successful-without-matching-output', startup, matching=False),
         run_case(out, 'initializer-fails-with-matching-output', startup, initializer=17),
         run_case(out, 'initializer-fails-without-matching-output', startup, initializer=17, matching=False),
         run_case(out, 'claim-fails', startup, claim=23),
+        run_case(out, 'initializer-transport-fails', startup, initializer=74),
+        run_case(out, 'initializer-completion-fails', startup, initializer=75),
+        run_case(out, 'M2-initializer-fails', startup, initializer=17, m2=True),
+        run_case(out, 'M2-claim-fails', startup, claim=23, m2=True),
         run_case(out, 'blocked-initializer', startup, block='initializer'),
         run_case(out, 'blocked-claim', startup, block='claim'),
         run_case(out, 'blocked-recovery-sysctl', fragments['recovery.inc'], block='recovery'),
@@ -176,9 +199,10 @@ def exercise(out, source=ROOT / 'tools/phxctl/phxboot.sh'):
                           'tools/test_allocation_startup.py': hashlib.sha256(Path(__file__).read_bytes()).hexdigest()},
         'fragments_sha256': {name: hashlib.sha256(text.encode()).hexdigest() for name, text in fragments.items()},
         'observations': {
-            'initializer_failure_does_not_block_claim_in_reference': True,
-            'nonzero_pipeline_status_does_not_block_claim_in_reference': True,
-            'claim_failure_does_not_block_later_setup_in_reference': True,
+            'initializer_failure_blocks_claim_and_later_setup': True,
+            'initializer_status_is_independent_of_matching_output': True,
+            'claim_failure_blocks_later_setup': True,
+            'original_helper_status_reaches_firmware_and_M2_failure_exit': True,
             'startup_waits_for_initializer_and_claim': True,
             'recovery_sysctl_precedes_its_shutdown_request': True,
             'watch_hangs_definition_and_call_follow_startup': True,

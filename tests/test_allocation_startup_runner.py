@@ -29,7 +29,7 @@ class StartupSourceAuditTests(unittest.TestCase):
         before = self.reference.read_bytes()
         with redirect_stdout(StringIO()):
             result = audit.exercise(self.root / 'audit')
-        self.assertEqual(result['cases'], 7)
+        self.assertEqual(result['cases'], 12)
         self.assertTrue(result['passed'])
         self.assertTrue(all(result['observations'].values()))
         self.assertEqual(self.reference.read_bytes(), before)
@@ -38,6 +38,16 @@ class StartupSourceAuditTests(unittest.TestCase):
         self.assertFalse(result['target_services_opened'])
         self.assertFalse(result['reference_script_executed_as_a_whole'])
         self.assertFalse(result['real_sysctl_nvram_marker_or_shutdown_commands'])
+        results = {row['case']: row for row in result['results']}
+        for name, status in [('initializer-fails-with-matching-output', 17),
+                             ('initializer-fails-without-matching-output', 17),
+                             ('initializer-transport-fails', 74), ('initializer-completion-fails', 75),
+                             ('M2-initializer-fails', 17)]:
+            self.assertEqual(status, results[name]['exit_status'])
+            self.assertNotIn('claim-enter', results[name]['events'])
+        for name in ('claim-fails', 'M2-claim-fails'):
+            self.assertEqual(23, results[name]['exit_status'])
+        self.assertEqual(0, results['successful-without-matching-output']['exit_status'])
         self.assertEqual(result, json.loads((self.root / 'audit/report.json').read_text()))
 
     def test_changed_source_is_refused_before_any_child_or_output(self):
@@ -68,6 +78,8 @@ class StartupSourceAuditTests(unittest.TestCase):
         self.assertNotIn('watch_hangs', fragments['startup.inc'])
         self.assertNotIn('wait_fb', fragments['startup.inc'])
         self.assertIn('m2_fail() {', fragments['recovery.inc'])
+        self.assertIn('exit "${2:-0}"', fragments['recovery.inc'])
+        self.assertIn('startup_fail() {', fragments['failure.inc'])
 
     def test_fixture_commands_require_explicit_guard(self):
         script = self.root / 'guard.sh'

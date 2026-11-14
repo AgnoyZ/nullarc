@@ -1,9 +1,15 @@
 # Reference startup failure propagation audit
 
-Status on 2026-11-14: **additional source admission/recovery gaps confirmed;
+Historical pre-fix audit on 2026-11-14: **additional source admission/recovery gaps confirmed;
 no startup integration or target execution**. The [execution plan](ALLOCATION-EXECUTION-PLAN.md)
 still requires native delivery, recovery review and Phase A before a display
 attempt. These findings do not identify the allocation root cause.
+
+The later [caller-status correction](ALLOCATION-STARTUP-STATUS-FIX.md) adds
+explicit checks to the reference wrappers. The source pin and seven scenarios
+below describe the pre-fix revision; its retained validation remains historical.
+The current harness pins the corrected monitor and tests its failure exits.
+The initializer-compatibility and recovery-independence gaps remain open.
 
 ## Pinned source and test boundary
 

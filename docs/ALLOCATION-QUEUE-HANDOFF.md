@@ -6,6 +6,12 @@ an initializer, target read, GPU workload or restart. The
 [execution plan](ALLOCATION-EXECUTION-PLAN.md) and its native-delivery, Phase A,
 independent-recovery and fresh-execution gates remain open.
 
+This records the pre-fix caller behavior at the source commit named below.
+The later [caller-status correction](ALLOCATION-STARTUP-STATUS-FIX.md) preserves
+the helper failures through the reference wrappers. The filter-only negative
+control remains; the checked composition additionally verifies that failed
+helpers no longer reach its claim hook. Resource ownership remains unresolved.
+
 ## Actual caller inputs and prerequisites
 
 `sched_test()` initializes the scheduler and sends its resource/query packets,
@@ -66,8 +72,9 @@ request only if the resulting pipeline status is zero:
 
 The retained compute/adoption output satisfies the filters even when the
 graphics stage failed. The hook is deliberately conditional on a successful
-filter; the actual boot source's later claim is not even guarded by that
-condition. No kernel claim or display command is executed in this fixture.
+filter; at the reviewed pre-fix commit, the boot source's later claim was not
+even guarded by that condition. No kernel claim or display command is executed
+in this fixture.
 
 The [actual-kernel-method CPU review](ALLOCATION-QUEUE-READINESS.md) separately
 shows that the current claim guard permits a compute-only software state.

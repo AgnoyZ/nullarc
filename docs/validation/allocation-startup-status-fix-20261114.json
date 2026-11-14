@@ -1,0 +1,47 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "reference-caller-status-fix; focused-fragments-passed; clean-source-full-suite-pending",
+  "documentation": "docs/ALLOCATION-STARTUP-STATUS-FIX.md",
+  "base_commit": "c65bb34e56ca5a2d8f926ce01c1e28fb7e89bc5b",
+  "correction": {
+    "full_wrapper_checks_each_direct_stage": true,
+    "pipeline_status_captured_immediately": true,
+    "helper_status_precedes_filter_status": true,
+    "failure_exits_before_watchdog_cancellation": true,
+    "initializer_failure_prevents_claim": true,
+    "claim_failure_prevents_later_setup": true,
+    "diagnostic_match_not_used_as_success": true,
+    "original_status_preserved_in_firmware_and_M2_failure_exit": true,
+    "other_recovery_callers_default_status_unchanged": true
+  },
+  "initial_focused_checks": {
+    "startup_audit_unit_methods_passed": 6,
+    "startup_source_fragment_scenarios_passed": 12,
+    "selected_status_filter_unit_methods_passed": 4,
+    "helper_filter_guard_combinations_passed": 5,
+    "both_reference_Bash_syntax_checks_passed": true
+  },
+  "clean_source_validation": {
+    "actual_fake_IO_C_guard_compositions_completed": false,
+    "full_suite_completed": false,
+    "status": "pending; no pass claimed"
+  },
+  "source_hashes": {
+    "tools/phxctl/full.sh": "6a40269868053415e6c3299c109684590fb863b8f472a9aea5f50a69b57bfe7b",
+    "tools/phxctl/phxboot.sh": "fb8c0e966986a7870683726737a2355fe8de2de6f049ab11c74e6759c58aace3"
+  },
+  "limits": {
+    "whole_reference_or_installed_workflow_executed": false,
+    "installed_startup_changed": false,
+    "kernel_C_helper_ABI_VM_budget_or_pinning_changed": false,
+    "recovery_thresholds_or_operations_changed": false,
+    "atomic_dual_queue_adoption_or_resource_ownership_fixed": false,
+    "safe_complete_initializer_or_independent_recovery_proven": false,
+    "native_candidate_or_EFI_rollback_packet_changed": false,
+    "target_snapshot_requests": 0,
+    "GPU_work_arming_or_reboot": false,
+    "allocation_root_cause_confirmed": false,
+    "actual_reboot_session_resume_verified": false
+  }
+}

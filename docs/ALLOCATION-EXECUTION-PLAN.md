@@ -83,6 +83,11 @@ independent recovery.
 The [reference startup audit](ALLOCATION-STARTUP-AUDIT.md) found a further
 admission gap in pinned source fragments: failed initialization or claim can
 still reach later setup, because their statuses are not explicitly checked.
+The subsequent [source caller-status fix](ALLOCATION-STARTUP-STATUS-FIX.md)
+adds those checks and preserves helper failures through the nested wrapper.
+It does not supply a compatible initializer, baseline admission, transactional
+queue handoff or independent recovery; the reference scripts remain unapproved
+for execution.
 The recovery function also has serial helper dependencies, although its AGDC
 handler schedules teardown work without explicitly waiting for that worker.
 The audit's command fakes characterize source control flow; they do not prove

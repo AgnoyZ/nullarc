@@ -34,7 +34,15 @@ all_apps() { { printf '# phxboot: Metal for every app%s\n' "$1"; for d in $DENY;
 m2_fail() {
     echo "M2 failed ($1): PhxAMDFB off, rebooting"
     apps_only; sysctl -w debug.phxagdc=0 >/dev/null 2>&1
-    nvram -d phxfb-boot; nv_commit; rm -f "$MARK" $G/phxboot-m2; sync; shutdown -r now; exit 0
+    nvram -d phxfb-boot; nv_commit; rm -f "$MARK" $G/phxboot-m2; sync; shutdown -r now; exit "${2:-0}"
+}
+# Stop before claim/display setup while preserving the failed helper's status.
+# This does not make the reference initializer or its recovery independent/safe to deploy.
+startup_fail() {
+    local status=$2
+    [ "$M2" = 1 ] && m2_fail "$1 failed (status $status)" "$status"
+    echo "$1 failed (status $status): stopping startup"
+    release; rm -f "$MARK"; exit "$status"
 }
 # PhxAMDFB comes from the Aux KC, which loads well after PhxBringup: wait for the panel's framebuffer (PhxAMDFB, or
 # IONDRV when PhxAMDFB was not armed) before telling which one took it
@@ -54,7 +62,9 @@ echo "PhxAMDFB on the panel: $M2"
 touch "$MARK"; sync
 apps_only
 MC=1 CS=1 ADOPT=1 GFX=1 AG=1 bash $G/full.sh kiqsched | grep -E "^compute:|^gfx:|adopt"
-$G/phxctl/mesboot claim
+init_status=${PIPESTATUS[0]}
+[ "$init_status" -eq 0 ] || startup_fail "initialization" "$init_status"
+$G/phxctl/mesboot claim || { claim_status=$?; startup_fail "claim" "$claim_status"; }
 # no BO cache flushing per submit/wait (the GPU maps system memory snooped): 41 fps window drag instead of 13, and no
 # artifacts seen (2026-10-20)
 sysctl -w debug.phxbos_flush=0 >/dev/null 2>&1

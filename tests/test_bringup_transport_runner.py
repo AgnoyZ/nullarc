@@ -15,9 +15,45 @@ sys.path.insert(0, str(ROOT / "tools"))
 from test_bringup_transport import cases, check_case, exercise, compile_native, completion_cases, check_completion_case
 from test_bringup_transport import submission_cases, check_submission_case
 from test_bringup_transport import handoff_cases, check_handoff_case, extract_handoff_filters, check_handoff_pipeline
+from test_bringup_transport import extract_handoff_guards, check_guarded_handoff, PIPELINE_GUARD, INITIALIZER_GUARD
 
 
 class TransportRunnerTests(unittest.TestCase):
+    def test_pipeline_guard_preserves_helper_failure_and_rejects_filter_failure(self):
+        full = (ROOT / 'tools/phxctl/full.sh').read_text()
+        boot = (ROOT / 'tools/phxctl/phxboot.sh').read_text()
+        guard, _ = extract_handoff_guards(full, boot)
+        script = ('helper() { printf "fixture\\n"; return "$1"; }\n'
+                  'tail() { while IFS= read -r line; do :; done; return "$1"; }\n'
+                  'helper "$1" | tail "$2"\n' + guard + 'printf "fake-watchdog-cancel\\n"\n')
+        for helper, filtering, expected in ((0, 0, 0), (74, 0, 74), (75, 0, 75), (75, 19, 75), (0, 19, 19)):
+            with self.subTest(helper=helper, filtering=filtering):
+                result = subprocess.run(['/bin/bash', '--noprofile', '--norc', '-c', script,
+                                         'fake-pipeline', str(helper), str(filtering)],
+                                        capture_output=True, text=True, timeout=3,
+                                        env={'PATH': '/usr/bin:/bin', 'LC_ALL': 'C'})
+                self.assertEqual(expected, result.returncode, result.stderr)
+                self.assertEqual(expected == 0, 'fake-watchdog-cancel\n' in result.stdout)
+
+    def test_immediate_source_status_guards_are_required(self):
+        full = (ROOT / 'tools/phxctl/full.sh').read_text()
+        boot = (ROOT / 'tools/phxctl/phxboot.sh').read_text()
+        self.assertEqual((PIPELINE_GUARD, INITIALIZER_GUARD), extract_handoff_guards(full, boot))
+        for a, b in ((full.replace(PIPELINE_GUARD, '', 1), boot),
+                     (full.replace(PIPELINE_GUARD, PIPELINE_GUARD.replace('[0]', '[1]')), boot),
+                     (full, boot.replace(INITIALIZER_GUARD, 'true\n'))):
+            with self.assertRaises(RuntimeError): extract_handoff_guards(a, b)
+
+    def test_checked_caller_requires_original_status_and_no_claim_on_failure(self):
+        for status in (0, 74, 75):
+            text = 'fake-claim-requested\n' if status == 0 else f'fake-startup-failed:{status}\n'
+            result = subprocess.CompletedProcess([], status, text, '')
+            self.assertEqual(status == 0, check_guarded_handoff(result, status)['claim_hook_requested'])
+            for invalid in (subprocess.CompletedProcess([], 0 if status else 74, text, ''),
+                            subprocess.CompletedProcess([], status, text + 'fake-claim-requested\n', ''),
+                            subprocess.CompletedProcess([], status, '', '')):
+                with self.assertRaises(RuntimeError): check_guarded_handoff(invalid, status)
+
     def test_handoff_cases_cover_partial_graphics_failure_and_both_adoption_refusals(self):
         self.assertEqual({'ok', 'gfx-timeout', 'gfx-wrong-scratch', 'gfx-wrong-memory',
                           'compute-adopt-status', 'gfx-adopt-status'}, set(handoff_cases()))
@@ -62,6 +98,10 @@ class TransportRunnerTests(unittest.TestCase):
         self.assertEqual(52, len(report['fault_injection_cases_passed']))
         self.assertEqual(20, len(report['completion_path_cases_passed']))
         self.assertEqual(16, len(report['submission_boundary_cases_passed']))
+        for row in report['actual_handoff_cases_passed']:
+            checked = row['checked_source_composition']
+            self.assertEqual(row['actual_mesboot_returncode'], checked['caller_status'])
+            self.assertEqual(row['case'] == 'ok', checked['claim_hook_requested'])
 
     def test_submission_rejection_has_no_transport_or_state_changes(self):
         data = {"calls": 0, "ring_writes": 0, "wptr": 897, "seq": 0}

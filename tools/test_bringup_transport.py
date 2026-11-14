@@ -171,6 +171,27 @@ def extract_handoff_filters(full, boot):
     return tail, grep
 
 
+PIPELINE_GUARD = '''pipeline_status=( "${PIPESTATUS[@]}" )
+[ "${pipeline_status[0]}" -eq 0 ] || exit "${pipeline_status[0]}"
+[ "${pipeline_status[1]}" -eq 0 ] || exit "${pipeline_status[1]}"
+'''
+INITIALIZER_GUARD = '''init_status=${PIPESTATUS[0]}
+[ "$init_status" -eq 0 ] || startup_fail "initialization" "$init_status"
+'''
+
+
+def extract_handoff_guards(full, boot):
+    """Pin the immediate status checks separately from diagnostic output filters."""
+    extract_handoff_filters(full, boot)
+    full_row = next(line for line in full.splitlines() if 'MESBOOT_CS=$CS' in line and 'ADOPT_GFX=$AG' in line)
+    boot_row = next(line for line in boot.splitlines() if line.startswith('MC=1 CS=1 ADOPT=1 GFX=1 AG=1 bash '))
+    if full.count(PIPELINE_GUARD) != 4 or full_row + '\n' + PIPELINE_GUARD not in full:
+        raise RuntimeError('Initializer pipeline status guards changed; re-audit before execution')
+    if boot_row + '\n' + INITIALIZER_GUARD not in boot:
+        raise RuntimeError('Boot initializer status guard changed; re-audit before execution')
+    return PIPELINE_GUARD, INITIALIZER_GUARD
+
+
 def check_handoff_pipeline(result):
     # The marker is a file-free test hook, not a kernel claim or a display command.
     if result.returncode != 0 or result.stdout.count('fake-claim-requested\n') != 1:
@@ -178,6 +199,17 @@ def check_handoff_pipeline(result):
     if 'fake-filter-status=0\n' not in result.stdout or 'compute:' not in result.stdout:
         raise RuntimeError('Expected retained compute output and a successful filter')
     return {'filter_status': 0, 'claim_hook_requested': True, 'kernel_claim_executed': False}
+
+
+def check_guarded_handoff(result, expected_status):
+    claims = result.stdout.count('fake-claim-requested\n')
+    failures = result.stdout.count('fake-startup-failed:')
+    if result.returncode != expected_status or claims != (expected_status == 0) or failures != (expected_status != 0):
+        raise RuntimeError('Checked source caller lost the helper status or continued after failure')
+    if expected_status and f'fake-startup-failed:{expected_status}\n' not in result.stdout:
+        raise RuntimeError('Checked source caller changed the failure status')
+    return {'caller_status': result.returncode, 'claim_hook_requested': bool(claims),
+            'kernel_claim_executed': False}
 
 
 def exercise(out):
@@ -211,6 +243,7 @@ def exercise(out):
     full = (ROOT / 'tools/phxctl/full.sh').read_text()
     boot = (ROOT / 'tools/phxctl/phxboot.sh').read_text()
     tail, grep = extract_handoff_filters(full, boot)
+    full_guard, boot_guard = extract_handoff_guards(full, boot)
     shell_environment = os.environ.copy()
     for key in ('BASH_ENV', 'ENV', 'SHELLOPTS', 'BASHOPTS'):
         shell_environment.pop(key, None)
@@ -224,8 +257,18 @@ def exercise(out):
         filtered = subprocess.run(['bash', '--noprofile', '--norc', '-c', script,
                                    'fake-handoff', str(binary), fault],
                                   capture_output=True, text=True, timeout=10, env=shell_environment)
+        # Execute only exact extracted guards and filters around the actual fake-I/O C helper.
+        # startup_fail is a file-free terminal hook, never the reference recovery implementation.
+        guarded_script = ('initializer() {\n"$1" handoff "$2" 2>&1 | ' + tail + '\n' + full_guard + '}\n'
+                          'startup_fail() { printf "fake-startup-failed:%s\\n" "$2"; exit "$2"; }\n'
+                          'initializer "$1" "$2" | ' + grep + '\n' + boot_guard +
+                          'printf "fake-claim-requested\\n"\n')
+        guarded = subprocess.run(['bash', '--noprofile', '--norc', '-c', guarded_script,
+                                  'fake-checked-handoff', str(binary), fault],
+                                 capture_output=True, text=True, timeout=10, env=shell_environment)
         handoffs.append({'case': fault, 'actual_mesboot_returncode': result.returncode,
-                         **observed, 'source_filter_composition': check_handoff_pipeline(filtered)})
+                         **observed, 'source_filter_composition': check_handoff_pipeline(filtered),
+                         'checked_source_composition': check_guarded_handoff(guarded, result.returncode)})
     report = {"source_provenance": provenance, "fault_injection_cases_passed": passed,
               "completion_path_cases_passed": completions,
               "submission_boundary_cases_passed": submissions,
@@ -237,7 +280,7 @@ def exercise(out):
                    'tools/phxctl/phxboot.sh', 'tests/test_bringup_transport.c', 'tools/test_bringup_transport.py')},
               "transport_backend": "fake IOKit; actual patched mesboot source",
               "hardware_executed": False, "driver_runtime_tested": False,
-              "limitation": "Injected transport/completion observations test actual userspace control flow, not GPU execution or packet correctness. Handoff tests execute sched_test with both queues and exact extracted tail/grep filters, not startup scripts, native kernel adoption, kernel claim or display/recovery."}
+              "limitation": "Injected transport/completion observations test actual userspace control flow, not GPU execution or packet correctness. Handoff tests execute sched_test with both queues, extracted filters and immediate status guards, not whole startup scripts, native kernel adoption, kernel claim or real display/recovery. Filter-only compositions remain negative controls; the checked caller now rejects failed helpers."}
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2), flush=True)
     return report
