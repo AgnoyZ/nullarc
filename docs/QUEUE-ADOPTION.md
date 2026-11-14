@@ -1,5 +1,10 @@
 # Kernel queue adoption
 
+Build 38 additionally [refuses full accelerator claim](DESKTOP-CLAIM-FIX.md)
+until both compute and graphics queues have been adopted. This does not
+change adoption geometry, the six-scalar ABI, aggregate activity flags or
+the hardware/ownership limits described below.
+
 Patch `0017-checked-queue-adoption.patch` changes the existing
 `PhxBringup::adoptQueue` implementation used by debug selector 112. It does not
 change the six-scalar ABI or automatically hand a probe queue to the kernel.

@@ -1,5 +1,11 @@
 # Allocation queue-readiness evidence contract
 
+Historical characterization of the pre-build-38 claim policy. The subsequent
+[build-38 correction](DESKTOP-CLAIM-FIX.md) requires both adopted engines
+before claim; the aggregate activity predicate and the evidence limitations
+below are unchanged. The table's successful single-engine claims describe
+the old source, not the corrected candidate.
+
 Status, 2026-11-14: **actual-source CPU characterization with fake memory,
 locks and PCI publication only**. The allocation root cause remains
 unconfirmed. No production method, ABI, layout guard or claim policy changes

@@ -90,6 +90,9 @@ adds those checks and preserves helper failures through the nested wrapper.
 It does not supply a compatible initializer, baseline admission, transactional
 queue handoff or independent recovery; the reference scripts remain unapproved
 for execution.
+The later [build-38 claim correction](DESKTOP-CLAIM-FIX.md) rejects a partial
+engine handoff in the kernel as well. It remains an uninstalled source
+candidate and does not satisfy those other admission or hardware gates.
 The recovery function also has serial helper dependencies, although its AGDC
 handler schedules teardown work without explicitly waiting for that worker.
 The audit's command fakes characterize source control flow; they do not prove

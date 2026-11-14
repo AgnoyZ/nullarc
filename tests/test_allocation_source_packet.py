@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -37,6 +38,14 @@ class SourcePacketTests(unittest.TestCase):
                 shutil.copytree(source, target)
             else:
                 shutil.copy2(source, target)
+        # This temporary repository supplies a synthetic review commit, not the real
+        # historical review. Keep its positive fixture on the exporter's fixed build 37
+        # without requiring historical Git objects in shallow CI checkouts.
+        kernel = self.root / 'src/phxbringup/PhxBringup.cpp'
+        source, replacements = re.subn(r'^#define PHX_KEXT_BUILD [0-9]+u$',
+                                       '#define PHX_KEXT_BUILD 37u', kernel.read_text(), flags=re.M)
+        self.assertEqual(replacements, 1)
+        kernel.write_text(source)
         self.commit()
         self.reviewed = self.head()
         self.out = self.root / 'build/packet'
@@ -56,7 +65,7 @@ class SourcePacketTests(unittest.TestCase):
         return packet.export_packet(kwargs.pop('out', self.out), kwargs.pop('commit', self.head()),
                                     self.root, reviewed=kwargs.pop('reviewed', self.reviewed), **kwargs)
 
-    def test_actual_source_export_matches_git_blobs_modes_checksums_and_limits(self):
+    def test_synthetic_reviewed_export_matches_git_blobs_modes_checksums_and_limits(self):
         result = self.export()
         self.assertTrue(result['source_only'])
         self.assertFalse(result['target_binary_included'])
@@ -213,6 +222,18 @@ class SourcePacketTests(unittest.TestCase):
         self.commit()
         with self.assertRaisesRegex(packet.PacketError, 'Unreviewed SDK pin'):
             self.export(reviewed=self.head())
+
+    def test_new_kernel_build_does_not_reuse_build37_review(self):
+        path = self.root / 'src/phxbringup/PhxBringup.cpp'
+        original = path.read_text()
+        self.assertIn('#define PHX_KEXT_BUILD 37u', original)
+        path.write_text(original.replace('#define PHX_KEXT_BUILD 37u', '#define PHX_KEXT_BUILD 38u'))
+        self.commit()
+        with self.assertRaisesRegex(packet.PacketError, 'changed since reviewed snapshot'):
+            self.export()
+        with self.assertRaisesRegex(packet.PacketError, 'Not reviewed build37 source'):
+            self.export(reviewed=self.head())
+        self.assertFalse(self.out.exists())
 
     def test_checkout_change_during_export_is_refused_before_output(self):
         original = packet.checked_archive

@@ -14,7 +14,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from prepare_source import prepare
-from test_queue_adoption import CASES, READINESS_CASES, check_result, exercise, extract_source, extract_readiness_source
+from test_queue_adoption import CASES, CLAIM_CASES, READINESS_CASES, check_result, exercise, extract_source, extract_readiness_source
 
 
 class QueueAdoptionRunnerTests(unittest.TestCase):
@@ -50,6 +50,8 @@ class QueueAdoptionRunnerTests(unittest.TestCase):
             self.assertIn('PhxBringup::' + name + '(', methods)
         self.assertEqual(8, len(READINESS_CASES))
         self.assertTrue(set(READINESS_CASES).issubset(CASES))
+        self.assertEqual(7, len(CLAIM_CASES))
+        self.assertTrue(set(CLAIM_CASES).issubset(CASES))
 
     def test_readiness_extraction_rejects_missing_or_duplicate_actual_source(self):
         for source in (self.source * 2,
@@ -65,6 +67,7 @@ class QueueAdoptionRunnerTests(unittest.TestCase):
             result = exercise(Path(directory) / 'audit')
         self.assertEqual(set(CASES), {row['case'] for row in result['cases']})
         self.assertEqual(list(READINESS_CASES), result['readiness_cases'])
+        self.assertEqual(list(CLAIM_CASES), result['claim_cases'])
         self.assertEqual(extract_readiness_source(self.source)[2], result['actual_readiness_source_sha256'])
         self.assertFalse(result['hardware_executed'])
         self.assertFalse(result['kernel_loaded'])

@@ -29,7 +29,11 @@ READINESS_CASES = (
     'readiness-identity-collision', 'readiness-stopping-retained', 'readiness-missing-pci',
     'readiness-zero-submission',
 )
-CASES += READINESS_CASES
+CLAIM_CASES = (
+    'claim-both-reverse-adoption', 'claim-compute-adoption-refused', 'claim-graphics-adoption-refused',
+    'claim-no-gpu-lock', 'claim-no-pci', 'claim-stopping-both', 'claim-stop-at-lock',
+)
+CASES += READINESS_CASES + CLAIM_CASES
 
 
 def extract_source(source):
@@ -92,6 +96,7 @@ def exercise(out):
               'actual_queue_structure_sha256': hashlib.sha256(struct.encode()).hexdigest(),
               'actual_readiness_source_sha256': readiness_hashes,
               'readiness_cases': list(READINESS_CASES),
+              'claim_cases': list(CLAIM_CASES),
               'cases': results, 'hardware_executed': False, 'kernel_loaded': False,
               'limitation': 'Actual adoption, gpuReady, claimAccel and bootMemory with host memory/locks and fake PCI property/matching. Readiness cases also use the actual queue-selection and bootstrap arithmetic headers. No kernel load, target ownership, hardware idle, HQD, GART, scheduler execution, actual stop path, concurrency or display verification.'}
     inputs = [ROOT / 'src/phxbringup/PhxBringup.cpp', ROOT / 'src/phxbringup/PhxBootMemory.h',

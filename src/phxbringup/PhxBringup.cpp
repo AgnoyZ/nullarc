@@ -36,7 +36,7 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
 #include "PhxBoPolicy.hpp"
 #include "PhxAllocationDiagnostic.hpp"
 
-#define PHX_KEXT_BUILD 37u
+#define PHX_KEXT_BUILD 38u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -1111,7 +1111,14 @@ IOReturn PhxBringup::adoptQueue(const uint64_t in[6]) {
 // PhxAccel (the NullMoth accelerator in its AMD configuration) starts only on a GPU marked as driven; matching is
 // re-run so the accelerator personality, refused at boot, is offered the device again.
 IOReturn PhxBringup::claimAccel() {
-    if (!pci || !gpuReady())
+    if (!pci || !gpuLock)
+        return kIOReturnNotReady;
+    // gpuReady means any adopted engine is available for native experiments. PhxAccel exposes
+    // both graphics and compute, so a partial handoff must not publish the full accelerator.
+    IOLockLock(gpuLock);
+    const bool ready = gpuReady() && gq[0].ready && gq[1].ready;
+    IOLockUnlock(gpuLock);
+    if (!ready)
         return kIOReturnNotReady;
     pci->setProperty("nmxgpu-claimed", kOSBooleanTrue);
     pci->registerService();

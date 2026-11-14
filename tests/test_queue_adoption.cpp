@@ -11,7 +11,12 @@ using IOReturn = int;
 enum { kIOReturnSuccess, kIOReturnBadArgument, kIOReturnNotReady, kIOReturnExclusiveAccess };
 static unsigned depth = 0, acquisitions = 0;
 struct FakeLock { unsigned rank; bool held{false}; };
-static void IOLockLock(FakeLock *p) { assert(p && !p->held && p->rank == depth + 1); p->held = true; ++depth; ++acquisitions; }
+static void (*afterLock)(FakeLock *) = nullptr;
+static void IOLockLock(FakeLock *p) {
+    assert(p && !p->held && p->rank == depth + 1);
+    p->held = true; ++depth; ++acquisitions;
+    if (afterLock) afterLock(p);
+}
 static void IOLockUnlock(FakeLock *p) { assert(p && p->held && p->rank == depth); p->held = false; --depth; }
 static void IOLog(const char *, ...) {}
 struct FakeMap {
@@ -30,7 +35,7 @@ struct FakePci {
         assert(!std::strcmp(name, "nmxgpu-claimed") && value == kOSBooleanTrue);
         ++properties;
     }
-    void registerService() { assert(properties); ++registrations; }
+    void registerService() { assert(properties && depth == 0); ++registrations; }
 };
 class PhxBringup {
 public:
@@ -103,8 +108,8 @@ static void readinessCase(const std::string &test) {
         PhxBringup graphics, both;
         prepareReadinessFixture(graphics); prepareReadinessFixture(both);
         adopt(p, false); adopt(graphics, true); adopt(both, false); adopt(both, true);
-        const auto computeState = snapshotAndClaim(p, true, kIOReturnSuccess);
-        const auto graphicsState = snapshotAndClaim(graphics, true, kIOReturnSuccess);
+        const auto computeState = snapshotAndClaim(p, true, kIOReturnNotReady);
+        const auto graphicsState = snapshotAndClaim(graphics, true, kIOReturnNotReady);
         const auto bothState = snapshotAndClaim(both, true, kIOReturnSuccess);
         assert(!p.gq[1].ready && !graphics.gq[0].ready && both.gq[0].ready && both.gq[1].ready);
         assert(std::memcmp(&computeState, &graphicsState, sizeof(computeState)) == 0);
@@ -136,7 +141,8 @@ static void readinessCase(const std::string &test) {
         return;
     }
     if (test == "readiness-missing-pci") p.pci = nullptr;
-    const auto state = snapshotAndClaim(p, true, p.pci ? kIOReturnSuccess : kIOReturnNotReady);
+    const auto state = snapshotAndClaim(p, true,
+        p.pci && p.gq[0].ready && p.gq[1].ready ? kIOReturnSuccess : kIOReturnNotReady);
     assert(!phxGartLayoutValid(&layout, &state)); // Preserve the pre-initialization validator's active-queue refusal.
     if (test == "readiness-zero-submission") {
         assert(p.gSeq == 0 && p.gq[0].head == p.gq[0].tail && p.gq[0].retiredSeq == 0);
@@ -148,9 +154,55 @@ static void readinessCase(const std::string &test) {
     }
 }
 
+static PhxBringup *claimTarget = nullptr;
+static void stopAtClaimLock(FakeLock *lock) {
+    assert(claimTarget && lock == claimTarget->gpuLock && depth == 1);
+    claimTarget->stopping = true;
+    afterLock = nullptr;
+}
+
+static void claimCase(const std::string &test) {
+    PhxBringup p;
+    adopt(p, test == "claim-compute-adoption-refused" || test == "claim-both-reverse-adoption");
+    if (test == "claim-compute-adoption-refused" || test == "claim-graphics-adoption-refused") {
+        // The second engine's ring and writeback overlap. Actual adoption must refuse it;
+        // its peer's accepted state must not let the incomplete accelerator match WindowServer.
+        const uint64_t refused[6] = {0x50000, 1024, 0x50000, 0x20, 13,
+            test == "claim-compute-adoption-refused" ? 0x53000ull : 0x53001ull};
+        assert(p.adoptQueue(refused) == kIOReturnBadArgument);
+    } else {
+        adopt(p, test != "claim-both-reverse-adoption");
+    }
+    if (test == "claim-no-gpu-lock") p.gpuLock = nullptr;
+    else if (test == "claim-no-pci") p.pci = nullptr;
+    else if (test == "claim-stopping-both") p.stopping = true;
+    else if (test == "claim-stop-at-lock") {
+        claimTarget = &p;
+        afterLock = stopAtClaimLock;
+    }
+    const bool accepted = test == "claim-both-reverse-adoption";
+    const auto memory = p.memory.words, bells = p.bells.words;
+    unsigned char queues[sizeof(p.gq)]; std::memcpy(queues, p.gq, sizeof(p.gq));
+    const unsigned accesses = p.memory.accesses, flushes = p.flushes, locks = acquisitions;
+    assert(p.claimAccel() == (accepted ? kIOReturnSuccess : kIOReturnNotReady));
+    assert(p.device.properties == (accepted ? 1u : 0u) && p.device.registrations == (accepted ? 1u : 0u));
+    assert(acquisitions == locks + (p.pci && p.gpuLock ? 1u : 0u));
+    assert(depth == 0 && !p.gpuMutex.held && !p.smuMutex.held);
+    assert(p.memory.accesses == accesses && p.flushes == flushes);
+    assert(p.memory.words == memory && p.bells.words == bells);
+    assert(std::memcmp(queues, p.gq, sizeof(p.gq)) == 0);
+    assert(afterLock == nullptr);
+    claimTarget = nullptr;
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     const std::string test = argv[1];
+    if (test.rfind("claim-", 0) == 0) {
+        claimCase(test);
+        std::cout << "{\"case\":\"" << test << "\",\"passed\":true,\"hardware_executed\":false}\n";
+        return 0;
+    }
     if (test.rfind("readiness-", 0) == 0) {
         readinessCase(test);
         std::cout << "{\"case\":\"" << test << "\",\"passed\":true,\"hardware_executed\":false}\n";
