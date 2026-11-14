@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-14",
+  "source_commit": "e75e33f9b217ceace2c2d60eeddf013641297554",
+  "classification": "fresh read-only metadata and retained private capture runtime; no target execution",
+  "target_metadata": {
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "loaded_kext_build": 36,
+    "loaded_image_matches_retained_build36": true,
+    "firmware_framebuffer_present": true,
+    "available_display_gates_zero": true,
+    "other_queried_gates_unavailable": 2,
+    "selected_arming_value_absent": true,
+    "named_startup_markers_absent": true,
+    "named_competing_helpers_absent": true,
+    "boot_identity_bracket_matched": true,
+    "absence_of_all_background_GPU_work_proven": false
+  },
+  "focused_tests": {
+    "python": "3.9.6",
+    "test_allocation_capture": {"passed": 21, "skipped": 0},
+    "test_allocation_observer": {"passed": 23, "skipped": 0},
+    "native_kqueue_temporary_directory_case_passed": true,
+    "target_driver_service_opened": false,
+    "full_repository_suite_run_or_supported_on_this_interpreter_claimed": false
+  },
+  "private_runtime": {
+    "root_owned_helper_files": 2,
+    "root_owned_isolated_entrypoints": 2,
+    "help_entrypoint_checks_passed": 2,
+    "interpreter_isolation_flags": ["-I", "-S"],
+    "independent_staged_files_hash_checks_passed": 4,
+    "independent_import_module_records_hash_and_trust_checks_passed": 86,
+    "interpreter_hash_and_trust_check_passed": true,
+    "retained_reader_hash_and_strict_signature_passed": true,
+    "installed_as_launchd_job": false,
+    "connected_to_workload_startup": false
+  },
+  "retained_backup_readback": {
+    "files_verified": 337,
+    "bytes_verified": 105882009,
+    "EFI_mounted_or_compared_live": false,
+    "independent_recovery_operator_attested": true,
+    "independent_recovery_boot_tested_by_agent": false
+  },
+  "target_snapshot_requests": 0,
+  "driver_installed_or_loaded_by_this_pass": false,
+  "startup_modified": false,
+  "GPU_execution_or_M2_arming": false,
+  "restart_scheduled": false,
+  "failed_boot_history_obtained": false,
+  "desktop_takeover_validated": false,
+  "root_cause_confirmed": false
+}

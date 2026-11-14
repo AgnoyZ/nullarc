@@ -6,6 +6,13 @@ continuity blocker in the [install-packet record](ALLOCATION-INSTALL-PACKET.md).
 It does not replace that record's historical failed activation or consume a
 new target-operation grant.
 
+Later on the same date, the [capture-runtime delivery](ALLOCATION-CAPTURE-RUNTIME.md)
+closed the trusted interpreter/helper staging gap below, with focused tests
+on the system interpreter and independent private read-back. It did not
+install a kernel, run a snapshot reader or connect the observer to startup.
+The Goal observations here describe this historical continuation; later
+execution must verify its own actual continuity state.
+
 ## What changed
 
 The supported user-origin lifecycle operation restored the existing Goal to

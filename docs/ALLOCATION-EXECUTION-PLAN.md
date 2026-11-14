@@ -10,6 +10,9 @@ fresh EFI backup. The later [continuity and input revalidation](ALLOCATION-RESUM
 confirms the same Goal is active and the retained inputs still match; real
 reboot/resume and Phase A remain unverified.
 This plan is not an installer, launcher, arming receipt or hardware result.
+The later [capture-runtime delivery](ALLOCATION-CAPTURE-RUNTIME.md) supplies
+root-owned tested helpers and an isolated system-interpreter entrypoint; it
+does not supply a loaded build-37 kernel or startup integration.
 The consumed build-36 M2/reboot grants remain spent. No installation, target
 service open, GPU work, startup edit, arming or reboot was performed in the
 preflight/build phase.
