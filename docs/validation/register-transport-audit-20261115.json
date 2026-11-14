@@ -1,0 +1,230 @@
+{
+  "format": 1,
+  "date": "2026-11-15",
+  "source_parent": "7598408739731aa5a17b653bad671c2f33df560a",
+  "status": "source/CPU register transport audit; no demonstrated production defect, target execution, driver deployment or desktop fix",
+  "prior_records": [
+    "desktop-vmid-execution-20261114.json",
+    "ip-discovery-target-20261113.json",
+    "gc-access-audit-20261113.json"
+  ],
+  "latest_historical_target_OS": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "new_OS_probe": false
+  },
+  "primary_review": {
+    "repository": "torvalds/linux",
+    "commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "files": [
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/soc21.c",
+        "sha256": "8210b4fd7236f1629655ae2afe38ddcb15ddb1e7f42d25d0147bc42bedf3939d",
+        "matches_existing_manifest": true,
+        "AMD_MIT_style_notice_reviewed": true,
+        "fresh_download_matching_cache": false
+      },
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c",
+        "sha256": "6b3dc555a2587666b46cdade8141966f49eaca71b40ad53b0a45b8624e5aeec9",
+        "matches_existing_manifest": true,
+        "AMD_MIT_style_notice_reviewed": true,
+        "fresh_download_matching_cache": true
+      },
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c",
+        "sha256": "fc38d8b22667c1154c8d3a30a74763d5a15b17276a0b9faf014eb16587af36ad",
+        "matches_existing_manifest": true,
+        "AMD_MIT_style_notice_reviewed": true,
+        "fresh_download_matching_cache": true
+      },
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/soc15_common.h",
+        "sha256": "2ee34db532a920980856dd390b2bb1a336791299cab7e9ab160c6cfec8ae27cd",
+        "matches_existing_manifest": true,
+        "AMD_MIT_style_notice_reviewed": true,
+        "fresh_download_matching_cache": true
+      },
+      {
+        "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_device.c",
+        "sha256": "1533076e08cebbe7062799cc5077f03a1adf31fb61aebe42428b719eda52acd7",
+        "matches_existing_manifest": true,
+        "AMD_MIT_style_notice_reviewed": true,
+        "fresh_download_matching_cache": false
+      },
+      {
+        "path": "drivers/gpu/drm/amd/include/asic_reg/gc/gc_11_0_0_offset.h",
+        "sha256": "a2394677509a3415a9e6307d876cae9cd654a99275ab40b3027d983da26801f2",
+        "matches_existing_manifest": true,
+        "AMD_MIT_style_notice_reviewed": true,
+        "fresh_download_matching_cache": false
+      },
+      {
+        "path": "drivers/gpu/drm/amd/include/asic_reg/gc/gc_11_0_0_sh_mask.h",
+        "sha256": "83dd0060886da2927e3f722b992af208e4d41999b0740123a770a6561f060c94",
+        "matches_existing_manifest": true,
+        "AMD_MIT_style_notice_reviewed": true,
+        "fresh_download_matching_cache": false
+      }
+    ],
+    "GRBM_GFX_CNTL_offset": 2304,
+    "GRBM_GFX_CNTL_base_index": 1,
+    "VMID_shift": 4,
+    "VMID_mask": 240,
+    "static_header_block_and_CLI_software_byte_offsets_match": true,
+    "GC_11_0_1_uses_gfx_v11_0_with_gc_11_0_0_headers": true,
+    "SOC15_bases_come_from_discovery": true,
+    "ordinary_MMIO_is_dword_scaled": true,
+    "modern_Linux_and_local_provider_map_BAR5": true,
+    "historical_target_discovery_already_matched_both_SEG_macros": true,
+    "new_target_discovery_capture": false,
+    "historical_candidate_source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+    "equal_method_bodies": [
+      "rreg",
+      "wreg",
+      "writeReg",
+      "readRegs",
+      "doReadRegs",
+      "doDbgWriteReg"
+    ],
+    "live_kernel_memory_or_current_physical_mapping_verified": false,
+    "Linux_bodies_whole_headers_or_binaries_added": false
+  },
+  "new_coverage": {
+    "test_file": "tests/test_register_transport.py",
+    "harness": "tests/test_register_transport.cpp",
+    "actual_CLI_functions": [
+      "checked_scalar",
+      "checked_method",
+      "rd",
+      "wr",
+      "grbm_select"
+    ],
+    "actual_client_functions": [
+      "externalMethod",
+      "shape",
+      "doReadRegs",
+      "doDbgWriteReg"
+    ],
+    "actual_provider_functions": [
+      "rreg",
+      "wreg",
+      "writeReg",
+      "readRegs"
+    ],
+    "independent_literal_address_and_field_oracles": true,
+    "fakes": [
+      "BAR storage",
+      "IOKit marshaling",
+      "locks and reaper policy",
+      "unrelated dispatcher branches"
+    ],
+    "real_IOKit_PCI_cache_attributes_ordering_scheduling_or_lock_implementation_validated": false,
+    "synthetic_lost_store_zeroes_both_actual_reply_paths": true,
+    "synthetic_fault_is_not_hardware_cause_evidence": true
+  },
+  "CPU_checks": {
+    "python": "3.9.6",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "methods_passed": 43,
+    "new_methods": 7,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "checks": [
+      {
+        "test_file": "test_register_transport.py",
+        "returncode": 0,
+        "seconds": 1.518,
+        "methods": 7,
+        "skips": 0
+      },
+      {
+        "test_file": "test_desktop_handoff.py",
+        "returncode": 0,
+        "seconds": 30.144,
+        "methods": 31,
+        "skips": 0
+      },
+      {
+        "test_file": "test_native_include_graph.py",
+        "returncode": 0,
+        "seconds": 0.074,
+        "methods": 5,
+        "skips": 0
+      }
+    ],
+    "actual_register_harness_and_desktop_CLI_sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "full_suite_rerun": false,
+    "temporary_negative_controls": [
+      {
+        "mutation": "shifted-selector-address",
+        "compile_returncode": 0,
+        "run_returncode": -6,
+        "detected": true
+      },
+      {
+        "mutation": "dword-divided-as-bytes",
+        "compile_returncode": 0,
+        "run_returncode": -6,
+        "detected": true
+      },
+      {
+        "mutation": "write-reply-zero-substitution",
+        "compile_returncode": 0,
+        "run_returncode": -6,
+        "detected": true
+      },
+      {
+        "mutation": "read-reply-zero-preserving-read",
+        "compile_returncode": 0,
+        "run_returncode": -6,
+        "detected": true
+      }
+    ],
+    "initial_harness_compile": {
+      "returncode": 1,
+      "reason": "missing allocation snapshot selector declaration; corrected by including the actual ABI header",
+      "counted_as_pass": false
+    },
+    "initial_read_zero_mutant_compile": {
+      "returncode": 1,
+      "reason": "unused pointer under Werror; final mutant preserves volatile read before returning zero",
+      "counted_as_runtime_detection": false
+    }
+  },
+  "tested_input_sha256": {
+    "tools/phxctl/mesboot.c": "150086f697f2fedee1d61ce85db3a51125ce762286581933a079a2df5077a847",
+    "src/phxbringup/PhxBringup.cpp": "92ad3f3961de373a35744b5d3f899ee53105251a3769615c4f18d0e2d0c57ce7",
+    "src/phxbringup/PhxNativeABI.h": "05c1feb4a825e6bf8b3212a2b46275430bf51c03a36753509594c66e5bbeaef6",
+    "src/phxbringup/PhxDesktopHandoff.h": "6f2566b05e4f2ce3c39d7286400b72a10a6834a9057129c91e27e3d5bde69547",
+    "src/phxbringup/PhxAllocationSnapshot.h": "e5c863996e2373f5f3d2c87e5cc963bd5c60770c59478d3c120264508a640c01",
+    "tests/test_register_transport.py": "23d931a88007e9d159d16e87d3d381ec3540bd314dd45d363532fe37be264b46",
+    "tests/test_register_transport.cpp": "cb005af81e2a44094239491c7f54eaead41f4a8a64616da013c72f69ac1ea021",
+    "tests/test_desktop_handoff.py": "78de4946223f1dc77b700505c8b245c616c57601e7d5c745981bb677416c3488",
+    "tests/test_desktop_entrypoint.c": "ec9ae6dc4880b8096b50c84a60549c598e2331c025420ae57f64cd123b5ccb0a"
+  },
+  "boundary": {
+    "production_source_changed": false,
+    "installed_driver_helper_startup_EFI_or_security_changed": false,
+    "new_target_service_opens": 0,
+    "new_GPU_commands": 0,
+    "reboot_requested": false,
+    "sudo_invocations": 0,
+    "consumed_target_request_or_receipts_modified": false,
+    "current_boot_terminal_for_GPU_work": true,
+    "target_linked_helper_built_signed_installed_or_uploaded": false,
+    "raw_target_data_or_identifiers_published": false
+  },
+  "limits": [
+    "CPU memory and fake marshaling do not validate the physical BAR, hardware acceptance, cache attributes or complete deployed runtime.",
+    "The historical discovery comparison and source instruction audit must not be treated as a new capture or live kernel memory inspection.",
+    "No cause is established for the latest dual-zero selector result; no register-base, timeout, reset/halt or cacheability patch is justified by these checks.",
+    "No GPU execution, acceleration or desktop success is established."
+  ],
+  "next_step": "Continue offline review of retained evidence and initialization prerequisites. A new physical experiment requires a separate reviewed bounded request, verified fresh boot and independent recovery; never replay the consumed VMID scope.",
+  "rollback": "Revert only these tests and audit documentation in a normal new commit; preserve all historical target records and consumed scopes."
+}

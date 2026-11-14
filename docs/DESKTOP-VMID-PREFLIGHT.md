@@ -237,3 +237,13 @@ defect. No acceleration or desktop success is established. Preserve this consume
 scope and stop all further GPU work on this boot; continue with source/fake
 review only. Any further physical experiment needs a separate reviewed request
 and a verified fresh boot.
+
+## Subsequent source transport audit
+
+The [2026-11-15 source/CPU audit](REGISTER-TRANSPORT-AUDIT.md) adds independent
+literal-address coverage through the actual CLI, dispatcher, ABI and provider
+read/write methods. Forty-three focused methods pass, and four temporary source
+mutations are detected. The earlier target discovery comparison already matched
+both `SEG` macros; static header naming does not establish a mapping defect.
+No production source or installed component changed, no GPU work followed the
+terminal result, and the physical cause and desktop fix remain unestablished.
