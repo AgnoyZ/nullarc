@@ -22,7 +22,7 @@ EXPORT = ("src/phxbringup", "src/phxaccel", "src/nmplugin", "src/amd/phx_topolog
 
 # Canonical downstream headers at src/; the component directories carry the copies the build uses.
 HEADERS = ("PhxHardwarePolicy.hpp", "PhxPspLayout.h", "PhxBootMemory.h", "PhxLegacyBoot.h",
-           "PhxGartLayout.h", "PhxMesQueueLayout.h", "PhxFirmwareProfile.h")
+           "PhxGartLayout.h", "PhxMesQueueLayout.h", "PhxDesktopHandoff.h", "PhxFirmwareProfile.h")
 
 def git(path, *args):
     return subprocess.check_output(["git", "-C", str(path), *args])
@@ -93,6 +93,7 @@ def prepare(destination, root=ROOT):
               "boot_memory_sha256": hashlib.sha256((root / "src/PhxBootMemory.h").read_bytes()).hexdigest(),
               "gart_layout_sha256": hashlib.sha256((root / "src/PhxGartLayout.h").read_bytes()).hexdigest(),
               "mes_queue_layout_sha256": hashlib.sha256((root / "src/PhxMesQueueLayout.h").read_bytes()).hexdigest(),
+              "desktop_handoff_sha256": hashlib.sha256((root / "src/PhxDesktopHandoff.h").read_bytes()).hexdigest(),
               "runtime_path_sha256": hashlib.sha256((root / "src/PhxRuntimePath.h").read_bytes()).hexdigest(),
               "hardware_tested": False}
     (destination / "source-provenance.json").write_text(json.dumps(result, indent=2) + "\n")

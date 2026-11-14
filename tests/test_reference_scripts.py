@@ -84,7 +84,9 @@ class ReferenceScriptTests(unittest.TestCase):
         open_kext = tool.split("static int open_kext(int explicit_layout)", 1)[1].split("static uint32_t rd(", 1)[0]
         self.assertIn("layout_from_driver(svc, explicit_layout)", open_kext)
         self.assertIn("IOServiceClose(conn); return -1;", open_kext)
-        self.assertEqual(tool.count("if (open_kext(1)) return 1;"), 3)
+        self.assertEqual(tool.count("if (open_kext(1)) return 1;"), 2)
+        # GART/MES keep their gate, reusing only the already-reserved desktop connection.
+        self.assertEqual(tool.count("if (!desktop_initializing && open_kext(1)) return 1;"), 2)
         self.assertEqual(tool.count("if (open_kext(0)) return 1;"), 1)
 
 

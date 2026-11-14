@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include "../../src/phxbringup/PhxMesQueueLayout.h"
+#include "../../src/phxbringup/PhxDesktopHandoff.h"
 #include "../../src/phxbringup/PhxFirmwareProfile.h"
 #include "mes_v11_api_def.h"
 #include "gfx11_shader_probe.h"
@@ -37,10 +38,11 @@ static uint64_t fb_pa = 0x6A0000000ull;       // GCMC_VM_FB_OFFSET << 24 (the re
 #define SEG0(o) (0x1260u + (o))
 #define SEG1(o) (0xA000u + (o))
 // VRAM layout of the experiment (offsets), all inside the GART window
-#define KIQ_RING 0x2500000ull            // 4 KiB ring
-#define KIQ_WB   0x2501000ull            // +0 rptr report, +16 wptr poll
-#define KIQ_MQD  0x2502000ull            // 2 KiB
-#define KIQ_EOP  0x2503000ull            // 2 KiB
+static uint64_t kiq_arena = 0x2500000ull;
+#define KIQ_RING kiq_arena
+#define KIQ_WB   (kiq_arena + 0x1000ull)
+#define KIQ_MQD  (kiq_arena + 0x2000ull)
+#define KIQ_EOP  (kiq_arena + 0x3000ull)
 /* Defaults are retained only for legacy experiments; sched-query sets every field. */
 static uint64_t scheduler_ring = 0x2510000ull, scheduler_wb = 0x2511000ull;
 static uint64_t scheduler_mqd = 0x2512000ull, scheduler_eop = 0x2513000ull;
@@ -49,7 +51,8 @@ static uint32_t scheduler_doorbell = 0x16;
 #define SCH_WB scheduler_wb
 #define SCH_MQD scheduler_mqd
 #define SCH_EOP scheduler_eop
-#define TESTBUF  0x2520000ull
+static uint64_t test_buffer = 0x2520000ull;
+#define TESTBUF test_buffer
 
 static int use_mc;
 static uint64_t bootstrap_va = GART_VA;
@@ -57,6 +60,8 @@ static uint64_t bootstrap_va = GART_VA;
 #define MC(off) (vram_mc + (off))
 
 static io_connect_t conn;
+static int desktop_initializing;
+static uint64_t desktop_compute_wptr, desktop_graphics_wptr;
 
 /* Transport failure is terminal: never use a zero/partial reply or continue writes. */
 static kern_return_t checked_scalar(io_connect_t connection, uint32_t selector,
@@ -268,7 +273,7 @@ static int gart(int argc, char **argv)
                                  gart_argument(argv[4]), gart_argument(argv[5])};
    if (!phxGartInputsValid(&layout) || env_on("PTE_SYS") || env_on("FAULT_DEFAULT"))
       gart_failure(64, "invalid GART arguments or incompatible legacy environment override");
-   if (open_kext(1)) return 1;
+   if (!desktop_initializing && open_kext(1)) return 1;
    struct PhxBootMemory memory = {0};
    size_t snapshot_size = sizeof(memory);
    checked_method(conn, PHX_BOOT_MEMORY_SELECTOR, NULL, 0, NULL, 0, NULL, NULL, &memory, &snapshot_size);
@@ -337,7 +342,7 @@ static int gart(int argc, char **argv)
       if (usleep(1000) && errno != EINTR) gart_failure(74, "GART invalidation polling delay failed");
    }
    if (sample == 1000) gart_failure(75, "GART invalidation acknowledgement timed out");
-   if (IOServiceClose(conn) != KERN_SUCCESS) gart_failure(74, "service close failed");
+   if (!desktop_initializing && IOServiceClose(conn) != KERN_SUCCESS) gart_failure(74, "service close failed");
    printf("gart complete: %llu pages, address readbacks and invalidation acknowledged; GPU execution unverified\n",
           (unsigned long long)pages);
    return 0;
@@ -364,7 +369,7 @@ static int mes_start(int argc, char **argv)
       if (fw->pipe != pipe || fw->file_index >= PHX_FW_FILE_COUNT || !fw->instruction_start || (fw->instruction_start & 3))
          mes_start_failure(64, "invalid generated firmware entrypoint");
    }
-   if (open_kext(1)) return 1;
+   if (!desktop_initializing && open_kext(1)) return 1;
    struct PhxBootMemory memory = {0};
    size_t snapshot_size = sizeof(memory);
    checked_method(conn, PHX_BOOT_MEMORY_SELECTOR, NULL, 0, NULL, 0, NULL, NULL, &memory, &snapshot_size);
@@ -411,7 +416,7 @@ static int mes_start(int argc, char **argv)
       if (usleep(1000) && errno != EINTR) mes_start_failure(74, "MES polling delay failed");
    }
    if (sample == 1000) mes_start_failure(75, "MES activation register state timed out");
-   if (IOServiceClose(conn) != KERN_SUCCESS) mes_start_failure(74, "service close failed");
+   if (!desktop_initializing && IOServiceClose(conn) != KERN_SUCCESS) mes_start_failure(74, "service close failed");
    puts("MES start: two firmware entrypoints and activation register state checked; scheduler execution unverified");
    return 0;
 }
@@ -625,10 +630,20 @@ static int mes_submit(void *pkt, size_t size, size_t api_status_off, const char 
    printf("mes %s: fence=%llu (want %llu) status=%llu -> OK\n", what, (unsigned long long)f, (unsigned long long)sch_seq, (unsigned long long)st);
    return 0;
 }
-#define CMP_RING 0x2540000ull
-#define CMP_WB   0x2541000ull
-#define CMP_MQD  0x2542000ull
-#define CMP_EOP  0x2543000ull
+static uint64_t compute_arena = 0x2540000ull;
+static uint32_t compute_doorbell = 6;
+#define CMP_RING compute_arena
+#define CMP_WB   (compute_arena + 0x1000ull)
+#define CMP_MQD  (compute_arena + 0x2000ull)
+#define CMP_EOP  (compute_arena + 0x3000ull)
+static void desktop_release_packet(uint64_t ring, uint32_t position, uint64_t fence, uint64_t token)
+{
+   const uint64_t address = MC(fence);
+   const uint32_t packet[8] = {0xc0064900u, 0x06603514u, 0x40000000u,
+       (uint32_t)address, (uint32_t)(address >> 32), (uint32_t)token, (uint32_t)(token >> 32), 0};
+   vw(fence, (uint32_t)~token); vw(fence + 4, (uint32_t)(~token >> 32));
+   for (unsigned i = 0; i < 8; ++i) vw(ring + (position + i) * 4, packet[i]);
+}
 static void vm8_test(void);
 static void gfx_via_mes(void);
 static void compute_via_mes(void)
@@ -636,30 +651,43 @@ static void compute_via_mes(void)
    for (int i = 0; i < 1024; i++) vw(CMP_RING + i * 4, 0);
    for (int i = 0; i < 32; i++) vw(CMP_WB + i * 4, 0);
    for (int i = 0; i < 4; i++) vw(TESTBUF + i * 4, 0);
-   mqd_build(CMP_MQD, CMP_RING, CMP_WB, CMP_EOP, 1, 6);
+   mqd_build(CMP_MQD, CMP_RING, CMP_WB, CMP_EOP, 1, compute_doorbell);
    union MESAPI__ADD_QUEUE a;
    memset(&a, 0, sizeof(a));
    a.header.type = MES_API_TYPE_SCHEDULER;
    a.header.opcode = MES_SCH_API_ADD_QUEUE;
    a.header.dwsize = API_FRAME_SIZE_IN_DWORDS;
    a.pipe_id = 0; a.queue_id = 0;
-   a.doorbell_offset = 6;
+   a.doorbell_offset = compute_doorbell;
    a.mqd_addr = VA(CMP_MQD);
    a.wptr_addr = VA(CMP_WB + 16);
    a.queue_type = MES_QUEUE_TYPE_COMPUTE;
    a.map_legacy_kq = 1;
    if (mes_submit(&a, sizeof(a), offsetof(union MESAPI__ADD_QUEUE, api_status), "ADD_QUEUE(compute, map_legacy_kq)")) return;
+   if (desktop_initializing) hqd_verify(1, 0, CMP_MQD, CMP_RING, CMP_WB, compute_doorbell);
    wr(SEG1(0x2040), 0xCAFEDEAD);
    vw(CMP_RING + 0, 0xC0017900); vw(CMP_RING + 4, 0x40); vw(CMP_RING + 8, 0xDEADBEEF);
    vw(CMP_RING + 12, 0xC0033700); vw(CMP_RING + 16, 0x00100500);
    vw(CMP_RING + 20, (uint32_t)VA(TESTBUF)); vw(CMP_RING + 24, (uint32_t)(VA(TESTBUF) >> 32)); vw(CMP_RING + 28, 0xFEEDF00D);
-   vw(CMP_WB + 16, 8); vw(CMP_WB + 20, 0);
-   db(6 * 4, 8);
-   for (int i = 0; i < 50; i++) { usleep(10000); if (rd(SEG1(0x2040)) == 0xDEADBEEF && vr(TESTBUF) == 0xFEEDF00D) break; }
+   uint32_t initial_wptr = 8;
+   if (desktop_initializing) {
+      desktop_release_packet(CMP_RING, initial_wptr, compute_arena + 0x5000, PHX_DESKTOP_COMPUTE_TOKEN);
+      initial_wptr += 8;
+   }
+   vw(CMP_WB + 16, initial_wptr); vw(CMP_WB + 20, 0);
+   db((uint64_t)compute_doorbell * 4, initial_wptr);
+   for (int i = 0; i < 50; i++) {
+      if (usleep(10000) && errno != EINTR) mes_start_failure(74, "compute completion delay failed");
+      if (rd(SEG1(0x2040)) == 0xDEADBEEF && vr(TESTBUF) == 0xFEEDF00D &&
+          (!desktop_initializing || vr64(compute_arena + 0x5000) == PHX_DESKTOP_COMPUTE_TOKEN)) break;
+   }
    if (rd(SEG1(0x2040)) != 0xDEADBEEF || vr(TESTBUF) != 0xFEEDF00D) gpu_failure("compute execution");
+   if (desktop_initializing && vr64(compute_arena + 0x5000) != PHX_DESKTOP_COMPUTE_TOKEN)
+      gpu_failure("compute full-width release fence");
    grbm_select(1, 0, 0, 0);
    printf("compute: scratch0=0x%08x (want deadbeef) testbuf=0x%08x (want feedf00d) hqd_active=%u rptr=%u\n", rd(SEG1(0x2040)), vr(TESTBUF), rd(SEG0(0x1fab)), rd(SEG0(0x1fb3)));
    grbm_select(0, 0, 0, 0);
+   if (desktop_initializing) { desktop_compute_wptr = initial_wptr; return; }
    if (env_on("ADOPT")) {   // hand the working compute queue to the kext: SUBMIT from RADV goes here from now on
       uint64_t in[6] = {CMP_RING, 1024, CMP_WB, 6 * 4, 8, 0x2550000};
       kern_return_t kr = checked_scalar(conn, SEL_DBG_ADOPTQ, in, 6, NULL, NULL);
@@ -1079,12 +1107,14 @@ static void mec_test(void)
 
 // GFX (graphics) kernel queue: me0 pipe0 queue0 mapped by MES ADD_QUEUE(type GFX, map_legacy_kq), MQD per gfx_v11_0_gfx_mqd_init.
 // Doorbell 0x116 (dword) inside the RB doorbell range Linux programs (LOWER 0x458 / UPPER 0x7f8, byte units).
-#define GFX_RING 0x2570000ull            // 8 KiB ring (2048 dw: the clear-state preamble alone is 960)
+static uint64_t graphics_arena = 0x2570000ull;
+static uint32_t graphics_doorbell = 0x116u;
+#define GFX_RING graphics_arena         // 8 KiB ring (2048 dw: the clear-state preamble alone is 960)
 #define GFX_RDW  2048u
-#define GFX_WB   0x2574000ull            // +0 rptr report, +16 wptr poll
-#define GFX_MQD  0x2575000ull            // v11_gfx_mqd, 2 KiB
-#define GFX_CSB  0x2576000ull            // RLC clear-state buffer (RLC_CSIB_*), as gfx_v11_0_init_csb
-#define GFX_DB   0x116u
+#define GFX_WB   (graphics_arena + 0x4000ull)
+#define GFX_MQD  (graphics_arena + 0x5000ull)
+#define GFX_CSB  (graphics_arena + 0x6000ull)
+#define GFX_DB   graphics_doorbell
 #include "csb_gfx11.h"
 static void gfx_via_mes(void)
 {
@@ -1123,6 +1153,10 @@ static void gfx_via_mes(void)
    a.map_legacy_kq = 1;
    if (mes_submit(&a, sizeof(a), offsetof(union MESAPI__ADD_QUEUE, api_status), "ADD_QUEUE(gfx, map_legacy_kq)")) return;
    grbm_select(0, 0, 0, 0);
+   if (desktop_initializing && (rd(SEG1(0x900)) || rd(SEG0(0x1e80)) != 1 ||
+       rd(SEG0(0x1e86)) != (uint32_t)rb || rd(SEG0(0x1e87)) != (uint32_t)(rb >> 32) ||
+       rd(SEG0(0x1e8d)) != ((GFX_DB << 2) | (1u << 30))))
+      gpu_failure("graphics HQD readback");
    printf("gfx hqd after map: active=%u base=0x%x cntl=0x%08x dbctl=0x%08x rptr=%u\n", rd(SEG0(0x1e80)), rd(SEG0(0x1e86)),
           rd(SEG0(0x1e8f)), rd(SEG0(0x1e8d)), rd(SEG0(0x1e88)));
    vw(TESTBUF + 0x40, ~0x6F7A6F7Au);   // reject stale memory from an earlier graphics test
@@ -1133,13 +1167,24 @@ static void gfx_via_mes(void)
    vw(GFX_RING + w++ * 4, 0xC0033700); vw(GFX_RING + w++ * 4, 0x00100500);                                   // WRITE_DATA mem, wr confirm
    vw(GFX_RING + w++ * 4, (uint32_t)MC(TESTBUF + 0x40)); vw(GFX_RING + w++ * 4, (uint32_t)(MC(TESTBUF + 0x40) >> 32));
    vw(GFX_RING + w++ * 4, 0x6F7A6F7A);
+   if (desktop_initializing) {
+      desktop_release_packet(GFX_RING, w, graphics_arena + 0x7000, PHX_DESKTOP_GRAPHICS_TOKEN);
+      w += 8;
+   }
    vw(GFX_WB + 16, w); vw(GFX_WB + 20, 0);
    db(GFX_DB * 4, w);
-   for (int i = 0; i < 50; i++) { usleep(10000); if (rd(SEG1(0x2041)) == 0xDEADBEEF && vr(TESTBUF + 0x40) == 0x6F7A6F7A) break; }
+   for (int i = 0; i < 50; i++) {
+      if (usleep(10000) && errno != EINTR) mes_start_failure(74, "graphics completion delay failed");
+      if (rd(SEG1(0x2041)) == 0xDEADBEEF && vr(TESTBUF + 0x40) == 0x6F7A6F7A &&
+          (!desktop_initializing || vr64(graphics_arena + 0x7000) == PHX_DESKTOP_GRAPHICS_TOKEN)) break;
+   }
    if (rd(SEG1(0x2041)) != 0xDEADBEEF || vr(TESTBUF + 0x40) != 0x6F7A6F7A) gpu_failure("gfx execution");
+   if (desktop_initializing && vr64(graphics_arena + 0x7000) != PHX_DESKTOP_GRAPHICS_TOKEN)
+      gpu_failure("graphics full-width release fence");
    grbm_select(0, 0, 0, 0);
    printf("gfx: scratch1=0x%08x (want deadbeef) testbuf=0x%08x (want 6f7a6f7a) rptr=%u rptr_wb=%u grbm=0x%08x cp_stat=0x%08x\n",
           rd(SEG1(0x2041)), vr(TESTBUF + 0x40), rd(SEG0(0x1e88)), vr(GFX_WB), rd(0x2004), rd(0x21a0));
+   if (desktop_initializing) { desktop_graphics_wptr = w; return; }
    if (env_on("ADOPT_GFX")) {   // hand the gfx queue to the kext as its second queue
       uint64_t in[6] = {GFX_RING, GFX_RDW, GFX_WB, GFX_DB * 4, w, 0x2580000 | 1};
       kern_return_t kr = checked_scalar(conn, SEL_DBG_ADOPTQ, in, 6, NULL, NULL);
@@ -1210,8 +1255,109 @@ static void sdma_sys_test(void)
    printf("SDMA control write to VRAM: 0x%08x (want 6e6e6e6e)\n", vr(TESTBUF + 0x200));
 }
 
+static void desktop_idle_queue(uint32_t me, uint32_t pipe, uint32_t active_register)
+{
+   grbm_select(me, pipe, 0, 0);
+   if (rd(SEG1(0x900)) != ((me << 2) | pipe)) gpu_failure("desktop queue selection");
+   uint32_t active = rd(active_register);
+   if (active == UINT32_MAX || (active & 1)) gpu_failure("desktop queue idle precondition");
+   grbm_select(0, 0, 0, 0);
+   if (rd(SEG1(0x900))) gpu_failure("desktop GRBM idle selection");
+}
+
+/* No shell, watchdog, output filter, environment-selected engine or implicit layout.
+ * Firmware/power completion precedes this stage. Display/recovery belong to the coordinator.
+ */
+static int desktop_command(int argc, char **argv)
+{
+   _Static_assert(sizeof(kCsbGfx11) / 4 == PHX_DESKTOP_CSB_DWORDS, "desktop graphics preamble contract");
+   if (argc != 14) mes_start_failure(64, "desktop command requires four GART arguments and four arena/doorbell pairs (KIQ, scheduler, compute, graphics)");
+   struct PhxDesktopRequest request = {0};
+   struct PhxDesktopLayout *layout = &request.layout;
+   layout->version = PHX_DESKTOP_VERSION;
+   layout->gart = (struct PhxGartLayout){PHX_GART_LAYOUT_VERSION, gart_argument(argv[2]),
+       gart_argument(argv[3]), gart_argument(argv[4]), gart_argument(argv[5])};
+   struct PhxMesQueueLayout *queues[] = {&layout->kiq, &layout->scheduler, &layout->compute, &layout->graphics};
+   for (unsigned i = 0; i < 4; ++i)
+      *queues[i] = (struct PhxMesQueueLayout){PHX_MES_QUEUE_VERSION,
+          gart_argument(argv[6 + i * 2]), gart_argument(argv[7 + i * 2])};
+   if (!phxDesktopInputsValid(layout)) mes_start_failure(64, "invalid desktop layout inputs");
+   const char *overrides[] = {"PHX_LAYOUT_REFERENCE", "MESBOOT_MC", "PTE_SYS", "FAULT_DEFAULT",
+       "MESBOOT_CS", "MESBOOT_GFX", "ADOPT", "ADOPT_GFX", "NO_CSB", "MESBOOT_VMT", "VM8",
+       "AGPTEST", "CTX0_OFF", "PT_SYS", "PTE_EXTRA", "ROOT_FL", "VARONLY", "NO_GCR",
+       "COPYTEST", "VM8_HI", "VM8_MT", "VM8_FLAT", "VM8_IBSYS", "VM8_SYS", "IB0"};
+   for (unsigned i = 0; i < sizeof(overrides) / sizeof(overrides[0]); ++i) {
+      const char *value = getenv(overrides[i]);
+      if (value && *value) mes_start_failure(64, "desktop command rejects legacy experiment environment variables");
+   }
+   if (open_kext(1)) return 1;
+   if (!strcmp(argv[1], "desktop-claim")) {
+      request.operation = PHX_DESKTOP_CLAIM;
+      request.computeWptr = PHX_DESKTOP_COMPUTE_WPTR;
+      request.graphicsWptr = PHX_DESKTOP_GRAPHICS_WPTR;
+      checked_method(conn, PHX_DESKTOP_SELECTOR, NULL, 0, &request, sizeof(request), NULL, NULL, NULL, NULL);
+      if (IOServiceClose(conn) != KERN_SUCCESS) mes_start_failure(74, "service close failed after desktop claim");
+      puts("desktop claim: exact sealed two-engine handoff accepted; display unverified");
+      return 0;
+   }
+   struct PhxBootMemory memory = {0};
+   size_t size = sizeof(memory);
+   checked_method(conn, PHX_BOOT_MEMORY_SELECTOR, NULL, 0, NULL, 0, NULL, NULL, &memory, &size);
+   if (!phxDesktopLayoutValid(layout, &memory) || memory.mcBase != vram_mc || memory.physicalBase != fb_pa)
+      mes_start_failure(75, "desktop resources overlap or bootstrap identity/layout changed");
+   request.operation = PHX_DESKTOP_RESERVE;
+   checked_method(conn, PHX_DESKTOP_SELECTOR, NULL, 0, &request, sizeof(request), NULL, NULL, NULL, NULL);
+   desktop_initializing = 1;
+   bootstrap_va = layout->gart.virtualBase; use_mc = 0; skip_hqd = 0;
+   kiq_arena = layout->kiq.arenaOffset;
+   scheduler_ring = layout->scheduler.arenaOffset; scheduler_wb = scheduler_ring + 0x1000;
+   scheduler_mqd = scheduler_ring + 0x2000; scheduler_eop = scheduler_ring + 0x3000;
+   scheduler_doorbell = (uint32_t)layout->scheduler.doorbellIndex;
+   compute_arena = layout->compute.arenaOffset; compute_doorbell = (uint32_t)layout->compute.doorbellIndex;
+   graphics_arena = layout->graphics.arenaOffset; graphics_doorbell = (uint32_t)layout->graphics.doorbellIndex;
+   test_buffer = compute_arena + 0x4000;
+   uint32_t mes = rd(SEG1(0x2807));
+   if (mes == UINT32_MAX || (mes & 0x3c000000u) || rd(SEG1(0x900)))
+      gpu_failure("inactive MES and idle selection preconditions");
+   desktop_idle_queue(3, 1, SEG0(0x1fab));
+   desktop_idle_queue(3, 0, SEG0(0x1fab));
+   desktop_idle_queue(1, 0, SEG0(0x1fab));
+   desktop_idle_queue(0, 0, SEG0(0x1e80));
+   const uint32_t setup[][2] = {{0x0de0, 1}, {SEG1(0x802), 0}, {SEG1(0x803), 0x01000000}};
+   for (unsigned i = 0; i < sizeof(setup) / sizeof(setup[0]); ++i)
+      if (wr(setup[i][0], setup[i][1]) != setup[i][1] || rd(setup[i][0]) != setup[i][1])
+         gpu_failure("desktop doorbell/CP setup readback");
+   if (gart(6, argv) || mes_start(6, argv)) gpu_failure("desktop GART/MES initialization");
+   const uint64_t lengths[] = {PHX_MES_QUEUE_ARENA_BYTES, PHX_MES_QUEUE_ARENA_BYTES,
+       PHX_DESKTOP_COMPUTE_BYTES, PHX_DESKTOP_GRAPHICS_BYTES};
+   for (unsigned i = 0; i < 4; ++i)
+      for (uint64_t offset = 0; offset < lengths[i]; offset += 4) vw(queues[i]->arenaOffset + offset, 0);
+   uint32_t schedulers = (rd(SEG1(0x98a)) & 0xffffff00u) | (3u << 5) | (1u << 3);
+   wr(SEG1(0x98a), schedulers); wr(SEG1(0x98a), schedulers | 0x80);
+   const uint32_t kiq_doorbell = (uint32_t)layout->kiq.doorbellIndex;
+   mqd_build(KIQ_MQD, KIQ_RING, KIQ_WB, KIQ_EOP, 1, kiq_doorbell);
+   /* Four KiB queue, matching its actual reserved ring and MQD, never legacy size 0x11. */
+   hqd_program(3, 1, KIQ_MQD, KIQ_RING, KIQ_WB, 0xd8308909u, (kiq_doorbell << 2) | (1u << 30));
+   hqd_verify(3, 1, KIQ_MQD, KIQ_RING, KIQ_WB, kiq_doorbell);
+   sched_init();
+   hqd_verify(3, 0, SCH_MQD, SCH_RING, SCH_WB, scheduler_doorbell);
+   sched_resources();
+   compute_via_mes();
+   gfx_via_mes();
+   if (desktop_compute_wptr != PHX_DESKTOP_COMPUTE_WPTR || desktop_graphics_wptr != PHX_DESKTOP_GRAPHICS_WPTR)
+      gpu_failure("complete desktop queue positions");
+   request.operation = PHX_DESKTOP_SEAL;
+   request.computeWptr = desktop_compute_wptr; request.graphicsWptr = desktop_graphics_wptr;
+   checked_method(conn, PHX_DESKTOP_SELECTOR, NULL, 0, &request, sizeof(request), NULL, NULL, NULL, NULL);
+   if (IOServiceClose(conn) != KERN_SUCCESS) mes_start_failure(74, "service close failed after desktop handoff");
+   puts("desktop handoff: both execution markers, full-width release fences and checked adoption accepted; claim/display pending");
+   return 0;
+}
+
 int main(int argc, char **argv)
 {
+   if (argc >= 2 && (!strcmp(argv[1], "desktop-init") || !strcmp(argv[1], "desktop-claim")))
+      return desktop_command(argc, argv);
    if (argc >= 2 && (!strcmp(argv[1], "sched-query") || !strcmp(argv[1], "compute-probe") || !strcmp(argv[1], "shader-probe"))) return scheduler_query(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "mes")) return mes_start(argc, argv);
    if (argc >= 2 && !strcmp(argv[1], "gart")) return gart(argc, argv);

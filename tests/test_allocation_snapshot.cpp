@@ -31,7 +31,7 @@ struct IOExternalMethodArguments {
 };
 // The actual dispatcher references these types only in non-snapshot paths.
 #include "snapshot-constants.inc"
-#include "PhxBootMemory.h"
+#include "PhxDesktopHandoff.h"
 static void IOLog(const char *, ...) { assert(false && "snapshot must not log"); }
 class PhxBringup {
 public:
@@ -39,6 +39,8 @@ public:
 #include "snapshot-state.inc"
     void recordAllocation(const phxn_allocation_record &);
     IOReturn copyAllocationSnapshot(phxn_allocation_snapshot *);
+    IOReturn lockDebugMutation(const void *, uint32_t) { assert(false && "snapshot must bypass mutation lock"); return kIOReturnNotReady; }
+    void unlockDebugMutation() { assert(false && "snapshot must bypass mutation lock"); }
 };
 class IOAccelPhxNativeClient {
 public:

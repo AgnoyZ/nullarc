@@ -6,6 +6,11 @@ new target execution grant. The allocation root cause remains unconfirmed.
 The [execution plan](ALLOCATION-EXECUTION-PLAN.md) and its Phase A, recovery and
 fresh-authorization gates remain in force.
 
+The later [build-39 native handoff](DESKTOP-NATIVE-HANDOFF.md) adds separate
+explicit `desktop-init`/`desktop-claim` interfaces and provider-lifetime
+reservation. The legacy entrypoints characterized below keep their original
+layout gates. The new candidate is not installed or hardware validated.
+
 ## Current entrypoints do not form a complete initialization chain
 
 The current `tools/phxctl/mesboot.c` dispatches `gart` and `mes` to commands

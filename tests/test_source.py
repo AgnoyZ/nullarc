@@ -63,7 +63,7 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(data).hexdigest(), self.provenance["firmware_profile_sha256"])
     def test_bootstrap_memory_headers_are_staged_and_hashed(self):
         for name, key in (("PhxBootMemory.h", "boot_memory_sha256"), ("PhxLegacyBoot.h", "legacy_boot_sha256"), ("PhxGartLayout.h", "gart_layout_sha256"),
-                          ("PhxMesQueueLayout.h", "mes_queue_layout_sha256")):
+                          ("PhxMesQueueLayout.h", "mes_queue_layout_sha256"), ("PhxDesktopHandoff.h", "desktop_handoff_sha256")):
             data = (ROOT / "src" / name).read_bytes()
             self.assertEqual(data, (self.stage / "src/phxbringup" / name).read_bytes())
             self.assertEqual(hashlib.sha256(data).hexdigest(), self.provenance[key])

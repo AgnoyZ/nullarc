@@ -7,7 +7,7 @@
 #include <vector>
 #include "PhxNativeABI.h"
 #include "PhxAllocationSnapshot.h"
-#include "PhxBootMemory.h"
+#include "PhxDesktopHandoff.h"
 
 using IOReturn = uint32_t;
 constexpr IOReturn kIOReturnSuccess = 0;
@@ -74,11 +74,22 @@ static void IOLog(const char *format, ...) {
     X(doDbgDoorbell, PHXN_SEL_DBG_DOORBELL) \
     X(doDbgSysMem, PHXN_SEL_DBG_SYSMEM) \
     X(doDbgAdoptQueue, PHXN_SEL_DBG_ADOPTQ) \
-    X(doDbgClaim, PHXN_SEL_DBG_CLAIM)
+    X(doDbgClaim, PHXN_SEL_DBG_CLAIM) \
+    X(doDesktopHandoff, PHX_DESKTOP_SELECTOR)
+
+struct FakeDebugOwner {
+    bool held{false};
+    IOReturn lockDebugMutation(const void *client, uint32_t selector) {
+        assert(client && activeLock && activeLock->held && !held && phxDesktopMutationSelector(selector));
+        held = true; return kIOReturnSuccess;
+    }
+    void unlockDebugMutation() { assert(held && activeLock && activeLock->held); held = false; }
+};
 
 class IOAccelPhxNativeClient {
 public:
     FakeLock mutex;
+    FakeDebugOwner service; FakeDebugOwner *owner{&service};
     FakeLock *lock{&mutex};
     bool hello{false}, closed{false};
 #include "submit-diagnostic-state.inc"
@@ -113,7 +124,7 @@ static IOReturn call(IOAccelPhxNativeClient &client, uint32_t selector,
                      IOExternalMethodArguments *args = nullptr) {
     events.clear();
     const IOReturn result = client.externalMethod(selector, args, nullptr, nullptr, nullptr);
-    assert(!activeLock && !client.mutex.held);
+    assert(!activeLock && !client.mutex.held && !client.service.held);
     const bool early = selector == PHXN_SEL_WAITSEQ || selector == PHXN_SEL_TOPOLOGY ||
                        selector == PHXN_SEL_SURF_GPU_MARK || selector == PHXN_SEL_ALLOCATION_SNAPSHOT;
     assert(early ? events == std::vector<std::string>{"handler"} :
@@ -220,7 +231,7 @@ int main() {
         assert(logs.size() == 1 && client.calls == 2 && client.reaps == 2);
         ++cases;
     }
-    assert(cases == 72 && nonSubmitPaths == 30);
+    assert(cases == 74 && nonSubmitPaths == 31);
     printf("{\"cases\":%u,\"non_submit_dispatch_paths\":%u,\"hardware_executed\":false,\"kernel_loaded\":false}\n",
            cases, nonSubmitPaths);
 }

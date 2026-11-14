@@ -12,8 +12,8 @@ class SubmitDiagnosticTests(unittest.TestCase):
     def test_actual_dispatcher_propagates_errors_and_limits_logs_under_sanitizers(self):
         with tempfile.TemporaryDirectory() as directory:
             report = exercise(Path(directory) / 'result')
-        self.assertEqual(72, report['cases'])
-        self.assertEqual(30, report['non_submit_dispatch_paths'])
+        self.assertEqual(74, report['cases'])
+        self.assertEqual(31, report['non_submit_dispatch_paths'])
         self.assertFalse(report['hardware_executed'])
         self.assertFalse(report['kernel_loaded'])
 

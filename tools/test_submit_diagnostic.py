@@ -41,7 +41,7 @@ def exercise(out):
                    check=True, timeout=120)
     process = subprocess.run([str(binary)], capture_output=True, text=True, check=True, timeout=30)
     result = json.loads(process.stdout)
-    expected = {'cases': 72, 'non_submit_dispatch_paths': 30,
+    expected = {'cases': 74, 'non_submit_dispatch_paths': 31,
                 'hardware_executed': False, 'kernel_loaded': False}
     if result != expected or any(type(result[k]) is not type(v) for k, v in expected.items()):
         raise RuntimeError('Unexpected actual-dispatcher diagnostic report')
@@ -50,6 +50,8 @@ def exercise(out):
     inputs = [source, ROOT / 'src/phxbringup/PhxNativeABI.h',
               ROOT / 'src/phxbringup/PhxAllocationSnapshot.h',
               ROOT / 'src/phxbringup/PhxBootMemory.h', ROOT / 'src/phxbringup/PhxPspLayout.h',
+              ROOT / 'src/phxbringup/PhxDesktopHandoff.h', ROOT / 'src/phxbringup/PhxMesQueueLayout.h',
+              ROOT / 'src/phxbringup/PhxGartLayout.h',
               ROOT / 'src/amd/phx_topology.h', ROOT / 'tests/test_submit_diagnostic.cpp']
     result['inputs_SHA256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                                for p in inputs}

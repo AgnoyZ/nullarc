@@ -26,6 +26,7 @@
 #include "PhxPspLayout.h"
 #include "PhxBootMemory.h"
 #include "PhxLegacyBoot.h"
+#include "PhxDesktopHandoff.h"
 static_assert(sizeof(PhxPspLayout) == 64, "PSP layout wire size");
 static_assert(sizeof(PhxLegacyBoot) == 128, "legacy boot profile wire size");
 static_assert(PHX_PSP_LAYOUT_RING_BYTES == PHX_PSP_FENCE_REL + 0x1000, "PSP layout ring span");
@@ -36,7 +37,7 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
 #include "PhxBoPolicy.hpp"
 #include "PhxAllocationDiagnostic.hpp"
 
-#define PHX_KEXT_BUILD 38u
+#define PHX_KEXT_BUILD 39u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -158,6 +159,10 @@ public:
     // user BOs are then mapped into the VMID 8 page table and SUBMIT writes INDIRECT_BUFFERs into the queue's ring.
     IOReturn adoptQueue(const uint64_t in[6]);
     IOReturn claimAccel();
+    IOReturn lockDebugMutation(const void *client, uint32_t selector);
+    void unlockDebugMutation();
+    IOReturn desktopHandoff(const void *client, const PhxDesktopRequest &request);
+    void abandonDesktop(const void *client);
     bool gpuReady() const { return !stopping && (gq[0].ready || gq[1].ready); }
     // one GPUVM context (VMID 8..15) per client process: RADV instances allocate VAs independently
     uint32_t vmidAlloc();
@@ -237,6 +242,11 @@ private:
     bool queueProgress(const GpuQueue &q, uint64_t *done, PhxQueueObservation *observation = nullptr) const;
     uint64_t gpuRetiredLocked(PhxRetirementObservation *observation = nullptr) const;
     IOLock *gpuLock{nullptr};
+    IOLock *bootstrapLock{nullptr}; // client lock -> bootstrap -> gpu -> smu; never held by passive capture
+    enum DesktopState { DesktopUnused, DesktopInitializing, DesktopSealed, DesktopClaimed, DesktopAbandoned };
+    DesktopState desktopState{DesktopUnused};
+    const void *desktopOwner{nullptr}; // identity only, cleared before the client can be destroyed
+    PhxDesktopLayout desktopLayout{}; // retained until provider destruction, including failure/stop
     PhxAllocationHistory allocationHistory{}; // gpuLock; survives native-client close/context reuse
     // One GPUVM context (page tables) per client, and the eight hardware VMIDs lent to contexts at submission time,
     // as amdgpu does: a fixed VMID per client capped Metal at eight processes, and with every app allowed Metal the
@@ -343,6 +353,7 @@ private:
     IOReturn doDbgSysMem(IOExternalMethodArguments *a);
     IOReturn doDbgAdoptQueue(IOExternalMethodArguments *a);
     IOReturn doDbgClaim(IOExternalMethodArguments *a);
+    IOReturn doDesktopHandoff(IOExternalMethodArguments *a);
     void flushBos();
     Bo *findBo(uint32_t h);
     bool ibCovered(uint64_t vaCanon, uint64_t bytes);
@@ -356,6 +367,7 @@ private:
     bool privileged{false};
     bool hello{false}, closed{false};
     bool sessionClaimed{false};
+    bool desktopReservationOwned{false}; // only the reserving client enters bootstrap cleanup on close
     bool submitFailureLogged{false}; // protected by lock; one refusal per native client
     uint8_t allocationFailureLogs[3]{}; // lock: pending overlap, host descriptor, host prepare
     uint32_t vmid{0};        // this client's GPUVM context, taken on its first GPU mapping or submission
@@ -432,6 +444,7 @@ bool PhxBringup::start(IOService *provider) {
     doorbellMap = pci->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress2);
     smuLock = IOLockAlloc();
     gpuLock = IOLockAlloc();
+    bootstrapLock = IOLockAlloc();
     uint32_t dbg = 0;
     debug = PE_parse_boot_argn("phxdebug", &dbg, sizeof(dbg)) && dbg == 1;
     if (mmio) {
@@ -484,16 +497,18 @@ void PhxBringup::stop(IOService *provider) {
         thread_call_free(hangCall);
         hangCall = nullptr;
     }
+    if (bootstrapLock) IOLockLock(bootstrapLock);
     if (gpuLock) IOLockLock(gpuLock);
     stopping = true;
     if (gpuLock) reapContextsLocked();
-    bool retained = quarantinedBuffers || gq[0].ready || gq[1].ready || ringMc || tmrSetUp;
+    bool retained = desktopState != DesktopUnused || quarantinedBuffers || gq[0].ready || gq[1].ready || ringMc || tmrSetUp;
     for (const VmCtx &c : vm) retained = retained || c.busy;
     for (const HwVmid &h : hwv) retained = retained || h.ctx || h.faulted;
     if (retained) {
         // Lost synchronization or orphaned slot state cannot prove device-wide quiescence.
         if (!stopQuarantined) { retain(); stopQuarantined = true; }
         if (gpuLock) IOLockUnlock(gpuLock);
+        if (bootstrapLock) IOLockUnlock(bootstrapLock);
         IOLog("PhxBringup: stop quarantined active hardware/resources; reclaim requires verified quiescence\n");
         IOService::stop(provider);
         return;
@@ -545,6 +560,11 @@ void PhxBringup::stop(IOService *provider) {
     if (smuLock) {
         IOLockFree(smuLock);
         smuLock = nullptr;
+    }
+    if (bootstrapLock) {
+        IOLockUnlock(bootstrapLock);
+        IOLockFree(bootstrapLock);
+        bootstrapLock = nullptr;
     }
     PMstop();
     IOService::stop(provider);
@@ -1033,6 +1053,94 @@ void PhxBringup::reapContextsLocked() {
         c.busy = false;
         phxReleaseBuffers(buffers);
     }
+}
+
+// Success returns with bootstrapLock held through the entire debug operation.
+// Passive capture never enters this lane. Failed/closed reservations are not reusable.
+IOReturn PhxBringup::lockDebugMutation(const void *client, uint32_t selector) {
+    if (!client || !bootstrapLock) return kIOReturnNotReady;
+    IOLockLock(bootstrapLock);
+    if (stopping) { IOLockUnlock(bootstrapLock); return kIOReturnNotReady; }
+    if (desktopState == DesktopUnused || selector == PHX_DESKTOP_SELECTOR ||
+        (desktopState == DesktopInitializing && desktopOwner == client && phxDesktopInitializerSelector(selector)))
+        return kIOReturnSuccess;
+    IOLockUnlock(bootstrapLock);
+    return kIOReturnExclusiveAccess;
+}
+
+void PhxBringup::unlockDebugMutation() {
+    IOLockUnlock(bootstrapLock);
+}
+
+void PhxBringup::abandonDesktop(const void *client) {
+    if (!bootstrapLock) return;
+    IOLockLock(bootstrapLock);
+    if (desktopOwner == client && desktopState == DesktopInitializing) {
+        desktopOwner = nullptr;
+        desktopState = DesktopAbandoned;
+    }
+    IOLockUnlock(bootstrapLock);
+}
+
+// Caller holds bootstrapLock. The reservation covers GART, KIQ, scheduler, both
+// complete queue arenas and PSP prerequisites, rather than just ring/wb/fence.
+IOReturn PhxBringup::desktopHandoff(const void *client, const PhxDesktopRequest &request) {
+    if (!client || !gpuLock || !smuLock || !fbAper || !doorbellMap || !mmio) return kIOReturnNotReady;
+    if (request.operation == PHX_DESKTOP_RESERVE) {
+        if (desktopState != DesktopUnused) return kIOReturnExclusiveAccess;
+        if (request.computeWptr || request.graphicsWptr) return kIOReturnBadArgument;
+        PhxBootMemory memory{};
+        IOReturn result = bootMemory(&memory);
+        if (result != kIOReturnSuccess) return result;
+        if (!phxDesktopLayoutValid(&request.layout, &memory)) return kIOReturnBadArgument;
+        const PhxMesQueueLayout *queues[] = {&request.layout.kiq, &request.layout.scheduler,
+                                            &request.layout.compute, &request.layout.graphics};
+        for (unsigned i = 0; i < 4; ++i)
+            if (!phxPspSpanFits(queues[i]->doorbellIndex * 4, 8, doorbellMap->getLength()))
+                return kIOReturnBadArgument;
+        IOLockLock(gpuLock);
+        bool busy = stopping || gq[0].ready || gq[1].ready;
+        for (const VmCtx &context : vm) busy = busy || context.busy;
+        for (const HwVmid &slot : hwv) busy = busy || slot.ctx || slot.faulted;
+        if (!busy) {
+            desktopLayout = request.layout;
+            desktopOwner = client;
+            desktopState = DesktopInitializing;
+        }
+        IOLockUnlock(gpuLock);
+        return busy ? kIOReturnNotReady : kIOReturnSuccess;
+    }
+    if (request.operation != PHX_DESKTOP_SEAL && request.operation != PHX_DESKTOP_CLAIM)
+        return kIOReturnBadArgument;
+    if (memcmp(&request.layout, &desktopLayout, sizeof(desktopLayout)) ||
+        request.computeWptr != PHX_DESKTOP_COMPUTE_WPTR || request.graphicsWptr != PHX_DESKTOP_GRAPHICS_WPTR)
+        return kIOReturnBadArgument;
+    if (request.operation == PHX_DESKTOP_CLAIM) {
+        if (desktopState != DesktopSealed) return kIOReturnNotReady;
+        desktopState = DesktopAbandoned; // even a failed claim cannot be retried
+        IOReturn result = claimAccel();
+        if (result == kIOReturnSuccess) desktopState = DesktopClaimed;
+        return result;
+    }
+    if (desktopState != DesktopInitializing || desktopOwner != client) return kIOReturnExclusiveAccess;
+    desktopOwner = nullptr;
+    desktopState = DesktopAbandoned; // sticky before inspecting or handing over either queue
+    const uint64_t compute = desktopLayout.compute.arenaOffset, graphics = desktopLayout.graphics.arenaOffset;
+    volatile uint8_t *base = reinterpret_cast<volatile uint8_t *>(fbAper->getVirtualAddress());
+    const uint64_t offsets[] = {compute + 0x5000, graphics + 0x7000, compute + 0x1010, graphics + 0x4010};
+    const uint64_t expected[] = {PHX_DESKTOP_COMPUTE_TOKEN, PHX_DESKTOP_GRAPHICS_TOKEN,
+                                 request.computeWptr, request.graphicsWptr};
+    for (unsigned i = 0; i < 4; ++i)
+        if (*reinterpret_cast<volatile uint64_t *>(base + offsets[i]) != expected[i]) return kIOReturnNotReady;
+    const uint64_t computeQueue[6] = {compute, 1024, compute + 0x1000,
+        desktopLayout.compute.doorbellIndex * 4, request.computeWptr, compute + 0x5000};
+    const uint64_t graphicsQueue[6] = {graphics, 2048, graphics + 0x4000,
+        desktopLayout.graphics.doorbellIndex * 4, request.graphicsWptr, (graphics + 0x7000) | 1};
+    IOReturn result = adoptQueue(computeQueue);
+    if (result != kIOReturnSuccess) return result;
+    result = adoptQueue(graphicsQueue);
+    if (result == kIOReturnSuccess) desktopState = DesktopSealed;
+    return result;
 }
 
 IOReturn PhxBringup::adoptQueue(const uint64_t in[6]) {
@@ -2143,6 +2251,10 @@ void IOAccelPhxNativeClient::freeAll() {
 void IOAccelPhxNativeClient::closeResources() {
     if (closed) return;
     closed = true;
+    if (desktopReservationOwned && owner) {
+        owner->abandonDesktop(this);
+        desktopReservationOwned = false;
+    }
     if (vmid && owner) {
         owner->deferClient(vmid, lastSeq, bufferStorage);
         bufferStorage = nullptr;
@@ -2220,6 +2332,9 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         r = kIOReturnNotReady;
     } else {
         reapPending();
+        const bool mutation = phxDesktopMutationSelector(selector);
+        r = mutation ? owner->lockDebugMutation(this, selector) : kIOReturnSuccess;
+        if (r == kIOReturnSuccess) {
         switch (selector) {
         case PHXN_SEL_HELLO:     r = doHello(a); break;
         case PHXN_SEL_QUERYINFO: r = doQueryInfo(a); break;
@@ -2247,7 +2362,10 @@ IOReturn IOAccelPhxNativeClient::externalMethod(uint32_t selector, IOExternalMet
         case PHXN_SEL_DBG_SYSMEM: r = doDbgSysMem(a); break;
         case PHXN_SEL_DBG_ADOPTQ: r = doDbgAdoptQueue(a); break;
         case PHXN_SEL_DBG_CLAIM: r = doDbgClaim(a); break;
+        case PHX_DESKTOP_SELECTOR: r = doDesktopHandoff(a); break;
         default:                 r = kIOReturnBadArgument; break;
+        }
+        if (mutation) owner->unlockDebugMutation();
         }
     }
     // RADV may turn different native refusals into DEVICE_LOST. Preserve the first native code
@@ -3010,6 +3128,17 @@ IOReturn IOAccelPhxNativeClient::doDbgClaim(IOExternalMethodArguments *a) {
     if (!shape(a, 1, 0, 0, 0) || a->scalarInput[0] != 1)
         return kIOReturnBadArgument;
     return owner->claimAccel();
+}
+
+IOReturn IOAccelPhxNativeClient::doDesktopHandoff(IOExternalMethodArguments *a) {
+    if (!owner->debugEnabled()) return kIOReturnUnsupported;
+    if (!privileged) return kIOReturnNotPrivileged;
+    if (!shape(a, 0, 0, sizeof(PhxDesktopRequest), 0) || !a->structureInput) return kIOReturnBadArgument;
+    PhxDesktopRequest request{};
+    memcpy(&request, a->structureInput, sizeof(request));
+    IOReturn result = owner->desktopHandoff(this, request);
+    if (request.operation == PHX_DESKTOP_RESERVE && result == kIOReturnSuccess) desktopReservationOwned = true;
+    return result;
 }
 
 // Write back and invalidate the CPU caches over every BO: CPU-written data must be in memory before the GPU reads

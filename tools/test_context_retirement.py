@@ -30,6 +30,7 @@ CASES = (
     'wait-after-close', 'close-during-wait', 'stop-active', 'stop-pending', 'stop-faulted', 'stop-orphan',
     'wait-adaptive-timeout', 'wait-cap-timeout',
     'stop-cold', 'stop-repeat', 'host-pins-preserved', 'mixed-buffer-release', 'empty-buffer-container',
+    'shutdown-desktop-initializing', 'shutdown-desktop-sealed', 'shutdown-desktop-abandoned',
     'alloc-stopping-after-lock', 'unbound-peer-invalid-hardware', 'client-pending-bo-close',
 ) + tuple(f'clear-{kind}-{fault}' for kind in ('root', 'used', 'cached') for fault in BACKING_FAULTS) + (
     'clear-root-mismatch', 'clear-used-zero', 'clear-pages-overflow', 'clear-stale-base',

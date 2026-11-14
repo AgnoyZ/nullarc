@@ -82,6 +82,8 @@ def exercise(out):
             raise RuntimeError('Refused reader must not publish JSON')
     result['reader_cases'] = len(reader_cases)
     inputs = [source, ROOT / 'src/phxbringup/PhxAllocationDiagnostic.hpp',
+              ROOT / 'src/phxbringup/PhxDesktopHandoff.h', ROOT / 'src/phxbringup/PhxMesQueueLayout.h',
+              ROOT / 'src/phxbringup/PhxGartLayout.h', ROOT / 'src/phxbringup/PhxBootMemory.h', ROOT / 'src/phxbringup/PhxPspLayout.h',
               ROOT / 'src/phxbringup/PhxAllocationSnapshot.h', ROOT / 'src/phxbringup/PhxNativeABI.h',
               ROOT / 'tests/test_allocation_snapshot.cpp', ROOT / 'tests/test_allocation_snapshot_reader.cpp',
               ROOT / 'tests/fake_native_iokit/IOKit/IOKitLib.h', ROOT / 'tools/allocation_snapshot.cpp', Path(__file__)]

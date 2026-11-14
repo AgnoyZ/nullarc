@@ -1,0 +1,124 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "build-39 source and private native compile candidate; not installed or hardware validated",
+  "source_parent": "2ca01f24d624a0e461a446726e9a93618dd1c6ad",
+  "validation_mode": "clean isolated committed snapshot; all tracked input hashes matched before and after final full suite; final code/test/workflow hashes independently matched to candidate",
+  "tested_input_sha256": {
+    ".github/workflows/allocation-capture-check.yml": "564819332a64f0ab8ad32fab26ee20e9ced9eee4769cfee531c25998fb8327dd",
+    "src/PhxDesktopHandoff.h": "6f2566b05e4f2ce3c39d7286400b72a10a6834a9057129c91e27e3d5bde69547",
+    "src/phxbringup/PhxDesktopHandoff.h": "6f2566b05e4f2ce3c39d7286400b72a10a6834a9057129c91e27e3d5bde69547",
+    "src/phxbringup/PhxBringup.cpp": "92ad3f3961de373a35744b5d3f899ee53105251a3769615c4f18d0e2d0c57ce7",
+    "tests/test_desktop_entrypoint.c": "384a41552ac7793ee55ab2104737a162afc5423d60cf7afb3dfbfca3e30be605",
+    "tests/test_desktop_handoff.cpp": "33f6734733443f53adb65953827bd8d6d9dd4a1768c8e686922b4de86d97daad",
+    "tests/test_desktop_handoff.py": "76a905f1fbaae070438f02b9d83a42c7b80191b5f6d995173b8dc7eb8c5afa46",
+    "tests/test_source.py": "49bbb4ffb529beb136bae9ca47be28383b3f99451e5ce9bd51ce6e17875cd489",
+    "tools/phxctl/mesboot.c": "60f13bf87d2c1513c962a1be96a661422c1bdfa2052e0b86e39c560cac31d513",
+    "tools/prepare_source.py": "7ee4bf7c8a7faf7a0171d325d8bceb70e1351271cfbeb9f6af83b1bf9e04fd11",
+    "tests/test_allocation_snapshot.cpp": "b2d1af392b9936f4c5cd368b7c7a4b86ab815976bf8a91c582e71391cb7b66f2",
+    "tests/test_context_retirement.cpp": "699ca0a3fde94b3177c006149ab5e2fe353d575734e75db0bcc3246d2253a3a6",
+    "tests/test_submit_diagnostic.cpp": "a9d700e2fa167a622f1f28281f443e2f9e92a581ceb87b5665657602741ea822",
+    "tests/test_submit_diagnostic_runner.py": "13d835236414b8cff1e5e20ccbc42bf96639f1d993d9759e392a7d63668756a6",
+    "tests/test_reference_scripts.py": "d7d9a247bc80ae80ec549a876e181f37e52d136f09d9ba3ec42541b719ad63ce",
+    "tools/test_allocation_snapshot.py": "e1c22f21784231e6c79ea8a079415da624d9daf9bca01b5252d7e01316c1cf23",
+    "tools/test_context_retirement.py": "6e183bc38d4d7457db0efc009b1e43d70427912241c6173f4d928f4fe29d559a",
+    "tools/test_submit_diagnostic.py": "82cd5f7a270417c8ab270618157a4f9374b4bb5b2503142fa0a602e0f45813ca"
+  },
+  "host": {
+    "system": "macOS",
+    "version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "checks": [
+    {
+      "name": "clean-full-suite",
+      "python": "3.13.18",
+      "tests": 589,
+      "returncode": 0,
+      "reported_seconds": 310.084,
+      "skipped_tests": 0,
+      "source_inputs_unchanged": true
+    },
+    {
+      "name": "clean-apple-native-handoff-cpu",
+      "python": "3.9.6",
+      "tests": 19,
+      "returncode": 0,
+      "reported_seconds": 22.33,
+      "native_production_inputs_unchanged": true
+    },
+    {
+      "name": "actual-cleanup-stop-methods",
+      "cases": 115,
+      "returncode": 0,
+      "includes_desktop_reservation_quarantine_cases": 3,
+      "hardware_executed": false
+    },
+    {
+      "name": "retirement-runner-regressions",
+      "tests": 6,
+      "returncode": 0
+    }
+  ],
+  "native": {
+    "kernel_build": 39,
+    "build_architecture_signature_and_toolchain_commands_passed": 14,
+    "helper_adhoc_signatures_verified": true,
+    "kernel_adhoc_signature_verified": true,
+    "architecture": "x86_64",
+    "compiler": "Apple Clang 21.0.0",
+    "host_sdk_version": "26.5",
+    "MacKernelSDK_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "MacKernelSDK_tree": "ef361592c6340fe53560a8aba98619da641ed437",
+    "sdk_exact_files_verified_before_and_after_compile": 1232,
+    "binaries": {
+      "PhxBringup": {
+        "bytes": 120800,
+        "sha256": "9746adb43c9b207d0fd29f8db7ef70116168066ed3fc6022284191953e08ae01"
+      },
+      "mesboot": {
+        "bytes": 148112,
+        "sha256": "2c7c17cf19234373be5c445c42c3d0d9e953c6e8198ebf3fe1a764b978922a2a"
+      },
+      "phxctl": {
+        "bytes": 49856,
+        "sha256": "adf6b6ff8d032a2f4adcb0e4e324227ba68a5d6da51480a8b1c29bd64540fcf5"
+      }
+    },
+    "compiled_production_inputs_match_final_tested_source": true,
+    "warning_note": "Three existing field-shadow warnings in PhxBringup; two existing kIOMainPortDefault minimum-target availability warnings across the tools; one existing unused legacy local in mesboot. These unrelated statements are unchanged."
+  },
+  "prior_validation_attempts": "Earlier runs were not passes: one focused stopping-status regression was corrected, dispatcher fakes and a shared-connection call-count assertion were updated, and an explicit cleanup-fixture case label was restored. Final full suite and actual cleanup harness passed after those corrections.",
+  "full_suite_warning_note": "Existing unclosed SQLite connection ResourceWarnings in unchanged GoalResume fixtures; no new focused-handoff ResourceWarning.",
+  "implemented_source_properties": [
+    "explicit-layout one-connection GART/MES/KIQ/scheduler and compute/graphics initialization",
+    "provider-lifetime reservation of complete queue arenas, GART and PSP prerequisites against competing raw debug mutations",
+    "fresh independent scratch/memory markers and full-width release fences before seal",
+    "exact layout and writeback binding; both checked adoption results precede claim",
+    "one sealed claim; failed or abandoned reservations cannot reset or rearm",
+    "actual passive client close bypasses a busy initializer mutation lock",
+    "existing stop quarantine includes every reservation state"
+  ],
+  "existing_allocation_snapshot_format_and_history_policy_unchanged": true,
+  "existing_both_engine_claim_guard_retained": true,
+  "VM_guards_budgets_pin_direction_unchanged": true,
+  "new_target_snapshot_requests": 0,
+  "new_target_service_opens": 0,
+  "native_helpers_executed_on_target": false,
+  "kernel_loaded": false,
+  "new_driver_deployment": false,
+  "startup_installed_or_changed": false,
+  "M2_armed": false,
+  "desktop_takeover_executed": false,
+  "normal_or_fallback_reboot_requested": false,
+  "public_binary_uploads": false,
+  "desktop_request_consumed": false,
+  "root_cause_confirmed": false,
+  "remaining_gates": [
+    "complete pinned private kernel/helper/capture/interpreter delivery and startup rollback",
+    "concrete firmware/power, display, release, original-threshold monitor and independent disarm/reboot adapters",
+    "retained same-boot historical hold/panel-open ordering without extending the 120-second hold",
+    "exact one-attempt packet and live preflight before using the outstanding diagnostic request"
+  ]
+}

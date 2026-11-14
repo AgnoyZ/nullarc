@@ -10,8 +10,12 @@ pre-initializer baseline or reproduce desktop takeover. Phase B remains
 the next integration boundary. The new [startup coordinator source candidate](
 ALLOCATION-STARTUP-COORDINATOR.md) implements completed-baseline admission and
 a separate recovery dispatcher with multiprocess tests. It is not installed
-and still requires the concrete compatible initializer, native adapters and
+and still requires native delivery, display adapters and
 historical hold/panel-order evidence before the requested desktop attempt.
+The later [build-39 native handoff candidate](DESKTOP-NATIVE-HANDOFF.md)
+implements an explicit-layout initializer, complete arena reservation and
+checked two-engine adoption/claim. It remains uninstalled and unvalidated on
+hardware; it does not make the outstanding desktop attempt ready to run.
 
 Historical status before installation on 2026-11-14 after fresh live-execution permission: **private native
 build-37 delivery and an exact rollback packet are retained; the operator

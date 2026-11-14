@@ -105,6 +105,9 @@ public:
     PhxRetiredBuffers *quarantinedBuffers{nullptr};
     uint64_t gSeq{10}, ringMc{0}; bool tmrSetUp{false};
     int mutex{0}, smuMutex{0}; int *gpuLock{&mutex}, *smuLock{&smuMutex};
+    int bootstrapMutex{0}; int *bootstrapLock{nullptr};
+    enum DesktopState { DesktopUnused, DesktopInitializing, DesktopSealed, DesktopClaimed, DesktopAbandoned };
+    DesktopState desktopState{DesktopUnused};
     FakeMap aperture, registers, bells;
     FakeMap *fbAper{&aperture}, *mmio{&registers}, *doorbellMap{&bells};
     IOMemoryDescriptor pciObject; IOMemoryDescriptor *pci{&pciObject};
@@ -141,6 +144,7 @@ public:
     uint64_t ptTablePhys(VmCtx &c, uint32_t i) { assert(mutex && i == 0); return c.chunk[0] ? c.phys : 0; }
     void clearRing() { ++clears; }
     void releaseSession() { ++sessionReleases; }
+    void abandonDesktop(const void *) { assert(false && "non-reserving client must not enter bootstrap cleanup"); }
     bool vmOwnershipKnown(uint32_t) const;
     bool ptClear(VmCtx &) const;
     bool vmFlushTlb(uint32_t) const;
@@ -159,7 +163,7 @@ public:
     struct Map { bool used; };
     PhxBringup *owner;
     int mutex{0}; int *lock{&mutex};
-    bool closed{false}, hello{true}, sessionClaimed{true};
+    bool closed{false}, hello{true}, sessionClaimed{true}, desktopReservationOwned{false};
     uint32_t vmid{1}; uint64_t lastSeq{5}, emitted{5};
     PhxRetiredBuffers *bufferStorage; Bo *bos; Map *maps{nullptr};
     uint32_t pendFenceHandle{0}, pendFenceOffset{0}; uint64_t pendFenceSeq{0};
@@ -307,8 +311,15 @@ int main(int argc, char **argv) {
         else if (test == "shutdown-no-lock-firmware") p.ringMc = 0x300000;
         else if (test == "shutdown-no-lock-tmr") p.tmrSetUp = true;
         else if (test == "shutdown-no-lock-ledger" || test == "shutdown-no-lock-repeat") p.quarantinedBuffers = buffers;
+        else if (test.rfind("shutdown-desktop-", 0) == 0) {
+            p.bootstrapLock = &p.bootstrapMutex;
+            assert(test == "shutdown-desktop-initializing" || test == "shutdown-desktop-sealed" || test == "shutdown-desktop-abandoned");
+            p.desktopState = test == "shutdown-desktop-initializing" ? PhxBringup::DesktopInitializing :
+                             test == "shutdown-desktop-sealed" ? PhxBringup::DesktopSealed : PhxBringup::DesktopAbandoned;
+        }
         else assert(cold && "Unknown shutdown scenario");
         p.stop(nullptr);
+        assert(!p.bootstrapMutex);
         assert(p.hangStop && !p.hangCall && p.timer.cancelled && p.timer.freed);
         assert(p.stopping && p.stops == 1 && !normal.releases && !host.completes && !host.releases && !frees && !lineFlushes);
         if (cold) {
