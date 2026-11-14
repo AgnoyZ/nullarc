@@ -7,40 +7,44 @@ restart, exact loaded-image verification and
 passed** on macOS 26.7.2 build 25G332. Both snapshots had zero observed
 refusals. They followed inherited initialization; they do not establish a
 pre-initializer baseline or reproduce desktop takeover. Phase B remains
-the next integration boundary. The retained historical status and plan below
-do not supersede that later evidence.
+the next integration boundary. The new [startup coordinator source candidate](
+ALLOCATION-STARTUP-COORDINATOR.md) implements completed-baseline admission and
+a separate recovery dispatcher with multiprocess tests. It is not installed
+and still requires the concrete compatible initializer, native adapters and
+historical hold/panel-order evidence before the requested desktop attempt.
 
-Status on 2026-11-14 after fresh live-execution permission: **private native
+Historical status before installation on 2026-11-14 after fresh live-execution permission: **private native
 build-37 delivery and an exact rollback packet are retained; the operator
 confirms an independent recovery route; Phase A remains unperformed**.
 The [live preflight and native-build record](ALLOCATION-LIVE-PREFLIGHT.md)
 supplies actual current OS/build metadata and private candidate identities.
 The [install-packet record](ALLOCATION-INSTALL-PACKET.md) adds the verified
 fresh EFI backup. The later [continuity and input revalidation](ALLOCATION-RESUME-REVALIDATION.md)
-confirms the same Goal is active and the retained inputs still match; real
-reboot/resume and Phase A remain unverified.
+confirmed the same Goal was active and the retained inputs matched at that
+earlier point. The completed restart and Phase A evidence above supersede its
+then-unverified reboot/read status.
 This plan is not an installer, launcher, arming receipt or hardware result.
 The later [capture-runtime delivery](ALLOCATION-CAPTURE-RUNTIME.md) supplies
 root-owned tested helpers and an isolated system-interpreter entrypoint; it
-does not supply a loaded build-37 kernel or startup integration.
+did not itself supply a loaded build-37 kernel or startup integration. The
+later installation and passive reads supply the loaded-kernel/read evidence.
 The consumed build-36 M2/reboot grants remain spent. No installation, target
 service open, GPU work, startup edit, arming or reboot was performed in the
 preflight/build phase.
 
-The immediate objective is to prove that the reviewed build-37 software
-snapshot can be read on a firmware-desktop boot. A subsequent, separately
-reviewed experiment would attempt to retain refusal history from a failed
-display boot before recovery. Neither objective establishes acceleration or
-the allocation root cause in advance.
+The passive-read objective is complete. The immediate objective is now a
+concrete reviewed startup chain capable of retaining refusal history from
+the requested display attempt before independent recovery. Neither result
+would establish acceleration or the allocation root cause in advance.
 
 ## Reviewed inputs and present gaps
 
 | Input | Reviewed identity or evidence | What it does not supply |
 | --- | --- | --- |
-| Build-37 kernel and standalone reader | Reviewed snapshot source `1c17a1712cb3a64db31148cb33d0c2c9741e7e5d`; private native build from `2c26f4deffc4940c1a0a69d9b36c6770191ee0a8`; [native validation](validation/allocation-live-preflight-20261114.json) | Target load, recovery acceptance or a successful target read |
+| Build-37 kernel and standalone reader | Reviewed snapshot source `1c17a1712cb3a64db31148cb33d0c2c9741e7e5d`; private native build from `2c26f4deffc4940c1a0a69d9b36c6770191ee0a8`; [installed and passive-read evidence](ALLOCATION-PHASE-A.md) | A pre-initializer baseline, display acceptance or a failed-boot capture |
 | Capture helper | `e2cb77bc7b1d0ff058744e1b7a1746da32e2a45e`; [capture contract](ALLOCATION-CAPTURE-CANDIDATE.md) | A supervisor, startup sequencing or recovery integration |
 | Independent observer | `25510a8321d45b8223883987c9145652517b4939`; [observer validation](validation/allocation-observer-20261114.json) | Workload admission, proof of report causation or guaranteed completion before recovery |
-| Last verified combined source/documentation | `f3ff243da716ff755433fdb01ac8bb91183682a4` | New target authorization or evidence that build 37 is currently loaded |
+| Historical combined source/documentation checkpoint | `f3ff243da716ff755433fdb01ac8bb91183682a4` | Later installation, passive-read or integration results |
 | Installed monitor | Read-only control-point review; its privately retained hash is unchanged | An approved startup modification or a complete execution audit |
 
 The corrected hosted kernel/reader compile retained zero artifacts; that
@@ -89,8 +93,9 @@ Starting two LaunchDaemons together, a successful process spawn,
 `observer.started`, a wall-clock filename, or the existing second-resolution
 release log cannot by themselves prove either strict boundary. The observer
 publishes its marker after baseline and immediately scans for reports; a
-report can already have appeared during baseline. It has no workload-ready
-handshake. The generic [boot gate](BOOT-GATE.md) is not a drop-in solution:
+report can already have appeared during baseline. The optional callback in
+the new coordinator candidate follows its first post-baseline scan; the
+installed startup still has no such handshake. The generic [boot gate](BOOT-GATE.md) is not a drop-in solution:
 it executes stages serially and runs a release hook on exit. Placing a
 potentially kernel-blocked collector in that stage chain would not establish
 independent recovery.
@@ -111,10 +116,11 @@ handler schedules teardown work without explicitly waiting for that worker.
 The audit's command fakes characterize source control flow; they do not prove
 an installed integration or an actual kernel/AGDC hang.
 
-**Current decision: do not attach the observer to startup or run another M2
-attempt.** First complete the passive-read gate below. Then review one concrete
-startup integration against the required ordering and recovery contract.
-There is no runnable integration in this plan.
+**Current decision: complete the native startup adapters before attaching the
+observer or running the outstanding M2 attempt.** The passive-read gate has
+passed. The coordinator source and its tests close part of the implementation
+gap, while compatible initialization, native acceptance and historical hold
+ordering remain unresolved. This plan is not a runnable integration.
 
 ## Required private execution packet
 
@@ -151,10 +157,11 @@ report names and raw I/O/log output in ignored private storage. A future
 sanitized public result should contain only reviewed aggregate facts and
 source/provenance references.
 
-## Phase A: prove passive read feasibility on the firmware desktop
+## Phase A recipe: passive firmware-desktop read, completed 2026-11-14
 
-This is the recommended next target scope **after** its packet and authorization
-are complete. It is not performed or granted here.
+The following recipe was completed in the separately recorded
+[Phase A scope](ALLOCATION-PHASE-A.md). Its baseline and second-read claims are
+consumed; do not replay them. The recipe describes the evidence boundary.
 
 1. Review the exact package and rollback first. If installing/loading build 37
    requires a reboot, scope that normal firmware-desktop boot separately.
@@ -301,11 +308,11 @@ the current missing evidence.
 | --- | --- | --- |
 | Reviewed source and offline contracts | Complete; [observer record](validation/allocation-observer-20261114.json) | Preserve the pinned input identities |
 | Retained target package and rollback packet | Prepared and independently read back; recovery route operator-attested | Recheck exact bytes and live identity before any mutation |
-| Goal continuity admission | Same Goal active; saved-session continuation observed on the installation boot | Preserve active-state and consumed-claim guards; a real authorized reboot/resume remains unverified |
-| Trusted capture runtime | Helper/interpreter/import closure not staged and verified for root execution | Complete the exact private delivery scope before authorizing a passive read |
-| Passive firmware-desktop read | Not executed | Concrete one-use package/load/read scope and continuity admission; then valid Phase A evidence |
-| Ordered startup integration with independent recovery | Not implemented or verified | Exact source change and integration failure tests |
-| One display/M2 attempt | Not authorized or executed | All preceding gates and a new one-use execution scope |
+| Goal continuity admission | Normal restart, resumed session and same-boot exact-image readback recorded | Preserve active-state and consumed-claim guards for the next scope |
+| Trusted capture runtime | Root-owned helper/interpreter/import closure delivered and verified; used for Phase A | Deliver and pin any changed observer/coordinator and native adapters separately |
+| Passive firmware-desktop read | Phase A passed: two same-boot build-37 reads, all reason counts/deltas zero | Claims consumed; these post-inherited-initialization reads cannot be the next startup baseline |
+| Ordered startup integration with independent recovery | Source candidate and fake-process integration tests implemented; not installed | Compatible native initializer/claim/display/monitor/recovery adapters, input delivery, historical hold ordering and rollback review |
+| One display/M2 attempt | Owner requested; outstanding attempt remains unconsumed and unexecuted | Complete preceding technical gates and bind the exact one-use packet to that request |
 | Allocation root cause | Unconfirmed | Captured target evidence within its stated limits |
 
 The original [machine-readable plan](validation/allocation-execution-plan-20261114.json)

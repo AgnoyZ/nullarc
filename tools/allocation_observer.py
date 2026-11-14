@@ -86,7 +86,7 @@ class ReportWatch:
 
 def observe(reports, out, reader, digest, build, image, window_seconds,
             watch_factory=ReportWatch, baseline=capture.begin, failure=capture.finish,
-            clock=time.monotonic):
+            clock=time.monotonic, on_ready=None):
     capture.host_check()
     capture.require(type(window_seconds) is int and 1 <= window_seconds <= MAX_SECONDS, 'watch-window')
     deadline = clock() + window_seconds
@@ -95,6 +95,7 @@ def observe(reports, out, reader, digest, build, image, window_seconds,
         initial = watcher.scan()  # Already armed; post-baseline scan covers persistent arrivals during baseline.
         baseline(out, reader, digest, build, image)
         root = capture.directory(out)
+        baseline_completed = clock()
         started = {'format': 1, 'reports_directory': str(reports), 'initial_report_count': len(initial),
                    'window_seconds': window_seconds, 'deadline_monotonic': deadline,
                    'baseline_sha256': hashlib.sha256(capture.read_file(root / 'baseline.json')).hexdigest()}
@@ -131,6 +132,18 @@ def observe(reports, out, reader, digest, build, image, window_seconds,
                 failure(root)  # Ordinary one-attempt collector; no recovery callback exists.
                 raw = capture.read_file(root / 'failure.json')
                 return complete('captured', notifications, hashlib.sha256(raw).hexdigest())
+            if notifications == 0 and on_ready is not None:
+                # A startup coordinator may validate this receipt, not observer.started.
+                # The first post-baseline scan above excludes reports already discovered
+                # during baseline. The callback must not wait for startup or recovery.
+                ready_at = clock()
+                if ready_at >= deadline:
+                    return complete('window-expired', notifications)
+                on_ready({'format': 1, 'baseline_sha256': started['baseline_sha256'],
+                          'baseline_completed_ns': int(baseline_completed * 1_000_000_000),
+                          'ready_ns': int(ready_at * 1_000_000_000),
+                          'deadline_ns': int(deadline * 1_000_000_000),
+                          'observer_pid': os.getpid()})
             if notifications == MAX_EVENTS:
                 return complete('event-limit', notifications)
             remaining = deadline - clock()

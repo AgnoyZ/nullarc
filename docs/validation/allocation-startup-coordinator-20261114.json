@@ -1,0 +1,93 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "source candidate; offline process integration verified; not installed",
+  "source_parent": "a5f4ee5a66b95540a427ed9ae36e7d18f787a493",
+  "validation_mode": "clean isolated committed worktree; code hashes matched the candidate before and after every suite",
+  "tested_input_sha256": {
+    "tools/allocation_capture.py": "5388b0c1a4f91c315451628ed44257907f56e30e7ccf5afc088bd97922c5d328",
+    "tools/allocation_observer.py": "48b95209bcd64e7c9f4fed6484613be6a9828158248cf741dfd6761b75c9dbad",
+    "tools/allocation_startup.py": "20ed638efd0dd04eaecec4ebe95840ea8793942adc8994df86b1c30ac3ca5e21",
+    "tests/test_allocation_capture.py": "c27bbf7ee43615291e98dc95c36eb3c6cf04914004ae693824365984d424ed85",
+    "tests/test_allocation_observer.py": "34962a76e87edb2f85639530bdddb059ef51bae440878efddaea40a884da2a9c",
+    "tests/test_allocation_coordinator.py": "d09761f3091de0d71273bbf71677ff9804f13e305a377944b90afe2e11ecbb8b",
+    ".github/workflows/allocation-capture-check.yml": "964c59bc70f4239d194b623e366006d29f79a46351a72b676a551d276d8c3bc2"
+  },
+  "host": {
+    "system": "macOS",
+    "version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "focused_apple_python": "3.9.6",
+  "full_suite_python": "3.13.18",
+  "coordinator_test_methods": 43,
+  "focused_tests_total": 90,
+  "checks": [
+    {
+      "name": "clean-apple-capture-coordinator",
+      "returncode": 0,
+      "tests": 64,
+      "reported_seconds": 74.496,
+      "resource_warnings": false,
+      "source_inputs_unchanged": true,
+      "stage_clean": true
+    },
+    {
+      "name": "clean-apple-observer",
+      "returncode": 0,
+      "tests": 26,
+      "reported_seconds": 5.173,
+      "resource_warnings": false,
+      "source_inputs_unchanged": true,
+      "stage_clean": true
+    },
+    {
+      "name": "clean-full-suite",
+      "returncode": 0,
+      "tests": 570,
+      "reported_seconds": 337.853,
+      "resource_warnings": true,
+      "source_inputs_unchanged": true,
+      "stage_clean": true
+    }
+  ],
+  "full_suite_skipped_tests": 0,
+  "warning_note": "Full-suite unclosed sqlite3.Connection ResourceWarnings occurred during unchanged GoalResume fixture tests; focused helper suites emitted no ResourceWarning.",
+  "previous_dirty_checkout_run": "stopped after expected clean-source preparation refusals; not counted as valid full-suite evidence",
+  "implemented_source_properties": [
+    "durable fixed-scope one-attempt claim and refusal of competing reuse",
+    "recovery armed before observer and completed-baseline admission",
+    "strict baseline schema/hash/spec/identity/capacity checks and frozen expectations",
+    "ordered zero-status initialization, claim, display, release and monitor stages",
+    "known-pending recovery and dead-observer admission refusal",
+    "bounded stage output and exact owned process housekeeping",
+    "separate deadline owner dispatches disarm and display without waiting for display completion",
+    "refused or blocked disarm still reaches the original absolute watchdog deadline",
+    "recovery receipt binds owner PID, expected identity and durable attempt-claim hash",
+    "first report after release triggers collection without replacing monitor crash thresholds",
+    "Darwin group-signal error does not skip observer cleanup or overwrite the original refusal"
+  ],
+  "new_target_snapshot_requests": 0,
+  "new_target_service_opens": 0,
+  "gpu_workload_executed": false,
+  "startup_installed_or_changed": false,
+  "new_driver_deployment": false,
+  "M2_armed": false,
+  "desktop_takeover_executed": false,
+  "normal_or_fallback_reboot_requested": false,
+  "public_binary_uploads": false,
+  "driver_behavior_or_recovery_thresholds_changed": false,
+  "full_native_initializer_integrated": false,
+  "native_display_monitor_recovery_adapters_integrated": false,
+  "historical_hold_panel_order_proven": false,
+  "live_firmware_recovery_verified": false,
+  "desktop_request_consumed": false,
+  "root_cause_confirmed": false,
+  "remaining_gates": [
+    "compatible explicit-layout native initialization and both-engine resource handoff",
+    "reviewed native claim/display/release/monitor/disarm adapters and delivery",
+    "historical framebuffer hold/panel-open order and original monitor thresholds",
+    "exact one-attempt packet, startup rollback and live preflight"
+  ]
+}

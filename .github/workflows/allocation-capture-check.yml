@@ -19,6 +19,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_allocation_capture.py -v
       - name: Exercise independent observer on temporary files and fake collectors
         run: python3 -m unittest discover -s tests -p test_allocation_observer.py -v
+      - name: Exercise startup coordinator and independent recovery with file-only commands
+        run: python3 -m unittest discover -s tests -p test_allocation_coordinator.py -v
       - name: Verify source and execution scope
         run: |
           git diff --exit-code HEAD -- src tools tests

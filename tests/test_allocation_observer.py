@@ -90,6 +90,33 @@ class ObserverTests(unittest.TestCase):
         self.assertEqual('captured', self.run_observer()['outcome'])
         self.assertEqual([], self.waits)
 
+    def test_readiness_follows_full_baseline_and_first_post_baseline_scan(self):
+        receipts = []
+        def ready(value):
+            self.assertEqual(['watch-armed', 'scan', 'baseline', 'scan'], self.trace)
+            self.assertEqual(hashlib.sha256((self.out / 'baseline.json').read_bytes()).hexdigest(),
+                             value['baseline_sha256'])
+            self.assertEqual(os.getpid(), value['observer_pid'])
+            self.assertLessEqual(value['baseline_completed_ns'], value['ready_ns'])
+            self.assertLess(value['ready_ns'], value['deadline_ns'])
+            receipts.append(value)
+        self.run_observer(on_ready=ready)
+        self.assertEqual(1, len(receipts))
+
+    def test_early_report_never_signals_readiness(self):
+        self.scans = [{}, {'WindowServer-during.spin': (1, 3)}]
+        ready = mock.Mock()
+        self.run_observer(on_ready=ready)
+        ready.assert_not_called()
+
+    def test_expired_baseline_never_signals_readiness(self):
+        def slow(*args):
+            self.baseline(*args)
+            self.now = 90.0
+        ready = mock.Mock()
+        self.run_observer(baseline=slow, on_ready=ready)
+        ready.assert_not_called()
+
     def test_old_reports_are_ignored_and_same_name_new_inode_is_new(self):
         self.scans = [{'WindowServer-old.ips': (1, 2)}] * 2 + [{'WindowServer-old.ips': (1, 3)}]
         self.assertEqual('captured', self.run_observer()['outcome'])
