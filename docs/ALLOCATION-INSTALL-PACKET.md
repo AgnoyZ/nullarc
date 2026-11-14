@@ -9,6 +9,11 @@ This phase prepared and independently verified the exact private rollback
 packet for the [retained build-37 candidate](ALLOCATION-LIVE-PREFLIGHT.md).
 It did not install the candidate or issue a target snapshot request.
 
+Later state: the [continuity/input revalidation](ALLOCATION-RESUME-REVALIDATION.md)
+confirmed the same Goal active and reverified the original retained packets.
+The activation refusal below is historical; do not repeat that consumed
+request. Target execution scopes and the trusted capture runtime remain open.
+
 ## Current identity and exact change
 
 The preparation observed the same build-36 PhxBringup service and loaded-image
@@ -57,7 +62,7 @@ continues the same private packet. The original error, original program and
 corrected program remain retained. This did not consume or replay a target
 snapshot, installation, display or reboot attempt.
 
-## Remaining continuity constraint
+## Historical continuity refusal
 
 The installed Codex app-server protocol exposes Goal lifecycle get/set
 requests. A read through its standard-input/output transport successfully
@@ -69,10 +74,12 @@ still reported `blocked`. The unavailable default control socket and this
 refusal were retained separately; neither was treated as a successful resume.
 
 No Goal database was directly changed, no helper guard was bypassed and no
-automatic status-change retry was scheduled. The existing login helper still
-requires an active Goal. Restore it through the supported user lifecycle
-control after the current writer has finished, then check the helper against
-the actual saved session. A real reboot/resume test remains outstanding.
+automatic status-change retry was scheduled. The existing login helper
+requires an active Goal. At that point, the remaining prerequisite was
+supported lifecycle restoration after the writer finished, followed by a
+check against the actual saved session. That restoration has since succeeded,
+as recorded in the follow-up above; do not replay the failed activation.
+A real reboot/resume test remains outstanding.
 
 The next target stage remains [Phase A](ALLOCATION-EXECUTION-PLAN.md#phase-a-prove-passive-read-feasibility-on-the-firmware-desktop).
 Before installation/reboot, recheck live identities, the exact packet and

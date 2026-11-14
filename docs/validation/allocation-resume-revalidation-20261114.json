@@ -1,0 +1,75 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "status": "same-goal-active; retained-inputs-reverified; Phase-A-unperformed",
+  "documentation": "docs/ALLOCATION-RESUME-REVALIDATION.md",
+  "continuity": {
+    "same_existing_goal_active": true,
+    "supported_user_origin_lifecycle_restoration_verified": true,
+    "saved_session_continuation_observed": true,
+    "explicit_user_full_access_switch_observed": true,
+    "repository_default_helper_changed": false,
+    "installed_private_helper_and_plist_match_updated_receipt": true,
+    "native_CLI_matches_configured_hash": true,
+    "current_boot_matches_installation_boot": true,
+    "existing_per_boot_claim_preserved": true,
+    "direct_goal_database_mutation": false,
+    "real_reboot_resume_verified": false
+  },
+  "fresh_read_only_checks": {
+    "loaded_build": 36,
+    "candidate_build": 37,
+    "single_service_and_loaded_image_match_retained_baseline": true,
+    "same_boot_and_service_before_after": true,
+    "firmware_framebuffer_class": "IONDRVFramebuffer",
+    "available_display_switches_zero": 2,
+    "other_switches_unavailable": 2,
+    "unavailable_values_treated_as_zero": false,
+    "selected_NVRAM_arming_value_present": false,
+    "selected_named_markers_absent": 5,
+    "bounded_named_helper_matches": 0,
+    "all_background_GPU_activity_excluded": false,
+    "selected_installed_inputs_match_retained_baseline": 8,
+    "native_packet_manifest_entries_verified": 57,
+    "native_packet_manifest_bytes_verified": 3333129,
+    "rollback_packet_manifest_entries_verified": 436,
+    "rollback_packet_manifest_bytes_verified": 106164036,
+    "exact_kernel_reader_hashes_match": true,
+    "EFI_mounted_or_live_EFI_recompared_this_followup": false,
+    "recovery_operator_attested": true,
+    "recovery_boot_tested_by_agent": false
+  },
+  "evidence_corrections": {
+    "original_raw_evidence_retained": true,
+    "restricted_metadata_failures_classified_unverified": true,
+    "nested_launchd_coalition_not_job_state": true,
+    "corrected_top_level_job_state": "not running"
+  },
+  "existing_hosted_run": {
+    "id": 43539539120,
+    "head_sha": "0f7b19b6f0f23e63be5c4e43a738b2f07a29b928",
+    "status": "completed",
+    "conclusion": "success",
+    "source_tests": "success",
+    "macos_kexts": "success",
+    "retained_artifacts": 0,
+    "hardware_execution_evidence": false
+  },
+  "remaining_gaps": {
+    "capture_helper_at_retained_native_SOURCE_tools_path": false,
+    "trusted_root_capture_interpreter_import_closure_staged": false,
+    "fresh_exact_unconsumed_target_scopes_established": false,
+    "Phase_A_performed": false,
+    "allocation_root_cause_confirmed": false
+  },
+  "execution_limits": {
+    "consumed_target_grants_restored": false,
+    "native_driver_rebuilt_this_followup": false,
+    "candidate_installed_or_loaded": false,
+    "target_snapshot_requests": 0,
+    "GPU_initialization_legacy_helper_execution_M2_arming_or_reboot": false,
+    "EFI_Windows_partition_security_or_installed_runtime_changed": false,
+    "public_binary_or_raw_evidence_upload": false,
+    "unchanged_local_full_suite_rerun": false
+  }
+}

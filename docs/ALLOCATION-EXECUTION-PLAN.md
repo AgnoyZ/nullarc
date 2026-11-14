@@ -6,7 +6,9 @@ confirms an independent recovery route; Phase A remains unperformed**.
 The [live preflight and native-build record](ALLOCATION-LIVE-PREFLIGHT.md)
 supplies actual current OS/build metadata and private candidate identities.
 The [install-packet record](ALLOCATION-INSTALL-PACKET.md) adds the verified
-fresh EFI backup and the still-blocked Goal continuity admission.
+fresh EFI backup. The later [continuity and input revalidation](ALLOCATION-RESUME-REVALIDATION.md)
+confirms the same Goal is active and the retained inputs still match; real
+reboot/resume and Phase A remain unverified.
 This plan is not an installer, launcher, arming receipt or hardware result.
 The consumed build-36 M2/reboot grants remain spent. No installation, target
 service open, GPU work, startup edit, arming or reboot was performed in the
@@ -283,7 +285,8 @@ the current missing evidence.
 | --- | --- | --- |
 | Reviewed source and offline contracts | Complete; [observer record](validation/allocation-observer-20261114.json) | Preserve the pinned input identities |
 | Retained target package and rollback packet | Prepared and independently read back; recovery route operator-attested | Recheck exact bytes and live identity before any mutation |
-| Goal continuity admission | Blocked; supported activation request rejected by current active writer | Supported user lifecycle activation after the writer finishes; verify saved-session helper readiness |
+| Goal continuity admission | Same Goal active; saved-session continuation observed on the installation boot | Preserve active-state and consumed-claim guards; a real authorized reboot/resume remains unverified |
+| Trusted capture runtime | Helper/interpreter/import closure not staged and verified for root execution | Complete the exact private delivery scope before authorizing a passive read |
 | Passive firmware-desktop read | Not executed | Concrete one-use package/load/read scope and continuity admission; then valid Phase A evidence |
 | Ordered startup integration with independent recovery | Not implemented or verified | Exact source change and integration failure tests |
 | One display/M2 attempt | Not authorized or executed | All preceding gates and a new one-use execution scope |

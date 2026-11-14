@@ -8,10 +8,13 @@ install a driver, authorize a workload or request a reboot.
 
 The local Codex CLI's `exec resume` interface and read-only goal/session
 database checks were inspected on 2026-11-14. The configured native CLI is
-SHA-256 pinned. The helper adds no model, approval, sandbox-bypass or remote
-control override. Configuration, session identifiers, checkpoint, per-boot
-claims and execution logs stay private outside the repository. No credentials
-are copied into the LaunchAgent or checkpoint.
+SHA-256 pinned. The repository's default helper adds no model, approval,
+sandbox-bypass or remote control override. The later
+[session-specific revalidation](ALLOCATION-RESUME-REVALIDATION.md) records the
+user-authorized Full Access adaptation of the installed private copy;
+the repository default is unchanged. Configuration, session identifiers,
+checkpoint, per-boot claims and execution logs stay private outside the
+repository. No credentials are copied into the LaunchAgent or checkpoint.
 
 ## Restart contract
 
