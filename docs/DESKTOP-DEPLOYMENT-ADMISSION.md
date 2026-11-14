@@ -1,7 +1,8 @@
 # Desktop deployment admission: KDK and AuxKC approval
 
-Status, 2026-11-14: **deployment blocked; candidate restored out of the installed
-location; no desktop diagnostic executed**. The actual host is macOS 26.7.2,
+Status, 2026-11-14, after the owner's manual grants and a host reboot:
+**candidate not installed; normal AuxKC replacement approval still unproven;
+desktop capture restored; no desktop diagnostic executed**. The actual host is macOS 26.7.2,
 build 25G332, x86_64. PhxBringup build 37 remains loaded and installed. The
 build-39 delivery for the [checked startup adapter](DESKTOP-STARTUP-ADAPTERS.md)
 is staged privately. This record concerns deployment admission, not the cause
@@ -80,10 +81,77 @@ having sudo privileges has not been demonstrated to fix this failure.
 Apple's [API documentation](https://developer.apple.com/documentation/localauthentication/lacontext/canevaluatepolicy(_:error:))
 describes this as a prerequisite check. Its [extension approval guidance](https://support.apple.com/en-us/120363)
 points to Login Items & Extensions on macOS 15 and later when a relevant system
-alert asks for approval; a successful approval there has not been observed here.
+alert asks for approval. A successful normal approval of this candidate's
+AuxKC replacement has not been observed here.
 
-The next deployment admission requires a normal OS approval path that actually
-succeeds. Do not substitute approval-skipping flags, raw-cache activation,
+### Readbacks after the owner's manual grants
+
+The host rebooted at 16:27:54 +08:00. This was observed, not requested by the
+agent. The current boot no longer matches the private delivery's preparation
+boot. Neither the old preparation record nor any consumed installer was
+modified to make it reusable.
+
+At 16:29, a helper launched through the ordinary Terminal application reported
+Accessibility and Screen Recording access, and an actual desktop screenshot
+succeeded. At 16:37 a window-only screenshot and Accessibility readback of
+System Settings also succeeded. These results establish permission for
+Terminal's execution context; they do not establish permission for every
+agent or privileged process. Private screenshots and UI trees are not published.
+The visible Login Items & Extensions pane did not establish a candidate-specific
+approval. No approval control was clicked. A later attempt to select only its
+category tab found no unique target and performed no click.
+
+A read-only query of the system kext policy database found an existing
+`com.luuumi.PhxAccel` row with `allowed = 1`. The observation does not establish
+when that approval was granted or authorize a claim that the new candidate is
+already cached. Both the original and staged candidate's `kmutil print-diagnostics`
+returned status zero while reporting `Authenticating extension failed: Bad code
+signature`. The installed original separately passed strict `codesign`
+verification and remains loaded. Cryptographic signature verification, system
+authentication, the policy row, and a successful AuxKC replacement are distinct
+observations. The diagnostic message alone is not evidence of a new absolute
+installation blocker or of the desktop failure's cause.
+
+The filtered cache inspection returned no accelerator rows. A subsequent
+unfiltered inspection found the original PhxAccel image and did not find the
+candidate image in its row. An empty filtered result must not be treated as
+proof that no accelerator exists in the collection.
+
+The 16:40 metadata readback found loaded build 37, no display arming, both
+checked display gates at zero, and no legacy startup job. The competing
+continuation remained absent and disabled after reboot. The original single
+diagnostic scope was still empty. At 16:44 the graphical console reported
+locked: Terminal still reported both permissions, but an actual screenshot
+failed with `could not create image from display`. This is a current session
+condition, not evidence that the owner's grants were lost.
+
+A separate 16:46 hash-only review reverified all 24 original cache files and
+their backups, the original installed PhxAccel and its rollback copy, all five
+other pinned installed inputs, both candidate bundles, all four staged source
+modules against the checkout, all nine firmware pins, and every packet pin
+other than the intentionally future installed-candidate entries. The complete
+340-file EFI backup still matches; live EFI was not remounted or revalidated in
+this review. No fourth deployment admission, cache rebuild, GPU operation,
+arming or agent-requested reboot occurred. The old packet's preparation boot
+remains deliberately unchanged and differs from the current boot.
+
+At the owner's subsequent request to disable automatic locking, automatic
+display sleep and idle system sleep were set to zero for both battery and AC
+power. A readback at 16:54 verified both profiles; the screen saver idle timer
+was already zero and was left unchanged. Original power settings and a restore
+command were saved privately. A normal user-activity wake was issued, and at
+16:55 a real desktop screenshot succeeded again. Password requirements and
+credentials were not changed, and no authentication bypass was used. The
+earlier locked-console observation is historical rather than the current
+capture status. This power-setting change is not driver deployment or AuxKC
+replacement approval. A subsequent Terminal screen-capture consent alert was
+accepted with its uniquely matched standard Allow button through Accessibility;
+this was a capture-permission action, not driver-replacement approval.
+
+Continuation needs a new review of the then-current source, boot, live EFI and
+rollback state, with graphical-session availability rechecked. The next deployment
+admission requires a normal OS approval path that actually succeeds. Do not
+substitute approval-skipping flags, raw-cache activation,
 security changes or a live driver load on the already-initialized current boot.
 Do not replay any of the three consumed installers or the earlier build-37
 operations. A future admission must be newly reviewed against the then-current

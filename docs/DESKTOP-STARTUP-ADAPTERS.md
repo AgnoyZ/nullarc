@@ -136,4 +136,10 @@ The subsequent [deployment-admission record](DESKTOP-DEPLOYMENT-ADMISSION.md)
 separately records installation of the matching KDK and three unsuccessful,
 rolled-back kernel-collection admissions. The current installed driver remains
 build 37; normal AuxKC approval has not passed and the requested desktop
-diagnostic remains unconsumed.
+diagnostic remains unconsumed. Later readbacks confirmed the owner's Terminal
+Accessibility and Screen Recording grants and an allowed PhxAccel policy row,
+but the new candidate is not cached. A host reboot invalidated the old
+preparation's boot match. After a locked-console interval, desktop capture
+recovered following the owner's request to disable automatic display and idle
+system sleep. These observations and the newly verified rollback hashes are
+recorded there; none is a successful candidate installation or desktop test.
