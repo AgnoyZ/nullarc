@@ -1,0 +1,127 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "source_candidate_commit": "da7ea171091cb5ce6fb2fcf4a3a0840205310eec",
+  "status": "inert execution preparation and file/mock validation complete; no fresh-boot admission, active request, GPU command or reboot",
+  "source_candidate_record": "desktop-vmid-preflight-20261114.json",
+  "last_verified_target_from_prior_record": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "provider_build": 39,
+    "new_provider_or_OS_probe_for_this_preparation": false
+  },
+  "trusted_file_review": {
+    "existing_input_pins_verified": 49,
+    "existing_recovery_pins_verified": 12,
+    "complete_interpreter_runtime_closure_verified": true,
+    "historical_receipt_sets_verified": [
+      188,
+      29,
+      97,
+      187
+    ],
+    "historical_scopes_modified": false
+  },
+  "native_candidate": {
+    "source_dependencies_match_candidate_commit": 10,
+    "original_unsigned_binary_hash_matched": true,
+    "separate_private_copy_ad_hoc_signed": true,
+    "strict_signature_verified": true,
+    "signed_binary_sha256": "66ad021734de89cb898ff6f580f5e4188faa1440a195738d4fb736e2e80810d9",
+    "binary_executed": false,
+    "installed": false,
+    "driver_approval_established_by_this_signature": false,
+    "previously_executed_observer_bytes_preserved_for_future_copy": true
+  },
+  "planned_boundary": {
+    "commands_in_order": [
+      "configured GC observer",
+      "unchanged gfx-power-sequence",
+      "TMR-ready GC observer",
+      "desktop-vmid-preflight"
+    ],
+    "max_attempts": 1,
+    "observer_invocations_maximum": 2,
+    "firmware_power_invocations_maximum": 1,
+    "VMID_preflight_invocations_maximum": 1,
+    "VMID_selector_write_requests_maximum_from_source": 2,
+    "VMID_desktop_reservations_maximum_from_source": 1,
+    "work_budget_seconds": 120,
+    "independent_watchdog_seconds": 150,
+    "proposed_normal_reboot_maximum": 1,
+    "independent_timeout_recovery_reboot_maximum": 1,
+    "normal_reboot_scheduled_or_new_authorization_record_created": false,
+    "system_domain_explicit_root_watchdog_ready_required_before_native_commands": true,
+    "fixed_private_input_pins_if_fresh_admission_passes": 55,
+    "fixed_recovery_pins_if_fresh_admission_passes": 14,
+    "these_planned_pin_counts_are_not_a_completed_fresh_admission": true,
+    "baseline_idle_and_always_on_controls_required": true,
+    "post_power_CP_RLC_idle_selection_MES_inactive_and_unchanged_memory_size_required": true,
+    "exact_VMID_trace_order_and_both_readbacks_checked": true,
+    "matching_numeric_readbacks_distinguished_from_checked_command_completion": true,
+    "finite_failures_terminal_no_later_command": true,
+    "unknown_or_timeout_requests_independent_recovery": true,
+    "same_boot_continuation_initialization_or_automatic_retry": false,
+    "driver_startup_queue_claim_display_EFI_NVRAM_security_or_proxy_changes": false,
+    "native_request_counts_independently_live_traced": false
+  },
+  "actual_same_boot_refusal": {
+    "administrator_context": true,
+    "compared_identity": "kern.bootsessionuuid against excluded completed-experiment boot",
+    "exit_status": 78,
+    "reason": "fresh-boot-required",
+    "refused_before_new_scope_request_claim_watchdog_or_native_dispatch": true,
+    "independent_file_readback_of_absence_and_unchanged_historical_receipts": true,
+    "GPU_commands": 0,
+    "runner_launched": false,
+    "reboot_requested": false
+  },
+  "CPU_checks": {
+    "unique_methods": 88,
+    "private_runner_file_mock_methods": 35,
+    "admission_launcher_file_mock_methods": 7,
+    "native_CLI_provider_fake_IOKit_methods": 31,
+    "collector_fake_IOKit_methods": 7,
+    "file_analyzer_methods": 8,
+    "private_methods_also_passed_in_trusted_root_interpreter": 42,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "native_CLI_and_collector_sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "full_suite_rerun": false,
+    "earlier_91_method_source_validation_is_historical_not_added_to_this_count": true
+  },
+  "rejected_initial_file_test_run": {
+    "methods": 35,
+    "fixture_errors": 10,
+    "counted_as_pass": false,
+    "correction": "Test guard used the outer temporary folder instead of the per-case supplied scope; fixture corrected, production admission guards retained."
+  },
+  "prepared_code_sha256": {
+    "runner-private.py": "79f405278894b5b09e2428b99003090ef352da97d6b882802cd42a25a671516c",
+    "test-runner-private.py": "480ddd63b6dbef437bf03c3933457b936022713257ae7a33094f921686128ca2",
+    "freeze-after-fresh-boot-private.py": "ecf1d8c699b9752c77632b889594c0a61c693918b5e60b1411782905ecb50838",
+    "launch-once-private.py": "de1c80340f2052c543f5c41cbde67c589a54dd26ceff63f13148a1234b7326ba",
+    "test-admission-private.py": "5fd5712ffb7f742598ca0e1ed5376593e436413df136c0b9cc362f6ed84ac794"
+  },
+  "preservation": {
+    "production_tools_src_and_tests_changed": false,
+    "new_active_target_scope_created": false,
+    "native_target_binary_executions": 0,
+    "driver_or_startup_deployment": false,
+    "new_reboot_request": false,
+    "consumed_requests_or_receipts_modified": false,
+    "binaries_firmware_raw_logs_layouts_identifiers_or_credentials_published": false
+  },
+  "limits": [
+    "Only the current-boot refusal path of the future admission script was exercised on the host; fresh-boot admission and root delivery remain pending.",
+    "Watchdog launch/recovery is covered by files and mocks here; no new hardware deadline reboot recovery was demonstrated.",
+    "A native signature, CPU checks or prepared plan is not selector execution, acceleration or desktop success evidence.",
+    "The physical cause of the earlier first-KIQ dual-zero readback remains unconfirmed."
+  ],
+  "next_step": "Obtain a new explicit instruction for one ordinary reboot and one fresh-boot terminal VMID diagnostic with at most one independent timeout-recovery reboot. After the new boot, verify identity/provider/framebuffer/off state, all file pins/runtime and prior receipts; freeze a distinct max-one request before any GPU command. Do not replay consumed scopes or initialize on the current terminal boot.",
+  "rollback": "Leave the inert preparation unselected. No installed component, active request or launchd job was created; preserve historical receipts and the off state."
+}

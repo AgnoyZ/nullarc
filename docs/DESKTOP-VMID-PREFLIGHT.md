@@ -5,6 +5,9 @@ helper was executed, installed, signed for delivery or uploaded by this change.
 The latest [GC observation experiment](GC-STATE-OBSERVATION.md#fresh-boot-target-observations)
 remains consumed and its boot remains terminal for GPU work. This addition
 neither fixes desktop takeover nor authorizes a reboot or another target test.
+The later [inert delivery preparation](#prepared-single-attempt-experiment)
+also passes file/mock validation; no fresh-boot admission or GPU execution has
+followed it.
 
 ## Why test VMID separately
 
@@ -107,3 +110,48 @@ the other warnings treated as errors. That binary remains local and unexecuted.
 For source rollback, revert only this diagnostic addition in a normal new
 commit. No installed component was changed. Keep prior target receipts and
 all consumed requests intact.
+
+## Prepared single-attempt experiment
+
+A separate private execution candidate now fixes the order to one configured
+observer, the unchanged firmware/power command, one TMR-ready observer, then
+one `desktop-vmid-preflight`. It preserves the previously executed observer's
+bytes and uses a separately signed copy of the new VMID helper. Ten native
+source dependencies match the source candidate. Signature checking is for this
+private tool copy and does not establish OS driver approval.
+
+Before the VMID command, the candidate requires the observer's always-on
+controls, matching memory-size controls, CP_STAT zero, RLC bootload completion,
+inactive MES and idle selection. It validates the exact VMID trace sequence
+and distinguishes matching numeric readbacks from checked command completion.
+Every finite failure ends the experiment; unknown results or a timeout request
+independent recovery. No path continues into queue initialization or display.
+
+The proposed work budget is 120 seconds, with a separately ready system-domain
+root watchdog at 150 seconds. Fresh admission would bind 55 input pins and
+14 recovery pins, a distinct max-one request and at most one emergency reboot.
+These are planned delivery counts, not a completed fresh admission or a
+demonstration of hardware deadline recovery. An ordinary reboot to obtain
+the required fresh boot is a separate proposed action and has not been scheduled.
+
+The current boot's stable session identifier still matches the completed GC
+experiment. An actual administrator-context admission invocation refused with
+exit 78, `fresh-boot-required`, before creating a delivery, request, claim,
+watchdog or native process. Independent file readback verified those absences
+and all four historical receipt sets (188, 29, 97 and 187 files). Forty-nine
+existing input pins, twelve existing recovery pins and the complete trusted
+Python runtime closure were verified without GPU commands.
+
+Eighty-eight unique CPU methods pass: 35 private runner methods, seven admission/
+launcher methods, 31 native CLI/provider methods, seven collector methods and
+eight analyzer methods. The 42 private file/mock methods also pass under the
+trusted administrator interpreter. The native CLI and collector use fake
+IOKit with ASan/UBSan. The earlier 91-method source result is historical and
+is not added to this count; the full suite was not rerun.
+
+The preparation remains inert. No new owner-authorization record, live target
+scope, installed component, launchd job, GPU call or reboot request was created.
+Fresh-boot admission and execution remain pending a separate owner instruction.
+See the [sanitized preparation record](
+validation/desktop-vmid-preparation-20261114.json). Rollback is to leave this
+private candidate unselected and preserve all prior consumed scopes.
