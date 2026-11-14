@@ -247,3 +247,12 @@ mutations are detected. The earlier target discovery comparison already matched
 both `SEG` macros; static header naming does not establish a mapping defect.
 No production source or installed component changed, no GPU work followed the
 terminal result, and the physical cause and desktop fix remain unestablished.
+
+## Newly authorized desktop boot test
+
+The owner subsequently requested a distinct single desktop takeover boot test
+while questioning the collection path. [Retained native-output review and new
+preparation](DESKTOP-RETEST.md) confirm that both zeros were already present
+before summary parsing, without excluding a native-path defect or observer
+interference. That new authorization does not replay this terminal VMID scope.
+At preparation-record creation, activation and the new reboot remained pending.

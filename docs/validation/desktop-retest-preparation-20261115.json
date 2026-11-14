@@ -1,0 +1,91 @@
+{
+  "format": 1,
+  "date": "2026-11-15",
+  "source_parent": "07e6f8ae8accd936b0cf83b3ac98fe29d7391296",
+  "status_at_record_creation": "authorized new desktop boot test; prepared and CPU-checked; not activated or reboot-dispatched",
+  "authorization": {
+    "distinct_from_consumed_requests": true,
+    "ordinary_reboot_limit": 1,
+    "fresh_boot_desktop_attempt_limit": 1,
+    "failure_or_timeout_recovery_reboot_limit": 1,
+    "automatic_retry": false,
+    "previous_requests_remain_consumed": true
+  },
+  "retained_native_evidence": {
+    "preceding_record": "desktop-vmid-execution-20261114.json",
+    "raw_stderr_rechecked": true,
+    "requested": 16,
+    "write_readback": 0,
+    "independent_readback": 0,
+    "native_returncode": 75,
+    "native_timed_out": false,
+    "zeros_present_before_summary_parsing": true,
+    "native_path_or_observer_interference_excluded": false,
+    "physical_cause_established": false
+  },
+  "metadata_probe": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "bringup_build": 39,
+    "PhxAMDFB_instances": 0,
+    "NMXAccel_instances": 0,
+    "firmware_framebuffer_instances": 1,
+    "PhxAccel_module_loaded": false
+  },
+  "preparation": {
+    "new_authorization_digest_and_empty_scope": true,
+    "execution_pins_verified": 39,
+    "recovery_pins_verified": 8,
+    "complete_trusted_interpreter_closure_verified": true,
+    "installed_input_hashes_verified": 8,
+    "native_strict_signature_verified": true,
+    "native_source_dependencies_matched": 10,
+    "historical_receipt_counts_verified": [188, 29, 97, 187, 190],
+    "retains_reviewed_observer": true,
+    "collector_free_comparison": false,
+    "installed_startup_changed": false,
+    "off_marker_removed": false,
+    "display_armed": false,
+    "GPU_commands": 0,
+    "reboot_requested": false
+  },
+  "planned_execution": {
+    "fresh_boot_identity_required": true,
+    "separate_activation_and_ordinary_reboot_claims": true,
+    "metadata_guard_before_discovery": true,
+    "original_watchdog_deadline_seconds": 240,
+    "unchanged_guarded_firmware_power_then_desktop_init": true,
+    "failed_selection_blocks_later_stages": true,
+    "later_stages_if_prerequisites_pass": ["claim", "display", "release", "90-second monitor"],
+    "native_output_and_status_preserved": true,
+    "one_shared_recovery_reboot_claim": true,
+    "persistent_M2_or_automatic_rearming": false,
+    "hard_hang_recovery_guaranteed": false,
+    "driver_EFI_collection_partition_BIOS_or_security_changes": false
+  },
+  "CPU_checks": {
+    "methods_passed": 120,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "checks": [
+      {"file": "test_desktop_startup.py", "methods": 30, "returncode": 0},
+      {"file": "test_allocation_coordinator.py", "methods": 47, "returncode": 0},
+      {"file": "test_desktop_handoff.py", "methods": 31, "returncode": 0},
+      {"file": "test_register_transport.py", "methods": 7, "returncode": 0},
+      {"file": "private arming admission contracts", "methods": 5, "returncode": 0}
+    ],
+    "arming_contracts_are_predicate_only": true,
+    "complete_new_activation_mutation_or_rollback_tested": false,
+    "empty_discovery_counted": false,
+    "full_suite_rerun": false
+  },
+  "result_boundary": {
+    "new_target_test_executed": false,
+    "reboot_observed": false,
+    "collector_cause_established": false,
+    "desktop_success_or_acceleration_proven": false,
+    "raw_diagnostics_private_paths_identifiers_or_binaries_published": false
+  },
+  "rollback": "Before uncertain reboot dispatch, restore exact startup/off-marker bytes and remove only this request's one-shot flag with readback. After dispatch may have occurred, preserve evidence and inspect actual state; never replay. Target failure uses the existing independent disarm/recovery path."
+}
