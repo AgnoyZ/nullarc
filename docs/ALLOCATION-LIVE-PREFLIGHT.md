@@ -5,6 +5,12 @@ preflight and a private local native build. This supersedes the earlier
 source-only task boundary. The old M2/reboot grants were not reused. This work
 does not establish the allocation root cause or authorize an automatic retry.
 
+The later [install/rollback packet phase](ALLOCATION-INSTALL-PACKET.md)
+records the operator's recovery confirmation, a fresh verified read-only EFI
+backup and the exact proposed bundle difference. The observations below
+describe the earlier preflight/build phase; its no-mount statement does not
+describe that later read-only backup.
+
 ## Current machine evidence
 
 The preflight observed macOS **26.7.2, build 25G332**, on **x86_64**. Software
@@ -71,12 +77,14 @@ publicly; the standalone-reader publication scope was not expanded.
 ## Remaining execution gate
 
 Native delivery and fresh execution authority are no longer the original
-missing inputs. The next prerequisite is a verified independently usable
-recovery route and an exact rollback/install packet for the retained package.
-Current live identities must be rechecked immediately before any mutation.
-The still-blocked Goal engine is a separate continuity issue: its existing
-login helper correctly refuses an inactive goal. No goal database was edited
-to bypass that guard, and real reboot/resume remains unverified.
+missing inputs. The later install-packet phase records the operator-confirmed
+recovery route and independently verified exact rollback packet. Current live
+identities must still be rechecked immediately before any mutation. The
+still-blocked Goal engine is a separate continuity issue: a supported status
+activation request was rejected because the thread has an active writer,
+and the existing login helper correctly refuses an inactive goal. No goal
+database was directly edited to bypass that guard, and real reboot/resume
+remains unverified.
 
 After those prerequisites, follow [Phase A](ALLOCATION-EXECUTION-PLAN.md#phase-a-prove-passive-read-feasibility-on-the-firmware-desktop):
 install/load only the pinned PhxBringup candidate through the reviewed normal

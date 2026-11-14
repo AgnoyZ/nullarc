@@ -1,9 +1,12 @@
 # Allocation snapshot execution plan: review before target use
 
 Status on 2026-11-14 after fresh live-execution permission: **private native
-build-37 kernel/reader delivery is retained; independent recovery and Phase A
-remain unverified**. The [live preflight and native-build record](ALLOCATION-LIVE-PREFLIGHT.md)
+build-37 delivery and an exact rollback packet are retained; the operator
+confirms an independent recovery route; Phase A remains unperformed**.
+The [live preflight and native-build record](ALLOCATION-LIVE-PREFLIGHT.md)
 supplies actual current OS/build metadata and private candidate identities.
+The [install-packet record](ALLOCATION-INSTALL-PACKET.md) adds the verified
+fresh EFI backup and the still-blocked Goal continuity admission.
 This plan is not an installer, launcher, arming receipt or hardware result.
 The consumed build-36 M2/reboot grants remain spent. No installation, target
 service open, GPU work, startup edit, arming or reboot was performed in the
@@ -32,7 +35,9 @@ SDK, signatures and command records in root-owned storage. It does not expand
 the two-kext/RADV public publication exceptions to a full stack or the reader.
 The earlier [retained-package review](ALLOCATION-PACKAGE-REVIEW.md) remains an
 historical inventory of the old build-36 archive and offline build-35 backup.
-Separately usable recovery is still unverified. The fresh preflight observed
+The operator subsequently confirmed a separately usable recovery route; the
+agent has not boot-tested it. A fresh full EFI backup and exact PhxBringup-only
+rollback packet passed independent read-back. The fresh preflight observed
 macOS 26.7.2 build 25G332 with build 36 loaded; identities must be checked
 again immediately before any install/load/read operation.
 
@@ -111,6 +116,7 @@ values for each item; an empty field or example value is a refusal condition:
 - An exact backup/restore manifest for each proposed installed change, a
   reviewed firmware-desktop return path and an operator recovery procedure.
   An external recovery route must be verified rather than assumed. Record
+  whether its availability is operator-attested or agent boot-tested, and
   what remains unrecoverable under a hard kernel/bus hang.
 - Separate authorization for the particular package/install/load operation,
   passive reader invocations and any normal reboot required for that load.
@@ -271,8 +277,9 @@ the current missing evidence.
 | Gate | Current status | Required before proceeding |
 | --- | --- | --- |
 | Reviewed source and offline contracts | Complete; [observer record](validation/allocation-observer-20261114.json) | Preserve the pinned input identities |
-| Retained target package and rollback packet | Not established | Exact reviewed bytes, delivery/provenance and verified recovery route |
-| Passive firmware-desktop read | Not authorized or executed | Separate concrete package/load/read scope; then valid Phase A evidence |
+| Retained target package and rollback packet | Prepared and independently read back; recovery route operator-attested | Recheck exact bytes and live identity before any mutation |
+| Goal continuity admission | Blocked; supported activation request rejected by current active writer | Supported user lifecycle activation after the writer finishes; verify saved-session helper readiness |
+| Passive firmware-desktop read | Not executed | Concrete one-use package/load/read scope and continuity admission; then valid Phase A evidence |
 | Ordered startup integration with independent recovery | Not implemented or verified | Exact source change and integration failure tests |
 | One display/M2 attempt | Not authorized or executed | All preceding gates and a new one-use execution scope |
 | Allocation root cause | Unconfirmed | Captured target evidence within its stated limits |
