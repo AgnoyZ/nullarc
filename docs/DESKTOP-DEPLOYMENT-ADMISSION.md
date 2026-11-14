@@ -1,8 +1,9 @@
 # Desktop deployment admission: KDK and AuxKC approval
 
 Status, 2026-11-14, after the owner's manual grants and a host reboot:
-**candidate not installed; normal GUI driver approval completed, candidate AuxKC
-replacement still unproven; no desktop diagnostic executed**. The actual host is macOS 26.7.2,
+**candidate not installed; normal GUI driver approval completed, but a fifth
+admission through ordinary Terminal sudo still met the biometric refusal;
+no desktop diagnostic executed**. The actual host is macOS 26.7.2,
 build 25G332, x86_64. PhxBringup build 37 remains loaded and installed. The
 build-39 delivery for the [checked startup adapter](DESKTOP-STARTUP-ADAPTERS.md)
 is staged privately. This record concerns deployment admission, not the cause
@@ -34,7 +35,7 @@ application and core exited, and effective HTTP, HTTPS, SOCKS and PAC proxies
 were independently read back as disabled, matching the original effective
 state. Other current application preferences were preserved.
 
-## Four separate cache admissions
+## Five separate cache admissions
 
 Each admission had its own private exclusive records. None consumed the
 outstanding single desktop-diagnostic request.
@@ -45,6 +46,7 @@ outstanding single desktop-diagnostic request.
 | After verified KDK installation | Same operation with the exact `--kdk` path | This was too broad: it attempted Boot/System collections for several variants. Variant kernels were missing and the release operation met the read-only system filesystem. |
 | AuxKC-specific admission | `kmutil rebuild` | Detected one PhxAccel replacement, requested user approval, then returned `Biometry is not available.` |
 | Fresh current-boot admission after the owner's grants | `kmutil rebuild` from the ordinary owner Terminal, effective UID 501, with a real PTY | Returned `Operation not permitted` before driver approval; no existing sudo ticket was available. |
+| After normal Settings approval, with a separately reviewed admission | Fixed `sudo /usr/bin/kmutil rebuild` from the ordinary owner's Terminal, preserving the owner's login identity and controlling terminal | Normal sudo password authentication passed; the candidate replacement was detected, but the subsequent OS authentication request returned `Biometry is not available.` with status 250. |
 
 The broad second operation was a deployment-command error, not a GPU result.
 The local `kmutil(8)` manual describes `install` as updating Boot/System
@@ -235,13 +237,62 @@ candidate remained absent. The policy row was allowed with flags zero. No
 restart or GPU diagnostic was requested. This establishes a working normal GUI
 approval route, not a successful candidate installation.
 
-Continuation can use that demonstrated normal GUI route after a review of the
-then-current source, boot, live EFI and
-rollback state, with graphical-session availability rechecked. The next deployment
-admission requires a normal OS approval path that actually succeeds. Do not
+### Fifth admission after normal GUI approval
+
+The record commit `1e92204d366b3ceafd663add3728723c7a5eb0c1` was pushed and
+independently verified before preparing a separate fifth installer. The existing
+delivery preparation, packet, four consumed installers and original diagnostic
+scope were preserved. All ten tested production input hashes still matched.
+Fresh preflight checked the complete live EFI against its backup, all 24 cache
+files and backups, original installed accelerator and startup inputs, candidate
+bundles, geometry, current boot and unfiltered original-cache identity. Ordinary
+Terminal again completed Accessibility readback and a desktop screenshot.
+
+Thirteen isolated CPU cases passed before deployment. They cover bundle
+replacement and recovery, verification refusal, unknown-content preservation,
+Terminal result/identity/command checking, refusal and timeout, blocked
+redispatch, and a same-user single-use credential channel including invalid
+framing. These are local installer/channel checks, not GPU validation.
+
+The owner-authorized password was supplied only in memory to normal sudo for
+one fixed `/usr/bin/kmutil rebuild` operation. It was not stored in scripts,
+files, command arguments or application logs. The ordinary Terminal runner
+verified the owner's UID, effective UID and login identity, and inherited its
+controlling terminal. It did not expose an arbitrary privileged command route.
+The one-use socket was removed afterward.
+
+The operation ran between 17:55:50 and 17:56:29 +08:00. Sudo authentication
+passed: `kmutil` checked the collection, identified one PhxAccel addition and
+removal, and requested approval. It then returned status 250 and
+`Biometry is not available.` without timing out. A bounded read-only system-log
+review recorded the OS authentication service applying the owner's identity
+to this actual request and returning error -6. The log named its request
+`HumanPresence`; these host-internal details are observations, not stable public
+API contracts. The earlier root-versus-owner login difference alone does not
+resolve this failure. Neither that finding nor this cache refusal establishes
+the cause of the earlier desktop failure.
+
+The worker completed rollback. An independent verifier at 17:57:42 checked
+the complete original accelerator and backup, installed startup inputs, all 24
+original cache files and backups, no extra collections, unchanged protected
+staging, and the complete 340-file live EFI and its backup. It unmounted EFI
+afterward. Unfiltered inspection still found the original cached accelerator;
+the candidate was absent. Build 37 remained loaded on the same boot, display
+gates were zero, arming was absent and the original diagnostic scope was empty.
+No cache needed restoration from backup. No EFI/startup replacement, new GPU
+snapshot, initialization, desktop claim or reboot occurred.
+
+Settings still displayed the restart-required row and no new candidate-specific
+Allow control. The successful password-based Settings approval and the refused
+`kmutil` authentication remain distinct observations. Repeating the same sudo
+command is not an established continuation route.
+
+Any further deployment admission requires a normal OS approval path that
+actually succeeds, reviewed against then-current source, boot, GUI, live EFI,
+cache and rollback state. Do not
 substitute approval-skipping flags, raw-cache activation,
 security changes or a live driver load on the already-initialized current boot.
-Do not replay any of the four consumed installers or the earlier build-37
+Do not replay any of the five consumed installers or the earlier build-37
 operations. A future admission must be newly reviewed against the then-current
 source, installed inputs and rollback state; the consumed installers also pin
 their original source HEAD.

@@ -133,7 +133,7 @@ Python/native-clock brackets passed. None of this installs/loads a driver,
 arms display takeover, invokes a target snapshot selector or proves a desktop.
 
 The subsequent [deployment-admission record](DESKTOP-DEPLOYMENT-ADMISSION.md)
-separately records installation of the matching KDK and four unsuccessful,
+separately records installation of the matching KDK and five unsuccessful,
 rolled-back kernel-collection admissions. The current installed driver remains
 build 37; normal AuxKC approval has not passed and the requested desktop
 diagnostic remains unconsumed. Later readbacks confirmed the owner's Terminal
@@ -151,4 +151,11 @@ Allow row in Privacy & Security, including owner-authorized password entry,
 completed normal GUI authentication and produced a restart-required message.
 Readback still found the original accelerator installed and cached. That route
 can inform a separate reviewed candidate admission; these observations are not
-a successful candidate installation or desktop test.
+a successful candidate installation or desktop test. A fifth admission then
+ran the fixed rebuild command through normal sudo in that ordinary Terminal.
+Password authentication passed and the candidate replacement was detected,
+but the OS authentication request still returned `Biometry is not available.`
+Independent readback again verified the original accelerator, startup, all 24
+caches and complete 340-file live EFI after rollback. Thirteen local
+installer/channel CPU cases passed; the original one-diagnostic scope remained
+empty. The owner-login context alone has therefore not resolved cache admission.
