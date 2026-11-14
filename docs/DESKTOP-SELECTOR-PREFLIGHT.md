@@ -220,17 +220,21 @@ interpreter. Production helper and kernel source were not changed. The earlier
 test/documentation change. See the [sanitized target record](
 validation/desktop-selector-preflight-target-20261114.json).
 
-The current boot is terminal for GPU work. Preserve the readback guards and
+That preflight boot was terminal for GPU work. Preserve the readback guards and
 these consumed scopes. Further hardware diagnosis requires a fresh boot and a
 separately reviewed, byte-pinned, bounded request with independent recovery;
 do not bypass the selector check, repeat firmware/power or continue to
-initialization on this boot. Review GC access and initialization prerequisites
+initialization on that boot. Review GC access and initialization prerequisites
 offline before selecting another experiment. No recovery rollback was needed
 for this finite failure; no persistent launcher or installed component was
 changed. Revert only the new fake-test case as a normal commit if necessary,
 retaining the hardware evidence and existing guards.
 
-The subsequent [fixed GC observer](GC-STATE-OBSERVATION.md) is a source/CPU-only
-candidate for measuring initialization, reset/halt and GRBM read-timeout state
-on a separately admitted fresh boot. It has not run on the GPU and adds no
-same-boot continuation, selector bypass or automatic retry.
+The subsequent [fixed GC observer](
+GC-STATE-OBSERVATION.md#fresh-boot-target-observations) completed baseline and
+post-power observations on a separately admitted fresh boot after an explicit
+owner-requested reboot. READ_TIMEOUT changed from zero to `0x30`, with changed
+CP/MES halt fields. No selector write was performed, so this does not reproduce
+or explain the earlier failed preflight. Its distinct request is now consumed
+and that new boot is also terminal; no same-boot continuation, selector bypass
+or automatic retry was added.

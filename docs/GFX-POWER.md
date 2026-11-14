@@ -6,8 +6,11 @@ profile-driven firmware sequence and then requests IMU power-up and observes
 GFX boot status. Later target runs, including the [2026-11-14 selector preflight](
 DESKTOP-SELECTOR-PREFLIGHT.md#system-domain-target-result), completed this step;
 the first KIQ selector still failed. Completion is not full GC initialization
-or GPU-execution evidence. The [fixed GC observation candidate](
-GC-STATE-OBSERVATION.md) records missing state for a future bounded experiment.
+or GPU-execution evidence. A later [fresh-boot GC observation](
+GC-STATE-OBSERVATION.md#fresh-boot-target-observations) completed baseline and
+post-power captures: READ_TIMEOUT changed from zero to `0x30`, and CP/MES halt
+fields changed. It did not write a selector or establish why the earlier
+KIQ selection failed.
 The command does not set up GART,
 bootstrap MES queues, execute shaders or enable display acceleration.
 

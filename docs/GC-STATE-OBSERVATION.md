@@ -1,10 +1,13 @@
 # Fixed GC state observation before further selector diagnosis
 
-Status, 2026-11-14: **source/CPU-validated diagnostic candidate; native IOKit
-binary compiled, never run on the GPU or installed**. The current boot remains
-terminal after the [first-KIQ dual-zero result](
-DESKTOP-SELECTOR-PREFLIGHT.md#system-domain-target-result). This tool does not
-reopen that scope or establish a driver fix.
+Status, 2026-11-14: **a separately admitted fresh-boot experiment completed a
+configured baseline, one firmware/power command and a TMR-ready observation**.
+Both observer invocations returned zero. READ_TIMEOUT changed from `0` to
+`0x30`; CP/MES halt fields also changed. The experiment is consumed and this
+new boot is terminal for further GPU work. See [the target observations](
+#fresh-boot-target-observations). The earlier [first-KIQ dual-zero scope](
+DESKTOP-SELECTOR-PREFLIGHT.md#system-domain-target-result) remains consumed;
+this observation experiment did not write a selector or establish a driver fix.
 
 ## Source difference worth measuring
 
@@ -18,7 +21,8 @@ One specific difference is measurable without changing it:
 `gfx_v11_0_constants_init` programs the GRBM_CNTL READ_TIMEOUT field to `0xff`
 before its VMID-selection loop. The current checked firmware/power path does
 not perform that constants stage, and the failed desktop preflight does not
-record GRBM_CNTL. Its actual target value is unknown. Neither this difference
+record GRBM_CNTL. Its value during that failed preflight remains unknown; the
+later fresh-boot experiment below measured `0x30` after firmware/power. Neither this difference
 nor a reset/halt bit alone establishes why GRBM_GFX_CNTL read back zero. Do not
 copy the Linux initialization sequence, alter the timeout or clear reset/halt
 bits based only on this source comparison.
@@ -88,12 +92,14 @@ The collector does not supply those admission or watchdog mechanisms. A
 synchronous driver call can still stall; the fixed read count is not a wall
 clock timeout.
 
-The next experiment should observe a fresh configured baseline and the same
-fixed fields at reviewed PSP/firmware/IMU boundaries, without adding a selector
-probe or changing timeout/reset/halt values. This is an unselected future
-design, not an active request. Do not run the collector, repeat firmware/power,
-or initialize the GPU on the current stopped boot. Rollback of this source
-candidate is simply not selecting it; no installed component was changed.
+The initial design proposed observations across reviewed PSP/firmware/IMU
+boundaries. The later admitted experiment used two boundaries only: configured
+baseline and completion of the existing combined firmware/power command. It
+did not capture intermediate PSP, firmware or IMU snapshots. That request is
+now consumed. Do not run the collector, repeat firmware/power, probe selectors
+or initialize the GPU on the current stopped boot. No installed component was
+changed; retain the existing off marker and use a separately reviewed fresh
+boot for any future hardware experiment.
 
 ## File-only phase comparison
 
@@ -173,8 +179,9 @@ transport/length/all-ones failure, invalid metadata, drift, positive controls,
 exclusive output, privilege, ABI and checked-close failures. Every case uses
 fake IOKit; unexpected mutation requests abort the fixture.
 
-The native x86_64 IOKit build also passes with warnings treated as errors. Its
-binary was compiled privately and never executed. The production `mesboot.c`,
+At the source milestone, the native x86_64 IOKit build passed with warnings
+treated as errors and was compiled privately without execution. A later signed
+copy was executed only in the separate target experiment below. The production `mesboot.c`,
 `phxctl.c`, kernel, installed tools and startup configuration remain unchanged.
 The earlier full-suite result is historical and was not rerun for this scoped
 collector change. See the [sanitized source validation](
@@ -187,3 +194,57 @@ and 30 desktop-startup methods were rerun with zero failures/errors/skips:
 was run, recompiled or deployed by the comparison change. Its field/offset
 checks and preservation limits are recorded separately in [the comparison validation](
 validation/gc-state-comparison-20261114.json).
+
+## Fresh-boot target observations
+
+After the owner explicitly requested a reboot and then continued, a changed
+boot identity was verified on macOS 26.7.2, build 25G332. Metadata admission
+matched the expected build-39 provider and loaded image, firmware framebuffer,
+off marker and absent display arming; PhxAccel remained absent. All 11 native
+source dependencies and the original unsigned binary hash matched the prior
+validated candidate. A private copy was ad-hoc signed and passed strict
+verification. Neither an installed tool nor a driver was replaced.
+
+A distinct max-one request bound the fresh boot, exact commands, 49 input
+pins, 12 recovery pins, 90-second work budget and 120-second independent
+system-domain watchdog. All three historical receipt sets (188, 29 and 97
+files) matched before and after. The root watchdog became ready before any
+native command. One configured observer, one unchanged `gfx-power-sequence`
+and one TMR-ready observer each returned zero with their required completion
+markers. Both positive controls passed and memory-size controls agreed.
+
+| Observed field | Configured baseline | After firmware/power |
+| --- | --- | --- |
+| GRBM_CNTL.READ_TIMEOUT | `0x00` | `0x30` |
+| CP_MES_CNTL.MES_HALT | `0` | `1` |
+| CP_MES_CNTL pipe reset/active fields | all `0` | all `0` |
+| CP_ME_CNTL CE/PFP/ME halt fields | all `0` | all `1` |
+| GRBM_SOFT_RESET | `0` | `0` |
+| CP_SOFT_RESET_CNTL | `0` | `0` |
+| GRBM_GFX_CNTL, observed without a write | `0` | `0` |
+| CP_STAT zero and RLC bootload-complete bit | not both observed | both observed |
+
+All 17 GC fields were zero at baseline with passing always-on controls; 11
+were nonzero after firmware/power. These are completed observations, not a
+test of selector writability, acceleration or a new reproduction of the KIQ
+failure. In particular, `0x30` is nonzero and the source's `0xff` difference
+alone does not prove a timeout defect. Halt bits do not independently establish
+why a selector write failed on another boot. No timeout/reset/halt register
+was changed by the observer. The existing firmware/power command has its own
+mutations and is not included in that read-only statement.
+
+The terminal result dismissed the watchdog normally. Exact system-job readback
+showed one run and exit zero; the job was removed and absence verified. No
+recovery reboot was requested. The scope retains 187 private receipt files.
+There was no selector write, desktop reservation, GART/MES/queue initialization,
+seal, claim or display step. The collector's fixed request counts are derived
+from reviewed source and fake tests, not independent live GPU tracing.
+
+Twenty-seven runner file/mock methods and 15 shared collector/analyzer methods
+passed in this turn, with zero failures/errors/skips. The actual collector
+methods used ASan/UBSan and fake IOKit; the full suite was not rerun. Deadline
+recovery is CPU-tested; a hardware deadline-reboot recovery was not exercised.
+No additional hardware work is authorized by the result. Continue interpretation
+offline and preserve the terminal boot until a separately reviewed next
+experiment. See the [sanitized target record](
+validation/gc-phase-observation-target-20261114.json).
