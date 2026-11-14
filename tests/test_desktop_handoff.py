@@ -181,6 +181,26 @@ class DesktopHandoffTests(unittest.TestCase):
         self.assertEqual([0, 0, 0, 0, 0], [data[key] for key in
                          ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals")])
 
+    def test_target_zero_readbacks_stop_both_commands_after_first_KIQ_selection(self):
+        for command in ("desktop-init", "desktop-preflight"):
+            for variant in ("reference", "relocated"):
+                with self.subTest(command=command, variant=variant):
+                    result = subprocess.run([str(self.entrypoint), variant, "select-zero-readbacks", command],
+                                            capture_output=True, text=True, timeout=15,
+                                            env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+                    self.assertEqual(75, result.returncode, result.stderr)
+                    self.assertIn("phase=select me=3 pipe=1 queue=0 vmid=0 requested=0x0000000d "
+                                  "write-readback=0x00000000 readback=0x00000000", result.stderr)
+                    self.assertIn("desktop queue selection not confirmed", result.stderr)
+                    self.assertNotIn("desktop preflight:", result.stdout)
+                    self.assertNotIn("desktop handoff:", result.stdout)
+                    data = json.loads(re.search(r"^fake-desktop-summary (.*)$", result.stderr, re.M)[1])
+                    self.assertEqual([1, 1, 1, 1, 3], [data[key] for key in
+                                     ("opens", "snapshots", "reservations", "writes", "reads")])
+                    self.assertEqual([0] * 7, [data[key] for key in
+                                     ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells",
+                                      "seals", "claims", "closes")])
+
     def test_preflight_success_stops_after_eight_selection_writes_and_closes(self):
         for variant in ("reference", "relocated"):
             with self.subTest(variant=variant):

@@ -149,6 +149,9 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
             if (is("select-immediate-and-readback") && grbm_writes == 1) {
                 *reg((uint32_t)input[0]) ^= 1; *output ^= 1;
             }
+            if (is("select-zero-readbacks") && grbm_writes == 1) {
+                *reg((uint32_t)input[0]) = 0; *output = 0;
+            }
         }
         if (is("setup-readback") && input[0] == 0xde0) *output ^= 1;
         return 0;

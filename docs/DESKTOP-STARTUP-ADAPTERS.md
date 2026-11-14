@@ -225,3 +225,16 @@ host probe; it is not a deployed startup adapter or a target preflight result.
 See the [admission and cleanup evidence](
 validation/desktop-selector-preflight-admission-20261114.json). Neither consumed
 scope is reopened.
+
+A subsequent owner continuation selected that system-domain correction under
+a third, distinct max-one scope. Its watchdog became ready as root;
+firmware/power returned zero, then the first KIQ selector request (`ME=3`,
+`pipe=1`, value `0x0d`) read back zero immediately and subsequently. The
+terminal preflight exited 75 before all later initialization/display stages.
+The watchdog dismissed normally and its exact system job was removed. Both
+prior consumed receipt sets were unchanged; the new scope was not retried.
+There is no working-desktop or physical-cause claim. See the [target record](
+validation/desktop-selector-preflight-target-20261114.json). Four new fake-only
+cases retain this failure boundary for both commands and both layouts;
+26 CLI/provider CPU methods pass under ASan/UBSan. Further GPU work requires a
+fresh boot and a new bounded request, not replay of any consumed scope.

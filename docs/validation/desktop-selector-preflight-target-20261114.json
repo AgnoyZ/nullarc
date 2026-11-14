@@ -1,0 +1,184 @@
+{
+  "format": 1,
+  "date": "2026-11-14",
+  "repository_at_execution": "57b5c6c6282d1fb1149e496ecd982075b85febf8",
+  "helper_source_commit": "c7f3bdd9804057d98e50b2af5b1888047f0b7775",
+  "scope": "one fresh terminal selector preflight using corrected system-domain recovery; stop after first selector failure",
+  "status": "actual KIQ selection readback mismatch observed; launcher works; no initialized or accelerated desktop",
+  "prior_records": [
+    "desktop-postboot-20261114.json",
+    "desktop-selector-preflight-admission-20261114.json"
+  ],
+  "actual_host": {
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "architecture": "x86_64",
+    "loaded_provider_build": 39,
+    "same_recovery_boot_provider_and_service_identity": true,
+    "accelerator_loaded": false,
+    "candidate_framebuffer_present": false,
+    "firmware_framebuffer_present": true,
+    "accelerator_absent_unlike_original_desktop_attempt": true,
+    "environment_is_controlled_comparison_to_original": false
+  },
+  "authorization_and_input_verification": {
+    "new_owner_continuation_and_distinct_max_one_request": true,
+    "any_prior_authorization_or_scope_reused": false,
+    "original_desktop_receipt_hashes_verified_unchanged": 188,
+    "prior_preflight_admission_receipt_hashes_verified_unchanged": 29,
+    "input_pins_verified": 44,
+    "recovery_pins_verified": 10,
+    "complete_trusted_runtime_verified": true,
+    "strict_signed_native_helper_verification": true,
+    "signed_native_helper_unchanged": true,
+    "signed_native_helper_sha256": "10e1a34ba26a1332014ede9aeba00cf806f2a09082d96c91d554a959477f078e",
+    "runner_sha256": "f801c1565b82b2b666d5c47033a55d00d905b5fda772ea26ec39c6c75d9d26d0",
+    "runner_logic_unchanged_from_file_tested_candidate_except_new_label": true,
+    "driver_or_installed_startup_deployment": false
+  },
+  "observed_native_commands": {
+    "firmware_power": {
+      "invocations": 1,
+      "returncode": 0,
+      "timed_out": false,
+      "expected_completion_marker_present": true,
+      "effects_accounted_separately_from_preflight_selector_counts": true,
+      "reported_readiness_does_not_prove_complete_GC_initialization": true
+    },
+    "desktop_preflight": {
+      "invocations": 1,
+      "returncode": 75,
+      "timed_out": false,
+      "passed": false,
+      "diagnostic": {
+        "failed_phase": "select",
+        "failed_queue": "KIQ",
+        "me": 3,
+        "pipe": 1,
+        "queue_id": 0,
+        "vmid": 0,
+        "selector_requested": "0x0000000d",
+        "write_readback": "0x00000000",
+        "explicit_readback": "0x00000000"
+      },
+      "first_KIQ_failure_prevents_all_later_queue_checks": true,
+      "no_retry_or_restore_write_after_failure": true,
+      "no_doorbell_CP_setup_GART_MES_queue_init_VRAM_access_seal_claim_or_display_stage": true,
+      "success_only_checked_service_close_reached": false,
+      "kernel_reservation_abandonment_independently_observed": false,
+      "transport_status_and_scalar_or_structure_reply_shape_checked": true,
+      "earlier_unchecked_CLI_reply_count_qualification_applies": false
+    },
+    "GPU_commands_after_terminal_failure": 0,
+    "automatic_target_retry": false,
+    "normal_reboot_or_recovery_reboot_requested": false
+  },
+  "path_counts_inferred_from_source_and_fake_regression_not_target_tracing": {
+    "preflight_service_opens": 1,
+    "boot_memory_snapshots": 1,
+    "reservations": 1,
+    "selector_write_requests": 1,
+    "separate_register_read_requests": 3,
+    "applies_to_preflight_only_not_firmware_power": true,
+    "independent_target_request_instrumentation_installed": false
+  },
+  "watchdog_observed": {
+    "submission": "launchctl bootstrap system",
+    "bootstrap_returncode": 0,
+    "request_bound_ready_record": true,
+    "ready_effective_uid": 0,
+    "work_budget_seconds": 90,
+    "watchdog_budget_seconds": 120,
+    "firmware_timeout_seconds": 40,
+    "preflight_timeout_seconds": 15,
+    "outcome": "dismissed-after-terminal-diagnostic",
+    "reboot_requested": false,
+    "run_count": 1,
+    "exit_code": 0,
+    "KeepAlive": false,
+    "exact_system_job_removed_and_absence_verified": true,
+    "hardware_hard_hang_recovery_proven": false
+  },
+  "offline_source_review": {
+    "Linux_commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "selector_manifest": "linux-mes-selector-reference.json",
+    "cached_selector_manifest_files_hash_verified": 8,
+    "register_header_manifest": "linux-mes-queue-reference.json",
+    "register_header_hashes_verified": 2,
+    "existing_offset_base_index_and_ME3_pipe1_encoding_match_pinned_definitions": true,
+    "Linux_reference_reads_selector_not_assumed_write_only": true,
+    "Linux_bodies_headers_or_binaries_copied": false,
+    "new_GPU_calls": 0,
+    "physical_mapping_power_firmware_ownership_or_hardware_cause_established": false
+  },
+  "checks": [
+    {
+      "name": "fresh-private-system-domain-runner-file-and-mock-contracts",
+      "methods": 25,
+      "failures": 0,
+      "skips": 0,
+      "returncode": 0,
+      "GPU_or_reboot_commands": 0
+    },
+    {
+      "name": "native-CLI-provider-CPU-contracts-including-observed-dual-zero-fault",
+      "methods": 26,
+      "new_methods": 1,
+      "new_zero_readback_cases": 4,
+      "commands": [
+        "desktop-init",
+        "desktop-preflight"
+      ],
+      "layouts": [
+        "reference",
+        "relocated"
+      ],
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "reported_seconds": 17.774,
+      "failures": 0,
+      "skips": 0,
+      "returncode": 0,
+      "new_case_assertions": [
+        "exact KIQ diagnostic",
+        "exit 75",
+        "one selector write",
+        "three explicit reads",
+        "no restoration or later GPU work",
+        "no success message",
+        "no success-only close"
+      ],
+      "real_GPU_or_target_driver_commands": 0
+    },
+    {
+      "name": "earlier-full-source-regression",
+      "tests": 629,
+      "historical_only": true,
+      "rerun_for_this_change": false
+    }
+  ],
+  "final_state": {
+    "new_scope_consumed": true,
+    "retained_receipt_files": 97,
+    "all_three_scopes_consumed_not_reset_or_rearmed": true,
+    "same_boot_provider_and_service": true,
+    "firmware_framebuffer_present": true,
+    "off_marker_unchanged": true,
+    "display_arming_absent": true,
+    "exact_system_watchdog_absent": true,
+    "production_helper_or_kernel_source_changed": false,
+    "new_test_fixture_and_regression_added": true,
+    "new_driver_installed_startup_EFI_security_or_proxy_change": false,
+    "current_boot_terminal_for_GPU_work": true
+  },
+  "limits": [
+    "The new failure identifies KIQ ME=3 pipe=1 selection for this scoped preflight only; the original failed queue was not recorded and remains unknown.",
+    "Firmware/power command success and reply-shape checks do not prove GPU execution or every graphics initialization prerequisite.",
+    "The observed dual-zero readback is not proof of write-only semantics, an MMIO mapping or GFXOFF defect, an accelerator conflict, or a fix.",
+    "Failed-path request counts are derived from inspected source and fake-only regression, not a live target request trace.",
+    "No other queue selection or initialization may be tested on this boot; further GPU work requires a fresh boot and a distinct reviewed bounded request with pinned inputs and independent recovery.",
+    "No raw logs, personal layout values, firmware, driver binaries, private identity or diagnostic archives are published."
+  ]
+}

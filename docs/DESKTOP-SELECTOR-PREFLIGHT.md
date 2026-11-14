@@ -1,15 +1,19 @@
 # Terminal desktop queue-selector preflight
 
-Status, 2026-11-14: **native helper not run on the GPU; a separately scoped
-admission stopped before firmware/power because its watchdog never became
-ready**. A signed helper was privately staged; no driver or startup was
-deployed. See [the later admission result](#later-target-admission-and-launchd-correction).
+Status, 2026-11-14: **one separately authorized native preflight ran and stopped
+at the first KIQ selection: requested `0x0000000d`, write readback and subsequent
+readback both zero; exit 75**. Firmware/power returned zero. The corrected
+system-domain watchdog became ready, dismissed after the finite diagnostic
+and was removed. No GART/MES/queue initialization or desktop takeover followed.
+See [the target result](#system-domain-target-result).
 The [original build-39 desktop attempt](
 DESKTOP-DEPLOYMENT-ADMISSION.md#observed-reboot-result-and-recovery) stopped at
 queue-selection readback before GART/MES initialization. Its one-attempt
 authorization is consumed. The installed binary did not log which of the four
-selections failed or the immediate/later readback values. The later admission
-added no GPU observations; the physical cause remains unknown.
+selections failed or the immediate/later readback values. A later pre-GPU
+admission was consumed at watchdog readiness; the following distinct target
+experiment supplied the KIQ readbacks above. It does not retroactively identify
+the original failed queue or establish the physical cause.
 
 ## Evidence and retained guards
 
@@ -69,7 +73,7 @@ release API.
 
 ## Verification and future experiment
 
-The actual CLI and provider methods pass **25 CPU test methods** under
+At the source milestone, the actual CLI and provider methods passed **25 CPU test methods** under
 ASan/UBSan. Four new methods cover reference/relocated success, six injected
 selection/restore faults, fourteen argument/layout/transport/state refusals,
 and service-close failure. The fake backend asserts the preflight register
@@ -155,3 +159,73 @@ For the unused candidate, rollback is simply to retain it as private evidence
 and not select it; no installed component needs restoration. Remove only the
 exact experiment-owned launchd label in its verified domain if cleanup is
 needed; never remove unrelated jobs or use a broad process kill.
+
+## System-domain target result
+
+After a new owner continuation, a distinct max-one request selected the
+validated system-domain launcher with a new label. Its execution logic and the
+signed native helper were unchanged; only the launcher label was rebound.
+Admission checked 44 input pins, ten recovery pins, the complete interpreter
+tree, all 188 original desktop receipts and all 29 prior preflight-admission
+receipts. Both prior scopes remained consumed. The same recovery boot/provider
+identity, macOS 26.7.2 build 25G332, build 39, firmware framebuffer, off marker
+and absent display arming were retained. PhxAccel was still absent.
+
+The explicit system-domain job reported a request-bound ready receipt with
+effective UID zero. Exactly one firmware/power prerequisite command returned
+zero and its expected completion marker. Exactly one `desktop-preflight`
+then returned 75 with this extracted diagnostic:
+
+| Phase | Queue | ME | Pipe | Queue ID | VMID | Requested | Write readback | Subsequent readback |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
+| Select | KIQ | 3 | 1 | 0 | 0 | `0x0000000d` | `0x00000000` | `0x00000000` |
+
+No other queue selection, restoration, retry, doorbell/CP setup, GART/MES/queue
+initialization, VRAM access, seal, claim or display stage followed. The command
+does not reach its success-only checked service close on this failure path;
+do not report a successful close or independently observed kernel reservation
+abandonment. No live GPU request tracing was installed. Source control flow
+and the new fake-only regression imply one snapshot, one reservation, one
+selector write and three explicit register reads for this path; these counts
+are not independent target instrumentation.
+
+The watchdog recorded normal terminal dismissal without requesting reboot.
+System-domain readback showed one run and exit zero; the exact job was removed
+and absence verified. Final metadata retained the same boot/provider/service
+identity, firmware framebuffer, off marker and absent display arming. Both
+prior receipt sets still matched. The new target scope is consumed and was
+not reset or retried. No driver, installed startup, EFI, security setting or
+proxy changed.
+
+Offline rechecking verified all eight cached files against the pinned Linux
+selector-source manifest. Existing GC register definitions and the SOC21
+field encoding agree with `ME=3, pipe=1` producing `0x0d`; the helper's offset
+and base index match those definitions. The executed helper checks transport
+status and reply shape, so the older unchecked-CLI scalar-count qualification
+does not apply to this recorded failure. A completed firmware/power command
+still does not establish every GC initialization prerequisite or successful
+GPU execution. The result does not establish a write-only selector, a mapping
+or GFXOFF defect, or an accelerator conflict. It observes a selector mismatch
+in an accelerator-absent environment; the original accelerator-present attempt
+was not a controlled comparison.
+
+A new CPU regression injects this exact dual-zero response for both
+`desktop-init` and `desktop-preflight` with reference and relocated layouts.
+It asserts exit 75, the exact phase/fields/readbacks, one selector write, three
+explicit reads, no later work and no false success. All **26 native CLI/provider
+test methods** passed under ASan/UBSan with zero skips, including these four
+new cases. The launcher also passed its 25 file/mock methods under the trusted
+interpreter. Production helper and kernel source were not changed. The earlier
+629-test full-suite result is historical and was not rerun for this targeted
+test/documentation change. See the [sanitized target record](
+validation/desktop-selector-preflight-target-20261114.json).
+
+The current boot is terminal for GPU work. Preserve the readback guards and
+these consumed scopes. Further hardware diagnosis requires a fresh boot and a
+separately reviewed, byte-pinned, bounded request with independent recovery;
+do not bypass the selector check, repeat firmware/power or continue to
+initialization on this boot. Review GC access and initialization prerequisites
+offline before selecting another experiment. No recovery rollback was needed
+for this finite failure; no persistent launcher or installed component was
+changed. Revert only the new fake-test case as a normal commit if necessary,
+retaining the hardware evidence and existing guards.
