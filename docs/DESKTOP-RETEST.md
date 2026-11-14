@@ -169,3 +169,10 @@ experiment needs its own reviewed authorization and fresh-boot/recovery plan.
 The preparation's 120 passing CPU methods are historical and were not rerun
 for this documentation-only result record. Result checks reparsed the retained
 native statuses, trace, journal chain and recovery receipts without GPU calls.
+
+The subsequent [collector causality review](COLLECTOR-CAUSALITY-REVIEW.md)
+verifies that reported dual-zero behavior already appears in build-34 records,
+before the allocation-snapshot mechanism existed, and adds integrated CPU
+reader/client-lifecycle coverage. It retains the old CLI reply-count caveat
+and the absence of a collector-free physical control. It does not change this
+terminal result or authorize another target operation.

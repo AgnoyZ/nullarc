@@ -8,6 +8,7 @@ import shutil
 import subprocess
 
 from test_submit_diagnostic import extract as extract_dispatcher
+from test_snapshot_lifecycle import exercise as exercise_lifecycle
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,6 +82,9 @@ def exercise(out):
         elif run.stdout:
             raise RuntimeError('Refused reader must not publish JSON')
     result['reader_cases'] = len(reader_cases)
+    lifecycle = exercise_lifecycle(out / 'lifecycle')
+    result['lifecycle_cases'] = len(lifecycle['cases'])
+    result['lifecycle_report'] = 'lifecycle/report.json'
     inputs = [source, ROOT / 'src/phxbringup/PhxAllocationDiagnostic.hpp',
               ROOT / 'src/phxbringup/PhxDesktopHandoff.h', ROOT / 'src/phxbringup/PhxMesQueueLayout.h',
               ROOT / 'src/phxbringup/PhxGartLayout.h', ROOT / 'src/phxbringup/PhxBootMemory.h', ROOT / 'src/phxbringup/PhxPspLayout.h',
@@ -90,7 +94,8 @@ def exercise(out):
     result['inputs_sha256'] = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs}
     result['fragments_sha256'] = {name: hashlib.sha256(text.encode()).hexdigest() for name, text in fragments.items()}
     result['limitation'] = ('Actual dispatcher, snapshot checks, service wrappers and history header; fake locks, '
-                            'privilege/lifecycle flags and non-snapshot handlers. No real concurrency, kernel load, '
+                            'privilege/lifecycle flags and non-snapshot handlers; separate integrated reader/lifecycle '
+                            'coverage is in lifecycle/report.json. No real concurrency, kernel load, '
                             'GPU access, persistence over reboot or display acceptance.')
     (out / 'report.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result, indent=2))

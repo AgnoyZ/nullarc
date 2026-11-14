@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-15",
+  "source_parent": "259d651c255eeef387e446153a75e28037715344",
+  "status": "Offline collector chronology and integrated CPU lifecycle review; no production fix or new target test",
+  "latest_target_record": "desktop-retest-target-20261115.json",
+  "historical_target_records": [
+    "gc-power-selector-target-20261113.json",
+    "gc-access-audit-20261113.json"
+  ],
+  "historical_evidence": {
+    "record_date": "2026-11-13",
+    "candidate_source_commit": "c5c22b420aa8990eff90df4cbddd29815793ecf6",
+    "candidate_source_sha256": "580f6084845f57657fb4d19e80b98e77fba982250e3beb8ba6e8fe7e894f4bbb",
+    "build_reported_in_observer_stderr": 34,
+    "original_manifest_files_sizes_and_hashes_verified": 13,
+    "plan_runtime_manifest_same_boot_verified": true,
+    "raw_CLI_write_read_and_terminal_state_independently_reparsed": true,
+    "requested": 16,
+    "printed_immediate_readback": 0,
+    "printed_subsequent_readback": 0,
+    "source_lacks_allocation_snapshot_dispatch_and_handler": true,
+    "allocation_snapshot_introduction_commit": "925fd1d1e4c8eca5bf7ad0dc2ad4dfe7424fc087",
+    "allocation_snapshot_introduction_source_sha256": "37a83bc7b9cebded52ea9a016ef67e138b87e5c3656768f30dc891d9452785c8",
+    "allocation_snapshot_introduction_build": 37,
+    "old_source_is_ancestor_of_introduction": true,
+    "reported_dual_zero_predates_new_snapshot_mechanism": true,
+    "historical_CLI_did_not_validate_returned_scalar_count": true,
+    "short_reply_actually_occurred_established": false,
+    "other_register_observers_present": true,
+    "collector_free_control": false,
+    "live_kernel_memory_or_current_EFI_read": false
+  },
+  "current_source_review": {
+    "production_source_changed": false,
+    "actual_fresh_client_defaults_are_extracted_not_replaced_with_test_flags": true,
+    "reader_dispatch_store_and_lifecycle_executed_in_one_CPU_process": true,
+    "fresh_client_has_no_VMID_BO_or_desktop_reservation_to_reap_in_reviewed_path": true,
+    "software_allocations_sysctl_registration_session_state_locks_and_timing_are_side_effects": true,
+    "MMIO_or_retirement_added_by_snapshot_copy": false,
+    "summary_parser_can_explain_zeros_already_in_latest_native_stderr": false
+  },
+  "validation": {
+    "focused_Python_methods_passed": 49,
+    "skipped": 0,
+    "focused_suites": [
+      "allocation snapshot runner",
+      "context retirement runner",
+      "desktop handoff",
+      "register transport"
+    ],
+    "source_tests_against_working_tree_methods_passed": 43,
+    "initial_context_setup_refusal": "Uncommitted checkout rejected by prepare_source; not a production or GPU failure",
+    "context_runner_methods_passed_in_clean_detached_baseline": 6,
+    "clean_context_baseline": "259d651c255eeef387e446153a75e28037715344",
+    "context_tests_and_relevant_production_source_identical_to_working_tree": true,
+    "ASan_UBSan_snapshot_checks": 30,
+    "ASan_UBSan_actual_reader_fake_IOKit_cases": 17,
+    "ASan_UBSan_integrated_reader_lifecycle_cases": 16,
+    "integrated_case_names": [
+      "empty",
+      "samples",
+      "existing-session",
+      "foreign-reservation",
+      "unprivileged",
+      "missing-gpu-lock",
+      "base-init-failure",
+      "client-allocation-failure",
+      "lock-allocation-failure",
+      "buffer-allocation-failure",
+      "maps-allocation-failure",
+      "attach-failure",
+      "start-failure",
+      "destructor-only",
+      "repeat-close",
+      "repeated-readers"
+    ],
+    "ASan_UBSan_actual_context_retirement_cases": 115,
+    "temporary_mutations": [
+      {
+        "name": "fresh-client-VMID",
+        "compiled": true,
+        "case": "empty",
+        "exit": -6,
+        "detected_at_runtime": true
+      },
+      {
+        "name": "unconditional-desktop-cleanup",
+        "compiled": true,
+        "case": "foreign-reservation",
+        "exit": -6,
+        "detected_at_runtime": true
+      },
+      {
+        "name": "snapshot-falls-through-normal-dispatch",
+        "compiled": true,
+        "case": "empty",
+        "exit": -6,
+        "detected_at_runtime": true
+      }
+    ],
+    "fixture_development_correction": "Initial extraction crossed single-line session methods; fixed and covered by extraction assertions before the passing audit",
+    "full_suite_rerun": false,
+    "hosted_native_kernel_compile_or_workflow_dispatched": false,
+    "input_sha256": {
+      "src/phxbringup/PhxAllocationDiagnostic.hpp": "7c220396a14748936b88330c6bd371e51b66181911b146e495883f2de836e63b",
+      "src/phxbringup/PhxAllocationSnapshot.h": "e5c863996e2373f5f3d2c87e5cc963bd5c60770c59478d3c120264508a640c01",
+      "src/phxbringup/PhxBringup.cpp": "92ad3f3961de373a35744b5d3f899ee53105251a3769615c4f18d0e2d0c57ce7",
+      "src/phxbringup/PhxNativeABI.h": "05c1feb4a825e6bf8b3212a2b46275430bf51c03a36753509594c66e5bbeaef6",
+      "tests/fake_native_iokit/CoreFoundation/CoreFoundation.h": "57ae4410c21ecaecc00b9ae02c489a947dd49af2580da0931a617027aa650138",
+      "tests/fake_native_iokit/IOKit/IOKitLib.h": "e62a62f5a1ee5b73acd830e1ed8be762e1ce1f1ab3397cda821a44825e9a38e6",
+      "tests/test_allocation_snapshot.cpp": "b2d1af392b9936f4c5cd368b7c7a4b86ab815976bf8a91c582e71391cb7b66f2",
+      "tests/test_allocation_snapshot_reader.cpp": "97e6c8e6fe2a219e51491ba44638cd21022607aa419ff79f260249f1c9a3db56",
+      "tests/test_allocation_snapshot_runner.py": "9cace3c6ab9fcc5f9ee415fe4a11a0a763d3818f5761300060bfc915adcb708b",
+      "tests/test_snapshot_lifecycle.cpp": "310d79e1aff27aa0c6116f3b4d6bbef82d9806843e0cccb0076c24003d45954e",
+      "tools/allocation_snapshot.cpp": "5e07e32ea833e55f78a9704cf5c63b20099844856b6bb387c1a40d0bdd2f771d",
+      "tools/test_allocation_snapshot.py": "f988ebfd06b8d28cdfb79de0f2da4a8f5e4b2dfef0c321041ab7d1575111d01a",
+      "tools/test_snapshot_lifecycle.py": "d4067d1b45db8af1f7bab4f2202bb451e86f630f7edf7d474ce3bc4ecc084071"
+    },
+    "extracted_lifecycle_fragment_sha256": {
+      "lifecycle-methods.inc": "119b2676b99f1a4cf52cef6ac0ff4ded2e03a3f84e98bbe6e2c09700ea2b8c17",
+      "lifecycle-shared.inc": "557897e1c600e05c06d3cf1a8e40489d6050726f017bca870b65b7523ef148d5",
+      "lifecycle-client.inc": "2fcd25cdc0f32477f2c76488f442d6e303dbc5a37293d30d69ca3d68ff95c67a",
+      "lifecycle-state.inc": "acf2e1c801ca7bddda90a5922491f3124918db49b2c8acd2f0dc44bb837b66d6",
+      "lifecycle-constants.inc": "6e602b0f7cc477e7b336ca7601fb3ae160a2dc11bf01a52d92d6f61261567a05",
+      "lifecycle-stubs.inc": "b76d539aeb55d8f70e03983b59c2cfc966768271087da60e656a2ef0d9342776"
+    }
+  },
+  "limits": [
+    "Historical printed zeros have an unvalidated CLI reply-count qualification.",
+    "Different builds, boots, clients and power conditions are not a controlled comparison.",
+    "OS routing, object lifetime, allocation, privilege, sysctls and locks are explicit fakes.",
+    "No kernel concurrency, observer timing effect, physical MMIO or installed runtime identity proof.",
+    "GPU/reaper/bootstrap cleanup entry points abort in the lifecycle fake; their real implementation is not exercised by this harness.",
+    "Native access, readback semantics and initialization prerequisites remain unresolved."
+  ],
+  "preservation": {
+    "target_service_opened": false,
+    "GPU_commands": 0,
+    "arming": false,
+    "reboots": 0,
+    "installed_driver_helpers_startup_collections_EFI_or_security_changed": false,
+    "closed_requests_replayed_or_rearmed": false,
+    "historical_receipts_changed": false,
+    "raw_records_private_paths_identifiers_credentials_or_binaries_published": false,
+    "full_stack_binary_publication_boundary_changed": false,
+    "GPU_execution_desktop_success_or_acceleration_claimed": false,
+    "selector_readback_guards_bypassed": false
+  },
+  "next_step": "Continue offline native access and initialization-prerequisite analysis. No further physical operation follows from this closed request; any new experiment needs its own reviewed scope, fresh boot and independent recovery.",
+  "rollback": "Revert only these test and documentation additions in a new commit; preserve installed state, all historical evidence and consumed authorizations."
+}
