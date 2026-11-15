@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "date": "2026-11-15",
+  "snapshot_phase": "preparation before arming; actual postboot outcomes recorded separately",
+  "request": "Entire original stack, desktop takeover and reboot test",
+  "known_reference_layout_memory_corruption_or_hang_risk_explicitly_accepted": true,
+  "release": "v0.4.0-alpha",
+  "OS": {"version": "26.7.2", "build": "25G332", "architecture": "x86_64"},
+  "original_components": {
+    "full_installed_file_comparison_passed": true,
+    "loaded_bringup_image_matches_release": true,
+    "loaded_bringup_build": 34,
+    "initialization_helpers_startup_and_watchdogs_modified": false,
+    "private_target_profile_initialization_helpers_used": false,
+    "reference_physical_base_matches_target": false,
+    "reference_VRAM_extent_matches_target": false,
+    "reinstallation_or_EFI_change": false
+  },
+  "scope": {
+    "managed_ordinary_reboot_limit": 2,
+    "managed_failure_recovery_reboot_limit": 1,
+    "original_scripts_retain_their_own_watchdogs_and_recovery": true,
+    "initial_reboot_observation_seconds": 180,
+    "per_trial_boot_observation_seconds": 300,
+    "second_boot_requires_original_startup_completion_and_real_Metal_result": true,
+    "desktop_success_requires_loaded_original_identity_real_Metal_result_frame_progress_and_WindowServer_stability": true,
+    "desktop_trial_is_one_shot_next_boot_GPU_off": true,
+    "old_packets_replayed": false,
+    "observer_invokes_initialization_helper": false,
+    "observer_ACK_guaranteed_before_original_first_hardware_command": false,
+    "software_recovery_guaranteed_during_kernel_or_bus_hard_hang": false
+  },
+  "preparation": {
+    "CPU_methods_passed": 18,
+    "CPU_checks_execute_real_GPU_or_shutdown_commands": false,
+    "Metal_verifier_compiles": true,
+    "Metal_verifier_executed": false,
+    "pinned_inputs": 1696,
+    "frozen_interpreter_regular_files": 1656,
+    "external_witness_LaunchDaemon_unarmed_role_verified": true,
+    "initial_empty_IORegistry_parser_error_before_any_staging_write_inspected_and_corrected": true,
+    "off_marker_retained_at_snapshot": true,
+    "M2_and_one_shot_arming_absent_at_snapshot": true,
+    "GPU_initialization_commands_at_snapshot": 0,
+    "reboot_requests_at_snapshot": 0
+  },
+  "outcome": {
+    "postboot_assessed_in_this_record": false,
+    "hardware_acceleration_success_claimed": false,
+    "desktop_takeover_success_claimed": false,
+    "authoritative_execution_evidence": "Separate private root-owned intent, stage, deadline, probe and recovery receipts; inspect after reboot and never replay an existing intent."
+  },
+  "preservation": {
+    "installed_original_driver_runtime_plugin_or_helpers_changed": false,
+    "EFI_partition_BIOS_security_or_NVRAM_reset_changed": false,
+    "private_diagnostics_or_binaries_published": false,
+    "old_consumed_scopes_remain_closed": true
+  }
+}

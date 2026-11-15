@@ -2,7 +2,7 @@
   "format": 1,
   "date": "2026-11-15",
   "request": "Enable desktop takeover and hardware acceleration on the installed original nullarc release",
-  "status": "one original-kernel target-profile attempt refused at GART; subsequent GPU-off boot verified; exact-original follow-up not armed because of known layout conflict",
+  "status": "guarded original-kernel attempt refused at GART and recovered; subsequent explicitly risk-accepted exact-original trial tracked separately",
   "release": "v0.4.0-alpha",
   "original_loaded_bringup_build": 34,
   "original_loaded_image_identity_previously_verified": true,
@@ -76,7 +76,7 @@
     "old_requests_rearmed": false,
     "private_diagnostics_or_binaries_published": false
   },
-  "next_step": "Keep the consumed attempt closed and GPU startup disabled. Resolve the exact-original layout conflict, or record an explicitly reviewed bounded trial for the subsequent request; do not reuse the failed packet or silently deploy the private candidates.",
+  "next_step": "Keep this guarded attempt consumed. Follow the separate exact-original trial record and private root-owned receipts for the newly accepted request; never replay this packet or silently substitute its target-profile helper.",
   "OS": {
     "version": "26.7.2",
     "build": "25G332",
@@ -154,6 +154,9 @@
     "new_GPU_initialization_dispatched": false,
     "persistent_or_one_shot_arming_enabled": false,
     "new_reboot_requested": false,
-    "blocking_observation": "Exact original recipe would program reference-machine mappings outside the live target carve-out; resolve compatibility or explicitly scope that risk before startup."
+    "blocking_observation": "Exact original recipe would program reference-machine mappings outside the live target carve-out; resolve compatibility or explicitly scope that risk before startup.",
+    "snapshot_phase": "inspection before explicit risk acceptance",
+    "later_known_risk_explicitly_accepted": true,
+    "new_bounded_trial_record": "exact-original-trial-20261115.json"
   }
 }

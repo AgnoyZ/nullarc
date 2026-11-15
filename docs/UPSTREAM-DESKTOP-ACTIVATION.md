@@ -141,9 +141,11 @@ recipe would therefore program mappings outside the target's reported carve-out
 and may corrupt memory or hang the machine. The earlier guarded candidate's
 failure does not validate removing its checks and running those addresses.
 
-No new initialization, arming or reboot has been dispatched for this subsequent
-request. The exact-original address conflict must be resolved, or explicitly
-included in a separately reviewed bounded trial, before enabling startup.
+At the pre-acceptance inspection, no new initialization, arming or reboot had
+been dispatched for this subsequent request. The owner then explicitly accepted
+the reported address-conflict risk. A [new exact-original trial](
+EXACT-ORIGINAL-TRIAL.md) records that acceptance and its separate boot/recovery
+limits. It does not reopen the failed guarded packet or validate the layout.
 
 ## Preparation checks and rollback
 
