@@ -105,3 +105,19 @@ manifests, machine identities, firmware, binaries and logs remain private. No
 new binary publication is authorized, and the existing licences and artifact
 restrictions are unchanged. Neither hardware acceleration nor the prior
 CoreDisplay failure is established as fixed by this deployment.
+
+## Normal restart requested; fresh-boot result still pending
+
+The single restart intent was consumed at **17:01:22 +08:00 on 2026-11-15**,
+with a three-minute delay. The shutdown caller timed out after 15 seconds;
+its return code is unobserved. An independent process at **17:02:31 +08:00**
+verified exactly one matching root-owned shutdown scheduler, reparented to
+launchd, with the preparation boot unchanged. It also reverified all pinned
+inputs, the postboot job, GPU-off, absent display arming and unmounted EFI.
+No second shutdown request was sent.
+
+The expected restart time is approximately **17:04:22 +08:00**. A retained
+scheduler is not proof that the restart occurred or that the candidate loaded.
+Read the one-use postboot result/error and actual loaded image before claiming
+any smoke pass or continuing to GPU initialization. Preserve the consumed
+restart intent even if the connection disappears.

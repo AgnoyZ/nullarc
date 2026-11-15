@@ -64,7 +64,17 @@
     "numeric_layout_configuration_only": true,
     "firmware_or_GPU_initialization_allowed": false,
     "desktop_arming_allowed": false,
-    "automatic_retry": false
+    "automatic_retry": false,
+    "later_reboot_dispatch": {
+      "intent_consumed": true,
+      "caller_timed_out_after_seconds": 15,
+      "caller_return_code_observed": false,
+      "one_matching_root_scheduler_independently_verified": true,
+      "same_preparation_boot_at_scheduler_verification": true,
+      "dispatch_retried": false,
+      "expected_restart_local_time": "2026-11-15T17:04:22+08:00",
+      "fresh_boot_result_pending": true
+    }
   },
   "boundaries": {
     "real_GPU_execution_proven": false,
