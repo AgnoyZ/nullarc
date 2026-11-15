@@ -112,3 +112,59 @@ fix the prior CoreDisplay assertion, or prove an accelerated desktop. No public
 binary upload is added. The root MIT/GPL-2.0 terms for these tools and existing
 per-file AMD headers/notices are preserved; no source from another licensed
 runtime component is copied. Full-stack publication restrictions remain.
+
+## Installed original baseline; first test pending
+
+The original build-34 bundle has now been restored to the existing active
+OpenCore entry. A separate read-only mount verified the entire resulting EFI
+manifest: **345 files before, 347 after**, with all **342 unrelated files**,
+OpenCore configuration and Windows unchanged. A fresh complete private backup
+and both displaced/retained bundle identities were verified. EFI is unmounted.
+Only the four reviewed user-space files were replaced; all other GPU files,
+original firmware/runtime/plugin/accelerator, original startup/plist and
+allowlist still match their retained inputs. GPU-off remains present and
+display-arming/pending flags remain absent. The running kernel is still build
+39 at this checkpoint; restoring EFI bytes is not a fresh-boot load result.
+
+Preflight first refused strict signing checks on the retained original kernel
+and, separately, the unchanged old Metal verifier. Independent inspection
+confirmed both are the expected unsigned x86_64 originals with their exact
+retained hashes. The first refusal preceded root-packet/EFI changes; the second
+left only an inactive incomplete private preparation packet, before EFI mount
+or installation. Those failures remain retained. The original kernel/verifier
+were not re-signed or altered. Their admission uses exact manifests/hashes and
+the specifically expected unsigned result, never arbitrary signature errors.
+The two newly compiled helpers remain ad-hoc signed and strictly verified.
+No security setting was changed to make unsigned code load.
+
+The fresh test packet verifies 371 new immutable inputs, the prior packet's
+454 pins and the separately frozen interpreter. Seven actual bundle-swap
+fixture cases and eight helper/admission methods passed. Twenty final observer
+methods cover headless success and terminal errors, acknowledgement identity,
+duplicate intent, delayed/missing desktop readiness, wrong image, publication
+timeout and incorrect Metal output. An initial CPU fixture omitted its fake
+`DEVNULL` constant; it was corrected before the passing run. These are synthetic
+checks, not GPU results.
+
+The root LaunchDaemon executed its preparation role through the delivered
+interpreter with zero target calls. Before any reboot intent, its future
+observer was revised to wait at most 90 seconds for registry/firmware-desktop
+and one WindowServer process; wrong build 39 is an immediate refusal. The
+original plan/source/job are preserved, and the revised actual launchd
+preparation role also passed. No installation or consumed GPU/reboot trial was
+replayed to make that readiness change.
+
+This packet allows one ordinary reboot, one headless initialization and one
+unchanged Metal probe, with at most one separate recovery reboot after GPU
+initialization begins. Its independent 300-second deadline must acknowledge
+before the first write; the scripts then omit their own reboot/killall calls.
+GPU-off stays present, no native framebuffer or desktop flag is armed, and
+there is no automatic desktop-reboot transition. At this documentation
+checkpoint no reboot or GPU initialization has been dispatched. Read the
+exclusive restart intent and actual postboot result/error before reporting a
+load, GPU-execution or desktop success.
+
+Rollback restores the verified displaced bundle and the four exact backed-up
+user files after current-state checks. Keep GPU-off, preserve unrelated files
+and all consumed intents, and verify any restored image in a later bounded
+ordinary boot. No runtime/plugin/accelerator/security rollback is needed.
