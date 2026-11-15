@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "date": "2026-11-15",
+  "scope": "owner-requested matched bring-up deployment; load/layout/refusal smoke pending",
+  "candidate_source_commit": "6ed22ce2038946ac800e13cee47364ffcae74e45",
+  "branch": "downstream/780m-tahoe",
+  "OS": {
+    "architecture": "x86_64",
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "candidate": {
+    "build_label": 39,
+    "full_kext_compiled_and_linked": true,
+    "matching_tools_compiled_and_linked": true,
+    "ad_hoc_signatures_and_architecture_verified": true,
+    "existing_compiler_warnings_retained": true,
+    "additional_trial_ordering_switch": false,
+    "SHA256": {
+      "PhxBringup": "b2f07834458e61a9fd32898b29a61cb90f2496c876c7d298dd4dbfb7a1036eee",
+      "mesboot": "8ea16854857ba7f98d63ace418b0d1ef1bd7124b20d5e84a16bc7c9f1ffcf2b8",
+      "phxctl": "adf6b6ff8d032a2f4adcb0e4e324227ba68a5d6da51480a8b1c29bd64540fcf5"
+    },
+    "SDK_files_reverified_against_retained_archive_after_build": 1232,
+    "independent_read_only_probe_compiled_with_Werror": true
+  },
+  "deployment": {
+    "new_single_use_packet": true,
+    "EFI_before_file_count": 342,
+    "EFI_after_file_count": 345,
+    "complete_fresh_backup_verified": true,
+    "only_existing_PhxBringup_entry_replaced": true,
+    "original_bundle_retained_inactive": true,
+    "independent_full_manifest_readback": true,
+    "unrelated_EFI_file_count_unchanged": 340,
+    "OpenCore_config_and_Windows_unchanged": true,
+    "EFI_unmounted": true,
+    "matching_tools_deployed_in_separate_root_packet": true,
+    "original_runtime_plugin_firmware_accelerator_scripts_startup_and_allowlist_unchanged": true,
+    "GPU_off_retained": true,
+    "loaded_image_still_original_build": 34
+  },
+  "verification": {
+    "actual_swap_function_tempfile_cases_passed": 7,
+    "postboot_runner_CPU_methods_passed": 6,
+    "postboot_CPU_skips": 0,
+    "private_fixture_initial_failure": "noncanonical temporary path alias; fixture corrected before passing run",
+    "postboot_CPU_tests_execute_real_host_commands": false,
+    "focused_source_regressions_rerun": true,
+    "full_repository_suite_rerun": false,
+    "source_layout_methods_passed": 3,
+    "source_wrapper_methods_passed": 6
+  },
+  "postboot": {
+    "root_launchdaemon_interpreter_preparation_role_verified": true,
+    "fresh_boot_observed": false,
+    "candidate_loaded": false,
+    "smoke_dispatched": false,
+    "smoke_cases_completed": 0,
+    "smoke_cases_planned": 6,
+    "ordinary_reboot_limit": 1,
+    "reboot_dispatched_at_record_checkpoint": false,
+    "reboot_dispatched_after_checkpoint_requires_private_receipt": true,
+    "numeric_layout_configuration_only": true,
+    "firmware_or_GPU_initialization_allowed": false,
+    "desktop_arming_allowed": false,
+    "automatic_retry": false
+  },
+  "boundaries": {
+    "real_GPU_execution_proven": false,
+    "GPU_region_ownership_proven": false,
+    "hardware_acceleration_or_CoreDisplay_fix_claimed": false,
+    "old_trial_packets_reopened": false,
+    "partition_BIOS_security_or_unrelated_NVRAM_changed": false,
+    "binary_or_raw_diagnostic_publication": false,
+    "OpenViking_lookup": "unavailable; no registered tools",
+    "AuxKC_or_PhxAccel_or_runtime_rebuilt_or_replaced": false
+  },
+  "rollback": "Restore only retained original PhxBringup after exact current EFI checks; retain GPU-off; no consumed scope replay."
+}

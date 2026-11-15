@@ -2,9 +2,11 @@
 
 2026-11-15: source correction for the owner's reported original-layout risk.
 This is a downstream change, not a byte-identical upstream release. It has not
-been installed or exercised on the GPU. The installed original stack and the
-closed original-only trial remain unchanged; the recovered GPU-off state must
-not be cleared by repository validation.
+been exercised on the GPU. The source-stage validation below did not install
+it. A subsequent explicitly requested [matched deployment](VRAM-LAYOUT-DEPLOYMENT.md)
+has installed the corrected bring-up bundle; its fresh-boot load/smoke remain
+pending at that deployment checkpoint. The original runtime/plugin/accelerator,
+closed original-only trial and recovered GPU-off state are preserved.
 
 ## Confirmed mismatch
 
