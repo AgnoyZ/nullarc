@@ -59,7 +59,7 @@
   "private_material_published": false,
   "binary_upload_added": false,
   "actual_reboot_or_desktop_result_claimed": true,
-  "current_status": "per-boot immutable log cutoff correction prepared and unarmed; 2080 pins and actual launchd preparation passed; source sync and one future dispatch pending",
+  "current_status": "immutable startup cutoff observer consumed; one restart scheduled and independently verified; next-boot real desktop and Metal evidence pending",
   "dispatch_readback": {
     "ordinary_reboot_requested_once": true,
     "caller_returncode": 0,
@@ -316,5 +316,20 @@
     "desktop_armed": false,
     "reboot_requested": false,
     "contract_sha256": "f5f0d9ba962f5ece2243c1a127afbc025bf87ed6c3b3c57f3d02989d22c02b00"
+  },
+  "startup_clock_trial_dispatch": {
+    "scheduled_once_independently_verified": true,
+    "scheduler_root_owned": true,
+    "same_preparation_boot": true,
+    "loaded_build": 34,
+    "original_kernel_and_four_corrected_helpers_verified": true,
+    "one_shot_display_arming_readback": true,
+    "observer_inputs_verified": 2080,
+    "preparation_boot_GPU_reinitialization": false,
+    "expected_restart_local_time_approximately": "2026-11-15T21:35:03.972236+08:00",
+    "normal_reboot_dispatches_remaining": 0,
+    "automatic_retry": false,
+    "source_checkpoint": "c64cc4a5d8ed446b8575668f9a7ed30a0fb14100",
+    "actual_next_boot_result": "pending; scheduled restart is not observed boot or desktop success"
   }
 }

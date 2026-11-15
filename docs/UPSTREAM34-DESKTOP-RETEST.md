@@ -349,3 +349,15 @@ access, and the complete read-only EFI manifest passed. At this checkpoint
 GPU-off is present, display is unarmed and **no new reboot has been requested**.
 The fresh packet retains one ordinary desktop boot, at most one unchanged Metal
 probe, the 300-second limit and at most one managed recovery, with no retry.
+
+## Fixed-cutoff observer dispatched once
+
+Source checkpoint `c64cc4a5d8ed446b8575668f9a7ed30a0fb14100` was independently
+verified on the public downstream remote before this fresh packet was armed.
+Readback confirmed one root-owned restart scheduler, all **2080** fixed inputs,
+exact original build 34, corrected helpers and one-shot native-display flags.
+The scheduler estimates **21:35:03 +08:00 on 2026-11-15**. This is a scheduled
+time; actual next-boot and desktop/Metal results remain pending. Normal restart
+dispatches remaining are **zero**, and this consumed packet must not be replayed.
+The same one-attempt, one-probe, 300-second observation and bounded-recovery
+limits remain in force. No initialization occurred in the preparation boot.
