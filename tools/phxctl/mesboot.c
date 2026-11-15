@@ -1260,7 +1260,7 @@ static void desktop_idle_queue(uint32_t me, uint32_t pipe, uint32_t active_regis
    const uint32_t requested = (me << 2) | pipe;
    uint32_t immediate = grbm_select(me, pipe, 0, 0);
    uint32_t observed = rd(SEG1(0x900));
-   if (observed != requested) {
+   if (immediate != requested || observed != requested) {
       fprintf(stderr, "mesboot desktop-select: phase=select me=%u pipe=%u queue=0 vmid=0 requested=0x%08x write-readback=0x%08x readback=0x%08x\n",
               me, pipe, requested, immediate, observed);
       gpu_failure("desktop queue selection");
@@ -1269,7 +1269,7 @@ static void desktop_idle_queue(uint32_t me, uint32_t pipe, uint32_t active_regis
    if (active == UINT32_MAX || (active & 1)) gpu_failure("desktop queue idle precondition");
    immediate = grbm_select(0, 0, 0, 0);
    observed = rd(SEG1(0x900));
-   if (observed) {
+   if (immediate || observed) {
       fprintf(stderr, "mesboot desktop-select: phase=restore me=0 pipe=0 queue=0 vmid=0 requested=0x00000000 write-readback=0x%08x readback=0x%08x\n",
               immediate, observed);
       gpu_failure("desktop GRBM idle selection");

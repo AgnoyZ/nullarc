@@ -182,6 +182,37 @@ class DesktopHandoffTests(unittest.TestCase):
         self.assertEqual([0, 0, 0, 0, 0], [data[key] for key in
                          ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals")])
 
+    def test_each_queue_selection_and_restore_requires_matching_immediate_readback(self):
+        selections = ((3, 1, 13), (3, 0, 12), (1, 0, 4), (0, 0, 0))
+        for command in ("desktop-init", "desktop-preflight"):
+            for variant in ("reference", "relocated"):
+                for ordinal in range(1, 9):
+                    with self.subTest(command=command, variant=variant, ordinal=ordinal):
+                        result = subprocess.run([str(self.entrypoint), variant,
+                                                f"selector-immediate-{ordinal}", command],
+                                                capture_output=True, text=True, timeout=15,
+                                                env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+                        self.assertEqual(75, result.returncode, result.stderr)
+                        restore = ordinal % 2 == 0
+                        me, pipe, requested = (0, 0, 0) if restore else selections[ordinal // 2]
+                        phase = "restore" if restore else "select"
+                        self.assertIn(f"phase={phase} me={me} pipe={pipe} queue=0 vmid=0 "
+                                      f"requested=0x{requested:08x} write-readback=0x{requested ^ 1:08x} "
+                                      f"readback=0x{requested:08x}", result.stderr)
+                        rows = re.findall(r"^fake-desktop-summary (.*)$", result.stderr, re.M)
+                        self.assertEqual(1, len(rows))
+                        data = json.loads(rows[0])
+                        # Initial MES/selector reads, then 3 reads per completed queue;
+                        # a failed selection has no banked read or idle restoration.
+                        expected_reads = 2 + (ordinal // 2) * 3 + (0 if restore else 1)
+                        self.assertEqual([1, 1, 1, ordinal, expected_reads], [data[key] for key in
+                                         ("opens", "snapshots", "reservations", "writes", "reads")])
+                        self.assertEqual([0] * 7, [data[key] for key in
+                                         ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells",
+                                          "seals", "claims", "closes")])
+                        self.assertNotIn("desktop preflight:", result.stdout)
+                        self.assertNotIn("desktop handoff:", result.stdout)
+
     def test_target_zero_readbacks_stop_both_commands_after_first_KIQ_selection(self):
         for command in ("desktop-init", "desktop-preflight"):
             for variant in ("reference", "relocated"):

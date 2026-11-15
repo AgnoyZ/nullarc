@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-15",
+  "source_parent": "4f9852efdcbecadf02c4c5cb2ec06f75d1231a30",
+  "status": "Uninstalled source repair: reject desktop immediate-only selector mismatch; physical dual-zero cause unresolved",
+  "production_change": {
+    "file": "tools/phxctl/mesboot.c",
+    "function": "desktop_idle_queue",
+    "conditions_changed": 2,
+    "selection_requires_both_readbacks_equal_request": true,
+    "restoration_requires_both_readbacks_zero": true,
+    "new_IO_register_values_retries_timeouts_cleanup_or_ordering": false,
+    "other_production_files_changed": false,
+    "existing_VMID_and_MES_guards_unchanged": true,
+    "before_source_sha256": "150086f697f2fedee1d61ce85db3a51125ce762286581933a079a2df5077a847",
+    "after_source_sha256": "963cd20be985bc6d9f0151ebb788b2a34dc92636736f9f948c36cf68f6794708"
+  },
+  "reproduction": {
+    "backend": "Actual CLI with fake IOKit/register banks/VRAM/completions; ASan/UBSan",
+    "new_Python_regression_methods": 1,
+    "synthetic_matrix_cases": 32,
+    "commands": [
+      "desktop-init",
+      "desktop-preflight"
+    ],
+    "layouts": [
+      "reference",
+      "relocated"
+    ],
+    "selector_write_ordinals": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "fault": "Immediate reply differs by one bit; stored synthetic selector and subsequent read remain correct",
+    "before_fix_failed_refusal_expectations": 32,
+    "before_fix_unexpected_CLI_successes": 32,
+    "after_fix_cases_passed": 32,
+    "after_fix_terminal_exit": 75,
+    "exact_IO_counts_verified": true,
+    "diagnostic_paired_read_preserved": true,
+    "later_banked_access_selection_VRAM_doorbells_seal_claim_or_checked_close": false
+  },
+  "validation": {
+    "focused_Python_methods_passed": 51,
+    "skipped": 0,
+    "suite_methods": {
+      "desktop_handoff": 32,
+      "register_transport": 7,
+      "native_include_graph": 5,
+      "GC_observer": 7
+    },
+    "ASan_UBSan_CPU_harnesses": true,
+    "temporary_mutations": [
+      {
+        "name": "ignore-immediate-selection",
+        "compiled": true,
+        "missed_refusals_detected_by_regression": 16,
+        "mutation_scoped_to_desktop_idle_queue": true,
+        "physical_execution": false
+      },
+      {
+        "name": "ignore-immediate-restoration",
+        "compiled": true,
+        "missed_refusals_detected_by_regression": 16,
+        "mutation_scoped_to_desktop_idle_queue": true,
+        "physical_execution": false
+      }
+    ],
+    "native_compile_only": [
+      {
+        "source": "tools/phxctl/mesboot.c",
+        "compiled_and_linked": true,
+        "executed": false,
+        "profile": "existing repository native recipe",
+        "source_sha256": "963cd20be985bc6d9f0151ebb788b2a34dc92636736f9f948c36cf68f6794708",
+        "x86_64_verified_without_execution": true
+      },
+      {
+        "source": "tools/phxctl/gc_state_observe.c",
+        "compiled_and_linked": true,
+        "executed": false,
+        "profile": "existing observer suppression with Wall Wextra Werror",
+        "source_sha256": "6de88228396bfc80fbc20930feb8d81f39af57725ff20d8dc22bd24f282b6889",
+        "x86_64_verified_without_execution": true
+      }
+    ],
+    "strict_native_warning_baseline": {
+      "extra_strict_native_attempt_passed": false,
+      "baseline_same_unused_variable_error": true,
+      "new_error_from_guard_change_found": false,
+      "unused_variable": "val",
+      "source_line_unchanged": 700,
+      "original_repository_native_recipe_used_for_final_compile": true
+    },
+    "mutation_preparation_qualifications": {
+      "initial_global_match_refused_as_ambiguous": true,
+      "initial_extra_strict_C_fake_compile_refused_preexisting_unused_variable": true,
+      "final_C_fake_profile_matches_existing_test_runner": true
+    },
+    "full_suite_rerun": false,
+    "hosted_workflow_dispatched": false,
+    "native_candidate_executed": false,
+    "input_sha256": {
+      "tools/phxctl/mesboot.c": "963cd20be985bc6d9f0151ebb788b2a34dc92636736f9f948c36cf68f6794708",
+      "tests/test_desktop_handoff.py": "0fe315a3796ce51609ca656f510bce2f873af92c873c43aa334dd668c66ca745",
+      "tests/test_desktop_entrypoint.c": "1c6574dd878daf5aa50058e91363941cb2f04b523f95613f51579a77c260249c",
+      "tests/test_register_transport.py": "23d931a88007e9d159d16e87d3d381ec3540bd314dd45d363532fe37be264b46",
+      "tests/test_register_transport.cpp": "cb005af81e2a44094239491c7f54eaead41f4a8a64616da013c72f69ac1ea021",
+      "tests/test_native_include_graph.py": "cd5b4483daadd6880524f9b07df7cded04a92bdc3c740b6df8b9984f3f12d3ea",
+      "tests/test_gc_state_observe.py": "9b898463afec0bad435d6c8aa35fecb36d41196f449b8521266faa3ce011c96e",
+      "tests/test_gc_state_observe.c": "35804450195630a9fd48cd3b7df6136c6f7dbc6599d25e6d2e8503148613203e",
+      "tools/phxctl/gc_state_observe.c": "6de88228396bfc80fbc20930feb8d81f39af57725ff20d8dc22bd24f282b6889"
+    }
+  },
+  "upstream_review": {
+    "reference_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+    "latest_upstream_claimed": false,
+    "reference_files": [
+      {
+        "path": "install/install.sh",
+        "pinned_upstream_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "sha256": "7ac42efc1332958e32aeb6a027d6a6e5bbefb204563dd310a2acd96aead3887f"
+      },
+      {
+        "path": "tools/phxctl/full.sh",
+        "pinned_upstream_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "sha256": "0581790dc01be1fc83fd5026b2cc9eff865800dc4269ace5cd87e05139a4ea0f"
+      },
+      {
+        "path": "tools/phxctl/bringup5.sh",
+        "pinned_upstream_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+        "sha256": "e3a5b0533b04fc1a10924c12d0c92e71e62052d968447a3f2c0956552bf5f87f"
+      }
+    ],
+    "installer_byte_identical_to_local": true,
+    "installer_contains_the_complete_selector_initialization_implementation": false,
+    "legacy_full_script_places_doorbell_CP_setup_before_GART_MES_and_requested_queue_step": true,
+    "downstream_desktop_idle_checks_precede_that_setup": true,
+    "difference_proven_to_cause_zero_readbacks": false,
+    "initialization_reordered_by_this_change": false,
+    "upstream_install_or_boot_helper_executed": false,
+    "upstream_implementation_imported_by_this_change": false
+  },
+  "interpretation": {
+    "historical_target_record": "desktop-retest-target-20261115.json",
+    "old_guard_already_rejects_that_dual_zero_case": true,
+    "physical_cause_explained_by_this_fix": false,
+    "hardware_write_acceptance_or_desktop_success_proven": false,
+    "real_MMIO_kernel_scheduling_concurrency_or_installed_binary_identity_tested": false
+  },
+  "preservation": {
+    "target_service_opened": false,
+    "GPU_commands": 0,
+    "arming": false,
+    "reboots": 0,
+    "driver_or_installed_helper_replacement": false,
+    "startup_collections_EFI_security_or_NVRAM_changed": false,
+    "old_closed_requests_or_candidate_pins_rewritten": false,
+    "raw_logs_private_paths_identifiers_credentials_binaries_firmware_or_EFI_published": false,
+    "full_stack_artifact_policy_changed": false,
+    "licenses_and_notices_unchanged": true
+  },
+  "rollback": "Revert only this source/test/documentation change in a normal new commit; preserve all historical target evidence.",
+  "execution_boundary": "Source candidate only. A later physical test needs a new reviewed request with exact changed-candidate pins, a fresh boot and independent recovery; never repin or replay consumed scopes."
+}

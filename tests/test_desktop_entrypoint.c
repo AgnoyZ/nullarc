@@ -159,6 +159,11 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
         if (ordinal_fault("vmid-write-all-ones", writes)) *output = UINT32_MAX;
         if (input[0] == SEG1(0x900)) {
             ++grbm_writes;
+            for (unsigned ordinal = 1; ordinal <= 8; ++ordinal) {
+                char name[64];
+                assert(snprintf(name, sizeof(name), "selector-immediate-%u", ordinal) > 0);
+                if (is(name) && grbm_writes == ordinal) *output ^= 1;
+            }
             if (is("select-immediate-and-readback") && grbm_writes == 1) {
                 *reg((uint32_t)input[0]) ^= 1; *output ^= 1;
             }
