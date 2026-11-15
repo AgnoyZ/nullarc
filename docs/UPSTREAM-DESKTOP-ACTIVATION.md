@@ -1,6 +1,6 @@
 # Original-kernel desktop activation
 
-Status, 2026-11-15: **one original-kernel initialization was attempted and
+Status of this guarded operation, 2026-11-15: **one original-kernel initialization was attempted and
 stopped at the GART selector-readback guard; the subsequent GPU-off boot is
 independently verified. Desktop takeover and hardware acceleration remain
 unverified**.
@@ -146,6 +146,11 @@ been dispatched for this subsequent request. The owner then explicitly accepted
 the reported address-conflict risk. A [new exact-original trial](
 EXACT-ORIGINAL-TRIAL.md) records that acceptance and its separate boot/recovery
 limits. It does not reopen the failed guarded packet or validate the layout.
+That exact-original startup subsequently completed, but its external Metal
+probe ran before the original driver's 60-second publication callback and
+triggered a verified GPU-off recovery. A separate [publication-aware trial](
+EXACT-ORIGINAL-READINESS.md) corrects the observation timing while retaining
+the original installed stack and all consumed-packet boundaries.
 
 ## Preparation checks and rollback
 

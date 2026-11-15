@@ -1,9 +1,12 @@
 # Exact-original startup and desktop trial
 
-Preparation snapshot, 2026-11-15: **the owner explicitly accepted the known
-reference-layout risk and requested an entirely original startup and desktop
-reboot test. Postboot results remain pending.** This is a new operation; the
-[earlier guarded attempt](UPSTREAM-DESKTOP-ACTIVATION.md) remains consumed.
+Execution assessed, 2026-11-15: **the original startup completed, but the external
+Metal probe ran before the original driver's delayed Metal publication and
+triggered recovery. A subsequent GPU-off boot is independently verified.**
+This packet is consumed. Neither Metal execution nor desktop takeover was
+verified. The [earlier guarded attempt](UPSTREAM-DESKTOP-ACTIVATION.md) also
+remains consumed; the [publication-aware follow-up](EXACT-ORIGINAL-READINESS.md)
+uses a separate packet.
 
 ## Original bytes and accepted risk
 
@@ -83,7 +86,7 @@ Twenty CPU-only methods exercise the actual observer's phase admission,
 candidate-output refusal, stale-log rejection, exclusive receipts, off/arming
 restoration, deadline closure and ambiguous shutdown handling. The fake process
 tests execute no real shutdown or GPU command. The independent Metal verifier
-compiles but has not executed during preparation. A metadata-parser error in
+compiled without executing during preparation. A metadata-parser error in
 the first staging read was inspected before retry: no trial packet/job or
 activation marker had been created; empty IORegistry output is now covered.
 
@@ -102,6 +105,53 @@ files are unchanged. The [sanitized preparation record](
 validation/exact-original-trial-20261115.json) contains no raw metadata, private
 paths, image identities, firmware or binaries. Actual boot outcomes are recorded
 separately in private root-owned receipts and must be read before reporting success.
+
+## Actual execution and premature Metal observation
+
+Arming was consumed at **15:10:02 +08:00**, followed by exactly one initial
+managed reboot request. Its caller returned zero without timing out. The new
+boot began at **15:11:27 +08:00**. The unchanged upstream startup reported the
+expected compute and graphics scratch/buffer values, both queue adoptions and
+claim returned zero, the next-boot display flag was armed, and startup printed
+`done` at **15:11:37 +08:00**. Original loaded-image and installed-input checks
+passed before the external Metal probe. These startup results are candidate
+evidence, not an independent Metal workload result.
+
+The external probe printed `No AMD Metal device`, with no success output. Its
+source returns before compiling or submitting a shader in that case. The
+observer recorded failure at **15:11:43 +08:00** and did not authorize the second
+desktop boot. This is not the earlier GART refusal or a dual-zero readback.
+
+The pinned original `PHX_FB` accelerator source withholds `MetalPluginName`
+until display arming or a 60-second headless callback. Historical kernel logs
+from this exact trial confirm that the name was withheld and the 60-second
+timer started at **15:11:35 +08:00**. The callback-disabling boot argument was
+absent. The probe therefore ran before that normal publication interval; its
+failure does not establish that the original Metal stack would still fail
+after publication. This is an external observer readiness defect. Actual
+post-publication Metal execution remains untested by this consumed packet.
+
+## Verified recovery and closure
+
+The observer restored GPU-off state, removed persistent and one-shot display
+arming, and consumed its single managed recovery intent at **15:11:43 +08:00**.
+The machine rebooted before a recovery-caller return receipt was written; that
+exit status is unobserved and was not retried. An independent read verified
+the subsequent boot beginning at **15:12:08 +08:00** and its recovery-postboot
+receipt. The current startup log says `kill switch present: nothing to do`.
+
+GPU-off is present; M2, one-shot and pending markers are absent. The original
+bring-up image still matches, and all 1,696 pinned inputs matched before
+retiring the consumed external witness. PhxAccel, PhxAMDFB and NMXAccel are
+absent; an IONDRVFramebuffer and one WindowServer remain. No initializer,
+observer or shutdown/reboot scheduler remains running. No second desktop boot
+was requested. Initialization and recovery allowances for this packet are zero.
+
+For the separate readiness-aware follow-up, only this inactive external
+witness plist was archived with a matching hash and removed from its active
+LaunchDaemon path. Its receipts and original contract are preserved. That
+intentional retirement changes the old plist location; it does not change a
+driver or permit replaying the consumed packet.
 
 Before arming, rollback is to keep the off marker, retain absent display flags,
 unload/remove only the scoped external witness job and preserve its packet.

@@ -1,7 +1,7 @@
 {
-  "format": 1,
+  "format": 2,
   "date": "2026-11-15",
-  "snapshot_phase": "preparation before arming; actual postboot outcomes recorded separately",
+  "snapshot_phase": "consumed first exact-original trial; recovery boot independently assessed",
   "request": "Entire original stack, desktop takeover and reboot test",
   "known_reference_layout_memory_corruption_or_hang_risk_explicitly_accepted": true,
   "release": "v0.4.0-alpha",
@@ -54,15 +54,56 @@
     "GPU_or_initialization_checks_changed_by_management_revision": false
   },
   "outcome": {
-    "postboot_assessed_in_this_record": false,
+    "postboot_assessed_in_this_record": true,
     "hardware_acceleration_success_claimed": false,
     "desktop_takeover_success_claimed": false,
-    "authoritative_execution_evidence": "Separate private root-owned intent, stage, deadline, probe and recovery receipts; inspect after reboot and never replay an existing intent."
+    "authoritative_execution_evidence": "Private immutable intent, stage, Metal stderr, historical kernel publication log and independent recovery-boot receipts; never replay this consumed packet.",
+    "original_startup_candidate_completed": true,
+    "original_compute_and_graphics_actual_tokens_match": true,
+    "original_queue_adoptions_and_claim_return_zero": true,
+    "original_startup_done_time_UTC_plus_8": "2026-11-15T15:11:37+08:00",
+    "initial_managed_reboot_requests": 1,
+    "initial_shutdown_returncode": 0,
+    "initial_shutdown_caller_timed_out": false,
+    "trial_boot_time_UTC_plus_8": "2026-11-15T15:11:27+08:00",
+    "Metal_probe_executed": true,
+    "Metal_probe_success": false,
+    "Metal_probe_stderr": "No AMD Metal device",
+    "Metal_shader_compilation_or_submission_reached": false,
+    "Metal_probe_preceded_original_publication_callback": true,
+    "original_kernel_log_confirms_plugin_withheld_and_60_second_timer": true,
+    "original_publication_timer_time_UTC_plus_8": "2026-11-15T15:11:35+08:00",
+    "publication_disabling_boot_argument_absent": true,
+    "external_observer_readiness_defect_identified": true,
+    "postpublication_Metal_failure_established": false,
+    "desktop_phase_started": false,
+    "managed_desktop_reboot_requests": 0,
+    "managed_recovery_reboot_requests": 1,
+    "recovery_shutdown_returncode_observed": false,
+    "recovery_request_retried": false,
+    "recovery_boot_time_UTC_plus_8": "2026-11-15T15:12:08+08:00",
+    "recovery_boot_independently_verified": true,
+    "original_pins_matched_before_witness_retirement": true,
+    "remaining_initialization_or_recovery_allowance": 0,
+    "consumed_external_witness_archived_with_matching_hash": true,
+    "closed": true
   },
   "preservation": {
     "installed_original_driver_runtime_plugin_or_helpers_changed": false,
     "EFI_partition_BIOS_security_or_NVRAM_reset_changed": false,
     "private_diagnostics_or_binaries_published": false,
     "old_consumed_scopes_remain_closed": true
+  },
+  "recovery_readback": {
+    "GPU_off_marker_present": true,
+    "M2_one_shot_pending_absent": true,
+    "loaded_original_bringup_identity_matches": true,
+    "PhxAccel_loaded": false,
+    "PhxAMDFB_present": false,
+    "NMXAccel_present": false,
+    "IONDRVFramebuffer_present": true,
+    "WindowServer_count": 1,
+    "initializer_observer_or_shutdown_scheduler_running": false,
+    "original_startup_skipped_due_to_off_marker": true
   }
 }

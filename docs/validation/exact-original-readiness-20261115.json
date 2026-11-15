@@ -1,0 +1,74 @@
+{
+  "format": 1,
+  "date": "2026-11-15",
+  "snapshot_phase": "publication-aware preparation staged but not armed",
+  "request": "Continue entirely-original desktop test after demonstrated external observer readiness defect",
+  "known_reference_layout_risk_explicitly_accepted": true,
+  "release": "v0.4.0-alpha",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "architecture": "x86_64"
+  },
+  "original_components": {
+    "full_installed_file_comparison_passed": true,
+    "loaded_original_bringup_build": 34,
+    "loaded_image_matches_original": true,
+    "drivers_helpers_startup_watchdogs_firmware_plugin_runtime_modified": false,
+    "Metal_verifier_source_and_binary_changed": false,
+    "reference_layout_conflict_resolved": false
+  },
+  "observer_change": {
+    "wait_for_actual_original_Metal_plugin_name_and_class": true,
+    "publication_wait_maximum_seconds": 120,
+    "reserve_within_boot_deadline_seconds": 45,
+    "registry_only_wait_no_GPU_or_arming_writes": true,
+    "original_60_second_headless_behavior_preserved": true,
+    "Metal_probe_attempt_limit_per_stage": 1,
+    "probe_exit_receipt_added": true,
+    "publication_alone_is_not_execution_evidence": true
+  },
+  "scope": {
+    "managed_ordinary_reboot_limit": 2,
+    "managed_recovery_reboot_limit": 1,
+    "initial_reboot_observation_seconds": 180,
+    "per_trial_boot_observation_seconds": 300,
+    "second_boot_requires_real_Metal_success": true,
+    "desktop_requires_real_Metal_frame_progress_and_WindowServer_stability": true,
+    "next_boot_GPU_off_even_on_desktop_success": true,
+    "automatic_retry": false,
+    "old_scopes_replayed": false,
+    "original_watchdogs_unchanged_and_separately_accounted": true,
+    "observer_ACK_guaranteed_before_original_first_hardware_command": false,
+    "software_recovery_guaranteed_for_hard_hang": false
+  },
+  "preparation": {
+    "CPU_methods_passed": 31,
+    "real_GPU_or_shutdown_executed_by_checks": false,
+    "immutable_pinned_inputs": 1697,
+    "frozen_interpreter_regular_files": 1656,
+    "unarmed_LaunchDaemon_role_verified": true,
+    "first_staging_refusal_before_any_new_packet_job_or_arming_write": true,
+    "only_extra_file_was_original_startup_generated_diagnostic": true,
+    "generated_diagnostic_exact_metadata_required_and_preserved": true,
+    "all_original_release_input_hashes_required": true,
+    "modified_missing_output_and_unexpected_file_cases_tested": true,
+    "old_external_witness_archived_and_retired": true,
+    "GPU_off_present_at_snapshot": true,
+    "M2_one_shot_pending_absent_at_snapshot": true,
+    "GPU_initialization_commands_at_snapshot": 0,
+    "reboot_requests_at_snapshot": 0
+  },
+  "outcome": {
+    "postboot_assessed_in_this_record": false,
+    "hardware_acceleration_success_claimed": false,
+    "desktop_takeover_success_claimed": false,
+    "authoritative_execution_evidence": "New private root-owned exclusive intent, publication, Metal-exit, stage and recovery receipts; read before continuing and never redispatch an existing intent."
+  },
+  "preservation": {
+    "old_consumed_contracts_and_receipts_overwritten": false,
+    "installed_original_files_changed": false,
+    "EFI_partition_BIOS_security_or_NVRAM_reset_changed": false,
+    "raw_diagnostics_private_paths_or_binaries_published": false
+  }
+}
