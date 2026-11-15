@@ -110,7 +110,10 @@ static kern_return_t phx34_scalar(io_connect_t connection, uint32_t selector,
        ((selector == 103 || selector == 105 || selector == 106 || selector == 107) &&
         (!out || expected != 4 || out[0] != 0)) ||
        (selector == 100 && (!out || expected != 2 || out[0] != 1))) {
-      fprintf(stderr, "upstream34-layout: selector %u ABI/firmware refusal\n", selector); exit(75);
+      fprintf(stderr, "upstream34-layout: selector %u ABI/firmware refusal: input0 0x%llx, output0 0x%llx, output1 0x%llx\n",
+              selector, (unsigned long long)(in && ni ? in[0] : 0),
+              (unsigned long long)(out && expected ? out[0] : 0),
+              (unsigned long long)(out && expected > 1 ? out[1] : 0)); exit(75);
    }
    return kr;
 }

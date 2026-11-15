@@ -212,3 +212,11 @@ no accelerator present. The successful headless result above remains historical
 evidence for that earlier boot, not the current desktop. See the retest record
 for the consumed reboot receipts and the source-only diagnostic correction;
 that correction is not installed and does not constitute another GPU test.
+
+After a further owner continuation, a new diagnostic-only deployment replaced
+the four user files and passed independent readback. Original kernel/runtime,
+firmware, plugin and startup are unchanged. Its fresh observer preparation
+passed with no GPU call, while GPU-off remains present and display arming is
+absent. The new preparation/next-boot status is recorded separately in the
+desktop retest record; the preceding failed and successful attempts remain
+consumed historical evidence.

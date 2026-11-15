@@ -59,7 +59,7 @@
   "private_material_published": false,
   "binary_upload_added": false,
   "actual_reboot_or_desktop_result_claimed": true,
-  "current_status": "consumed native desktop trial; original startup requested firmware fallback; acceleration inactive",
+  "current_status": "new diagnostic-only user files installed and single-use observer prepared; GPU-off retained, display unarmed and no new reboot dispatched at this source checkpoint",
   "dispatch_readback": {
     "ordinary_reboot_requested_once": true,
     "caller_returncode": 0,
@@ -124,6 +124,44 @@
       "tools/upstream34_layout/PhxUpstream34Layout.h": "da0512698f5f62e0aa02f521a580ce7a5aa0edc2dda11504bb5109874e996ccd",
       "tools/upstream34_layout/layout-fix.patch": "ca765a41ae7ead5ba45f683093c6d3012afebf3b85e3a7b7cc2655c398c620f0",
       "tests/test_upstream34_layout.py": "ecf07fc8811072658d63e2abadcba0a82a2839d135c9181549271241160750c5"
+    },
+    "checkpoint_commit": "0e965b8327ccfba6f0291d0c31f3a180e3d1f264"
+  },
+  "diagnostic_trial_preparation": {
+    "prepared": true,
+    "four_diagnostic_user_files_installed_and_verified": true,
+    "original_build34_kernel_runtime_firmware_plugin_and_startup_unchanged": true,
+    "EFI_manifest_read_only_verified_and_unmounted": true,
+    "fresh_launchd_preparation_role_passed": true,
+    "preparation_GPU_calls": 0,
+    "helper_CPU_methods_passed": 14,
+    "observer_CPU_methods_passed": 42,
+    "pins": 2087,
+    "ordinary_reboot_limit": 1,
+    "desktop_attempt_limit": 1,
+    "managed_recovery_reboot_limit": 1,
+    "automatic_retry": false,
+    "GPU_off": true,
+    "desktop_armed": false,
+    "reboot_requested": false,
+    "new_helper_SHA256": {
+      "bringup5.sh": "5564ab5d9c507a5d48dcbe32ebf5da912528584ffa4ee53e452b0478e3b54633",
+      "full.sh": "57c9f0706f59fb26a615cd377d0ab2c2d830651fe65aa029cfd09d9369cfe64c",
+      "phxctl/mesboot": "027a0ad6e6c51579e7e4690a3327b437de650276f8a897d8cdd1beca0d6772ec",
+      "phxctl/phxctl": "4f64e320ba0a2acd43091380ede21de7d2fd732620273d64e3dd67af5168c9cd"
+    },
+    "contract_sha256": "cbcbad1c8c18d7ad5d73b07df1e4aae67a08ae6342972a26882d44b60b671e99",
+    "prior_desktop_scope_remains_consumed": true,
+    "historical_headless_evidence_not_current_acceleration_claim": true,
+    "command_input_and_firmware_status_retained": true,
+    "startup_log_snapshots_and_noncompeting_upstream_fallback_observation": true,
+    "added_Python_cache_files_archived": 53,
+    "preexisting_pinned_files_changed_by_cache_recovery": 0,
+    "frozen_interpreter_no_bytecode_isolated_no_site_enforced": true,
+    "source_SHA256": {
+      "tools/upstream34_layout/PhxUpstream34Layout.h": "2f7e3124a99e97469debc9ee5d9bb760092c769ef530f99814257bc314f54de1",
+      "tools/upstream34_layout/layout-fix.patch": "ca765a41ae7ead5ba45f683093c6d3012afebf3b85e3a7b7cc2655c398c620f0",
+      "tests/test_upstream34_layout.py": "138590f4cc5cda068893e68ea7f9dc73319aaf3e95e070329f8c172c26d22b9c"
     }
   }
 }

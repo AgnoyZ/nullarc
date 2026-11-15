@@ -226,6 +226,10 @@ if fail and ((name=='phxctl' and args and args[0]==fail) or (name=='bash' and ar
         self.assertEqual(74, result.returncode)
         self.assertIn("kr 0x00000000", result.stderr)
         self.assertIn("bytes 0/4", result.stderr)
+        result, _ = self.invoke("phxctl", "smu", "0x16", "1", fixture="SMU-status")
+        self.assertEqual(75, result.returncode)
+        self.assertIn("selector 100 ABI/firmware refusal", result.stderr)
+        self.assertIn("input0 0x16, output0 0xff", result.stderr)
 
     def test_full_keeps_original_success_order(self):
         result, calls = self.run_shell("full.sh")

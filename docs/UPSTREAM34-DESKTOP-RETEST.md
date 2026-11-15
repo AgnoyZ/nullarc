@@ -142,3 +142,55 @@ not replaced the installed four files or the default source branch, and no
 new desktop attempt is armed. A future separately bounded trial must record
 its exact inputs and retain these diagnostics from startup; consumed intents
 must not be replayed.
+
+## New diagnostic trial prepared after owner continuation
+
+The owner's subsequent continuation requests the next deployment/test step.
+A new isolated packet has been prepared; the failed 18:29 trial remains closed.
+Its current-boot admission verifies that the earlier successful headless result
+is historical evidence, and that the later failed desktop boot has a distinct,
+closed fallback boot. It does not incorrectly require the accelerator to be
+active on that fallback boot.
+
+Only the four diagnostic user files have now been installed, backed up and
+independently read back. Original build 34, accelerator, firmware, plugin,
+runtime and startup remain unchanged. The complete EFI manifest was checked
+read-only and left unchanged/unmounted. OS remains macOS 26.7.2 / 25G332.
+The diagnostic wrappers additionally retain the command input and returned
+status for ABI/firmware refusal, so a failing SMU message can be identified.
+The successful GPU-command order and fail-closed rules are unchanged.
+
+Preflight initially refused new Python bytecode caches created by a prior
+inspection command that omitted its no-bytecode option. Exact comparison
+found **53 added cache files**, zero removed files and zero modifications to
+pre-existing pinned files. Only those exact additions were archived privately,
+the original manifests were restored and independently rechecked, and all
+subsequent frozen-interpreter commands use `-B -I -S`. No immutable manifest
+was weakened or rewritten to admit the additions. Preflight completed before
+the four-user-file installation.
+
+Fourteen helper methods, native x86_64 compilation/signature checks and
+**42** observer methods passed. The observer tests include saving the failing
+startup block and declining a competing recovery request when upstream has
+already requested fallback. The fresh actual launchd preparation role passed
+with **zero GPU calls**; its contract verifies **2087** pinned inputs, including
+the frozen interpreter files. This observer still does not gate upstream's
+first hardware I/O.
+
+At this source checkpoint the four diagnostic files are installed, GPU-off is
+present, display arming is absent and **no reboot has been dispatched**. The
+new packet permits one ordinary reboot/native-desktop attempt, a 300-second
+independent observation deadline, at most one unchanged Metal probe after
+startup succeeds, and at most one managed recovery reboot. Original startup
+watchdogs remain unchanged. A detected original fallback is recorded without
+immediately dispatching another shutdown; the independent deadline may still
+recover the same boot if original recovery does not happen. Subsequent boots
+close a consumed attempt instead of retrying. Software timers do not guarantee
+recovery from a hard hardware hang.
+
+Arming/dispatch and next-boot receipts must be independently read before
+claiming that this new reboot happened or acceleration passed. The default
+source branch remains pinned at `5805c05bed6cf0ce1e3fc28f8d088f6e5e296993`;
+these diagnostic files are from the downstream isolated recipe. Rollback
+restores only the four exact saved user files with GPU-off present and native
+display arming absent. The prior root packets and their receipts remain intact.
