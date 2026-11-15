@@ -70,3 +70,12 @@ test-nmplugin-surface-key:
 
 test-nmplugin-descriptor-mask:
 	python3 tests/test_nmplugin_descriptor_mask.py
+
+$(TEST_BIN_DIR)/test_upstream34_alias_policy: tests/test_upstream34_alias_policy.cpp src/phxaccel/PhxHardwarePolicy.hpp Makefile | $(TEST_BIN_DIR)
+	$(CXX) -std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined \
+		-fno-sanitize-recover=all -fno-omit-frame-pointer $< -o $@
+
+.PHONY: test-upstream34-framebuffer
+test-upstream34-framebuffer: $(TEST_BIN_DIR)/test_upstream34_alias_policy
+	./$(TEST_BIN_DIR)/test_upstream34_alias_policy
+	python3 tests/test_upstream34_framebuffer.py
