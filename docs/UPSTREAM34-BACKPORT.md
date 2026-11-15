@@ -5,6 +5,11 @@ based on default checkpoint `90bb06f6f9255cb5a16cc5eb87e78032566b2000`.
 The default branch itself is unchanged. Complete A1 tests before changing A2,
 then complete A2 tests before changing A3. Each stage is a separate commit.
 
+All three source/native gates passed in that order. A1 checkpoint: `11cb144`;
+A2 checkpoint: `79c0a0f`; A3 is the final cumulative candidate. Reproduce A1/A2
+on their respective checkpoints; use `--stage a3` on the final tree. A stage's
+gate deliberately refuses source changes belonging to a later stage.
+
 The original build-34 `src/phxbringup`, native ABI, user helpers, firmware
 sequence and geometry correction stay byte-identical to the baseline.
 Existing licence/notice files are preserved. No driver is installed, loaded,
@@ -108,6 +113,51 @@ measurement was performed.
 
 ## A3 — read-only panel timing
 
-Pending A2's successful gate. Planned source: downstream `661fd3c`, limited to
-validated timing readback and IOFramebuffer reporting; no HiDPI or display
-programming is included.
+A2 passed and synchronized as `79c0a0f486cc9e0e4bbbde80916cc495b9043127`
+before A3 edits began. Source: downstream `661fd3c`, upstream PR9
+`c9da802a8dbf3753fa15b5cd903934712c3c80f6`, limited to the timing helper,
+before/after snapshots around the existing refresh measurement, validated
+IOFramebuffer reporting and two registry properties. No HiDPI, EDID, gamma,
+display programming, VBL scheduling or present-completion changes are included.
+The existing native mode and all original backlight behavior are preserved.
+
+Stable, bounded, fixed-rate progressive snapshots matching the existing
+physical geometry yield detailed timing. Unknown/interlaced/variable/changed
+snapshots retain the old empty detailed-timing fallback. Pixel clock is an
+estimate derived from measured/snapped refresh; min/max remain zero. The
+helper and imported 43-case decoder fixture retain their component provenance
+under the existing PolyForm terms; that fixture is not a new observation of
+this machine. No licence/notice files or third-party binaries are changed.
+
+```sh
+python3 tools/test_upstream34_backport.py --stage a3 \
+  --vulkan-headers /path/to/Vulkan-Headers --sdk /path/to/MacKernelSDK \
+  --out build/backport-a3
+```
+
+In addition to all cumulative baseline/A1/A2 tests and native plugin/accelerator
+builds, the gate executes the decoder fixture and the actual `measureRefresh()`
+and timing callback around CPU mapping/clock doubles with ASan/UBSan. Checks
+include stable snapshots, frame-counter wrap, changed mode, missing/short map,
+inactive/interlaced/variable mode, wrong active area, too few frames, invalid
+rate, zero elapsed time, polarity, invalid output, zero clock bounds and cleared
+reserved data. Comparing the full synthetic register array checks that the
+measurement body adds no writes. Native SDK compilation validates real IOKit
+types independently of the CPU double. Real display acceptance and FPS remain
+unmeasured. Roll back by reverting A3 first, then A2 and A1 as needed; the
+installed default build-34 stack is unchanged by this source-only work.
+
+2026-11-16 final cumulative gate: **passed**, 15 checks on Intel macOS
+26.7.2 / 25G332 with Apple Clang 21.0.0. All baseline/A1/A2 tests passed again,
+as did 43 decoder cases and 59 actual refresh/timing callback assertions under
+ASan/UBSan. The extracted A2 production-method harness hash is unchanged from
+its successful checkpoint. Full native plugin and PhxAccel builds, signatures
+and architectures passed; compiler warning counts were 336 and zero,
+respectively. All 171 protected baseline files matched. Firmware fixture
+parsing remains an explicit baseline skip because its input files are absent.
+Evidence: `validation/upstream34-backport-a3-20261116.json`.
+
+These are source and host/native-build results. They establish no installed
+candidate acceptance, real Metal output, physical panel cadence, FPS increase
+or long-running stability. No deployment, GPU initialization, restart, EFI,
+NVRAM or OS-security change was performed.

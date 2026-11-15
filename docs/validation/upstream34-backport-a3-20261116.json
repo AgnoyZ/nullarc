@@ -1,0 +1,139 @@
+{
+  "stage": "a3",
+  "baseline": "90bb06f6f9255cb5a16cc5eb87e78032566b2000",
+  "result": "passed",
+  "upstream_kernel_build": 34,
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+  "checks": [
+    {
+      "name": "baseline-unit",
+      "exit_code": 0,
+      "log_sha256": "ad2fcbc6c0dbf4d6464d93c2f362b696c1124a00cabde9410b9055ad65ba044e"
+    },
+    {
+      "name": "baseline-layout",
+      "exit_code": 0,
+      "log_sha256": "a7fe4edf470890f2321cb2522ca4a82ec51f6036da6ac019ae8a5ef473ced855"
+    },
+    {
+      "name": "sampler-keys",
+      "exit_code": 0,
+      "log_sha256": "57355fc72a4e15be1c7b959a9344b941fafbac0e987b5b9ab3b9dff3cf85794b"
+    },
+    {
+      "name": "surface-keys",
+      "exit_code": 0,
+      "log_sha256": "98a4b418c45c3a58ed9321a24e0bbce018fcdccf28eddf13c0026e7a5a30fee0"
+    },
+    {
+      "name": "descriptor-masks",
+      "exit_code": 0,
+      "log_sha256": "b21406ee68c650f4c9047ed23fa2a7a3806f0a71c153a1bc42fe8bf454343aa6"
+    },
+    {
+      "name": "native-plugin-build",
+      "exit_code": 0,
+      "log_sha256": "5cbbd3e6932a601711691790852b4607610a2f5fa75ded457d07da76981e5a7d"
+    },
+    {
+      "name": "native-plugin-sign",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-plugin-signature",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-plugin-arch",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "framebuffer-methods",
+      "exit_code": 0,
+      "log_sha256": "014e63f7dcb7dbbda0fcfff510b345887a70244a0d08590669bce263aff62a05"
+    },
+    {
+      "name": "panel-timing-methods",
+      "exit_code": 0,
+      "log_sha256": "b2180f4d3e9315c4ebf68618d82108a4e580ce89171ed042382a709bdae26055"
+    },
+    {
+      "name": "native-accelerator-build",
+      "exit_code": 0,
+      "log_sha256": "da3180fa5d2f0ae44fb4d321ed79469ea82d5ffc45145de0dfce4834a0389656"
+    },
+    {
+      "name": "native-accelerator-signature",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-accelerator-arch",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "diff-whitespace",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "hardware_executed": false,
+  "installed": false,
+  "plugin_loaded": false,
+  "fps_measured": false,
+  "source_sha256": {
+    "src/nmplugin/NVMTLEventSync.m": "9b6ad5bfe9f65f00bcaf57106a14240f04dd94ec47f6956f768a5f670264f07f",
+    "src/nmplugin/NVMTLObjects.m": "a9404474144d48b06560698203081e5a144cb40028197c0c223f2f7ee4995567",
+    "src/nmplugin/nvmtl_sampler_key.h": "c5aa2f4f7900abead21b2fb486f413ce16ba6747295f8865cff6089ece546b2e",
+    "src/nmplugin/nvmtl_surface_key.h": "de4157a84d82917cebd580ec13d778b0cff0817d6a84975df7b7ea1f7351ed66",
+    "src/nmplugin/nvmtl_vk.c": "db894d5d958de775aab0a2259b625a4875f92bb183a14217bb93584d956ead58",
+    "src/nmplugin/nvmtl_vk.h": "c08a7abfd550cbdbb2eece73105e967b237ad160b579d6763fba6a1d17867c0d",
+    "src/phxaccel/PhxHardwarePolicy.hpp": "b98b0e7803a42d34f02e17fd97801dc7cc2c02bbe75d896368001fcb7195677e",
+    "src/phxaccel/accel/phx_panel_timing.h": "940cf03cada4fc876733dfae95a0b6112d6324baceb781c2e19b0d99f872859b",
+    "src/phxaccel/accel/phxfb.cpp": "337b6f4a311f945be2f03d73cdd3d3e2510860acef03d84da4c26371d91a317f"
+  },
+  "previous_stage": "a2",
+  "previous_stage_receipt_sha256": "af7c9195f9df672f16c516d28a3da2dee29bc5565c35e10b24dc75e4bf856c55",
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "plugin_sha256": "0b70f97447329f26c934150c1392bb8451d9d0b3f7abaa9c5383ad4849a32ccd",
+  "accelerator_sha256": "c15b6e06980bc618ee62c6fa5274aeabbdf8413c0cbfd640145269fa528d68c9",
+  "date": "2026-11-16",
+  "downstream_sources": [
+    "661fd3c"
+  ],
+  "previous_stage_commit": "79c0a0f486cc9e0e4bbbde80916cc495b9043127",
+  "protected_baseline_files": 171,
+  "protected_baseline_verified": true,
+  "baseline_layout_tests": 20,
+  "firmware_fixture_tests": "skipped: fixture inputs absent",
+  "panel_decoder_cases": 43,
+  "actual_refresh_timing_assertions": 59,
+  "framebuffer_method_assertions": 3646,
+  "a2_method_harness_unchanged": true,
+  "a2_method_harness_sha256": "98303c11e82d9106041df9f232ae5ab68b05767a5bf3f7c4d08d4b293724b60d",
+  "native_plugin_warnings": 336,
+  "native_accelerator_warnings": 0,
+  "validation_tool_sha256": "50b8a8aa5b7e825734d7d2b6d2ec5e456a60ef95a7ba1e899a2b750b9ee3f2ad",
+  "test_inputs_sha256": {
+    "tests/test_upstream34_alias_policy.cpp": "df84522513bfd50ac73f6b5e3b33d9327ae11cee374169aec6e8291704b0814f",
+    "tests/test_upstream34_framebuffer.py": "557b3f43327ecaa8e73a59f863bf185d9855fe366a0eaa5f263b56b128507dd5",
+    "tests/test_upstream34_layout.py": "64260355291e95301f0be565c4839eee83b32b1a0608f74e706e5d7649775856",
+    "tests/test_upstream34_panel_callbacks.py": "0b226383cc956be9fd279563570eaf6fdfcf5f744441aa3b8e8b29a7d00f6559",
+    "tests/test_upstream34_panel_timing.cpp": "3ee21aa69e1d02d5e496c4af1b3bf17068fd78e85b5e6456052167559d6adcfd",
+    "tests/upstream34_framebuffer_cases.cpp": "6a40ea48fd132bbf5a61b57c12d57e2458768347f7104617759e45d95defdfc3",
+    "tests/upstream34_panel_callbacks.cpp": "7f6e565fb043b1ca12f1e883c58e6019f1a97ab50d5e9525f31aaece3ef7d9ff"
+  },
+  "limitations": [
+    "No candidate installed or loaded; real GPU/display behavior remains untested",
+    "Panel register inputs are upstream test fixtures and CPU doubles, not live target observations",
+    "Native ABI/type checking is compilation evidence, not hardware acceptance",
+    "No frame-time, FPS, kernel FPU or long-duration stability validation"
+  ]
+}

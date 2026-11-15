@@ -1,5 +1,5 @@
 > **当前为独立回移候选 `backport/upstream34-a1-a3`。** 从默认分支分出，
-> 按 A1 → A2 → A3 逐项测试；build 34 的 PhxBringup、ABI 和启动工具保持不变。
+> A1 → A2 → A3 已依次通过主机测试与原生构建；build 34 的 PhxBringup、ABI 和启动工具保持不变。
 > 主机测试与原生构建不代表已安装或通过真实 GPU 验证。
 > 进度、测试与回退见 [UPSTREAM34-BACKPORT](docs/UPSTREAM34-BACKPORT.md)。
 >

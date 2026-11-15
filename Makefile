@@ -79,3 +79,12 @@ $(TEST_BIN_DIR)/test_upstream34_alias_policy: tests/test_upstream34_alias_policy
 test-upstream34-framebuffer: $(TEST_BIN_DIR)/test_upstream34_alias_policy
 	./$(TEST_BIN_DIR)/test_upstream34_alias_policy
 	python3 tests/test_upstream34_framebuffer.py
+
+$(TEST_BIN_DIR)/test_upstream34_panel_timing: tests/test_upstream34_panel_timing.cpp src/phxaccel/accel/phx_panel_timing.h Makefile | $(TEST_BIN_DIR)
+	$(CXX) -std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined \
+		-fno-sanitize-recover=all -fno-omit-frame-pointer $< -o $@
+
+.PHONY: test-upstream34-panel-timing
+test-upstream34-panel-timing: $(TEST_BIN_DIR)/test_upstream34_panel_timing
+	./$(TEST_BIN_DIR)/test_upstream34_panel_timing
+	python3 tests/test_upstream34_panel_callbacks.py

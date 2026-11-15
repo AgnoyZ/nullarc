@@ -19,6 +19,7 @@ A1_SOURCE = {
     "src/nmplugin/nvmtl_sampler_key.h", "src/nmplugin/nvmtl_surface_key.h",
 }
 A2_SOURCE = A1_SOURCE | {"src/phxaccel/accel/phxfb.cpp", "src/phxaccel/PhxHardwarePolicy.hpp"}
+A3_SOURCE = A2_SOURCE | {"src/phxaccel/accel/phx_panel_timing.h"}
 
 
 def git(*args):
@@ -55,6 +56,8 @@ def validate(args):
     pin = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=headers, text=True).strip()
     if pin != VULKAN_PIN or not (headers / "include/vulkan/vulkan.h").is_file():
         raise RuntimeError("Use the reviewed pinned Vulkan-Headers checkout")
+    if subprocess.check_output(["git", "status", "--porcelain", "--", "include"], cwd=headers):
+        raise RuntimeError("Vulkan-Headers inputs must be clean")
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=False)
     report = {
@@ -85,7 +88,7 @@ def validate(args):
             raise RuntimeError(name + " failed; inspect " + str(log))
 
     try:
-        allowed = A1_SOURCE if args.stage == "a1" else A2_SOURCE
+        allowed = {"a1": A1_SOURCE, "a2": A2_SOURCE, "a3": A3_SOURCE}[args.stage]
         report["protected_inputs_sha256"] = protected_inputs(allowed)
         report["source_sha256"] = {name: digest(ROOT / name) for name in sorted(allowed)}
         if args.stage != "a1":
@@ -93,12 +96,23 @@ def validate(args):
             if previous["result"] != "passed" or any(
                     digest(ROOT / name) != previous["source_sha256"][name] for name in A1_SOURCE):
                 raise RuntimeError("A1 has not passed with these exact plugin inputs")
+            predecessor = "a2" if args.stage == "a3" else "a1"
+            receipt = ROOT / ("docs/validation/upstream34-backport-" + predecessor + "-20261116.json")
+            prior = json.loads(receipt.read_text())
+            if prior["result"] != "passed":
+                raise RuntimeError("Previous stage has not passed")
+            if args.stage == "a3" and digest(ROOT / "src/phxaccel/PhxHardwarePolicy.hpp") != prior["source_sha256"]["src/phxaccel/PhxHardwarePolicy.hpp"]:
+                raise RuntimeError("A2 policy source changed after its passing gate")
+            report["previous_stage"] = predecessor
+            report["previous_stage_receipt_sha256"] = digest(receipt)
             if args.sdk is None:
                 raise RuntimeError("The framebuffer native gate requires --sdk")
             sdk = args.sdk.resolve()
             sdk_pin = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=sdk, text=True).strip()
             if sdk_pin != SDK_PIN:
                 raise RuntimeError("Use the reviewed MacKernelSDK checkout")
+            if subprocess.check_output(["git", "status", "--porcelain", "--", "Headers", "Library/x86_64"], cwd=sdk):
+                raise RuntimeError("MacKernelSDK inputs must be clean")
             report["sdk_commit"] = sdk_pin
         run("baseline-unit", ["make", "test", "CXX=clang++"])
         run("baseline-layout", ["make", "test-upstream34-layout"])
@@ -123,6 +137,8 @@ def validate(args):
         report["plugin_sha256"] = digest(binary)
         if args.stage != "a1":
             run("framebuffer-methods", ["make", "test-upstream34-framebuffer", "CXX=clang++"])
+            if args.stage == "a3":
+                run("panel-timing-methods", ["make", "test-upstream34-panel-timing", "CXX=clang++"])
             run("native-accelerator-build", ["sh", "src/phxaccel/build.sh", str(sdk)])
             kext = out / "PhxAccel.kext"
             shutil.copytree(ROOT / "src/phxaccel/build/PhxAccel.kext", kext)
@@ -144,7 +160,7 @@ def validate(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--stage", choices=["a1", "a2"], default="a1")
+    parser.add_argument("--stage", choices=["a1", "a2", "a3"], default="a1")
     parser.add_argument("--sdk", type=Path)
     parser.add_argument("--vulkan-headers", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
