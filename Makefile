@@ -54,3 +54,19 @@ clean:
 .PHONY: test-upstream34-layout
 test-upstream34-layout:
 	python3 tests/test_upstream34_layout.py -v
+
+# A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
+$(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
+	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \
+		-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+		tests/test_nmplugin_sampler_key.m -framework Foundation -o $@
+
+.PHONY: test-nmplugin-sampler-key test-nmplugin-surface-key test-nmplugin-descriptor-mask
+test-nmplugin-sampler-key: $(TEST_BIN_DIR)/test_nmplugin_sampler_key
+	./$(TEST_BIN_DIR)/test_nmplugin_sampler_key
+
+test-nmplugin-surface-key:
+	python3 tests/test_nmplugin_surface_key.py
+
+test-nmplugin-descriptor-mask:
+	python3 tests/test_nmplugin_descriptor_mask.py

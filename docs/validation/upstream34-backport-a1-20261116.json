@@ -1,0 +1,106 @@
+{
+  "stage": "a1",
+  "baseline": "90bb06f6f9255cb5a16cc5eb87e78032566b2000",
+  "result": "passed",
+  "upstream_kernel_build": 34,
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+  "checks": [
+    {
+      "name": "baseline-unit",
+      "exit_code": 0,
+      "log_sha256": "c81f48ddb4dc49ad139ab937079b8259e37f8ed32192bbdacfca409dfc7a21d7"
+    },
+    {
+      "name": "baseline-layout",
+      "exit_code": 0,
+      "log_sha256": "ff6415b91ea336e3112e31f6bfbb577ab4536f89bd0f9d11a3f56b323128c583"
+    },
+    {
+      "name": "sampler-keys",
+      "exit_code": 0,
+      "log_sha256": "57355fc72a4e15be1c7b959a9344b941fafbac0e987b5b9ab3b9dff3cf85794b"
+    },
+    {
+      "name": "surface-keys",
+      "exit_code": 0,
+      "log_sha256": "98a4b418c45c3a58ed9321a24e0bbce018fcdccf28eddf13c0026e7a5a30fee0"
+    },
+    {
+      "name": "descriptor-masks",
+      "exit_code": 0,
+      "log_sha256": "b21406ee68c650f4c9047ed23fa2a7a3806f0a71c153a1bc42fe8bf454343aa6"
+    },
+    {
+      "name": "native-plugin-build",
+      "exit_code": 0,
+      "log_sha256": "5cbbd3e6932a601711691790852b4607610a2f5fa75ded457d07da76981e5a7d"
+    },
+    {
+      "name": "native-plugin-sign",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-plugin-signature",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-plugin-arch",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "diff-whitespace",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "hardware_executed": false,
+  "installed": false,
+  "plugin_loaded": false,
+  "fps_measured": false,
+  "source_sha256": {
+    "src/nmplugin/NVMTLEventSync.m": "9b6ad5bfe9f65f00bcaf57106a14240f04dd94ec47f6956f768a5f670264f07f",
+    "src/nmplugin/NVMTLObjects.m": "a9404474144d48b06560698203081e5a144cb40028197c0c223f2f7ee4995567",
+    "src/nmplugin/nvmtl_sampler_key.h": "c5aa2f4f7900abead21b2fb486f413ce16ba6747295f8865cff6089ece546b2e",
+    "src/nmplugin/nvmtl_surface_key.h": "de4157a84d82917cebd580ec13d778b0cff0817d6a84975df7b7ea1f7351ed66",
+    "src/nmplugin/nvmtl_vk.c": "db894d5d958de775aab0a2259b625a4875f92bb183a14217bb93584d956ead58",
+    "src/nmplugin/nvmtl_vk.h": "c08a7abfd550cbdbb2eece73105e967b237ad160b579d6763fba6a1d17867c0d"
+  },
+  "plugin_sha256": "0b70f97447329f26c934150c1392bb8451d9d0b3f7abaa9c5383ad4849a32ccd",
+  "date": "2026-11-16",
+  "downstream_sources": [
+    "4d09aa9",
+    "8533c26",
+    "0c594e1"
+  ],
+  "protected_baseline_files": 172,
+  "protected_baseline_verified": true,
+  "baseline_layout_tests": 20,
+  "firmware_fixture_tests": "skipped: fixture inputs absent",
+  "sampler_indices": 517,
+  "sampler_concurrent_lookups": 262144,
+  "surface_boundary_keys": 77,
+  "surface_concurrent_cycles": 16384,
+  "descriptor_cases_per_mode": 321,
+  "descriptor_modes": [
+    "unset",
+    "0",
+    "1"
+  ],
+  "descriptor_legacy_mismatches": 0,
+  "native_plugin_warnings": 336,
+  "native_plugin_exports_verified": true,
+  "installed_stack_unchanged": true,
+  "validation_tool_sha256": "d8d0d7fa530cfc24d7bbb0098a92bf49ce3244c35fa57a7c53ba874e2c30c366",
+  "limitations": [
+    "CPU doubles are not real Metal or GPU execution",
+    "No candidate installed or plugin loaded",
+    "Firmware fixture tests skipped",
+    "No frame-time, FPS, rendering or long-duration stability evidence"
+  ]
+}
