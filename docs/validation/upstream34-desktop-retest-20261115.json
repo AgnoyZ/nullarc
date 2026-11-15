@@ -59,7 +59,7 @@
   "private_material_published": false,
   "binary_upload_added": false,
   "actual_reboot_or_desktop_result_claimed": true,
-  "current_status": "watchdog-correction trial consumed: real compute/graphics queue outputs and adoption passed, WindowServer Metal-device creation failed and original fallback completed; runtime-parent permission defect repaired locally and distinct next trial prepared, not yet dispatched at the linked source checkpoint",
+  "current_status": "permission-corrected original34 boot completed startup and real Metal GPU correctness; external observer incorrectly required command value 3 from boolean armed getter and requested bounded recovery; corrected pure observer checker tested and distinct fresh packet prepared, unarmed at the linked checkpoint",
   "dispatch_readback": {
     "ordinary_reboot_requested_once": true,
     "caller_returncode": 0,

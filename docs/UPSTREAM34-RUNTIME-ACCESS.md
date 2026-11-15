@@ -115,3 +115,51 @@ and all 2,078 pinned inputs. The restart is expected approximately
 **20:50:04 +08:00 on 2026-11-15**. No ordinary reboot dispatches remain.
 The next-boot desktop/Metal outcome has not yet been observed at this dispatch
 checkpoint and must be read from the new packet before making a success claim.
+
+## Actual permission-corrected boot and observer defect
+
+The new boot began at **20:50:30 +08:00**. Original startup again verified both
+GPU queues and adoptions, armed/released the panel at **20:50:42**, completed
+its 90-second WindowServer monitor, and reported **616** panel transactions
+with the original WindowServer still running. It completed at **20:52:14**.
+The unchanged independent Metal verifier returned zero at **20:52:19** and
+reported an AMD device, a completed command and matching GPU-written output.
+No fresh WindowServer crash report was found in the checked report directory.
+The preceding Metal-device assertion did not recur in this trial.
+
+The external observer nevertheless failed a later assertion and requested its
+one managed recovery at **20:52:29**. The firmware boot began at **20:52:48**.
+There is no desktop-complete/trial-success receipt. Current exact build34,
+geometry and file pins still match; GPU-off is present, native framebuffer
+and accelerator are absent, and the single firmware-desktop WindowServer is
+running. The witness is retired and this scope cannot retry. The successful
+startup's exact generated all-apps list was archived and restored to the
+original apps-only safe list, with GPU-off present and no accelerator running.
+
+Source inspection proves an observer contract error: it required
+`debug.nvaccelfb == 3`, but the original getter returns `gNvAccelArmed`, which
+is **0 or 1**. Writing 3 enables scanout; it does not change that getter into
+a command echo. Thus the old observer necessarily rejects a correctly armed
+original driver. Its combined assertion had no diagnostic message, and its
+two final frame samples were not persisted before validation. The historical
+failure must not be upgraded into a fully accepted desktop result: those
+missing samples cannot be reconstructed from the final counter alone.
+
+The new [pure evidence checker](../tools/upstream34_layout/desktop_evidence.py)
+requires boolean armed readback **1** in both samples, actual counter progress,
+all display gates, an unchanged single WindowServer and no new report. Each
+gate now has an explicit failure message. The fresh observer persists the
+before/after samples before applying the checker. Nine public CPU tests pass,
+alongside 42 inherited observer/trial tests and six credential-dropped file
+checks (**57 total**). The integrated `make test-upstream34-layout` also passed
+the existing 19 ASan/UBSan helper methods and the nine public checker methods.
+Installed driver, helper, plugin/runtime, firmware and
+startup bytes remain unchanged; this next test changes the external observer.
+
+A distinct packet with **2,079 pins** has passed its actual launchd preparation
+role, including 18 consumer file-access checks and exact original loaded-image
+and geometry checks. EFI was checked read-only and left unchanged/unmounted.
+At this checkpoint it is unarmed and has requested no reboot. Its limits remain
+one ordinary desktop boot, one unchanged Metal probe, 300 seconds of independent
+observation and at most one managed recovery, with no automatic retry. All
+preceding scopes remain consumed.

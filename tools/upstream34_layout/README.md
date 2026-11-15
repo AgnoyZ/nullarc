@@ -51,3 +51,17 @@ The same correction is synchronized to the default branch's actual entrypoints.
 A new distinct packet installed only the two shell files; both existing binary
 hashes remain unchanged. Its launchd preparation passed with no GPU work.
 Dispatch and actual postboot outcomes are separate from this preparation.
+
+## Desktop evidence contract
+
+`desktop_evidence.py` validates already-collected original build-34 frame
+samples without importing a GPU, loader or process API. `debug.nvaccelfb=3` is
+a write command; its getter returns the boolean `gNvAccelArmed`, so an armed
+readback must be **1**, not 3. Both samples must retain the display gates, frame
+counts must increase, WindowServer must remain a single unchanged process and
+the diagnostic-report list must not grow. Save both private samples before
+validation so a failed gate remains diagnosable. CPU regression command:
+
+```sh
+python3 -B tests/test_upstream34_desktop_evidence.py
+```
