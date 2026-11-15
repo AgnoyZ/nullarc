@@ -280,3 +280,21 @@ is no automatic retry. Software timers cannot guarantee recovery from a hard
 hardware hang. Rollback restores only the two backed-up scripts with GPU-off
 present and display arming absent. Actual dispatch/next-boot receipts must be
 read before claiming a reboot or acceleration result.
+
+## Corrected observer trial dispatched once
+
+The fresh external-observer packet from source checkpoint
+`2fb9af0cafee446a9fae6402592cb3cb00672a4a` was armed once on
+2026-11-15. Independent readback confirmed one root-owned restart scheduler,
+all **2079** input pins, exact loaded build 34 and the one-shot display flags.
+The scheduler estimates **21:09:16 +08:00**; this is a scheduled time, not an
+observed next boot. No GPU initialization ran in the preparation boot.
+Normal restart dispatches remaining are **zero** and this packet must not
+be replayed. Installed driver, runtime and startup bytes remain unchanged.
+
+The corrected observer requires original build 34's boolean armed readback
+**1**, saves both frame samples before checking them, and retains all other
+desktop, frame-progress, WindowServer and real Metal execution requirements.
+One desktop attempt, one unchanged Metal probe, a 300-second observation limit
+and at most one managed recovery remain the limits. Actual boot-bound receipts
+must be read before claiming accelerated desktop success.

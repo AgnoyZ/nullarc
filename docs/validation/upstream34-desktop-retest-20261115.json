@@ -59,7 +59,7 @@
   "private_material_published": false,
   "binary_upload_added": false,
   "actual_reboot_or_desktop_result_claimed": true,
-  "current_status": "permission-corrected original34 boot completed startup and real Metal GPU correctness; external observer incorrectly required command value 3 from boolean armed getter and requested bounded recovery; corrected pure observer checker tested and distinct fresh packet prepared, unarmed at the linked checkpoint",
+  "current_status": "corrected external observer trial consumed; one ordinary restart scheduled and independently verified; next-boot desktop and Metal result pending",
   "dispatch_readback": {
     "ordinary_reboot_requested_once": true,
     "caller_returncode": 0,
@@ -261,5 +261,20 @@
     },
     "contract_sha256": "156cf98302366cbfb890806a088408e65e15b518cc9ca193be4482e8e943f1fa"
   },
-  "latest_runtime_access_validation": "upstream34-runtime-access-20261115.json"
+  "latest_runtime_access_validation": "upstream34-runtime-access-20261115.json",
+  "corrected_observer_trial_dispatch": {
+    "scheduled_once_independently_verified": true,
+    "scheduler_root_owned": true,
+    "same_preparation_boot": true,
+    "loaded_build": 34,
+    "original_kernel_and_four_corrected_helpers_verified": true,
+    "one_shot_display_arming_readback": true,
+    "observer_inputs_verified": 2079,
+    "preparation_boot_GPU_reinitialization": false,
+    "expected_restart_local_time_approximately": "2026-11-15T21:09:16.641137+08:00",
+    "normal_reboot_dispatches_remaining": 0,
+    "automatic_retry": false,
+    "source_checkpoint": "2fb9af0cafee446a9fae6402592cb3cb00672a4a",
+    "actual_next_boot_result": "pending; scheduled restart is not proof of actual boot or desktop success"
+  }
 }
