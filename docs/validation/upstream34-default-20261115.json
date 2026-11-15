@@ -66,5 +66,34 @@
     "binary_upload_added": false,
     "existing_branches_rewritten": false,
     "remote_Actions_success_claimed": false
+  },
+  "watchdog_correction_checkpoint": {
+    "source_only": true,
+    "focused_methods_passed": 20,
+    "original_test_executables_passed": 5,
+    "ASan_UBSan": true,
+    "real_IOKit_in_fixture": false,
+    "native_build_and_signatures_passed": true,
+    "original_kernel_src_install_and_licenses_unchanged": true,
+    "exact_absent_process_exit_1_only_is_benign": true,
+    "other_cancellation_errors_terminal": true,
+    "initializer_stderr_line_and_status_retained": true,
+    "successful_GPU_command_order_preserved": true,
+    "latest_live_failure_before_queue_setup": true,
+    "exact_previous_live_failing_command_proven": false,
+    "installed": false,
+    "new_GPU_execution": false,
+    "reboot_dispatched": false,
+    "source_SHA256": {
+      "tools/phxctl/bringup5.sh": "a0906cceab45f747a1b89d5c75972463e52071b05ae1e6a6c71fac1d207b771d",
+      "tools/phxctl/full.sh": "36f5c8a01773a3687e6b633c5b0b5e1b3b2031329c5a2065b669b27c45cf0a71",
+      "tools/phxctl/PhxUpstream34Layout.h": "2f7e3124a99e97469debc9ee5d9bb760092c769ef530f99814257bc314f54de1",
+      "tools/upstream34_layout/layout-fix.patch": "3ebd7f1186db63a93662308e005427f1c7d55943c34294611a335a4a1caf9e21",
+      "tests/test_upstream34_layout.py": "64260355291e95301f0be565c4839eee83b32b1a0608f74e706e5d7649775856"
+    },
+    "native_helper_SHA256": {
+      "mesboot": "027a0ad6e6c51579e7e4690a3327b437de650276f8a897d8cdd1beca0d6772ec",
+      "phxctl": "4f64e320ba0a2acd43091380ede21de7d2fd732620273d64e3dd67af5168c9cd"
+    }
   }
 }

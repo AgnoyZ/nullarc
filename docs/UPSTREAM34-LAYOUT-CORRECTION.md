@@ -94,3 +94,30 @@ Repository rollback is to set the GitHub default back to
 `downstream/780m-tahoe`, without deleting or rewriting either branch. Preserve
 `main`, all development history and the source-fix branch. Repository rollback
 does not install or restore any system driver.
+
+## Watchdog cancellation correction and retained diagnostics
+
+The separate diagnostic desktop trial booted at 19:41:23 +08:00 on
+2026-11-15 and returned to the firmware desktop at 19:42:55. Its 17 firmware
+loads succeeded, but `bringup5.sh` exited with status 1 before queue setup.
+There is no desktop/Metal success receipt for that boot. The earlier separate
+headless GPU/Metal success does not establish desktop acceleration.
+
+An offline fixture reproduces a specific regression in the strict shell
+scripts: `killall shutdown` returning 1 because there is no matching process
+causes a silent terminal failure. Both cancellation sites now accept only
+status 1 together with the exact C-locale no-match diagnostic. Permission,
+empty, mixed and other errors remain visible and terminal. A nested fixture
+checks that the benign case reaches the original queue order and that an
+actual cancellation error stops before queue setup. This proves a shell defect,
+not that the untraced command in the previous boot was necessarily `killall`.
+
+The scripts also retain initializer/firmware stderr and exact failure status;
+an inherited ERR trap reports the failing initializer line/status. User-client
+diagnostics retain transport return codes, output lengths and firmware command
+status. Original successful GPU ordering, geometry/ABI admission and watchdog
+arming are preserved. The entire upstream `src/`, `install/` and licence trees
+remain byte-identical. This source checkpoint passes all five original test
+executables and **20 focused methods**, with ASan/UBSan and native signed
+x86_64 helper builds. These are CPU/source checks, not a new hardware result.
+No deployment, arming or reboot is performed by this branch change.

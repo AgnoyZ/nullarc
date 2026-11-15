@@ -3,8 +3,9 @@
 # LOAD_IP_FW, RLC autoload, then the SMU messages that switch GFX on (EnableGfxImu with 1). Firmware from ~/gpu/fw at
 # the offsets and sizes of linux-firmware's gc_11_0_1/psp_13_0_4 files. Run as root (phxboot) or as a user with sudo.
 # A reboot is armed for 3 minutes in case the PSP hangs and cancelled at the end.
-set -eu
+set -Eeu
 set -o pipefail
+trap 'rc=$?; printf "upstream34-bringup: line %s failed with status %s\n" "$LINENO" "$rc" >&2; exit "$rc"' ERR
 SUDO=""; [ "$(id -u)" = 0 ] || SUDO=sudo
 P(){ $SUDO ~/gpu/phxctl/phxctl "$@"; }
 # Original build-34 metadata/ABI admission precedes the watchdog or first hardware write.
@@ -20,13 +21,13 @@ if [ -z "${PHX34_WATCHDOG_ACK:-}" ]; then
 else
     [ -f "$PHX34_WATCHDOG_ACK" ] || exit 75
 fi
-P psp destroy >/dev/null 2>&1
+P psp destroy >/dev/null
 P psp create 0x1100000 >/dev/null
 P stage ~/gpu/fw/psp_13_0_4_toc.bin 256 2304 0x0 >/dev/null
 P raw 0x20 "$TOC_LO" "$TOC_HI" 0x900 0 0 0 >/dev/null
 P raw 0x5 "$TMR_LO" "$TMR_HI" 0x4000000 0x2 "$TMR_PA_LO" "$TMR_PA_HI" >/dev/null
 echo "== load firmware =="
-L(){ P loadfw "$@" 2>&1 | grep loadfw >> ~/gpu/fwaddr.log; }
+L(){ P loadfw "$@" | grep loadfw >> ~/gpu/fwaddr.log; }
 : > ~/gpu/fwaddr.log
 L ~/gpu/fw/gc_11_0_1_pfp.bin 256 263168 2 0x000000
 L ~/gpu/fw/gc_11_0_1_me.bin  256 263168 1 0x100000
@@ -53,4 +54,16 @@ P smu 0x2 0 | tail -1
 P smu 0x16 1 | tail -1
 sleep 2
 P regs 0xee7e 0x21a0 0x2004 0x263e
-if [ -z "${PHX34_WATCHDOG_ACK:-}" ]; then $SUDO killall shutdown 2>/dev/null; echo "watchdog cancelled rc=$?"; fi
+if [ -z "${PHX34_WATCHDOG_ACK:-}" ]; then
+    if watchdog_output=$($SUDO env LC_ALL=C killall shutdown 2>&1); then
+        echo "upstream34-watchdog: shutdown timer cancelled" >&2
+    else
+        rc=$?
+        if [ "$rc" -eq 1 ] && [ "$watchdog_output" = "No matching processes were found" ]; then
+            echo "upstream34-watchdog: no shutdown timer remains" >&2
+        else
+            printf 'upstream34-watchdog: cancellation failed with status %s: %s\n' "$rc" "$watchdog_output" >&2
+            exit "$rc"
+        fi
+    fi
+fi

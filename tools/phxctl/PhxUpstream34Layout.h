@@ -103,13 +103,17 @@ static kern_return_t phx34_scalar(io_connect_t connection, uint32_t selector,
    uint32_t expected = no ? *no : 0;
    kern_return_t kr = IOConnectCallScalarMethod(connection, selector, in, ni, out, no);
    if (kr || (no && *no != expected)) {
-      fprintf(stderr, "upstream34-layout: selector %u transport/size failure\n", selector); exit(74);
+      fprintf(stderr, "upstream34-layout: selector %u transport/size failure: kr 0x%08x, scalar outputs %u/%u\n",
+              selector, (unsigned)kr, no ? *no : 0, expected); exit(74);
    }
    if ((selector == 0 && (!out || expected != 4 || out[0] != (1u | (12u << 16)) || out[1] != 34)) ||
        ((selector == 103 || selector == 105 || selector == 106 || selector == 107) &&
         (!out || expected != 4 || out[0] != 0)) ||
        (selector == 100 && (!out || expected != 2 || out[0] != 1))) {
-      fprintf(stderr, "upstream34-layout: selector %u ABI/firmware refusal\n", selector); exit(75);
+      fprintf(stderr, "upstream34-layout: selector %u ABI/firmware refusal: input0 0x%llx, output0 0x%llx, output1 0x%llx\n",
+              selector, (unsigned long long)(in && ni ? in[0] : 0),
+              (unsigned long long)(out && expected ? out[0] : 0),
+              (unsigned long long)(out && expected > 1 ? out[1] : 0)); exit(75);
    }
    return kr;
 }
@@ -124,7 +128,9 @@ static kern_return_t phx34_method(io_connect_t connection, uint32_t selector,
    kern_return_t kr = IOConnectCallMethod(connection, selector, in, ni, input, inputSize,
                                          out, no, output, outputSize);
    if (kr || (no && *no != expected) || (outputSize && *outputSize != expectedSize)) {
-      fprintf(stderr, "upstream34-layout: selector %u transport/size failure\n", selector); exit(74);
+      fprintf(stderr, "upstream34-layout: selector %u transport/size failure: kr 0x%08x, scalar outputs %u/%u, bytes %zu/%zu\n",
+              selector, (unsigned)kr, no ? *no : 0, expected,
+              outputSize ? *outputSize : 0, expectedSize); exit(74);
    }
    return kr;
 }
