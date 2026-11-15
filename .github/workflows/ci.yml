@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "upstream34/vram-layout-fix" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "upstream34/vram-layout-fix" ]
 
 jobs:
   build-and-test:
@@ -36,3 +36,15 @@ jobs:
           echo "::error title=Unit tests failed::${msg}"
         fi
         exit "$status"
+
+  upstream34-layout:
+    runs-on: macos-15-intel
+    steps:
+    - name: Checkout complete source history for the pinned upstream baseline
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Test checked-in helpers with synthetic IOKit and shell fixtures
+      run: make test-upstream34-layout
+    - name: Compile and verify the identical original-plus-fix helpers
+      run: python3 tools/upstream34_layout/build.py build/upstream34-layout-ci-private --compile

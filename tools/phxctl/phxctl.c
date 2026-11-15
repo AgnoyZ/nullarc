@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#define PHX34_WITH_IOKIT
+#include "PhxUpstream34Layout.h"
 
 #define UC_TYPE 0x4E34384Eu
 #define SEL_HELLO 0
@@ -39,13 +41,14 @@ static int open_kext(void)
       fprintf(stderr, "PhxBringup service not found\n");
       return -1;
    }
+   if (!phx34_geometry(svc)) { IOObjectRelease(svc); return -1; }
    kern_return_t kr = IOServiceOpen(svc, mach_task_self(), UC_TYPE, &conn);
    IOObjectRelease(svc);
    if (kr) {
       fprintf(stderr, "IOServiceOpen: 0x%08x\n", kr);
       return -1;
    }
-   uint64_t in[2] = {1, 0}, out[4];
+   uint64_t in[2] = {1, 1u << 8}, out[4];
    uint32_t n = 4;
    kr = IOConnectCallScalarMethod(conn, SEL_HELLO, in, 2, out, &n);
    if (kr) {
@@ -129,7 +132,13 @@ int main(int argc, char **argv)
    if (open_kext())
       return 1;
 
-   if (!strcmp(argv[1], "regs")) {
+   if (!strcmp(argv[1], "layout")) {
+      printf("%llu %llu %llu %llu %llu %llu\n",
+             (unsigned long long)(uint32_t)phx34_live.tocMC, (unsigned long long)(phx34_live.tocMC >> 32),
+             (unsigned long long)(uint32_t)phx34_live.tmrMC, (unsigned long long)(phx34_live.tmrMC >> 32),
+             (unsigned long long)(uint32_t)phx34_live.tmrPhysical, (unsigned long long)(phx34_live.tmrPhysical >> 32));
+      return IOServiceClose(conn) ? 74 : 0;
+   } else if (!strcmp(argv[1], "regs")) {
       for (int i = 2; i < argc; i++) {
          uint32_t reg = (uint32_t)strtoul(argv[i], NULL, 0), v = 0;
          int kr = read_reg(reg, &v);
@@ -222,6 +231,7 @@ int main(int argc, char **argv)
          staged += (uint32_t)got;
       }
       fclose(f);
+      if (staged != size) { fprintf(stderr, "short firmware read\n"); return 74; }
       uint64_t lin[3] = {fwtype, bufoff, staged}, out[4] = {0, 0, 0, 0};
       uint32_t n = 4;
       kern_return_t kr = IOConnectCallScalarMethod(conn, SEL_DBG_PSP_LOADIPFW, lin, 3, out, &n);
@@ -254,6 +264,7 @@ int main(int argc, char **argv)
          staged += (uint32_t)got;
       }
       fclose(f);
+      if (staged != size) { fprintf(stderr, "short firmware read\n"); return 74; }
       printf("staged %s[0x%x:+%u] @fwbuf+0x%x\n", path, foff, staged, bufoff);
    } else if (!strcmp(argv[1], "wreg") && argc >= 4) {
       uint64_t in[2] = {strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0)}, out[1] = {0};

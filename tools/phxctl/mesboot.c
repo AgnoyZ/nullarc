@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <unistd.h>
 #include "mes_v11_api_def.h"
+#define PHX34_WITH_IOKIT
+#include "PhxUpstream34Layout.h"
 
 #define UC_TYPE 0x4E34384Eu
 #define SEL_HELLO 0
@@ -26,8 +28,10 @@ static int open_kext(void)
 {
    io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("PhxBringup"));
    if (!svc) { fprintf(stderr, "no PhxBringup\n"); return -1; }
+   if (!phx34_geometry(svc)) { IOObjectRelease(svc); return -1; }
    kern_return_t kr = IOServiceOpen(svc, mach_task_self(), UC_TYPE, &conn);
-   uint64_t hin[2] = {1, 0}, hout[4]; uint32_t hn = 4;
+   IOObjectRelease(svc);
+   uint64_t hin[2] = {1, 1u << 8}, hout[4]; uint32_t hn = 4;
    if (kr == 0) kr = IOConnectCallScalarMethod(conn, SEL_HELLO, hin, 2, hout, &hn);
    if (kr) { fprintf(stderr, "open: 0x%x\n", kr); return -1; }
    return 0;
@@ -70,11 +74,11 @@ static uint32_t vr(uint64_t off)
 }
 
 
-#define VRAM_MC 0x8000000000ull          // MC address of VRAM offset 0
+#define VRAM_MC (phx34_live.geometry.mc) // validated published MC base
 #define GART_VA 0x7FFF00000000ull            // VA = GART_VA + vram offset (first 128 MiB)
 #define GART_PT 0x2400000ull             // flat PTE table (VRAM offset)
 #define GART_N 32768
-#define FB_PA 0x6A0000000ull             // GCMC_VM_FB_OFFSET << 24
+#define FB_PA (phx34_live.geometry.physical) // validated published backing base
 
 #define SEG0(o) (0x1260u + (o))
 #define SEG1(o) (0xA000u + (o))
@@ -96,6 +100,8 @@ static int use_mc;
 
 static void gart(void)
 {
+   // A dedicated zero page in the unused gap after the PTE table, before the KIQ.
+   for (uint64_t off = 0; off < 4096; off += 4) vw(PHX34_DEFAULT_OFFSET + off, 0);
    for (uint64_t i = 0; i < GART_N; i++) {
       uint64_t pte = (FB_PA + i * 4096) | ((getenv("PTE_SYS") && *getenv("PTE_SYS")) ? 0x77 : 0x71);      // VALID | EXEC | READ | WRITE, local FB
       vw(GART_PT + i * 8, (uint32_t)pte);
@@ -106,9 +112,11 @@ static void gart(void)
    wr(SEG0(0x16f3), (uint32_t)((FB_PA + GART_PT) | 1)); wr(SEG0(0x16f4), (uint32_t)((FB_PA + GART_PT) >> 32));   // PDB base = physical (FB_PA + vram offset), as the Linux trace
    // system aperture / AGP / defaults exactly as the Linux trace (gfxhub_v3_0_init_system_aperture_regs)
    wr(SEG0(0x167c), 0); wr(SEG0(0x167b), 0x00ffffff); wr(SEG0(0x167a), 0);      // AGP_BASE/BOT/TOP (AGP off)
-   wr(SEG0(0x167d), 0x00200000); wr(SEG0(0x167e), 0x00205fff);                  // SYSTEM_APERTURE LOW/HIGH = VRAM MC range
-   wr(SEG0(0x15a8), 0x006a0f9f); wr(SEG0(0x15a9), 0);                           // SYSTEM_APERTURE_DEFAULT_ADDR LSB/MSB
-   wr(SEG0(0x15cb), 0x0000a23c); wr(SEG0(0x15cc), 0);                           // L2 protection fault default addr
+   wr(SEG0(0x167d), phx34_live.systemLow); wr(SEG0(0x167e), phx34_live.systemHigh);
+   wr(SEG0(0x15a8), (uint32_t)(phx34_live.defaultPhysical >> 12));
+   wr(SEG0(0x15a9), (uint32_t)(phx34_live.defaultPhysical >> 44));
+   wr(SEG0(0x15cb), (uint32_t)(phx34_live.defaultPhysical >> 12));
+   wr(SEG0(0x15cc), (uint32_t)(phx34_live.defaultPhysical >> 44));
    wr(SEG0(0x15c5), 0x00060000);                                                // L2_PROTECTION_FAULT_CNTL2
    wr(SEG0(0x15c4), env_on("FAULT_DEFAULT") ? 0x3ffffffc : 0x00000002);   // debug: no default-page redirect so faults are recorded                                                // L2_PROTECTION_FAULT_CNTL (fault handling on; was missing -> silent drops)
    wr(SEG0(0x15ce), 0xffffffff); wr(SEG0(0x15cf), 0x0000000f); wr(SEG0(0x15d0), 0);  // identity aperture LOW/HIGH (disabled)
@@ -741,6 +749,16 @@ int main(int argc, char **argv)
 {
    if (open_kext()) return 1;
    if (argc < 2) { fprintf(stderr, "mesboot gart|mes|kiq|all\n"); return 2; }
+   if (!strcmp(argv[1], "layout")) {
+      printf("{\"build\":34,\"MC_base\":%llu,\"physical_base\":%llu,\"VRAM_bytes\":%llu,"
+             "\"aperture_bytes\":%llu,\"table_physical\":%llu,\"default_physical\":%llu,"
+             "\"system_aperture_high\":%u,\"TMR_physical\":%llu,\"GPU_commands\":0}\n",
+             (unsigned long long)VRAM_MC, (unsigned long long)FB_PA,
+             (unsigned long long)phx34_live.geometry.bytes, (unsigned long long)phx34_live.geometry.aperture,
+             (unsigned long long)phx34_live.tablePhysical, (unsigned long long)phx34_live.defaultPhysical,
+             phx34_live.systemHigh, (unsigned long long)phx34_live.tmrPhysical);
+      return IOServiceClose(conn) ? 74 : 0;
+   }
    int all = !strcmp(argv[1], "all");
    if (getenv("MESBOOT_MC") && *getenv("MESBOOT_MC") == '1') use_mc = 1;
    if (!strcmp(argv[1], "db") && argc >= 4) { printf("db +0x%llx <- %llu kr=0x%x\n", strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0), db(strtoull(argv[2], NULL, 0), strtoull(argv[3], NULL, 0))); return 0; }

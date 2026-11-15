@@ -50,3 +50,7 @@ kext:
 
 clean:
 	rm -rf build/
+
+.PHONY: test-upstream34-layout
+test-upstream34-layout:
+	python3 tests/test_upstream34_layout.py -v

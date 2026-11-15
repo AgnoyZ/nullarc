@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "date": "2026-11-15",
+  "scope": "source-only original-build34 default branch",
+  "branch": "upstream34/vram-layout-fix",
+  "upstream_tag": "v0.4.0-alpha",
+  "upstream_commit": "9dd76b604fca5e0125bd3caa5723df0f611ff27f",
+  "correction_origin_commit": "9c1c37200110a7ba3262c5d669224342c947ad4b",
+  "observed_build_host": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "architecture": "x86_64"
+  },
+  "unchanged_upstream": {
+    "src_tree": "47a13b67bf4559b00f567aa16c09747fafeccb11",
+    "entire_src_tree": true,
+    "kernel_build": 34,
+    "kernel_ABI": true,
+    "install_tree": true,
+    "LICENSE": true,
+    "LICENSES": true,
+    "THIRD_PARTY_NOTICES.md": true
+  },
+  "checks": {
+    "original_make_test_exit_code": 0,
+    "original_test_executables_passed": 5,
+    "firmware_dependent_cases": "skipped: external fixtures absent",
+    "focused_methods_passed": 13,
+    "focused_methods_skipped": 0,
+    "actual_checked_in_entrypoints_and_shells": true,
+    "ASan_UBSan": true,
+    "focused_tests_link_real_IOKit": false,
+    "all_32768_GART_PTEs_checked": true,
+    "native_x86_64_helper_build_exit_code": 0,
+    "native_helpers_ad_hoc_signed_and_verified": true,
+    "original_unused_variable_warning_retained": true,
+    "patch_output_equals_checked_in_helpers": true,
+    "shell_syntax": true,
+    "python_syntax": true,
+    "git_diff_check": true,
+    "staged_source_privacy_review": true
+  },
+  "source_SHA256": {
+    "tools/phxctl/mesboot.c": "7a1e4de45589a40b3259bd33a790d9d537498e139fa56719145438801320a21f",
+    "tools/phxctl/phxctl.c": "c0a60d07b60b95f3da273bdbedf648980d30f05d337205a6e1bc7dd44a05f279",
+    "tools/phxctl/bringup5.sh": "d45cf6389e722fa29a8d0e71471168f6f3e0002ad471efd9856658adef761ce7",
+    "tools/phxctl/full.sh": "4aa51e035f40d234aa5ea413661655f43cedd1d946969004e9feb17f1c51ac80",
+    "tools/phxctl/PhxUpstream34Layout.h": "7c4ede33ae2f1ced6589c6fbb05feb57f8d3732119443bc4fa61a56aa54a92a0",
+    "tools/upstream34_layout/build.py": "2ea54e8000a34acd76f35c2850d54581c04c7c7008ae226887b32482b16130d9",
+    "tools/upstream34_layout/layout-fix.patch": "44f636b7978a7a46b28050d52b523a7dc6f39817fadc315cb77602dbf3062494",
+    "tests/test_upstream34_layout.py": "a389c66ab0f75ab3846afb1a39ee9c1e82df0642ea9c92c4858e291b217a0544",
+    "tests/fixtures/upstream34_fake_iokit.c": "5c64183d1009e4a514a12894d2e321a0aefcf5314a19ec1a325396f55dc603f4"
+  },
+  "native_helper_SHA256": {
+    "mesboot": "78de366ae7bfe0e17d972d52316d5fb0b4564ee1aedf15f0e3627c91ccea763e",
+    "phxctl": "e1b37c5ca5268c006a1a85fe9c5c8e0e1e30b437d8ec0afe5de63ea8f2c74613"
+  },
+  "operation_boundary": {
+    "system_driver_installed": false,
+    "GPU_initialization_run": false,
+    "GPU_execution_proven_by_this_change": false,
+    "desktop_takeover_proven_by_this_change": false,
+    "VRAM_region_ownership_proven": false,
+    "reboot_dispatched": false,
+    "EFI_NVRAM_or_security_changed": false,
+    "binary_upload_added": false,
+    "existing_branches_rewritten": false,
+    "remote_Actions_success_claimed": false
+  }
+}

@@ -23,7 +23,8 @@ memory/
 .current_notepad
 
 # Firmware test fixtures (downloaded by `make fixtures`, not committed)
-tests/fixtures/
+tests/fixtures/*
+!tests/fixtures/upstream34_fake_iokit.c
 
 # Reference dumps and vendor assets if downloaded locally
 reference/

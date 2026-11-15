@@ -1,3 +1,13 @@
+> **此 fork 的默认分支：原版 build 34＋显存地址修复。** 基于上游
+> `v0.4.0-alpha`（`9dd76b6`），内核、加速器和 Metal 插件源码保持原版；
+> 仅修复用户态启动工具中的显存映射及必要的错误检查。
+> [修复范围与验证边界](docs/UPSTREAM34-LAYOUT-CORRECTION.md)。
+> 以下上游参考机器的加速表现不代表本机已通过测试。
+>
+> **Fork default: upstream build 34 plus the VRAM layout correction.**
+> Development work remains on `downstream/780m-tahoe`. No binaries are published
+> by this branch, and local GPU/desktop success is not established by CPU tests.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/nullarc-logo-dark.svg">

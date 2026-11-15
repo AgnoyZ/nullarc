@@ -3,16 +3,28 @@
 # LOAD_IP_FW, RLC autoload, then the SMU messages that switch GFX on (EnableGfxImu with 1). Firmware from ~/gpu/fw at
 # the offsets and sizes of linux-firmware's gc_11_0_1/psp_13_0_4 files. Run as root (phxboot) or as a user with sudo.
 # A reboot is armed for 3 minutes in case the PSP hangs and cancelled at the end.
-set -u
+set -eu
+set -o pipefail
 SUDO=""; [ "$(id -u)" = 0 ] || SUDO=sudo
 P(){ $SUDO ~/gpu/phxctl/phxctl "$@"; }
-echo "== watchdog: reboot in 3 min unless cancelled =="
-$SUDO bash -c 'nohup shutdown -r +3 >/dev/null 2>&1 &'
+# Original build-34 metadata/ABI admission precedes the watchdog or first hardware write.
+layout=$(P layout)
+read -r TOC_LO TOC_HI TMR_LO TMR_HI TMR_PA_LO TMR_PA_HI extra <<< "$layout"
+[ -z "$extra" ] || exit 75
+for value in "$TOC_LO" "$TOC_HI" "$TMR_LO" "$TMR_HI" "$TMR_PA_LO" "$TMR_PA_HI"; do
+    case "$value" in ''|*[!0-9]*) echo "invalid target layout" >&2; exit 75;; esac
+done
+if [ -z "${PHX34_WATCHDOG_ACK:-}" ]; then
+    echo "== watchdog: reboot in 3 min unless cancelled =="
+    $SUDO bash -c 'nohup shutdown -r +3 >/dev/null 2>&1 &'
+else
+    [ -f "$PHX34_WATCHDOG_ACK" ] || exit 75
+fi
 P psp destroy >/dev/null 2>&1
 P psp create 0x1100000 >/dev/null
 P stage ~/gpu/fw/psp_13_0_4_toc.bin 256 2304 0x0 >/dev/null
-P raw 0x20 0x04000000 0x80 0x900 0 0 0 >/dev/null
-P raw 0x5 0x08000000 0x80 0x4000000 0x2 0x0C000000 0x6A >/dev/null
+P raw 0x20 "$TOC_LO" "$TOC_HI" 0x900 0 0 0 >/dev/null
+P raw 0x5 "$TMR_LO" "$TMR_HI" 0x4000000 0x2 "$TMR_PA_LO" "$TMR_PA_HI" >/dev/null
 echo "== load firmware =="
 L(){ P loadfw "$@" 2>&1 | grep loadfw >> ~/gpu/fwaddr.log; }
 : > ~/gpu/fwaddr.log
@@ -41,4 +53,4 @@ P smu 0x2 0 | tail -1
 P smu 0x16 1 | tail -1
 sleep 2
 P regs 0xee7e 0x21a0 0x2004 0x263e
-$SUDO killall shutdown 2>/dev/null; echo "watchdog cancelled rc=$?"
+if [ -z "${PHX34_WATCHDOG_ACK:-}" ]; then $SUDO killall shutdown 2>/dev/null; echo "watchdog cancelled rc=$?"; fi
