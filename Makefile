@@ -84,3 +84,4 @@ test-panel-timing: $(TEST_BIN_DIR)/test_panel_timing
 test-upstream34-layout:
 	python3 tests/test_upstream34_layout.py
 	python3 tests/test_upstream34_desktop_evidence.py
+	python3 tests/test_upstream34_startup_evidence.py

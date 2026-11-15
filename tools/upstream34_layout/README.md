@@ -65,3 +65,14 @@ validation so a failed gate remains diagnosable. CPU regression command:
 ```sh
 python3 -B tests/test_upstream34_desktop_evidence.py
 ```
+
+`startup_evidence.py` captures a single boot-time cutoff before polling original
+startup. Re-reading `kern.boottime` after a wall-clock adjustment can reject a
+block admitted earlier in the same boot. The reader retains the original
+latest-block and stale-log rules; callers must bind it to one boot identity.
+The private witness snapshots once and checks that identity during observation.
+Clock-step replay and stale/newest-block CPU regressions run with:
+
+```sh
+python3 -B tests/test_upstream34_startup_evidence.py
+```

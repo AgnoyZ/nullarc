@@ -298,3 +298,54 @@ desktop, frame-progress, WindowServer and real Metal execution requirements.
 One desktop attempt, one unchanged Metal probe, a 300-second observation limit
 and at most one managed recovery remain the limits. Actual boot-bound receipts
 must be read before claiming accelerated desktop success.
+
+## Corrected armed-readback trial: startup completed, observer lost freshness
+
+The actual native-panel boot began at **21:09:44 +08:00 on 2026-11-15**.
+Original startup again produced correct compute/graphics GPU-written values,
+successful queue adoptions and accelerator claim. It armed/released the panel,
+completed its WindowServer monitor with PID unchanged in the retained startup
+record, reported **666** panel transactions and wrote `done 21:11:32`. These
+records alone do not establish the independent desktop acceptance conditions.
+
+The external observer retained startup only through the arming line, then
+reported `no complete original startup before observation limit`. Its one managed
+recovery returned to a firmware-display boot at **21:14:35 +08:00**. No Metal
+probe or final frame pair ran in this attempt. Exact build 34 and all installed
+pins passed postboot readback; runtime consumer access still passed **18/18**.
+PhxAMDFB, NMXAccel and IOAccelerator are absent on the fallback boot. GPU-off is
+empty; M2/pending markers and the specific display variable are absent. Hardware
+acceleration is currently inactive. The exited external witness was archived
+and retired; its receipts remain consumed. The exact generated all-apps list
+was archived and rolled back to the original apps-only list.
+
+Private unified logs were filtered to the actual trial boot identity, time
+interval and expected processes. At **21:10:10** `timed` recorded a successful
+forward `settimeofday` adjustment of approximately **4.676 seconds**, followed
+by a small correction in the other direction. The observer incorrectly
+re-read `kern.boottime` on every poll: the moving cutoff could pass the fixed
+startup header and discard the entire block, including its later completion.
+Replaying the exact completed block against the first saved boot-time snapshot
+returns a candidate; advancing that boundary four seconds reproduces rejection.
+The historical per-poll cutoff values were not saved, so no unrecorded exact
+post-adjustment cutoff is claimed. Raw logs and identities remain private.
+
+`tools/upstream34_layout/startup_evidence.py` now captures one integer boot-time
+boundary before polling. A fresh observer uses that same reader for every poll
+and verifies the boot identity, while preserving stale-log refusal, original
+startup checks, all frame/WindowServer gates, real Metal verification and bounded
+recovery. This changes only external evidence collection; installed driver,
+helper, plugin, runtime, firmware and startup bytes remain unchanged.
+
+A distinct startup-clock packet passed its actual launchd preparation role with
+**2080** pinned inputs, **67** observer/access/evidence CPU methods and no GPU
+calls. The integrated target also passed **19** original helper methods under
+its retained sanitizer checks. Existing unrelated scheduler-sensitive downstream
+`make test` failures remain documented above; they were not suppressed. An early
+preparation read-only gate refused a concurrently running synthetic helper from
+the CPU suite; after that suite ended, preparation passed. No mutation occurred
+before that refusal. Exact original34, all installed bytes, runtime consumer
+access, and the complete read-only EFI manifest passed. At this checkpoint
+GPU-off is present, display is unarmed and **no new reboot has been requested**.
+The fresh packet retains one ordinary desktop boot, at most one unchanged Metal
+probe, the 300-second limit and at most one managed recovery, with no retry.
