@@ -104,3 +104,14 @@ even when private packet preparation uses umask 077, and verify access under
 the actual consumer credentials before admission.
 
 See the [sanitized validation record](validation/upstream34-runtime-access-20261115.json).
+
+## Subsequent single dispatch
+
+After the preparation record was committed, pushed and independently verified
+at `d46367aabefd2c0337824a3b7043bc46749ce5d4`, the new exclusive arming
+operator was consumed once. Shutdown returned zero without a caller timeout;
+an independent read found one root-owned scheduled restart, matching arming
+and all 2,078 pinned inputs. The restart is expected approximately
+**20:50:04 +08:00 on 2026-11-15**. No ordinary reboot dispatches remain.
+The next-boot desktop/Metal outcome has not yet been observed at this dispatch
+checkpoint and must be read from the new packet before making a success claim.

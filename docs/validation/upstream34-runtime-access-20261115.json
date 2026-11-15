@@ -84,5 +84,15 @@
   "current_desktop_acceleration_verified": false,
   "directory_defect_is_sole_cause_proven": false,
   "raw_diagnostics_or_identifiers_published": false,
-  "binary_publication_added": false
+  "binary_publication_added": false,
+  "subsequent_dispatch": {
+    "ordinary_reboot_requested_once": true,
+    "caller_returncode": 0,
+    "caller_timed_out": false,
+    "independent_root_scheduler_verified": true,
+    "expected_restart_local_approximately": "2026-11-15T20:50:04.818976+08:00",
+    "normal_reboot_dispatches_remaining": 0,
+    "automatic_retry": false,
+    "actual_next_boot_desktop_result_not_yet_observed": true
+  }
 }
