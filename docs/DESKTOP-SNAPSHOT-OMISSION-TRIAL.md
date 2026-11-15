@@ -1,10 +1,12 @@
-# Desktop allocation-snapshot omission candidate
+# Desktop allocation-snapshot omission trial
 
-Status, 2026-11-15: **source candidate; target execution not performed**. This
-isolates allocation-snapshot collection from the [consumed CP-before-selection
-trial](DESKTOP-UPSTREAM-ORDER-TRIAL.md#target-result-and-recovery). It is not an
-acceleration fix, a collector-free experiment or permission to replay that
-closed scope. No driver, native initializer or power sequence changes here.
+Status, 2026-11-15: **single target trial consumed and closed; first native
+selector still dual-zero; independent recovery and subsequent boot verified**.
+This isolates allocation-snapshot collection from the [consumed
+CP-before-selection trial](DESKTOP-UPSTREAM-ORDER-TRIAL.md#target-result-and-recovery)
+using the same signed native binary. It is not an acceleration fix, a
+collector-free experiment or permission to replay either closed scope. No
+driver, native initializer or power sequence changes here.
 
 ## What actually ran in the preceding attempt
 
@@ -85,8 +87,8 @@ is bundled with this mode.
 
 ## Execution and interpretation
 
-A later physical comparison needs a separate new scope, unchanged native
-candidate and installed inputs, one fresh boot, at most one attempt and bounded
+The physical comparison used a separate new scope, unchanged native candidate
+and installed inputs, one fresh boot, at most one attempt and bounded
 independent recovery. Old authorization objects and receipts remain consumed.
 Do not re-arm an old request or label a software-only baseline as a GPU snapshot.
 There is no driver installation, EFI/security change or same-boot retry in this
@@ -105,8 +107,10 @@ activated packet additionally needs its own exact startup/marker restoration
 and subsequent boot verification. Private identities, diagnostic output,
 binary candidates and root packets must remain outside public evidence.
 
-Validation results and source hashes are recorded in
+The historical preparation's validation results and source hashes are recorded in
 [`validation/desktop-snapshot-omission-preparation-20261115.json`](validation/desktop-snapshot-omission-preparation-20261115.json).
+Its source-only, unarmed status describes preparation, not the subsequent target
+execution below.
 
 All **200 focused test methods** passed without skips, including the existing
 native entrypoint, register-transport, fixed-GC collector and snapshot-lifecycle
@@ -119,3 +123,75 @@ process-fixture timeout and an ownership-refused root run are retained in the
 validation history; deadlines and ownership checks were not relaxed. The full
 repository suite was not rerun. No actual GPU command or recovery command ran
 in these tests.
+
+## Target result and recovery
+
+The [target record](validation/desktop-snapshot-omission-target-20261115.json)
+documents execution from synchronized source commit
+`22caaced08f8c30e70bcb6bf6d4d8d2f45af9862`. The signed native initializer is
+byte-identical to the preceding CP-before-selection trial's candidate, whose
+source reference is `594f6ad9c1acb757b8aa14954717733950ca4eb8`. The preparation,
+attempt and subsequent recovery boot identities are all distinct. The target
+reports macOS 26.7.2 / build 25G332 and bring-up build 39.
+
+The admitted baseline is format 2, explicitly names the omission mode and has
+no `snapshot` member. There are no baseline or failure snapshot invocation
+receipts, and no report trigger was recorded before recovery. The report
+observer acknowledged readiness before initialization; identity and framebuffer
+history reads remained enabled. This confirms the scoped omission path ran,
+not an absence of every possible observer or an empty allocation history.
+
+Exactly one firmware/power command and one native desktop initialization are
+recorded. Firmware/power returned zero. All three CP setup pairs completed
+before selection, with immediate and subsequent readbacks matching their
+requested values. The first KIQ selection still returned two zeros for a
+nonzero request. Native stderr records the failure directly; the native process
+exited 75 without timing out and its adapter returned 74. GART, MES, GPU workload,
+claim, display, release and monitor were not reached. These counts describe
+retained process/log observations, not independent hardware tracing.
+
+The four linked journal records, baseline/observer digests and both recovery
+claim hashes were checked independently. The metadata recovery worker handed
+off to coordinator recovery with the original deadline preserved. Finite
+initialization failure requested recovery about 0.38 seconds after the failed
+stage returned. The configured 240-second watchdog did not expire. Disarming
+completed; the one fallback reboot command returned zero, and a subsequent boot
+was independently observed. This does not exercise recovery from a hard hang.
+
+Display cleanup reported unknown OIDs for `nvaccel_iop` and `nvaccelfb`; AGDC and
+framebuffer-hold cleanup returned zero. A zero exit status for the display
+cleanup process does not establish that all four writes succeeded. Recovery
+did not wait for display cleanup or the observer before requesting reboot.
+
+After recovery there is one firmware framebuffer, no native framebuffer or
+accelerator service, no one-shot display flag, no persistent activation markers
+and no remaining initializer, startup job or reboot process. The off marker
+was present and empty before activation, temporarily removed for this one
+attempt and is now present and empty again. Startup remains the exact consumed
+single-use packet, not the original pre-activation startup configuration.
+There was no driver installation, kernel-collection rebuild or EFI, BIOS,
+partition or security change.
+
+All 185 new receipt files were stable across repeated reads and matched
+byte-exact private copies and a separate root-owned receipt map. All seven
+historical receipt sets, 43 execution pins, ten recovery pins, the complete
+frozen runtime, native signature and six other installed inputs were reverified.
+The preparation's 200 focused methods and 25 private activation methods are
+historical checks; they were not rerun for this result-only documentation
+change. Result inspection used retained files and boot/service metadata only,
+with no new GPU command, arming or reboot request. Raw output and identities
+remain private.
+
+On this unchanged guarded initializer, omitting allocation snapshots did not
+resolve the first selector failure. This weakens that particular collection
+path as the explanation and rules out outer summary parsing as the source of
+the recorded zeros. It does not establish a physical cause or exclude native
+access defects, remaining observers, power-state dependencies or another
+initialization prerequisite. Desktop takeover and acceleration remain unproven.
+
+This request's attempt and both reboot allowances are consumed and closed.
+Preserve the off marker, inactive packet and all receipts; never re-arm or
+replay them. Further work under this request is offline investigation. Another
+physical experiment needs a distinct reviewed scope, isolated change, fresh
+boot and independent recovery plan. Source rollback uses a normal new commit
+and does not reopen any consumed request.

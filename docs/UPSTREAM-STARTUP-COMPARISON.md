@@ -13,11 +13,15 @@ This review compares fixed source and existing sealed observations. It does
 not run either installer, query the live kernel, initialize a GPU or establish
 that the latest checkout is the loaded binary. The terminal [desktop retest](
 DESKTOP-RETEST.md#target-result-and-recovery) is the historical input to this
-comparison. The subsequent [upstream-order trial](
-DESKTOP-UPSTREAM-ORDER-TRIAL.md#target-result-and-recovery) is now the latest
-recorded physical result: its CP setup completed before the first selector,
-which still returned two zeros. Source references are fixed pins, not claims
-about the latest upstream release.
+comparison. In the subsequent [upstream-order trial](
+DESKTOP-UPSTREAM-ORDER-TRIAL.md#target-result-and-recovery), CP setup completed
+before the first selector, which still returned two zeros. The later
+[allocation-snapshot omission trial](
+DESKTOP-SNAPSHOT-OMISSION-TRIAL.md#target-result-and-recovery) used the same
+signed initializer without baseline/failure allocation snapshots and still
+failed at that first selector. Both requests are consumed; independent recovery
+and subsequent boots were verified. Source references are fixed pins, not
+claims about the latest upstream release.
 
 ## Installation and initialization are separate comparisons
 
@@ -128,7 +132,10 @@ one isolated variable, a fresh boot, independent recovery and rollback. It must
 not replay a consumed request or treat this offline review as permission to
 reorder register writes, install a stack or reboot.
 
-The subsequent [allocation-snapshot omission source candidate](DESKTOP-SNAPSHOT-OMISSION-TRIAL.md)
+The subsequent [allocation-snapshot omission trial](DESKTOP-SNAPSHOT-OMISSION-TRIAL.md)
 isolates one observation-path variable and records the related public GFXOFF
-and register-reading discussions. It changes no native initialization or power
-sequence and does not reopen this review's or the upstream-order trial's scope.
+and register-reading discussions. Its completed target comparison did not
+resolve the first selector failure. It changes no native initialization or
+power sequence and does not reopen this review's or the upstream-order trial's
+scope. Remaining observers, native access defects and power-state prerequisites
+are not excluded by that result.
