@@ -117,5 +117,17 @@
     "reboot_dispatched_at_documentation_checkpoint": false,
     "GPU_initialization_dispatched_at_documentation_checkpoint": false,
     "actual_postboot_result_pending": true
+  },
+  "restart_dispatch": {
+    "caller_returned_zero": true,
+    "caller_timed_out": false,
+    "one_root_scheduler_independently_verified": true,
+    "dispatch_retried": false,
+    "expected_restart_local_time_approximately": "2026-11-15T17:50:50.765403+08:00",
+    "loaded_build_at_scheduler_check": 39,
+    "original34_fresh_boot_result_pending": true,
+    "GPU_off_retained": true,
+    "display_arming_absent": true,
+    "old_scopes_replayed": false
   }
 }

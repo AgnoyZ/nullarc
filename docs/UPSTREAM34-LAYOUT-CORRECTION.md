@@ -168,3 +168,16 @@ Rollback restores the verified displaced bundle and the four exact backed-up
 user files after current-state checks. Keep GPU-off, preserve unrelated files
 and all consumed intents, and verify any restored image in a later bounded
 ordinary boot. No runtime/plugin/accelerator/security rollback is needed.
+
+## Single normal restart dispatched
+
+The restart caller returned zero, without timeout, at **17:47:50 +08:00 on
+2026-11-15**. An independent process verified exactly one corresponding
+root-owned scheduler, reparented to launchd, with the preparation boot and
+build 39 still running. The job/pins, installed files, unmounted EFI, GPU-off
+and absent display flags were reverified. No second restart was sent.
+
+The expected restart time is approximately **17:50:50 +08:00**. This scheduler
+observation is not evidence that original build 34 has loaded or that the new
+headless/Metal test passed. Preserve the consumed restart intent and read the
+actual next-boot result/error; do not schedule again after a lost connection.
