@@ -1,7 +1,7 @@
 # Local upstream-release replacement
 
-Status, 2026-11-15: **upstream v0.4.0-alpha installed on disk and independently
-verified; original-driver loading still requires the completion reboot**.
+Status, 2026-11-15: **upstream v0.4.0-alpha replacement complete; original
+PhxBringup loading independently verified after the completion reboot**.
 GPU startup is disabled. This is an explicitly requested replacement of the
 local modified installation, not an acceleration result or another desktop
 experiment. The downstream source repository and historical evidence remain.
@@ -45,7 +45,7 @@ boot files are unchanged. The EFI now has 342 files because the original bundle
 has two files where the modified bundle had three. The EFI was unmounted after
 verification. No partition, BIOS, security-policy or NVRAM-reset operation ran.
 
-## Activation boundary and completion reboot
+## Activation boundary and completed reboot
 
 The original startup LaunchDaemon is installed but was not started in the
 installation boot. The empty `phxboot-off` marker was restored after the original
@@ -55,20 +55,36 @@ that have not been validated for this target; earlier target layout records
 differ. Installing their bytes is not permission to execute that initialization
 or proof that the reference recipe is compatible.
 
-The independent readback still observes the preparation boot and modified
-bring-up build 39 loaded in memory. Disk replacement alone cannot unload that
-kernel image. A separate completion phase permits one ordinary reboot to load
-the newly installed original bundle, retaining the GPU-off marker. It does not
-reuse a desktop-test reboot allowance or enable GPU initialization. The installer
-phase itself requested no reboot.
+The installation-boot readback observed modified bring-up build 39 still loaded
+in memory. Disk replacement alone could not unload that kernel image. A separate
+completion phase used one ordinary reboot to load the newly installed original
+bundle, retaining the GPU-off marker. It did not reuse a desktop-test reboot
+allowance or enable GPU initialization. The installer phase itself requested no
+reboot.
 
-A separate one-use metadata-only LaunchDaemon is staged for that fresh boot. It
-compares the loaded bring-up image identity with the release, checks any loaded
-accelerator identity, records framebuffer/service metadata and the off/arming
-state, then removes its own LaunchDaemon file. It never sends GPU initialization
-commands, changes display flags, retries a test or requests a reboot. A staged
-job or scheduled restart is not evidence that the original driver loaded; retain
-that distinction until its actual fresh-boot receipt is inspected.
+A separate one-use metadata-only LaunchDaemon ran in the fresh boot and removed
+its own LaunchDaemon file. It compared the loaded bring-up image identity with
+the release, checked for a loaded accelerator, and recorded framebuffer/service
+metadata and the off/arming state. It sent no GPU initialization commands,
+changed no display flags, retried no test and requested no reboot.
+
+The completed boot began at **2026-11-15 13:52:24 +08:00**, on macOS
+**26.7.2 / build 25G332**, x86_64. An independent readback confirmed that the
+metadata receipt belongs to this boot and that the loaded PhxBringup image
+identity matches the release executable. Its reported build is **34**, replacing
+the previously loaded downstream build 39. PhxAccel is installed and still
+matches the release, but is not loaded. There is one firmware framebuffer,
+no PhxAMDFB service and no accelerator service.
+
+The original startup log for this boot contains only its entry header and
+`kill switch present: nothing to do`. The empty off marker remains present;
+persistent and one-shot activation flags are absent. A fresh comparison of the
+active GPU files, plugin, runtime, accelerator bundle and startup plist matches
+the original release, and signature checks pass. The 13 removed modified
+components remain in private quarantine. The metadata job and native
+initializers are not running. The EFI remains unmounted and was neither mounted
+nor written during this postboot verification. The installation request and its
+single completion reboot are now closed; there is no retry or reboot remaining.
 
 The eight old experiment receipt sets remain unchanged. Their installed-input
 pins describe the historical modified stack and have been superseded by this
@@ -78,7 +94,9 @@ verification or re-armed. Desktop takeover and acceleration remain unproven.
 ## Verification and rollback
 
 The [sanitized installation record](validation/upstream-replacement-20261115.json)
-records the artifact, backup, byte-comparison and kernel-collection checks.
+records the artifact, backup, byte-comparison, kernel-collection and fresh-boot
+identity checks. Loading original PhxBringup does not establish that the GPU
+initialization recipe is compatible or that acceleration works on this target.
 Private raw output, image identities, firmware, binaries, EFI and rollback
 packets were not published. Existing repository licences and binary-publication
 limits are unchanged.
