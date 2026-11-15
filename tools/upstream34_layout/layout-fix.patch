@@ -160,7 +160,8 @@
 +else
 +    [ -f "$PHX34_WATCHDOG_ACK" ] || exit 75
 +fi
- P psp destroy >/dev/null 2>&1
+-P psp destroy >/dev/null 2>&1
++P psp destroy >/dev/null
  P psp create 0x1100000 >/dev/null
  P stage ~/gpu/fw/psp_13_0_4_toc.bin 256 2304 0x0 >/dev/null
 -P raw 0x20 0x04000000 0x80 0x900 0 0 0 >/dev/null
@@ -168,7 +169,8 @@
 +P raw 0x20 "$TOC_LO" "$TOC_HI" 0x900 0 0 0 >/dev/null
 +P raw 0x5 "$TMR_LO" "$TMR_HI" 0x4000000 0x2 "$TMR_PA_LO" "$TMR_PA_HI" >/dev/null
  echo "== load firmware =="
- L(){ P loadfw "$@" 2>&1 | grep loadfw >> ~/gpu/fwaddr.log; }
+-L(){ P loadfw "$@" 2>&1 | grep loadfw >> ~/gpu/fwaddr.log; }
++L(){ P loadfw "$@" | grep loadfw >> ~/gpu/fwaddr.log; }
  : > ~/gpu/fwaddr.log
 @@ -41,4 +53,4 @@
  P smu 0x16 1 | tail -1
@@ -178,14 +180,20 @@
 +if [ -z "${PHX34_WATCHDOG_ACK:-}" ]; then $SUDO killall shutdown 2>/dev/null; echo "watchdog cancelled rc=$?"; fi
 --- a/tools/phxctl/full.sh
 +++ b/tools/phxctl/full.sh
-@@ -2,13 +2,19 @@
+@@ -2,13 +2,24 @@
  # full.sh <mesboot step>: power the GPU up (bringup5.sh), open the doorbells, unhalt the CP and start MES with the GART,
  # then run one mesboot step with its options from the environment (phxboot: MC=1 CS=1 ADOPT=1 GFX=1 AG=1 ... kiqsched).
  # Run as root (phxboot) or as a user with sudo. A reboot is armed for 4 minutes in case the GPU hangs the bus.
 +set -e
 +set -o pipefail
  SUDO=""; [ "$(id -u)" = 0 ] || SUDO=sudo
- bash ~/gpu/bringup5.sh >/dev/null 2>&1
+-bash ~/gpu/bringup5.sh >/dev/null 2>&1
++# Retain initializer stderr in phxboot's log even when stdout is filtered.
++if bash ~/gpu/bringup5.sh >/dev/null; then :; else
++    rc=$?
++    echo "upstream34-full: bringup5.sh failed with status $rc; GPU queue initialization not started" >&2
++    exit "$rc"
++fi
 -$SUDO bash -c "nohup shutdown -r +4 >/dev/null 2>&1 &"
 +if [ -z "${PHX34_WATCHDOG_ACK:-}" ]; then
 +    $SUDO bash -c "nohup shutdown -r +4 >/dev/null 2>&1 &"

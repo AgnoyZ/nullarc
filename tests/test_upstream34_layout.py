@@ -143,7 +143,8 @@ if name=='id':print('0');sys.exit(0)
 if name=='phxctl' and args==['layout']:
  print(os.environ['LAYOUT']);sys.exit(75 if fail=='layout' else 0)
 if name=='phxctl' and args and args[0]=='loadfw':print('loadfw synthetic')
-if fail and ((name=='phxctl' and args and args[0]==fail) or (name=='bash' and args and args[0].endswith('/bringup5.sh') and fail=='bringup5') or (name=='mesboot' and args==[fail])):sys.exit(75)
+if fail and ((name=='phxctl' and args and args[0]==fail) or (name=='bash' and args and args[0].endswith('/bringup5.sh') and fail=='bringup5') or (name=='mesboot' and args==[fail])):
+ print('synthetic first initializer error',file=sys.stderr);sys.exit(75)
 '''
         for name in ["phxctl", "mesboot"]:
             (helper / name).write_text(stub)
@@ -183,12 +184,14 @@ if fail and ((name=='phxctl' and args and args[0]==fail) or (name=='bash' and ar
         self.assertFalse(any(c[0] in ["bash", "killall"] for c in calls))
 
     def test_bringup_refusals_cannot_continue_to_later_stages(self):
-        for failure in ["layout", "stage", "raw", "loadfw", "autoload", "smu"]:
+        for failure in ["layout", "psp", "stage", "raw", "loadfw", "autoload", "smu"]:
             with self.subTest(failure=failure):
                 result, calls = self.run_shell("bringup5.sh", failure)
                 self.assertNotEqual(0, result.returncode)
                 commands = [c[1:] for c in calls if c[0] == "phxctl"]
                 self.assertEqual(failure, commands[-1][0])
+                if failure != "layout":
+                    self.assertIn("synthetic first initializer error", result.stderr)
         for layout in ["", "1 2 3", "1 2 3 4 5 6 7", "1 2 3 4 5 bad"]:
             result, calls = self.run_shell("bringup5.sh", layout=layout)
             self.assertNotEqual(0, result.returncode)
@@ -204,6 +207,25 @@ if fail and ((name=='phxctl' and args and args[0]==fail) or (name=='bash' and ar
             self.assertEqual(75, result.returncode)
             commands = [c[1] for c in calls if c[0] == "mesboot"]
             self.assertEqual(failure, commands[-1])
+
+    def test_full_retains_first_initializer_stderr_and_exact_failure_status(self):
+        for external in [False, True]:
+            with self.subTest(external_deadline=external):
+                result, calls = self.run_shell("full.sh", "bringup5", external=external)
+                self.assertEqual(75, result.returncode)
+                self.assertIn("synthetic first initializer error", result.stderr)
+                self.assertIn("bringup5.sh failed with status 75", result.stderr)
+                self.assertIn("GPU queue initialization not started", result.stderr)
+                self.assertEqual(["id", "bash"], [c[0] for c in calls])
+
+    def test_transport_diagnostics_distinguish_error_from_short_output(self):
+        result, _ = self.invoke("mesboot", "gart", fixture="transport-scalar")
+        self.assertIn("transport/size failure: kr 0x", result.stderr)
+        self.assertNotIn("kr 0x00000000", result.stderr)
+        result, _ = self.invoke("phxctl", "regs", "0x2004", fixture="short-output")
+        self.assertEqual(74, result.returncode)
+        self.assertIn("kr 0x00000000", result.stderr)
+        self.assertIn("bytes 0/4", result.stderr)
 
     def test_full_keeps_original_success_order(self):
         result, calls = self.run_shell("full.sh")

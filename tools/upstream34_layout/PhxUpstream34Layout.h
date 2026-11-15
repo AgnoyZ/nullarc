@@ -103,7 +103,8 @@ static kern_return_t phx34_scalar(io_connect_t connection, uint32_t selector,
    uint32_t expected = no ? *no : 0;
    kern_return_t kr = IOConnectCallScalarMethod(connection, selector, in, ni, out, no);
    if (kr || (no && *no != expected)) {
-      fprintf(stderr, "upstream34-layout: selector %u transport/size failure\n", selector); exit(74);
+      fprintf(stderr, "upstream34-layout: selector %u transport/size failure: kr 0x%08x, scalar outputs %u/%u\n",
+              selector, (unsigned)kr, no ? *no : 0, expected); exit(74);
    }
    if ((selector == 0 && (!out || expected != 4 || out[0] != (1u | (12u << 16)) || out[1] != 34)) ||
        ((selector == 103 || selector == 105 || selector == 106 || selector == 107) &&
@@ -124,7 +125,9 @@ static kern_return_t phx34_method(io_connect_t connection, uint32_t selector,
    kern_return_t kr = IOConnectCallMethod(connection, selector, in, ni, input, inputSize,
                                          out, no, output, outputSize);
    if (kr || (no && *no != expected) || (outputSize && *outputSize != expectedSize)) {
-      fprintf(stderr, "upstream34-layout: selector %u transport/size failure\n", selector); exit(74);
+      fprintf(stderr, "upstream34-layout: selector %u transport/size failure: kr 0x%08x, scalar outputs %u/%u, bytes %zu/%zu\n",
+              selector, (unsigned)kr, no ? *no : 0, expected,
+              outputSize ? *outputSize : 0, expectedSize); exit(74);
    }
    return kr;
 }

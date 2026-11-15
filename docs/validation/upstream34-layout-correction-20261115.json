@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-15",
-  "scope": "original build34 + corrected user tools: completed fresh-boot headless GPU/Metal success read back; separate desktop retest prepared",
+  "scope": "original build34 + corrected user tools: earlier fresh-boot headless GPU/Metal success; separate desktop retest consumed with original-startup fallback",
   "upstream_commit": "9dd76b604fca5e0125bd3caa5723df0f611ff27f",
   "upstream_tag": "v0.4.0-alpha",
   "branch": "downstream/780m-tahoe",
@@ -151,5 +151,14 @@
     "recovery_intent_present": false,
     "old_observer_job_retired": true,
     "old_scope_replayed": false
+  },
+  "desktop_trial_followup": {
+    "record": "upstream34-desktop-retest-20261115.json",
+    "native_desktop_success": false,
+    "fallback_boot_current_acceleration_active": false,
+    "original_startup_requested_fallback": true,
+    "diagnostic_candidate_source_only": true,
+    "installed_helpers_unchanged": true,
+    "headless_historical_success_preserved": true
   }
 }

@@ -204,3 +204,11 @@ The owner's new reboot-test request creates a separate, single native-desktop
 attempt, described in [the desktop retest record](UPSTREAM34-DESKTOP-RETEST.md).
 Its preparation does not install a driver, modify the original startup or
 convert its pending result into success.
+
+The subsequent actual desktop attempt has now been read back: original startup
+reported that the accelerator did not start and explicitly requested fallback.
+The 18:31:05 +08:00 boot uses the firmware desktop with GPU-off restored and
+no accelerator present. The successful headless result above remains historical
+evidence for that earlier boot, not the current desktop. See the retest record
+for the consumed reboot receipts and the source-only diagnostic correction;
+that correction is not installed and does not constitute another GPU test.

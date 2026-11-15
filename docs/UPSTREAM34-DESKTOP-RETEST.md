@@ -73,3 +73,72 @@ original M2 marker and only the specific `phxfb-boot` display variable, then
 verify a firmware-display boot if recovery was required. No driver replacement
 is necessary. Raw logs, crash reports, identities and diagnostic archives remain
 private; no binary publication is added.
+
+## Consumed trial result: original startup requested fallback
+
+The exclusive receipts and actual startup/kernel logs were read back on
+2026-11-15. The single ordinary restart was dispatched successfully and
+independently verified. Its native-desktop boot began at **18:29:35 +08:00**.
+The observer recorded that original startup crossed its off-marker gate and
+restored GPU-off while removing persistent display arming. There is no
+desktop-complete, Metal-exit or trial-success receipt.
+
+The original startup log reported `PhxAMDFB on the panel: 1`. Kernel logs also
+show the native panel publication. All **17** fresh firmware load records have
+zero transport and firmware statuses. However, startup retained no successful
+compute/graphics queue or adoption output, then reported a selector **113**
+transport/size failure and `M2 failed (NMXAccel did not start)`. The unchanged
+upstream `m2_fail` path explicitly requested a fallback reboot. The external
+witness did **not** dispatch a managed recovery reboot. Its next-boot closed
+receipt preserves the consumed state and prevents retry.
+
+The fallback boot began at **18:31:05 +08:00**. Independent reads confirmed
+original build 34, the target geometry and all four installed corrected-helper
+hashes. The firmware framebuffer is present; PhxAMDFB, NMXAccel and
+IOAccelerator are absent. One WindowServer has remained on this boot. GPU-off
+is an empty file, the M2 marker and pending marker are absent, and the specific
+display-arming variable is absent. No new WindowServer/panic/kernel diagnostic
+report was found in the checked system diagnostic directories after trial
+start. That absence is not a general proof that no transient fault occurred.
+
+Thus this attempt **did not establish accelerated desktop operation**, and
+hardware acceleration is **not active on the fallback boot**. This does not
+invalidate the separate 17:51 headless boot's real GPU/Metal execution success;
+those successful consumed receipts remain unchanged.
+
+Only the consumed external witness was retired: its exact plist was archived,
+launchd confirmed the job had already exited/unregistered, its processes were
+absent, and its auto-start plist was removed. Original startup and the installed
+helpers were rehashed and left unchanged. All historical receipts remain
+private and intact. No new GPU call, Metal probe or reboot was dispatched
+during readback or retirement. The default source branch remains
+`upstream34/vram-layout-fix` at
+`5805c05bed6cf0ce1e3fc28f8d088f6e5e296993`.
+
+## Diagnostic correction prepared offline; not deployed
+
+The exact first post-firmware failure remains **unknown**. Original `full.sh`
+discarded both streams from `bringup5.sh`, and the former wrapper omitted the
+actual IOKit return code and returned lengths. Selector 113 invokes
+`claimAccel`, which refuses a GPU that is not ready; its visible failure can
+therefore be downstream of incomplete initialization. The retained data cannot
+distinguish a power/autoload failure from another early initializer exit, and
+does not establish a new CoreDisplay failure.
+
+The downstream isolated build-34 recipe now preserves initializer stderr,
+keeps PSP-destroy errors and firmware-load errors out of stdout suppression or
+filtering, and propagates the exact initializer exit status before any later
+queue commands. Transport diagnostics now include the actual return code and
+expected/returned counts and byte lengths. Admission, GPU-command order,
+fail-closed behavior, watchdog policy and original kernel/ABI remain unchanged.
+
+Fourteen focused ASan/UBSan and synthetic-shell methods passed. They include
+the retained geometry/order checks, error-versus-short-output diagnostics,
+early initializer error retention, and no later queue operations after failure
+in either watchdog mode. Native x86_64 helper compilation, ad-hoc signing and
+strict verification also passed. These tests never link real IOKit into the
+fixture or run a GPU command. The diagnostic candidate is source-only: it has
+not replaced the installed four files or the default source branch, and no
+new desktop attempt is armed. A future separately bounded trial must record
+its exact inputs and retain these diagnostics from startup; consumed intents
+must not be replayed.

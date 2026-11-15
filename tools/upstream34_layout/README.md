@@ -23,3 +23,13 @@ execution or memory-ownership evidence. See
 [the correction record](../../docs/UPSTREAM34-LAYOUT-CORRECTION.md) before
 considering any deployment. The existing downstream sources and `main` are
 not replaced by this recipe; `patches/` remains historical.
+
+After the consumed 2026-11-15 desktop trial, this downstream recipe also retains
+initializer stderr and exact failure status, and includes IOKit return codes
+and returned/expected lengths in transport diagnostics. PSP-destroy and
+firmware-load failures are no longer swallowed by stderr redirection/filtering.
+Successful GPU-command order and fail-closed checks are unchanged. This
+diagnostic candidate is not installed, is not the default branch's currently
+pinned candidate, and has not executed GPU work. The failed trial and current
+firmware-desktop state are recorded in
+[the retest result](../../docs/UPSTREAM34-DESKTOP-RETEST.md#consumed-trial-result-original-startup-requested-fallback).
