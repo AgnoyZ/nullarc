@@ -127,3 +127,8 @@ must have a separate reviewed scope identifying the exact changed candidate,
 one isolated variable, a fresh boot, independent recovery and rollback. It must
 not replay a consumed request or treat this offline review as permission to
 reorder register writes, install a stack or reboot.
+
+The subsequent [allocation-snapshot omission source candidate](DESKTOP-SNAPSHOT-OMISSION-TRIAL.md)
+isolates one observation-path variable and records the related public GFXOFF
+and register-reading discussions. It changes no native initialization or power
+sequence and does not reopen this review's or the upstream-order trial's scope.

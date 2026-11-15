@@ -1,0 +1,100 @@
+{
+  "format": 1,
+  "date": "2026-11-15",
+  "base_commit": "87df12b757869f53c8c42dac34a449a8ec2dfbc8",
+  "status": "source-only explicit allocation-snapshot omission candidate; unarmed and uninstalled; physical cause unconfirmed",
+  "native_candidate_source_reference": "594f6ad9c1acb757b8aa14954717733950ca4eb8",
+  "change": {
+    "normal_packet_format": 1,
+    "trial_packet_format": 2,
+    "trial_mode": "omit-allocation-snapshots-trial",
+    "normal_mode_unchanged": true,
+    "baseline_snapshot_reader_invocations_in_trial": 0,
+    "failure_snapshot_reader_invocations_in_trial": 0,
+    "omission_is_not_an_empty_snapshot": true,
+    "identity_before_and_after_retained": true,
+    "reader_file_integrity_retained": true,
+    "report_vnode_observer_retained": true,
+    "native_selector_guards_retained": true,
+    "independent_recovery_retained": true,
+    "allocation_detail_capacity_verified_in_omission_mode": false,
+    "collector_free_claim": false,
+    "GFXOFF_or_native_initializer_changes": false
+  },
+  "checks": {
+    "focused_methods_by_suite": {
+      "test_allocation_capture.py": 24,
+      "test_allocation_observer.py": 29,
+      "test_allocation_coordinator.py": 52,
+      "test_desktop_startup.py": 32,
+      "test_desktop_handoff.py": 38,
+      "test_allocation_startup_runner.py": 6,
+      "test_register_transport.py": 7,
+      "test_gc_state_observe.py": 7,
+      "test_allocation_snapshot_runner.py": 5
+    },
+    "focused_methods_total": 200,
+    "focused_skipped": 0,
+    "exact_Python313_version": "3.13.18",
+    "exact_Python313_methods": 137,
+    "exact_Python313_source_copy_integrity_verified": true,
+    "mutation_cases_detected": [
+      "reader-executed",
+      "failure-reader-executed",
+      "implicit-omission-admitted",
+      "v1-omission-accepted"
+    ],
+    "full_repository_suite_run": false,
+    "earlier_failed_validation_attempts": [
+      "One concurrent process-fixture run hit the existing two-second stage timeout; serial replay passed without relaxing timeouts.",
+      "Initial exact-runtime root run in the user-owned checkout was refused by the existing command-parent ownership checks; an independently hashed root-owned source copy passed on the same interpreter.",
+      "A new packet rejection test initially used a nonprivate file; its permissions were corrected and a private mutation then confirmed semantic rejection."
+    ]
+  },
+  "source_inputs_sha256": {
+    "tests/desktop_startup_fixture.py": "be5b02d7584e49cecbb8ecdcf21e9ac3a0b21a45fdc940d22bf281d37b1f439d",
+    "tests/test_allocation_capture.py": "74eb16325d520bd43fb5458b475b91aa737cbc995400273fc7023550567fd867",
+    "tests/test_allocation_coordinator.py": "62fa843833fb3b12b366d8dd1d77dfbbe22e689dc3b7ce2e8bac8f32e4e5b274",
+    "tests/test_allocation_observer.py": "643525c03a1c631bd0785f5a28d93afad1866837c441a7cd709038df86137472",
+    "tests/test_desktop_startup.py": "0000b97941e6888f9064fbf02272b8bbd586077421f1f8a03a910132b8ad635c",
+    "tools/allocation_capture.py": "3b60a326be52d945c13c42d01b8e985d6ae1d62726ee873c52a714fc2ca02d1a",
+    "tools/allocation_observer.py": "8ccb952041968b4d8e2421419cbb7b395bb7aa9405d737c412e5e4a05d9a2799",
+    "tools/allocation_startup.py": "941e79d97077f7dc5f43f5f0168666b7fb932ecdf01e6c7c7c572c735c25ffd7",
+    "tools/desktop_startup.py": "e222e0fb3a30b9ee6645b20c69b1bc5d6b613fdb5214120234231297156b7999"
+  },
+  "unchanged_native_source_sha256": {
+    "tools/phxctl/mesboot.c": "a26bd8f5a273342856a80bdb7c1ddc7410cd41af772690011a4fe832818f7df5",
+    "tools/phxctl/phxctl.c": "b561d0030b94cf157ff1b8712dba0e7a85316e0989062710a424cef7074b2a50",
+    "tools/phxctl/gc_state_observe.c": "6de88228396bfc80fbc20930feb8d81f39af57725ff20d8dc22bd24f282b6889",
+    "tools/allocation_snapshot.cpp": "5e07e32ea833e55f78a9704cf5c63b20099844856b6bb387c1a40d0bdd2f771d",
+    "src/phxbringup/PhxBringup.cpp": "92ad3f3961de373a35744b5d3f899ee53105251a3769615c4f18d0e2d0c57ce7"
+  },
+  "target_readonly_metadata": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "bringup_build": 39,
+    "firmware_framebuffer_instances": 1,
+    "native_framebuffer_instances": 0,
+    "accelerator_instances": 0,
+    "off_marker_present_empty": true,
+    "consumed_startup_packet_unchanged": true,
+    "all_consumed_packet_input_pins_match": true,
+    "active_native_initializer_or_reboot_processes": false
+  },
+  "execution": {
+    "GPU_commands": 0,
+    "target_snapshot_reads": 0,
+    "driver_installations": 0,
+    "kernel_collection_rebuilds": 0,
+    "startup_changes": 0,
+    "display_arming_writes": 0,
+    "reboots_requested": 0,
+    "old_requests_rearmed": false,
+    "EFI_BIOS_partition_or_security_changes": false
+  },
+  "limits": [
+    "CPU/fake-IOKit checks do not validate hardware MMIO, GFXOFF state or recovery from a kernel/bus hard hang.",
+    "An omission trial also changes lifecycle and elapsed time; its result cannot isolate a hardware cause by itself.",
+    "No physical trial outcome is claimed by this preparation record."
+  ]
+}

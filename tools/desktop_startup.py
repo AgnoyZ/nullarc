@@ -168,9 +168,15 @@ def load_packet(path, recovery_only=False):
     capture.require(sys.version_info >= (3, 13), 'desktop-clock-runtime')
     path = capture.checked_path(path)
     packet = capture.decode(capture.read_file(path))
-    capture.keys(packet, 'format request_sha256 scope preparation_boot_uuid os_build spec '
-                 'accel_image_uuid interpreter runtime_manifest entrypoint phxctl mesboot firmware_dir psp_layout desktop_layout reports pins recovery_pins')
-    capture.require(capture.integer(packet['format']) == 1 and packet['os_build'] == '25G332'
+    capture.require(type(packet) is dict and type(packet.get('format')) is int
+                    and packet['format'] in (1, 2), 'desktop-packet')
+    fields = ('format request_sha256 scope preparation_boot_uuid os_build spec '
+              'accel_image_uuid interpreter runtime_manifest entrypoint phxctl mesboot firmware_dir '
+              'psp_layout desktop_layout reports pins recovery_pins')
+    capture.keys(packet, fields + (' snapshot_mode' if packet['format'] == 2 else ''))
+    if packet['format'] == 2:
+        capture.require(packet['snapshot_mode'] == capture.SNAPSHOT_OMIT_TRIAL, 'desktop-packet-snapshot-mode')
+    capture.require(packet['os_build'] == '25G332'
                     and re.fullmatch('[0-9a-f]{64}', packet['request_sha256']), 'desktop-packet')
     startup.validate_spec(packet['spec'])
     capture.require(packet['spec']['expected_build'] == 39, 'desktop-packet-build')
@@ -448,6 +454,8 @@ class Native:
         self.call('fallback-reboot', ['/sbin/shutdown', '-r', 'now'])
 
     def run(self):
+        snapshot_mode = self.p.get('snapshot_mode', capture.SNAPSHOT_REQUIRED)
+        capture.validate_snapshot_mode(snapshot_mode)
         capture.write_json(self.scope / 'boot-entry.started', {
             'format': 1, 'request_sha256': self.p['request_sha256'], 'monotonic_ns': time.monotonic_ns()})
         commands = {'disarm': self.command('disarm'), 'display': self.command('recover-display'),
@@ -475,7 +483,8 @@ class Native:
                 on_ready(value)
             spec = self.p['spec']
             return observer.observe(self.p['reports'], out, spec['reader'], spec['reader_sha256'],
-                                    spec['expected_build'], spec['expected_image_uuid'], 180, on_ready=ready)
+                                    spec['expected_build'], spec['expected_image_uuid'], 180, on_ready=ready,
+                                    snapshot_mode=snapshot_mode)
 
         try:
             early.arm(time.monotonic() + 2)
@@ -490,7 +499,8 @@ class Native:
             result = startup.supervise(self.scope, self.p['spec'], expected, self.identity, self.boundary,
                                        observe, {role: self.command(role) for role in startup.ROLES}, commands,
                                        stage_timeouts=STAGE_TIMEOUTS,
-                                       watchdog_deadline=early.deadline, on_recovery_armed=handoff)
+                                       watchdog_deadline=early.deadline, on_recovery_armed=handoff,
+                                       snapshot_mode=snapshot_mode)
         except BaseException:
             if not handed:
                 early.request()

@@ -347,6 +347,23 @@ class RuntimeTests(unittest.TestCase):
             loaded, got = desktop.load_packet(path)
             self.assertEqual(packet, loaded)
             self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), got[str(path)])
+            omitted = dict(packet, format=2, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+            omitted_path = self.scope / 'omitted-packet.json'
+            capture.write_json(omitted_path, omitted)
+            self.assertEqual(omitted, desktop.load_packet(omitted_path)[0])
+            for version, mode in ((1, capture.SNAPSHOT_OMIT_TRIAL), (2, 'required'),
+                                  (2, False), (2, ''), (True, capture.SNAPSHOT_OMIT_TRIAL)):
+                with self.subTest(version=version, mode=mode):
+                    wrong = dict(packet, format=version, snapshot_mode=mode)
+                    wrong_path = self.scope / 'wrong-packet.json'
+                    wrong_path.write_text(json.dumps(wrong))
+                    wrong_path.chmod(0o600)
+                    with self.assertRaises(capture.CaptureError):
+                        desktop.load_packet(wrong_path)
+            missing_path = self.scope / 'missing-mode-packet.json'
+            capture.write_json(missing_path, dict(packet, format=2))
+            with self.assertRaises(capture.CaptureError):
+                desktop.load_packet(missing_path)
         packet['recovery_pins'].pop(str(self.manifest))
         bad = self.scope / 'bad-packet.json'; capture.write_json(bad, packet)
         with mock.patch.object(desktop.sys, 'version_info', (3, 13, 18)), self.assertRaises(capture.CaptureError):
@@ -419,6 +436,33 @@ class ProcessIntegrationTests(unittest.TestCase):
         self.assertFalse((self.scope / 'claim.started').exists())
         self.assertFalse((self.scope / 'release.started').exists())
         self.assertNotIn('desktop-init', (self.scope / 'calls-initialize').read_text())
+
+    def test_omitted_snapshot_mode_runs_actual_adapter_process_chain_with_distinct_baseline(self):
+        self.packet['snapshot_mode'] = capture.SNAPSHOT_OMIT_TRIAL
+        p = self.run_chain('success')
+        self.assertEqual(0, p.returncode, p.stderr.decode())
+        baseline = json.loads((self.scope / 'run/capture/baseline.json').read_bytes())
+        self.assertEqual(2, baseline['format'])
+        self.assertEqual(capture.SNAPSHOT_OMIT_TRIAL, baseline['snapshot_mode'])
+        self.assertNotIn('snapshot', baseline)
+        journal = [json.loads(line) for line in (self.scope / 'run/startup.jsonl').read_text().splitlines()]
+        admitted = next(row for row in journal if row['event'] == 'admitted')
+        self.assertEqual(capture.SNAPSHOT_OMIT_TRIAL, admitted['data']['snapshot_mode'])
+        self.assertEqual(list(desktop.startup.ROLES), [row['data']['role'] for row in journal if row['event'] == 'stage-request'])
+        self.assertFalse((self.scope / 'fixture-reboot-requested').exists())
+
+    def test_omitted_snapshot_mode_keeps_failed_adapter_and_independent_reboot_path(self):
+        self.packet['snapshot_mode'] = capture.SNAPSHOT_OMIT_TRIAL
+        p = self.run_chain('init-fail')
+        self.assertEqual(74, p.returncode, p.stderr.decode())
+        deadline = time.monotonic() + 5
+        while not (self.scope / 'fixture-reboot-requested').exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertTrue((self.scope / 'fixture-reboot-requested').exists())
+        self.assertFalse((self.scope / 'claim.started').exists())
+        self.assertFalse((self.scope / 'release.started').exists())
+        baseline = json.loads((self.scope / 'run/capture/baseline.json').read_bytes())
+        self.assertNotIn('snapshot', baseline)
 
     def test_actual_recovery_adapters_reboot_while_display_helper_stays_blocked(self):
         p = self.run_chain('recovery-display-blocked')

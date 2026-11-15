@@ -174,6 +174,47 @@ class CaptureTests(unittest.TestCase):
     def baseline(self):
         return capture.begin(self.out, self.reader, self.digest, 37, IMAGE, run=self.run_fake)
 
+    def test_explicit_omission_retains_metadata_but_never_invokes_snapshot_reader(self):
+        result = capture.begin(self.out, self.reader, self.digest, 37, IMAGE,
+                               run=self.run_fake, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+        self.assertEqual(2, result['format'])
+        self.assertEqual(capture.SNAPSHOT_OMIT_TRIAL, result['snapshot_mode'])
+        self.assertNotIn('snapshot', result)
+        self.assertEqual(['boot-before', 'os-before', 'service-before', 'image-before',
+                          'boot-after', 'os-after', 'service-after', 'image-after'],
+                         [label for _, label in self.calls])
+        self.assertFalse((self.out / 'baseline/snapshot.stdout').exists())
+        before = len(self.calls)
+        with self.assertRaises(capture.CaptureError):
+            capture.finish(self.out, run=self.run_fake)
+        self.assertEqual(before, len(self.calls))
+        self.assertFalse((self.out / 'failure.started').exists())
+        with self.assertRaises(FileExistsError):
+            capture.begin(self.out, self.reader, self.digest, 37, IMAGE,
+                          run=self.run_fake, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+
+    def test_omission_still_refuses_changed_identity_and_reader_pin(self):
+        self.fault = lambda label, raw: b'00000000-0000-4000-8000-000000000003' if label == 'boot-after' else raw
+        with self.assertRaisesRegex(capture.CaptureError, 'identity-changed'):
+            capture.begin(self.out, self.reader, self.digest, 37, IMAGE,
+                          run=self.run_fake, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+        self.assertFalse((self.out / 'baseline.json').exists())
+        self.assertNotIn('snapshot', [label for _, label in self.calls])
+        self.out = self.work / 'omitted-bad-pin'
+        self.calls.clear()
+        with self.assertRaisesRegex(capture.CaptureError, 'reader-pin'):
+            capture.begin(self.out, self.reader, '0' * 64, 37, IMAGE,
+                          run=self.run_fake, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+        self.assertEqual([], self.calls)
+
+    def test_unknown_snapshot_mode_refuses_before_output_or_commands(self):
+        for mode in ('', 'omit', False, None):
+            with self.subTest(mode=mode), self.assertRaises(capture.CaptureError):
+                capture.begin(self.out, self.reader, self.digest, 37, IMAGE,
+                              run=self.run_fake, snapshot_mode=mode)
+        self.assertFalse(self.out.exists())
+        self.assertEqual([], self.calls)
+
     def test_full_sequence_is_two_single_reads_with_private_durable_outputs(self):
         baseline = self.baseline()
         add(self.value, 6)

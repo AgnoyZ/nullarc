@@ -85,6 +85,39 @@ class ObserverTests(unittest.TestCase):
         for path in [self.out, *self.out.rglob('*')]:
             self.assertFalse(path.stat().st_mode & 0o077)
 
+    def test_omission_keeps_report_trigger_but_never_calls_failure_snapshot(self):
+        def baseline(out, *args, **kwargs):
+            self.assertEqual({'snapshot_mode': capture.SNAPSHOT_OMIT_TRIAL}, kwargs)
+            self.baseline(out, *args)
+        result = self.run_observer(snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL, baseline=baseline)
+        self.assertEqual('report-observed-snapshot-omitted', result['outcome'])
+        self.assertEqual(2, result['format'])
+        self.assertEqual(capture.SNAPSHOT_OMIT_TRIAL, result['snapshot_mode'])
+        self.assertNotIn('failure_sha256', result)
+        self.assertNotIn('failure', self.trace)
+        self.assertTrue((self.out / 'observer.trigger.json').exists())
+        self.assertFalse((self.out / 'failure.json').exists())
+        self.assertFalse((self.out / 'failure.started').exists())
+        self.assertTrue(self.closed)
+
+    def test_invalid_snapshot_mode_never_arms_report_watch(self):
+        with self.assertRaises(capture.CaptureError):
+            self.run_observer(snapshot_mode='silently-skip')
+        self.assertEqual([], self.trace)
+        self.assertFalse(self.out.exists())
+
+    def test_omitted_snapshot_early_report_still_refuses_readiness(self):
+        self.scans = [{}, {'WindowServer-during.spin': (1, 3)}]
+        ready = mock.Mock()
+        def baseline(out, *args, **kwargs):
+            self.assertEqual({'snapshot_mode': capture.SNAPSHOT_OMIT_TRIAL}, kwargs)
+            self.baseline(out, *args)
+        result = self.run_observer(snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL,
+                                   baseline=baseline, on_ready=ready)
+        self.assertEqual('report-observed-snapshot-omitted', result['outcome'])
+        ready.assert_not_called()
+        self.assertNotIn('failure', self.trace)
+
     def test_report_created_during_baseline_is_seen_without_wait(self):
         self.scans = [{}, {'WindowServer-during.spin': (1, 3)}]
         self.assertEqual('captured', self.run_observer()['outcome'])

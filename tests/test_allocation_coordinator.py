@@ -42,6 +42,7 @@ class CoordinatorTests(unittest.TestCase):
         self.identity = {'boot_uuid': BOOT, 'os_build': '25A362', 'service_entry_id': 123,
                          'kext_build': 37, 'loaded_image_uuid': IMAGE}
         self.mode = None
+        self.snapshot_mode = 'required'
         self.stage_commands = {role: self.command(role) for role in startup.ROLES}
         self.recovery_commands = {role: self.command('recover-' + role)
                                   for role in startup.RECOVERY_ROLES}
@@ -65,11 +66,14 @@ class CoordinatorTests(unittest.TestCase):
         return {'framebuffer_id': 17, 'held': not (self.work / 'released').exists(),
                 'panel_open': (self.work / 'panel-open').exists()}
 
-    def baseline(self, out, *_args):
+    def baseline(self, out, *_args, **kwargs):
         out.mkdir(mode=0o700)
         value = {'format': 1, 'phase': 'baseline', 'saved_at': '2026-11-14T00:00:00+00:00',
                  'identity': copy.deepcopy(self.identity), 'spec': copy.deepcopy(self.spec),
                  'snapshot': empty()}
+        if kwargs.get('snapshot_mode') == capture.SNAPSHOT_OMIT_TRIAL:
+            value.pop('snapshot')
+            value.update(format=2, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
         if self.mode == 'bool-format': value['format'] = True
         if self.mode == 'bool-service': value['identity']['service_entry_id'] = True
         if self.mode == 'bool-build': value['spec']['expected_build'] = True
@@ -123,16 +127,87 @@ class CoordinatorTests(unittest.TestCase):
 
         observer.observe(self.reports, out, Path(self.spec['reader']), self.spec['reader_sha256'], 37, IMAGE, 90,
                          watch_factory=Watch, baseline=self.baseline,
-                         failure=failure, on_ready=on_ready)
+                         failure=failure, on_ready=on_ready, snapshot_mode=self.snapshot_mode)
 
     def run_attempt(self, **changes):
         args = dict(scope=self.scope, spec=self.spec, expected_identity=self.identity,
                     current_identity=lambda: copy.deepcopy(self.identity), boundary=self.boundary,
                     observer_job=self.observer_job, stages=self.stage_commands,
                     recovery_commands=self.recovery_commands, admission_seconds=1,
-                    stage_seconds=1, watchdog_seconds=3)
+                    stage_seconds=1, watchdog_seconds=3, snapshot_mode=self.snapshot_mode)
         args.update(changes)
         return startup.supervise(**args)
+
+    def test_omitted_baseline_needs_explicit_matching_admission_mode(self):
+        folder = self.work / 'omitted-baseline'
+        self.baseline(folder, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+        raw = (folder / 'baseline.json').read_bytes()
+        now = time.monotonic_ns()
+        ready = dict(format=1, baseline_sha256=hashlib.sha256(raw).hexdigest(),
+                     baseline_completed_ns=now - 2, ready_ns=now - 1,
+                     deadline_ns=now + 10_000_000_000, observer_pid=os.getpid())
+        args = (folder, ready, self.spec, self.identity, lambda: self.identity.copy())
+        with self.assertRaises(capture.CaptureError):
+            startup.baseline_admission(*args)
+        with mock.patch.object(capture, 'snapshot', side_effect=AssertionError('no synthetic snapshot')):
+            self.assertEqual(ready['baseline_sha256'], startup.baseline_admission(
+                *args, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL))
+        value = json.loads(raw)
+        value['snapshot'] = empty()
+        (folder / 'baseline.json').write_text(json.dumps(value))
+        ready['baseline_sha256'] = hashlib.sha256((folder / 'baseline.json').read_bytes()).hexdigest()
+        with self.assertRaises(capture.CaptureError):
+            startup.baseline_admission(*args, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+
+    def test_omission_mode_cannot_admit_an_ordinary_snapshot_baseline(self):
+        folder = self.work / 'ordinary-baseline'
+        self.baseline(folder)
+        now = time.monotonic_ns()
+        ready = dict(format=1, baseline_sha256=hashlib.sha256((folder / 'baseline.json').read_bytes()).hexdigest(),
+                     baseline_completed_ns=now - 2, ready_ns=now - 1,
+                     deadline_ns=now + 10_000_000_000, observer_pid=os.getpid())
+        with self.assertRaises(capture.CaptureError):
+            startup.baseline_admission(folder, ready, self.spec, self.identity,
+                                       lambda: self.identity.copy(), snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+
+    def test_omitted_baseline_retains_identity_hash_and_deadline_checks(self):
+        for fault in ('wrong-boot', 'changed-hash', 'late', 'wrong-mode', 'bool-format'):
+            with self.subTest(fault=fault):
+                folder = self.work / fault
+                self.baseline(folder, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+                path = folder / 'baseline.json'
+                value = json.loads(path.read_bytes())
+                if fault == 'wrong-boot': value['identity']['boot_uuid'] = '00000000-0000-4000-8000-000000000099'
+                if fault == 'wrong-mode': value['snapshot_mode'] = 'required'
+                if fault == 'bool-format': value['format'] = True
+                path.write_text(json.dumps(value))
+                now = time.monotonic_ns()
+                ready = dict(format=1, baseline_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                             baseline_completed_ns=now - 2, ready_ns=now - 1,
+                             deadline_ns=now + 10_000_000_000, observer_pid=os.getpid())
+                if fault == 'changed-hash': path.write_bytes(path.read_bytes() + b'\n')
+                if fault == 'late': ready['deadline_ns'] = now - 1
+                with self.assertRaises(capture.CaptureError):
+                    startup.baseline_admission(folder, ready, self.spec, self.identity,
+                        lambda: self.identity.copy(), snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
+
+    def test_omitted_snapshot_attempt_preserves_stages_and_independent_recovery(self):
+        self.snapshot_mode = capture.SNAPSHOT_OMIT_TRIAL
+        result = self.run_attempt()
+        self.assertEqual('reviewed-stages-returned', result['outcome'])
+        self.assertEqual(list(startup.ROLES), self.names())
+        baseline = json.loads((self.root / 'capture/baseline.json').read_bytes())
+        self.assertEqual(2, baseline['format'])
+        self.assertNotIn('snapshot', baseline)
+        self.assertEqual('dismissed-after-monitor', self.recovery_result()['outcome'])
+
+    def test_omitted_snapshot_does_not_bypass_failed_initialize_or_recovery(self):
+        self.snapshot_mode = capture.SNAPSHOT_OMIT_TRIAL
+        self.stage_commands['initialize'] = self.command('initialize', status=75)
+        with self.assertRaisesRegex(capture.CaptureError, 'startup-stage-failed'):
+            self.run_attempt()
+        self.assertNotIn('claim', self.names())
+        self.assertEqual('recovery-requested', self.recovery_result()['outcome'])
 
     def wait_file(self, path, timeout=5):
         deadline = time.monotonic() + timeout

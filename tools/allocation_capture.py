@@ -37,6 +37,8 @@ COMMANDS = {
 }
 ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LC_ALL': 'C',
        'SYSTEM_VERSION_COMPAT': '0'}
+SNAPSHOT_REQUIRED = 'required'
+SNAPSHOT_OMIT_TRIAL = 'omit-allocation-snapshots-trial'
 
 
 class CaptureError(Exception):
@@ -46,6 +48,11 @@ class CaptureError(Exception):
 def require(condition, code):
     if not condition:
         raise CaptureError(code)
+
+
+def validate_snapshot_mode(mode):
+    require(type(mode) is str and mode in (SNAPSHOT_REQUIRED, SNAPSHOT_OMIT_TRIAL),
+            'snapshot-mode')
 
 
 def host_check():
@@ -286,7 +293,13 @@ def comparison(baseline, failure):
     return result
 
 
-def collect(root, phase, spec, run, baseline=None, baseline_raw=None):
+def collect(root, phase, spec, run, baseline=None, baseline_raw=None, *, snapshot_mode=SNAPSHOT_REQUIRED):
+    # The explicit trial omits the reader invocation, never substitutes an empty
+    # history. Identity queries and reader-file integrity checks stay in place.
+    validate_snapshot_mode(snapshot_mode)
+    omitted = snapshot_mode == SNAPSHOT_OMIT_TRIAL
+    require(not omitted or (phase == 'baseline' and baseline is None and baseline_raw is None),
+            'snapshot-mode')
     # This exclusive, durable claim is never removed, including on failure.
     write_file(root / (phase + '.started'), b'one attempt; no automatic retry\n')
     sync_directory(root)
@@ -297,13 +310,18 @@ def collect(root, phase, spec, run, baseline=None, baseline_raw=None):
     before = identity(folder, 'before', deadline, spec, run)
     if baseline is not None:
         require(before == baseline['identity'], 'identity-changed')
-    raw = run((spec['reader'],), folder, 'snapshot', deadline)
-    value = snapshot(raw, spec['expected_build'])
+    if not omitted:
+        raw = run((spec['reader'],), folder, 'snapshot', deadline)
+        value = snapshot(raw, spec['expected_build'])
     after = identity(folder, 'after', deadline, spec, run)
     require(before == after, 'identity-changed')
     require(reader_pin(spec['reader'], spec['reader_sha256']) == pin, 'reader-pin')
-    result = {'format': 1, 'phase': phase, 'saved_at': datetime.now(timezone.utc).isoformat(),
-              'identity': after, 'spec': spec, 'snapshot': value}
+    result = {'format': 2 if omitted else 1, 'phase': phase, 'saved_at': datetime.now(timezone.utc).isoformat(),
+              'identity': after, 'spec': spec}
+    if omitted:
+        result['snapshot_mode'] = snapshot_mode
+    else:
+        result['snapshot'] = value
     if baseline is not None:
         require(read_file(root / 'baseline.json') == baseline_raw, 'baseline-changed')
         result['baseline_sha256'] = hashlib.sha256(baseline_raw).hexdigest()
@@ -314,8 +332,10 @@ def collect(root, phase, spec, run, baseline=None, baseline_raw=None):
     return result
 
 
-def begin(root, reader, digest, build, image, run=run_command):
+def begin(root, reader, digest, build, image, run=run_command, *, snapshot_mode=SNAPSHOT_REQUIRED):
+    # No CLI/environment switch selects the trial; its desktop packet is v2.
     host_check()
+    validate_snapshot_mode(snapshot_mode)
     root = checked_path(root)
     require(integer(build, (1 << 32) - 1) > 0, 'build')
     spec = {'reader': str(checked_path(reader)), 'reader_sha256': digest,
@@ -324,7 +344,7 @@ def begin(root, reader, digest, build, image, run=run_command):
     root.mkdir(mode=0o700)
     write_file(root / '.gitignore', b'*\n')
     sync_directory(root.parent)
-    return collect(directory(root), 'baseline', spec, run)
+    return collect(directory(root), 'baseline', spec, run, snapshot_mode=snapshot_mode)
 
 
 def finish(root, run=run_command):

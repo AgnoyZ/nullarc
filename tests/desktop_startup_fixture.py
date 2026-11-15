@@ -52,14 +52,17 @@ startup.Recovery = FixtureRecovery
 actual_observe = observer.observe
 
 
-def observe(reports, out, reader, digest, build, image, seconds, on_ready):
-    def baseline(out, *_args):
+def observe(reports, out, reader, digest, build, image, seconds, on_ready, *, snapshot_mode=capture.SNAPSHOT_REQUIRED):
+    def baseline(out, *_args, **kwargs):
         out.mkdir(mode=0o700)
         reasons = [dict(reason=name, count=0, records=[])
                    for name in capture.REASONS]
         value = dict(format=1, phase='baseline', saved_at='2026-11-14T00:00:00+00:00',
                      identity=packet['fixture_identity'], spec=packet['spec'],
                      snapshot=dict(version=1, kext_build=39, observed=0, samples_per_reason=4, reasons=reasons))
+        if kwargs.get('snapshot_mode') == capture.SNAPSHOT_OMIT_TRIAL:
+            value.pop('snapshot')
+            value.update(format=2, snapshot_mode=capture.SNAPSHOT_OMIT_TRIAL)
         capture.write_json(out / 'baseline.json', value)
 
     class Watch:
@@ -69,7 +72,8 @@ def observe(reports, out, reader, digest, build, image, seconds, on_ready):
         def close(self): pass
 
     return actual_observe(reports, out, reader, digest, build, image, seconds,
-                          baseline=baseline, watch_factory=Watch, on_ready=on_ready, clock=time.monotonic)
+                          baseline=baseline, watch_factory=Watch, on_ready=on_ready, clock=time.monotonic,
+                          snapshot_mode=snapshot_mode)
 
 
 observer.observe = observe

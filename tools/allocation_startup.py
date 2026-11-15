@@ -337,7 +337,10 @@ def identity_matches(current, expected, spec):
     capture.require(value == expected, 'startup-identity')
 
 
-def baseline_admission(root, ready, spec, expected_identity, current_identity):
+def baseline_admission(root, ready, spec, expected_identity, current_identity, *,
+                       snapshot_mode=capture.SNAPSHOT_REQUIRED):
+    capture.validate_snapshot_mode(snapshot_mode)
+    omitted = snapshot_mode == capture.SNAPSHOT_OMIT_TRIAL
     validate_spec(spec)
     validate_identity(expected_identity, spec)
     spec, expected_identity = dict(spec), dict(expected_identity)
@@ -354,17 +357,22 @@ def baseline_admission(root, ready, spec, expected_identity, current_identity):
     digest = hashlib.sha256(raw).hexdigest()
     capture.require(digest == ready['baseline_sha256'], 'startup-baseline-changed')
     value = capture.decode(raw)
-    capture.keys(value, 'format phase saved_at identity spec snapshot')
+    capture.keys(value, 'format phase saved_at identity spec ' + ('snapshot_mode' if omitted else 'snapshot'))
+    if omitted:
+        capture.require(value['snapshot_mode'] == snapshot_mode, 'startup-snapshot-mode')
     validate_spec(value['spec'])
     validate_identity(value['identity'], spec)
-    capture.require(capture.integer(value['format']) == 1 and value['phase'] == 'baseline'
+    capture.require(capture.integer(value['format']) == (2 if omitted else 1) and value['phase'] == 'baseline'
                     and type(value['saved_at']) is str and 0 < len(value['saved_at']) <= 64
                     and value['spec'] == spec and value['identity'] == expected_identity,
                     'startup-identity')
     identity_matches(current_identity, expected_identity, spec)
-    snapshot = capture.snapshot(json.dumps(value['snapshot']).encode(), spec['expected_build'])
-    capture.require(all(reason['count'] < 4 for reason in snapshot['reasons']),
-                    'startup-detail-capacity')
+    if not omitted:
+        snapshot = capture.snapshot(json.dumps(value['snapshot']).encode(), spec['expected_build'])
+        capture.require(all(reason['count'] < 4 for reason in snapshot['reasons']),
+                        'startup-detail-capacity')
+    # The explicit omission trial cannot certify allocation detail capacity.
+    # All modes still bind the baseline, identity, live observer and deadline.
     capture.require(not any((root / name).exists() for name in
                             ('failure.started', 'observer.trigger.json', 'observer.json')),
                     'startup-observer-ended')
@@ -421,7 +429,8 @@ def stop_child(pid, group=False):
 
 def supervise(scope, spec, expected_identity, current_identity, boundary, observer_job,
               stages, recovery_commands, admission_seconds=10, stage_seconds=60,
-              watchdog_seconds=240, stage_timeouts=None, on_recovery_armed=None, watchdog_deadline=None):
+              watchdog_seconds=240, stage_timeouts=None, on_recovery_armed=None, watchdog_deadline=None,
+              *, snapshot_mode=capture.SNAPSHOT_REQUIRED):
     """Run one reviewed attempt. Callbacks do not confer target acceptance.
 
     observer_job(out, on_ready) must call the actual observer; on_ready is a
@@ -430,6 +439,7 @@ def supervise(scope, spec, expected_identity, current_identity, boundary, observ
     reviewed adapter is required; a late state read alone proves no history.
     """
     capture.host_check()
+    capture.validate_snapshot_mode(snapshot_mode)
     reap_owned()
     scope = capture.directory(scope)
     validate_spec(spec)
@@ -509,7 +519,7 @@ def supervise(scope, spec, expected_identity, current_identity, boundary, observ
 
         running()
         baseline_hash = baseline_admission(root / 'capture', ready, spec,
-                                           expected_identity, current_identity)
+                                           expected_identity, current_identity, snapshot_mode=snapshot_mode)
         first_boundary = boundary()
         capture.keys(first_boundary, 'framebuffer_id held panel_open')
         first_boundary = dict(first_boundary)
@@ -518,7 +528,8 @@ def supervise(scope, spec, expected_identity, current_identity, boundary, observ
                         and first_boundary['held'] is True and first_boundary['panel_open'] is False,
                         'startup-panel-boundary')
         trail.emit('admitted', baseline_sha256=baseline_hash, ready=ready,
-                   boundary=first_boundary)
+                   boundary=first_boundary,
+                   **({'snapshot_mode': snapshot_mode} if snapshot_mode == capture.SNAPSHOT_OMIT_TRIAL else {}))
 
         def prerequisite(released=False, monitored=False):
             # Once release is admitted, first-report collection/observer exit
