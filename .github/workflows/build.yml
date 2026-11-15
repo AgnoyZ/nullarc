@@ -1,9 +1,5 @@
 name: Build and test experimental 780M sources
 on:
-  push:
-    branches: [main, downstream/780m-tahoe]
-    paths: ['src/**', 'tools/**', 'tests/**', 'patches/**', 'docs/**', 'upstream.lock.json', 'firmware.lock.json', '.github/workflows/**', 'AGENTS.md']
-  pull_request:
   workflow_dispatch:
     inputs:
       retain_artifacts:

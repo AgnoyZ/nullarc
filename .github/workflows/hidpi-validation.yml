@@ -1,8 +1,5 @@
 name: Native HiDPI candidate validation
 on:
-  push:
-    branches: [downstream/780m-tahoe]
-    paths: ['src/phxaccel/PhxHiDPI.hpp', 'src/phxaccel/accel/phxfb.cpp', 'tools/phx_hidpi*', 'tools/test_hidpi.py', 'tests/test_hidpi*', '.github/workflows/hidpi-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read

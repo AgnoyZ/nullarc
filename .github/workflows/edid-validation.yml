@@ -1,8 +1,5 @@
 name: Native supplied-panel EDID validation
 on:
-  push:
-    branches: [downstream/780m-tahoe]
-    paths: ['src/phxaccel/PhxEDID.hpp', 'src/phxaccel/accel/phxfb.cpp', 'tools/phx_edid.py', 'tools/test_edid.py', 'tests/test_edid*', '.github/workflows/edid-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read

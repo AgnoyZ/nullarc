@@ -1,8 +1,5 @@
 name: Priority improvement validation
 on:
-  push:
-    branches: [downstream/780m-tahoe]
-    paths: ['src/phxbringup/**', 'src/phxaccel/**', 'src/nmplugin/**', 'Makefile', 'tests/test_nmplugin*', 'tests/surface_key*', 'tests/descriptor_mask/**', 'tools/iosurf/surface_sync_probe.m', 'tools/test_bo_create.py', 'tests/test_bo_create*', 'tools/test_metal_capabilities.py', 'tests/test_metal_capabilities*', 'tools/test_shader_cache.py', 'tests/test_cache*', 'tools/test_submit_begin.py', 'tests/test_submit_begin*', 'tools/test_hidpi.py', 'tests/test_hidpi*', 'tools/test_present_copy.py', 'tests/test_present_copy*', 'tests/test_copy_path.cpp', 'tools/test_translation_flight.py', 'tests/test_translation_flight*', 'tools/test_async_cache.py', 'tests/test_async_cache*', 'tools/test_async_library.py', 'tests/test_async_library*', 'tools/test_async_function.py', 'tests/test_async_function*', '.github/workflows/priority-validation.yml']
   workflow_dispatch:
 permissions:
   contents: read
