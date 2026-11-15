@@ -1,6 +1,7 @@
 # Single desktop trial of the upstream CP setup prefix
 
-Status, 2026-11-15: **source and CPU preparation; no target result yet**. The
+Status, 2026-11-15: **single target attempt consumed; CP setup verified before
+selection; first selector still dual-zero; recovery reboot verified**. The
 owner requested an upstream-order test after the [startup comparison](
 UPSTREAM-STARTUP-COMPARISON.md). This is a new, single-use experiment. All earlier
 requests, target scopes and reboot allowances remain closed.
@@ -51,10 +52,10 @@ No activation followed that refusal. Preserve the changed startup as the new
 preparation baseline rather than silently repinning the old consumed request.
 The other six installed-input hashes still match the retained record.
 
-A separate root-owned packet will bind the new authorization, exact signed
+A separate root-owned packet bound the new authorization, exact signed
 trial helper, unchanged trusted runtime/firmware/installed drivers, current
 preparation boot, a new empty scope and all six historical receipt sets. It
-must use one ordinary fresh boot, one desktop attempt and at most one
+was limited to one ordinary fresh boot, one desktop attempt and at most one
 failure/timeout recovery reboot. There is no same-boot initialization,
 automatic retry, persistent M2 flag or request replay.
 
@@ -75,8 +76,9 @@ at preparation. The original startup and marker state are retained privately.
 
 ## Validation and reporting
 
-The [validation record](validation/desktop-upstream-order-preparation-20261115.json)
-pins the tested source and build configuration. Failure-first CPU checks reject
+The historical [preparation record](validation/desktop-upstream-order-preparation-20261115.json)
+pins the tested source and build configuration; its unarmed/no-target status
+describes preparation only. Failure-first CPU checks reject
 the old ordering. The fake-IOKit entrypoint compares ordinary/trial successful
 register traces with just the moved setup pairs omitted; counts and the
 remaining transcript digest match. It independently checks the six setup
@@ -97,3 +99,67 @@ normal new commit and preserves all consumed evidence.
 Only independently retained target status and native output can establish which
 stage actually ran. A scheduled reboot or a successful packet check is not a
 target execution, desktop success or acceleration result.
+
+## Target result and recovery
+
+The [target record](validation/desktop-upstream-order-target-20261115.json)
+documents the completed attempt from synchronized source commit
+`594f6ad9c1acb757b8aa14954717733950ca4eb8`, built with the explicit trial switch.
+The preparation, test and subsequent recovery boot identities are distinct.
+The target reports macOS 26.7.2 / build 25G332 and bring-up build 39.
+
+Firmware/power returned zero. The native `desktop-init` stderr then records all
+three CP setup pairs, with both the immediate and subsequent readbacks matching
+each requested value, followed by the setup-complete marker. Only then does it
+record the first queue selection. That selection still returns two zeros for
+the nonzero request, and the native process exits 75 without timing out. The
+initializer adapter returns 74. No GART, MES, GPU workload, claim, display,
+release or monitor stage is reached. The single native initialization and
+selector counts are process/log observations, not independent hardware tracing.
+
+The four linked coordinator journal records, observer/baseline hashes, native
+statuses and recovery claim hashes were independently checked against stable
+private receipts. One baseline snapshot returned zero with `observed=0` before
+initialization; no failure snapshot was recorded. The baseline collector ran
+and the observer remained active, so this is not a collector-free experiment.
+
+The independent metadata worker handed off to the coordinator's armed recovery
+worker. Finite initialization failure requested recovery; the recovery record
+follows the failed stage return by about 0.75 seconds. The 240-second watchdog
+did not expire. Disarming completed, and the one recorded recovery reboot
+command returned zero. The display cleanup process returned zero, but two of
+its writes reported unknown OIDs; only AGDC and framebuffer-hold writes returned
+zero. Do not treat that process status as four successful cleanup writes or as
+a hardware-deadline recovery test.
+
+Independent readback verified the subsequent boot, one firmware framebuffer,
+no native framebuffer or accelerator service, an absent one-shot flag and no
+persistent markers, initializer, startup job or reboot process. The off marker
+was originally absent and is now present and empty, intentionally preventing
+another automatic attempt. This is a recorded recovery safety-state change,
+not restoration of the original marker absence. The selected startup remains
+the exact consumed single-use packet. No driver, kernel collection, EFI, BIOS,
+partition or security change was performed for this experiment.
+
+All 188 new receipt files were stable and matched their private copies. All six
+historical receipt sets, 41 execution pins, nine recovery pins, the complete
+trusted runtime, signed candidate and six other installed inputs were
+reverified. The private activation executor additionally passed 21 tempfile-only
+methods under the exact Python 3.13 runtime before activation, including partial
+writes, rollback and uncertain-dispatch handling. The preparation's 135 focused
+methods are historical and were not rerun for this result-only documentation
+change. Result verification used retained files and boot/service metadata only.
+
+On this guarded candidate, moving the CP setup prefix earlier did not resolve
+the first selector failure. Direct native stderr rules out outer summary
+parsing as the source of the recorded zeros. It does not rule out a native
+access-path defect, observer interference or another initialization prerequisite,
+and it does not establish a physical cause or accelerated desktop. This remains
+the scoped CP-before-selection test, not a full upstream-stack comparison or
+an otherwise identical binary A/B against the historical helper.
+
+This request and both reboot allowances are consumed and closed. Preserve the
+inactive packet and all claims/receipts; never re-arm or replay them. Continue
+with offline investigation under this request. Any further physical test needs
+a distinct reviewed scope, fresh boot and independent recovery plan. The
+ordinary build still defaults to the original ordering.

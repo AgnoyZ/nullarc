@@ -179,5 +179,9 @@ terminal result or authorize another target operation.
 
 A later [desktop selector guard repair](DESKTOP-SELECTOR-GUARD.md) rejects an
 incorrect immediate reply even when the subsequent read matches. The old
-guard already rejects this retest's dual-zero pair, so that source-only repair
-does not explain or overturn this result. It is not installed or target-tested.
+guard already rejects this retest's dual-zero pair, so that repair does not
+explain or overturn this result. It was source-only at that review. The later
+[upstream-order trial](DESKTOP-UPSTREAM-ORDER-TRIAL.md#target-result-and-recovery)
+includes the newer selector guards in its candidate; its three CP setup pairs
+passed before the same first-selector dual-zero refusal. That distinct request
+is also consumed, and does not reopen this historical retest.

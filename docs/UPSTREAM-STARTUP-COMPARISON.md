@@ -12,9 +12,12 @@ package/commit successfully tested on this laptop.
 This review compares fixed source and existing sealed observations. It does
 not run either installer, query the live kernel, initialize a GPU or establish
 that the latest checkout is the loaded binary. The terminal [desktop retest](
-DESKTOP-RETEST.md#target-result-and-recovery) remains the latest recorded physical
-desktop result. Source references are fixed pins, not claims about the latest
-upstream release.
+DESKTOP-RETEST.md#target-result-and-recovery) is the historical input to this
+comparison. The subsequent [upstream-order trial](
+DESKTOP-UPSTREAM-ORDER-TRIAL.md#target-result-and-recovery) is now the latest
+recorded physical result: its CP setup completed before the first selector,
+which still returned two zeros. Source references are fixed pins, not claims
+about the latest upstream release.
 
 ## Installation and initialization are separate comparisons
 
@@ -48,7 +51,10 @@ GART-SELECTOR-GUARD.md) retain their separate evidence and limitations.
 The owner subsequently requested a test of this ordering difference. The
 [separate trial](DESKTOP-UPSTREAM-ORDER-TRIAL.md) preserves ordinary builds and
 uses an explicit compile-time CP-before-selection candidate, a new request and
-fresh-boot recovery; it does not reopen the historical desktop retest.
+fresh-boot recovery; it does not reopen the historical desktop retest. That
+single trial is now consumed, with finite-failure recovery and a subsequent boot
+independently verified. The scoped order change did not resolve the failure;
+the whole upstream stack was not replayed and no acceleration was established.
 
 ## What the historical power fields add
 
@@ -111,10 +117,12 @@ bits, a nonzero error byte, transitions and unreviewed-bit preservation. Real
 collector source compiled with ASan/UBSan feeds the analyzer in both observation
 modes using fake IOKit only. The full repository suite was not rerun.
 
-Installed drivers/helpers, startup, EFI, security, existing authorization objects
-and consumed experiments remain unchanged. Revert this source/test/documentation
+The offline comparison itself left installed drivers/helpers, startup, EFI,
+security, existing authorization objects and consumed experiments unchanged.
+The separate trial's startup/one-shot activation and recovery safety-state
+change are documented in its own result. Revert this source/test/documentation
 change with a normal new commit if necessary; preserve original observations.
-No acceleration fix or new target success is claimed. The next physical test
+No acceleration fix or new target success is claimed. Any further physical test
 must have a separate reviewed scope identifying the exact changed candidate,
 one isolated variable, a fresh boot, independent recovery and rollback. It must
 not replay a consumed request or treat this offline review as permission to
