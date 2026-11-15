@@ -397,3 +397,14 @@ stability. The project remains experimental. GPU-off is retained for the next
 boot, M2/pending markers and the specific persistent display variable are
 absent, and the consumed packet cannot retry. Current-session acceleration
 remains active; a subsequent boot is deliberately not persistently armed.
+
+## Subsequent desktop presentation measurement
+
+The same active session completed a separate bounded window-movement benchmark
+at **22:08–22:10 +08:00 on 2026-11-15**. Three plain-window rounds averaged
+**7.17 driver presentation transactions/s**; three glass/material-window rounds
+averaged **7.21/s**, using measured elapsed time at 2560 × 1600 and reported
+120 Hz. These are global driver counter rates, not game FPS or independent
+physical scanout measurements. No driver setting, initialization or reboot was
+needed. See [the full method and results](UPSTREAM34-DESKTOP-FPS.md) for the
+individual rounds, collection limits and health observations.
