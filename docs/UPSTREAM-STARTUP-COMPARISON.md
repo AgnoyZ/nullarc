@@ -139,3 +139,10 @@ resolve the first selector failure. It changes no native initialization or
 power sequence and does not reopen this review's or the upstream-order trial's
 scope. Remaining observers, native access defects and power-state prerequisites
 are not excluded by that result.
+
+The owner then explicitly requested [replacement of the locally installed
+modified stack with the original release](UPSTREAM-REPLACEMENT.md). The release
+bytes are installed and independently verified on disk, with GPU startup
+disabled and loaded-original verification pending the separate completion
+reboot. The historical trials above still describe the former modified stack;
+their installed-input pins are not current-stack verification after replacement.
