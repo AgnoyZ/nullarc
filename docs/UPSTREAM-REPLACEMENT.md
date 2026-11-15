@@ -86,6 +86,10 @@ initializers are not running. The EFI remains unmounted and was neither mounted
 nor written during this postboot verification. The installation request and its
 single completion reboot are now closed; there is no retry or reboot remaining.
 
+The owner's subsequent desktop-takeover and hardware-acceleration request is
+tracked as a [new activation operation](UPSTREAM-DESKTOP-ACTIVATION.md). It does
+not reopen this installation or its completion-reboot allowance.
+
 The eight old experiment receipt sets remain unchanged. Their installed-input
 pins describe the historical modified stack and have been superseded by this
 new explicit replacement request; they must not be treated as current-stack

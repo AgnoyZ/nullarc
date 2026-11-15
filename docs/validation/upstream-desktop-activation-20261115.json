@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "date": "2026-11-15",
+  "request": "Enable desktop takeover and hardware acceleration on the installed original nullarc release",
+  "status": "new target-profile activation prepared; GPU execution and desktop arming not yet attempted",
+  "release": "v0.4.0-alpha",
+  "original_loaded_bringup_build": 34,
+  "original_loaded_image_identity_previously_verified": true,
+  "upstream_helper_source_pin": "9dd76b604fca5e0125bd3caa5723df0f611ff27f",
+  "upstream_helper_source_sha256": "d0e6e286e3c0c4e75d0ef2ef5c54253c605ad87ab3f4dccff297821e748609f9",
+  "private_profile_source_sha256": "9e62bc2c3a0817681530ef33d9782a4045f48a294b493fdb5e9ecadacd0d2525",
+  "target_preflight": {
+    "reference_MC_base_matches": true,
+    "reference_physical_base_matches": false,
+    "reference_VRAM_size_matches": false,
+    "off_marker_present_empty": true,
+    "persistent_and_one_shot_arming_absent": true,
+    "pending_attempt_absent": true,
+    "installed_original_stack_unchanged": true
+  },
+  "preparation": {
+    "private_root_packet_staged": true,
+    "pinned_inputs": 59,
+    "frozen_interpreter_closure_verified": true,
+    "CPU_native_stub_cases_passed": 17,
+    "ASan_UBSan": true,
+    "native_test_executable_imports_IOKit": false,
+    "recovery_and_parser_cases_passed": 8,
+    "component_licences_and_AMD_header_notices_retained": true,
+    "candidate_is_byte_identical_upstream_binary": false,
+    "reference_override_or_refusal_guard_removal": false
+  },
+  "first_phase_limits": {
+    "GPU_initialization_attempts": 1,
+    "ordinary_reboots": 0,
+    "failure_recovery_reboots": 1,
+    "absolute_watchdog_seconds": 240,
+    "watcher_ack_required_before_hardware_command": true,
+    "off_marker_remains_present": true,
+    "desktop_arming": false,
+    "automatic_retry": false,
+    "original_shell_watchdogs_or_broad_shutdown_cancellation": false
+  },
+  "execution": {
+    "attempt_started": false,
+    "GPU_commands_executed": 0,
+    "desktop_armed": false,
+    "hardware_acceleration_execution_verified": false,
+    "desktop_takeover_verified": false,
+    "reboots_requested": 0
+  },
+  "preservation": {
+    "installed_kexts_plugin_runtime_helpers_or_startup_modified": false,
+    "EFI_or_security_changes": false,
+    "old_requests_rearmed": false,
+    "private_diagnostics_or_binaries_published": false
+  },
+  "next_step": "Execute the new single GPU initialization with independent recovery; proceed to the display phase only after real GPU completion and a successful Metal probe. Preserve failure evidence and never replay a consumed attempt."
+}
