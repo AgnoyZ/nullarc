@@ -1,7 +1,9 @@
 # Original-kernel desktop activation
 
-Status, 2026-11-15: **a new, explicitly requested activation is prepared;
-hardware execution and desktop takeover have not yet been attempted**.
+Status, 2026-11-15: **one original-kernel initialization was attempted and
+stopped at the GART selector-readback guard; the subsequent GPU-off boot is
+independently verified. Desktop takeover and hardware acceleration remain
+unverified**.
 
 The owner requested desktop takeover and hardware acceleration after the
 [original-release replacement](UPSTREAM-REPLACEMENT.md) completed. This is a new
@@ -34,9 +36,9 @@ not a byte-identical upstream binary or a validated acceleration fix.
 
 ## Bounded activation sequence
 
-The first phase retains the off marker and leaves persistent and one-shot
-display arming absent. It permits one GPU initialization in the verified
-original-kernel boot, which has not initialized the GPU since boot. It follows
+The first phase retained the off marker and left persistent and one-shot
+display arming absent. It permitted one GPU initialization in the verified
+original-kernel boot, which had not initialized the GPU since boot. It followed
 the original firmware/power, CP setup, GART and MES order. Queue adoption and
 claim require completion evidence; a separate bounded Metal compute probe must
 then return its GPU-written value. A driver name, a claim return or a printed
@@ -53,7 +55,95 @@ Only a successful first-phase receipt permits proceeding to the separately
 recorded display phase under the owner's new request. It must verify original
 PhxAMDFB/accelerator identities, initialization before releasing the display
 hold, actual frame progress and the absence of a WindowServer failure loop.
-No desktop flag has been armed by preparation.
+No desktop flag was armed during this operation.
+
+## Actual attempt and recovery
+
+The initializer executed once in the verified original build-34 boot. The
+independent watcher acknowledged its deadline before the first native command.
+Thirty native CLI invocations ran in the recorded firmware/power, CP setup and
+GART order. This counts process invocations, not MMIO operations or user-client
+calls inside those processes. The firmware/SMU parser checks and three CP setup
+readbacks passed; these are not GPU execution evidence.
+
+The thirtieth invocation, `GART`, returned **75**, without a command timeout,
+and printed `target profile refused: selector readback mismatch`. The refusal
+originates in the native candidate, before the coordinator parses its output.
+The guard checks the provider's immediate write reply and, only if that matches,
+a separate register read. It did not log the requested value, selector ordinal
+or either observed value. Consequently this attempt cannot be described as a
+dual-zero result, nor can the exact failed VMID transition be inferred. The
+coordinator did not invoke MES, compute/graphics, queue adoption/claim or the
+Metal probe after this failure. The display phase was not entered.
+
+The watcher restored the GPU-off state and called its single permitted delayed
+recovery reboot. Its `capture_output=True` subprocess call timed out after
+15 seconds and no return-code receipt was written. That is an ambiguous caller
+result, not evidence that the reboot was not scheduled; no second reboot call
+was made. An independent inspection verified a different boot beginning at
+**2026-11-15 14:25:50 +08:00**, after the recovery request. This is consistent
+with the requested delayed recovery; the shutdown caller's exit status remains
+unobserved.
+
+In this subsequent boot, macOS remains **26.7.2 / build 25G332**. The loaded
+PhxBringup image still matches the original release and reports build 34. All
+59 pinned input hashes match. The empty off marker is present; persistent,
+one-shot and pending activation flags are absent. PhxAccel is not loaded,
+PhxAMDFB and accelerator services are absent, and there is one firmware
+framebuffer. The current boot's startup log says `kill switch present: nothing
+to do`. No initializer, watcher or shutdown/reboot scheduler remains running.
+EFI was not mounted or changed by these inspections. The consumed packet and
+its evidence remain immutable; initialization and recovery allowances are zero.
+
+## Offline diagnostic follow-up
+
+Two private, uninstalled candidates address demonstrated evidence/recovery
+limitations without changing the consumed packet or installed original stack:
+
+- Selector diagnostics record the ordinal, requested value and immediate reply.
+  They explicitly record `readback=not-attempted` if the immediate reply fails;
+  they log the separate value only when that read actually occurs. They preserve
+  the original short-circuit IO sequence and exit-75 refusal. Under ASan/UBSan,
+  98 injected mismatch cases, 13 other refusal cases and one successful case
+  have matching old/new fake IO traces and counts. The fake executables do not
+  link IOKit. The new native candidate compiles/links but was not run.
+- The recovery candidate uses exclusive regular files for shutdown output,
+  records consumption before spawning, and preserves an explicit unknown/no-retry
+  state on caller timeout. Fourteen CPU-only recovery/parser methods pass. A
+  harmless Python descendant reproduces a captured-pipe timeout after its parent
+  exits; the candidate observes the parent exit with direct output files. This
+  supports an inherited-pipe explanation for the caller timeout, but does not
+  prove the actual shutdown descendant's behavior. No real shutdown command was
+  executed by these tests. Direct execution of the candidate worker is disabled.
+
+These candidates improve future diagnosis and recovery accounting; neither
+repairs or explains the physical selector failure. No new GPU experiment or
+display arming was performed during this follow-up.
+
+## Subsequent request for an entirely original test
+
+The owner subsequently requested an entirely original stack, desktop takeover
+and a reboot test. A fresh full-file comparison confirms that the active GPU
+directory, helpers, firmware, accelerator bundle, Metal plugin/runtime and
+startup plist already match the original release, apart from the deliberately
+retained empty off marker. Neither private candidate is in an active path.
+The loaded original bring-up identity is also reverified. Another replacement
+installation is unnecessary.
+
+The original installer's `--windowserver` option creates the persistent M2
+marker. Its documented sequence first boots GPU initialization and, after a
+successful startup, arms the next boot for desktop takeover. It does not promise
+desktop takeover on the first boot from the current unarmed state. Both the
+startup script and the original native helper still contain reference-machine
+physical addresses and extents that disagree with the live target metadata;
+the release helper offers no target-layout argument. An entirely unchanged
+recipe would therefore program mappings outside the target's reported carve-out
+and may corrupt memory or hang the machine. The earlier guarded candidate's
+failure does not validate removing its checks and running those addresses.
+
+No new initialization, arming or reboot has been dispatched for this subsequent
+request. The exact-original address conflict must be resolved, or explicitly
+included in a separately reviewed bounded trial, before enabling startup.
 
 ## Preparation checks and rollback
 
@@ -67,12 +157,13 @@ error refusal. These checks do not validate real MMIO, firmware or GPU execution
 
 The private root-owned packet pins 59 inputs and the existing frozen interpreter
 closure. The [sanitized record](validation/upstream-desktop-activation-20261115.json)
-keeps preparation distinct from execution. Sources, binaries, raw metadata and
-logs remain private; no full-stack artifact was uploaded.
+distinguishes preparation, the failed execution, recovery, and the unexecuted
+follow-up candidates. Sources, binaries, raw metadata and logs remain private;
+no full-stack artifact was uploaded.
 
-Before hardware execution, rollback simply means leaving the unexecuted packet
-inactive. After a failed initialization, retain the recovery receipt and GPU-off
-state, verify the subsequent boot, and do not replay the attempt. Do not weaken
+The attempted packet is consumed and must stay inactive. Retain the failure
+and independent recovery evidence and the verified GPU-off state; do not replay
+the attempt. The new offline candidates have not been installed. Do not weaken
 security, alter EFI, reinstall the modified fork or turn a failed check into an
 acceleration claim. Revert documentation with a new commit if necessary; that
 does not reactivate a consumed operation.
