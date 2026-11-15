@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "date": "2026-11-15",
+  "scope": "downstream source correction for unchecked reference-machine physical layout; compile and CPU tests only",
+  "working_repository": "AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "parent_source_commit": "1bba5ee4a9dbd87d0e0965201ed9ea1751cf05de",
+  "system": {
+    "architecture": "x86_64",
+    "macOS_version": "26.7.2",
+    "macOS_build": "25G332"
+  },
+  "geometry_evidence": "retained original-driver metadata from the closed original-only trial; no new registry dump or GPU command",
+  "target_geometry": {
+    "mc_base": "0x8000000000",
+    "physical_base": "0x780000000",
+    "vram_bytes": "0x100000000",
+    "aperture_bytes": "0x10000000"
+  },
+  "reference_geometry": {
+    "mc_base": "0x8000000000",
+    "physical_base": "0x6A0000000",
+    "vram_bytes": "0x180000000"
+  },
+  "changes": {
+    "runtime_reference_base_defaults_removed": true,
+    "reference_override_refused_in_all_modes": true,
+    "legacy_gate_matches_full_geometry_tuple": true,
+    "published_geometry_requires_16MiB_granularity_and_48bit_nonwrapping_spans": true,
+    "unchecked_raw_PSP_forwarding_removed": true,
+    "managed_TMR_backing_derived_from_target": true,
+    "reference_shell_raw_recipe_replaced_by_explicit_checked_power_wrapper": true,
+    "implicit_or_missing_helper_fallback": false,
+    "wire_selector_numbers_or_sizes_changed": false
+  },
+  "source_sha256": {
+    "src/phxbringup/PhxBringup.cpp": "fcb2c23dbd12dbc9fb502391898056c949d52467698e84c7bd2ab9d96606e0b6",
+    "tools/phxctl/mesboot.c": "91095574d5e265fd31173d5046b2876993a1279972a0189acc11a99f406b3650",
+    "tools/phxctl/bringup5.sh": "b94a7b90b32e3cabc348ca6a0ee9ecbbefa8b4542c16f5b60bd584ae3e470c1a"
+  },
+  "validation": {
+    "failure_first_layout_regression": "one method failed against previous runtime reference defaults before source correction",
+    "focused_unittest": {
+      "methods": 41,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0
+    },
+    "actual_kernel_PSP_cases": 126,
+    "actual_GART_cases": 337,
+    "sanitizers": [
+      "ASan",
+      "UBSan"
+    ],
+    "actual_target_like_geometry_PTE_table_aperture_and_default_register_literals_checked": true,
+    "default_raw_PSP_refusal_preserves_memory_and_registers": true,
+    "target_TMR_ignores_stale_caller_physical_words": true,
+    "native_mesboot_compiled_and_linked": true,
+    "native_PhxBringup_translation_unit_compiled": true,
+    "full_kext_linked": false,
+    "native_outputs_executed": false,
+    "shell_syntax_checked": true,
+    "full_repository_suite_rerun": false
+  },
+  "boundaries": {
+    "hardware_executed": false,
+    "real_GPU_service_opened": false,
+    "drivers_or_installed_helpers_changed": false,
+    "original_release_installation_changed": false,
+    "display_arming_or_original_trial_reopened": false,
+    "reboot_requested": false,
+    "EFI_BIOS_partition_NVRAM_or_security_changed": false,
+    "binaries_or_raw_diagnostics_published": false,
+    "exclusive_memory_ownership_proved": false,
+    "acceleration_or_CoreDisplay_fix_claimed": false,
+    "OpenViking_rule_and_experience_lookup": "unavailable: no registered tools found"
+  },
+  "rollback": "normal source revert only; installed original files and all consumed trial scopes are preserved"
+}

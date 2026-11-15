@@ -1,12 +1,12 @@
 """The reference workflow is not this repository's entry point, and that is asserted, not remembered.
 
-`tools/phxctl/{bringup3.sh, bringup5.sh, full.sh, phxboot.sh}` are upstream's reference scripts: they arm reboot
-watchdogs, write NVRAM and sysctls, and embed reference-machine constants and firmware byte offsets. This branch
+`tools/phxctl/{bringup3.sh, full.sh, phxboot.sh}` retain upstream reference workflows. The retired bringup5 recipe
+is now an explicit checked-command wrapper. The remaining workflows can arm reboot watchdogs, write NVRAM and
+sysctls, and embed reference-machine constants. This branch
 replaces them (`tools/phx_boot_gate.sh` for staged bring-up, `phxctl`/`mesboot` subcommands, `tools/phx_baseline.sh`
 for the read-only capture, `tools/phx_install_plan.py` for a plan a human executes).
 
-The audit's oldest finding — literal firmware payload offsets that load garbage for a different firmware set — lives
-only in those scripts. This test keeps the substitution honest: each script says it is not run here, no workflow runs
+This test keeps the substitution honest: each script says it is not run here, no workflow runs
 one, and the audited entry points only mention them in comments.
 """
 from pathlib import Path
@@ -63,16 +63,17 @@ class ReferenceScriptTests(unittest.TestCase):
         self.assertIn("payload_offset", manifest)
 
     def test_the_layout_gate_stays_in_the_audited_tool(self):
-        # mesboot programs the reference machine's physical addresses; the gate that checks them against what the
-        # driver publishes is what keeps that from happening on a different machine (docs/BRINGUP-AUDIT.md).
+        # Runtime addresses are populated from the driver; the legacy gate still rejects a different full tuple.
         tool = (ROOT / "tools/phxctl/mesboot.c").read_text(encoding="utf-8")
         self.assertIn("layout_from_driver", tool)
         self.assertIn("PHX_LAYOUT_REFERENCE", tool)
-        # The layout must be variables the gate can replace, never macros a reader might trust as facts.
+        # No runtime reference-base fallback survives before metadata validation.
+        self.assertIn("static uint64_t vram_mc = 0;", tool)
+        self.assertIn("static uint64_t fb_pa = 0;", tool)
         for line in tool.splitlines():
             self.assertNotIn("#define VRAM_MC", line)
             self.assertNotIn("#define FB_PA", line)
-        # The audited subcommand refuses to combine the reference override with its explicit layouts.
+        # The old reference override is retained only as a refused environment setting.
         self.assertIn('"PHX_LAYOUT_REFERENCE"', tool)
         overrides = [line for line in tool.splitlines() if "const char *overrides[]" in line]
         self.assertTrue(overrides, "the sched-query override list disappeared")

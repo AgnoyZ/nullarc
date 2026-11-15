@@ -18,7 +18,7 @@ INVALID_LAYOUT = ("snapshot-version", "snapshot-reserved", "snapshot-no-tmr", "s
 
 
 def cases():
-    yield from ("ok", "relocated", "env-zero", "legacy-all", "env-pte", "env-default", "no-service", "open-status",
+    yield from ("ok", "relocated", "target-carveout", "env-zero", "legacy-all", "env-pte", "env-default", "no-service", "open-status",
                 "hello-status", "hello-short", "hello-long", "hello-abi", "snapshot-status", "snapshot-short", "snapshot-long")
     for name in ("count", "negative", "overflow", "junk", "unaligned", "zero", "map-large", "va-overflow"):
         yield "arg-" + name

@@ -72,6 +72,12 @@ validate firmware responses, propagate every GPU timeout, or remove the hardcode
 reference memory layout. No automatic GPU reset or speculative recovery writes
 are added. The real tool is not executed or installed by these checks.
 
+The later [physical-layout safety correction](VRAM-LAYOUT-SAFETY.md) removes
+the runtime reference-base defaults and the `PHX_LAYOUT_REFERENCE` escape,
+retires the unchecked raw PSP path, and replaces `bringup5.sh`'s raw recipe
+with an explicit checked-command wrapper. The findings above describe the
+original review; they are not instructions to run the historical scripts.
+
 ## Completion handling checked on hosts, not target hardware
 
 `patches/0005-checked-gpu-completion.patch` makes missing MES completion terminal
@@ -246,9 +252,9 @@ that assessment is in `docs/RADEARC-REFERENCE.md`.
 | MMHUB `FB_LOCATION_BASE`/`FB_LOCATION_TOP`/`FB_OFFSET` at `0x1A8EC`/`0x1A8ED`/`0x1A8D7` (MMHUB 3.0.1, segment 1 base `0x1A000`) | `PhxNativeABI.h:68-70` | **still literal**, and these are exactly the registers a chip-derived layout would have to read |
 | NBIO HDP flush at `0xE4D` (NBIF 7.7.0), SMUIO `GOLDEN_TSC` at `0x16a2d` (SMUIO 13.0.7) | `PhxNativeABI.h:114`, `PhxBringup.cpp:1961` | **still literal** |
 | PSP and SMU mailboxes in MP0/MP1 **segment 1** (`0x16000`) of 13.0.4 | `PhxNativeABI.h:72-82`, `119-122` | **still literal.** RadeArc found 13.0.11 dispatches through **segment 0**, so a chip reporting 13.0.11 needs different mailbox offsets. Phoenix 1 is 13.0.4 and unaffected — but only a live read settles which segment a target uses |
-| `mesboot`: `vram_mc 0x8000000000`, `fb_pa 0x6A0000000`, `GART_VA`/`GART_PT`, the KIQ/scheduler VRAM offsets | `mesboot.c`, `layout_from_driver()` | **checked, not assumed** (2026-11-04): the layout is read from what `PhxBringup` publishes (`phx-fb-mc-base` / `phx-fb-size` / `phx-fb-phys`, `PhxBringup.cpp:472-474`) and the tool **refuses to program anything** when they are missing, page-misaligned, or differ from the compiled reference layout. `PHX_LAYOUT_REFERENCE=1` is the deliberate reference-machine override, and `sched-query` refuses to combine it with its explicit layouts. The offsets themselves are still the reference machine's — this verifies a layout, it does not derive a new one, which needs the register reads still postponed |
-| Firmware payload offsets and sizes as literals | `tools/phxctl/bringup5.sh:13-35` | **not this repository's path.** This workflow is not run here (`docs/BOOT-GATE.md`). The audited path derives extents from the files themselves: `tools/firmware_manifest.py` parses each header (`payload_offset`, `total`, per-component sizes) with bounds and overlap checks, `tools/firmware_profile.py` generates `PhxFirmwareProfile.h` from that audited manifest, and `phxctl firmware-sequence` loads from the generated steps with per-file SHA-256 from the reviewed lock. The literals survive only for the reference file set, in a script nothing here invokes |
-| TMR MC address `0x6A0C000000` = Firebat `FB_OFFSET` + `0xC000000` | `tools/phxctl/bringup5.sh:15` | same: reference script, not this path; `phxctl` takes the TMR extent from the checked layout instead |
+| Reference MC/backing bases, aperture extent and KIQ/scheduler offsets | `mesboot.c`, `layout_from_driver()` | Runtime bases start at zero; explicit commands derive their geometry from the driver and selector 116. Legacy commands additionally require the complete reference base/base/size tuple. `PHX_LAYOUT_REFERENCE` is now rejected in every mode. Fixed legacy offsets still require ownership validation; see `VRAM-LAYOUT-SAFETY.md`. |
+| Literal firmware payload offsets/sizes in the old shell recipe | Historical `tools/phxctl/bringup5.sh` | Removed from this wrapper. It now requires explicit regions and delegates to `phxctl gfx-power-sequence`, whose generated profile authenticates files and supplies checked firmware extents. This is not the old automatic startup recipe. |
+| Caller-supplied raw TMR physical words | Historical `tools/phxctl/bringup5.sh`, kernel selector 107 | No arbitrary raw PSP forwarding remains. The explicit compatibility translator derives backing as `fbPhys + tmrOffset`; without compatibility, raw calls are unsupported. Managed bounds/readiness checks remain mandatory. |
 
 Two consequences worth keeping in view:
 

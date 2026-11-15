@@ -68,7 +68,8 @@ public:
     void hdpFlush() { assert(lock); ++flushes; }
     bool pspWaitTos(uint32_t timeout) const {
         assert(lock && timeout == 2000); ++waits;
-        return mode == "layout-create-success" || mode == "legacy-raw-sequence" || (mode == "create-timeout" && waits == 1);
+        return mode == "layout-create-success" || mode == "legacy-raw-sequence" ||
+               mode == "legacy-raw-target-sequence" || (mode == "create-timeout" && waits == 1);
     }
     void step() {
         assert(lock); ++sleeps;
@@ -191,7 +192,14 @@ int main(int argc, char **argv) {
         uint32_t toc[6] = {uint32_t(p.fwBufMc), uint32_t(p.fwBufMc >> 32), 4, 0, 0, 0};
         uint32_t tmr[6] = {uint32_t(p.tmrMc), uint32_t(p.tmrMc >> 32), uint32_t(p.pspLayout.tmrCapacity),
                            2, 0xDEADBEEF, 0xBAD}; // synthetic stale physical address; must never reach firmware
-        if (test == "legacy-raw-sequence") {
+        if (test == "legacy-raw-target-sequence") {
+            p.fbMcBase = 0x8000000000ull; p.fbPhys = 0x780000000ull;
+            p.fbSize = 0x100000000ull; p.fbAperLen = 0x10000000;
+            p.tmrMc = p.fbMcBase + p.tmrOff; p.fwBufMc = p.fbMcBase + p.fwBufOff;
+            toc[0] = uint32_t(p.fwBufMc); toc[1] = uint32_t(p.fwBufMc >> 32);
+            tmr[0] = uint32_t(p.tmrMc); tmr[1] = uint32_t(p.tmrMc >> 32);
+        }
+        if (test == "legacy-raw-sequence" || test == "legacy-raw-target-sequence") {
             PhxLegacyBoot profile{1, 1, p.fbMcBase, p.fbPhys, p.fbSize, p.fbAperLen,
                                   0x10000, 0x1000, p.pspLayout};
             p.clearRing(); p.legacyBootEnabled = false; p.pspLayoutConfigured = false;
@@ -207,12 +215,19 @@ int main(int argc, char **argv) {
             assert(p.memory.words[offset + 2] == 4096 && p.memory.words[offset + 3] == 2);
             assert(p.memory.words[offset + 4] == uint32_t(p.fbPhys + p.tmrOff));
             assert(p.memory.words[offset + 5] == uint32_t((p.fbPhys + p.tmrOff) >> 32));
+            if (test == "legacy-raw-target-sequence") {
+                assert(p.memory.words[offset + 4] == 0x80100000u);
+                assert(p.memory.words[offset + 5] == 7); /* 0x780100000, never caller's stale physical words. */
+            }
             assert(p.loadIpFw(4, 0, 4, out) == kIOReturnSuccess);
             assert(p.pspCtl(2, 0, out) == kIOReturnSuccess && p.fenceCounter == 4 && p.writes == 10);
         } else if (test == "legacy-raw-default") {
             p.tocTmrSize = 0;
-            assert(p.pspRaw(0x20, toc, out) == kIOReturnSuccess && !p.tocTmrSize);
-            assert(p.pspRaw(5, tmr, out) == kIOReturnSuccess && !p.tmrSetUp);
+            const auto before = p.memory.words;
+            assert(p.pspRaw(0x20, toc, out) == kIOReturnUnsupported && !p.tocTmrSize);
+            assert(p.pspRaw(5, tmr, out) == kIOReturnUnsupported && !p.tmrSetUp);
+            assert(p.pspRaw(0x99, tmr, out) == kIOReturnUnsupported);
+            assert(p.memory.words == before && !p.writes && !p.reads && !p.fenceCounter);
             assert(p.loadIpFw(4, 0, 4, out) == kIOReturnNotReady);
         } else {
             if (test == "legacy-raw-no-ring") p.ringMc = 0;

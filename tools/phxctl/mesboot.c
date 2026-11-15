@@ -37,11 +37,11 @@
 #define SEL_DBG_SYSMEM 111
 #define SEL_DBG_ADOPTQ 112
 
-static uint64_t vram_mc = 0x8000000000ull;   // MC address of VRAM offset 0 (the reference machine's: see layout_from_driver)
+static uint64_t vram_mc = 0;                // No usable address until layout_from_driver succeeds.
 #define GART_VA 0x7FFF00000000ull            // VA = GART_VA + vram offset (first 128 MiB)
 #define GART_PT 0x2400000ull             // flat PTE table (VRAM offset)
 #define GART_N 32768
-static uint64_t fb_pa = 0x6A0000000ull;       // GCMC_VM_FB_OFFSET << 24 (the reference machine's)
+static uint64_t fb_pa = 0;                  // GCMC_VM_FB_OFFSET << 24, obtained from this driver's metadata.
 
 #define SEG0(o) (0x1260u + (o))
 #define SEG1(o) (0xA000u + (o))
@@ -103,13 +103,11 @@ static kern_return_t checked_method(io_connect_t connection, uint32_t selector,
 }
 
 
-/* The memory layout above is one Linux MMIO trace of the reference machine (Firebat U6C): vram_mc, fb_pa and the
- * aperture are that machine's addresses, not this one's. PhxBringup publishes what it actually found
- * (phx-fb-mc-base, phx-fb-size, phx-fb-phys), so the layout is taken from there and this tool refuses when the two
- * disagree -- programming the reference machine's physical addresses on another machine is the failure this check
- * exists to prevent. Explicit bootstrap commands derive their addresses from the published layout and then
- * validate selector 116. Legacy experiments keep the reference equality gate. PHX_LAYOUT_REFERENCE=1 is
- * available only to those legacy experiments, never to the explicit bootstrap paths. */
+/* PhxBringup publishes this machine's geometry, not the reference trace's addresses.
+ * Explicit bootstrap commands derive addresses from that geometry and validate selector 116.
+ * Legacy experiments additionally require the complete reference MC/physical/size tuple.
+ * The former PHX_LAYOUT_REFERENCE bypass is retired for every path: accepting a risk does
+ * not make another machine's backing pages part of this machine's reserved VRAM. */
 static int env_on(const char *n) { const char *v = getenv(n); return v && *v && *v != '0'; }
 
 static int prop_u64(io_registry_entry_t svc, CFStringRef key, uint64_t *out)
@@ -122,44 +120,40 @@ static int prop_u64(io_registry_entry_t svc, CFStringRef key, uint64_t *out)
    return ok;
 }
 
-/* 0 = the layout is settled and safe to program, -1 = it is not (the caller must stop). */
+/* 0 = published geometry passed arithmetic checks; ownership/readiness still require the explicit protocol. */
 static int layout_from_driver(io_registry_entry_t svc, int explicit_layout)
 {
+   const uint64_t reference_mc = 0x8000000000ull, reference_phys = 0x6A0000000ull;
+   const uint64_t reference_bytes = 0x180000000ull; /* Trace aperture 0x200000..0x205fff, in 256-KiB units. */
+   const uint64_t address_limit = 1ull << 48;
    uint64_t mc = 0, size = 0, phys = 0, build = 0;
    (void)prop_u64(svc, CFSTR("phx-build"), &build);
    const int published = prop_u64(svc, CFSTR("phx-fb-mc-base"), &mc) &&
                          prop_u64(svc, CFSTR("phx-fb-size"), &size) &&
                          prop_u64(svc, CFSTR("phx-fb-phys"), &phys);
    if (env_on("PHX_LAYOUT_REFERENCE")) {
-      if (explicit_layout) {
-         fprintf(stderr, "mesboot: explicit bootstrap cannot use PHX_LAYOUT_REFERENCE; refusing\n");
-         return -1;
-      }
-      fprintf(stderr, "mesboot: layout = the compiled reference-machine constants (VRAM MC 0x%llx, FB phys 0x%llx), "
-              "PHX_LAYOUT_REFERENCE=1\n", (unsigned long long)vram_mc, (unsigned long long)fb_pa);
-      return 0;
+      fprintf(stderr, "mesboot: PHX_LAYOUT_REFERENCE bypass is retired; refusing unverified reference addresses\n");
+      return -1;
    }
-   if (!published || !mc || !phys || size < 0x8000000ull || (phys & 0xfffull) ||
-       mc > UINT64_MAX - size || phys > UINT64_MAX - size) {
+   if (!published || !mc || !phys || size < 0x8000000ull || ((mc | phys | size) & 0xffffffull) ||
+       mc >= address_limit || phys >= address_limit || size > address_limit - mc || size > address_limit - phys) {
       fprintf(stderr,
               "mesboot: PhxBringup build %llu did not publish a usable carve-out (mc 0x%llx, size 0x%llx, phys 0x%llx);"
-              " refusing to program the reference machine's addresses. Fix the kext, or run on the reference machine "
-              "with PHX_LAYOUT_REFERENCE=1\n", (unsigned long long)build, (unsigned long long)mc,
+              " refusing to program addresses without valid target geometry\n", (unsigned long long)build, (unsigned long long)mc,
               (unsigned long long)size, (unsigned long long)phys);
       return -1;
    }
-   if (!explicit_layout && (mc != vram_mc || phys != fb_pa)) {
+   if (!explicit_layout && (mc != reference_mc || phys != reference_phys || size != reference_bytes)) {
       fprintf(stderr,
-              "mesboot: this machine's carve-out (mc 0x%llx, phys 0x%llx) is not the reference layout these GART and "
-              "MES offsets were written for (mc 0x%llx, phys 0x%llx); refusing. PHX_LAYOUT_REFERENCE=1 overrides for a "
-              "deliberate reference run\n", (unsigned long long)mc, (unsigned long long)phys,
-              (unsigned long long)vram_mc, (unsigned long long)fb_pa);
+              "mesboot: this machine's carve-out (mc 0x%llx, phys 0x%llx, size 0x%llx) is not the reference layout "
+              "these legacy offsets were written for (mc 0x%llx, phys 0x%llx, size 0x%llx); refusing. "
+              "Use the explicit target-layout bootstrap instead\n", (unsigned long long)mc, (unsigned long long)phys,
+              (unsigned long long)size, (unsigned long long)reference_mc, (unsigned long long)reference_phys,
+              (unsigned long long)reference_bytes);
       return -1;
    }
-   if (explicit_layout) {
-      vram_mc = mc;
-      fb_pa = phys;
-   }
+   vram_mc = mc;
+   fb_pa = phys;
    fprintf(stderr, "mesboot: layout from PhxBringup build %llu: VRAM MC 0x%llx, FB phys 0x%llx, carve-out 0x%llx\n",
            (unsigned long long)build, (unsigned long long)mc, (unsigned long long)phys, (unsigned long long)size);
    return 0;

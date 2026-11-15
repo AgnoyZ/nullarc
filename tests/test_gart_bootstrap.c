@@ -57,6 +57,13 @@ kern_return_t IOServiceClose(io_connect_t connection) {
     assert(registers[0x28de] == (uint32_t)((observation.mcBase + observation.vramBytes - 1) >> 18));
     assert(registers[0x2808] == (uint32_t)(dummy_pa >> 12) && registers[0x2809] == (uint32_t)(dummy_pa >> 44));
     assert(registers[0x282b] == (uint32_t)(dummy_pa >> 12) && registers[0x282c] == (uint32_t)(dummy_pa >> 44));
+    if (is("target-carveout")) {
+        assert(table_words[0] == 0x80000071u && table_words[1] == 7);
+        assert(table_words[8] == 0x80004071u && table_words[9] == 7);
+        assert(registers[0x2953] == 0x80700001u && registers[0x2954] == 7);
+        assert(registers[0x28dd] == 0x200000u && registers[0x28de] == 0x203fffu);
+        assert(registers[0x2808] == 0x780710u && registers[0x282b] == 0x780710u);
+    }
     ++closes; return is("close-status") ? 5 : 0;
 }
 
@@ -155,6 +162,10 @@ int main(int argc, char **argv) {
     memset(table_words, 0xa5, sizeof(table_words)); memset(default_words, 0xa5, sizeof(default_words));
     observation = (struct PhxBootMemory){1, 7, 0x1000000000ull, 0x2000000000ull, 0x1000000, 0x1000000, 0x300000, 0,
         {1, 0x10000, 0x100000, 0x400000, 0x600000, 0x100000, {0, 0}}};
+    if (is("target-carveout")) {
+        observation.mcBase = 0x8000000000ull; observation.physicalBase = 0x780000000ull;
+        observation.vramBytes = 0x100000000ull; observation.apertureBytes = 0x10000000;
+    }
     char *va = "0x4000000000", *bytes = "0x5000", *table = "0x700000", *dummy = "0x710000";
     if (is("relocated") || argc == 3) {
         observation.mcBase = 0x234500000000ull; observation.physicalBase = 0x123400000000ull;

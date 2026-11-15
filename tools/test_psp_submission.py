@@ -52,6 +52,7 @@ CASES = ("success", "timeout", "wrong-fence", "psp-error", "last-fence", "fence-
          "legacy-config-strict-reset",
          "legacy-config-invalid-preserves",
          "legacy-raw-sequence",
+         "legacy-raw-target-sequence",
          "legacy-raw-default",
          "legacy-raw-no-ring",
          "legacy-raw-no-layout",

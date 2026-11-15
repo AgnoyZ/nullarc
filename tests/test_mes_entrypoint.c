@@ -34,7 +34,7 @@ static CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t service, CF
     if (!strcmp(key, "phx-build")) return phxFakePropertyNumber(37);
     if (!strcmp(key, "phx-fb-mc-base")) return phxFakePropertyNumber(relocated ? 0x6000000000ll : 0x8000000000ll);
     if (!strcmp(key, "phx-fb-phys")) return phxFakePropertyNumber(relocated ? 0x300000000ll : 0x6A0000000ll);
-    if (!strcmp(key, "phx-fb-size")) return phxFakePropertyNumber(0x10000000ll);
+    if (!strcmp(key, "phx-fb-size")) return phxFakePropertyNumber(relocated ? 0x10000000ll : 0x180000000ll);
     assert(0);
     return NULL;
 }

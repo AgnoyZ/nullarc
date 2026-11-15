@@ -16,7 +16,10 @@ The raw TMR physical address in the reference script is also machine-specific.
 This revision adds an **explicit** startup profile and translates just these two
 legacy raw commands into the same checked TOC/TMR methods as the managed API.
 There are no new boot-arg address defaults, ABI selectors, watchdogs or restarts.
-Without the profile, existing managed checks and raw research behavior remain.
+Without the profile, managed checks remain mandatory. The later
+[physical-layout safety correction](VRAM-LAYOUT-SAFETY.md) retires the unchecked
+raw research fallback: selector 107 returns unsupported without forwarding
+caller-supplied words. The checked TOC/TMR aliases described below are retained.
 
 ## Startup property contract
 

@@ -47,13 +47,14 @@ static CFTypeRef IORegistryEntryCreateCFProperty(io_registry_entry_t svc, CFStri
 }
 ''' + declarations + "\n" + functions + r'''
 int main(void) {
-    const uint64_t ref_mc = vram_mc, ref_phys = fb_pa;
+    const uint64_t ref_mc = 0x8000000000ull, ref_phys = 0x6a0000000ull;
+    assert(vram_mc == 0 && fb_pa == 0); /* No reference backing can be used before validation. */
     observed_mc = 0x6000000000ull; observed_phys = 0x300000000ull; observed_size = 0x10000000;
     unsetenv("PHX_LAYOUT_REFERENCE");
-    assert(layout_from_driver(1, 0) == -1 && vram_mc == ref_mc && fb_pa == ref_phys);
+    assert(layout_from_driver(1, 0) == -1 && !vram_mc && !fb_pa);
     setenv("PHX_LAYOUT_REFERENCE", "1", 1);
-    assert(layout_from_driver(1, 1) == -1 && vram_mc == ref_mc && fb_pa == ref_phys);
-    assert(layout_from_driver(1, 0) == 0 && vram_mc == ref_mc && fb_pa == ref_phys);
+    assert(layout_from_driver(1, 1) == -1 && !vram_mc && !fb_pa);
+    assert(layout_from_driver(1, 0) == -1 && !vram_mc && !fb_pa);
     unsetenv("PHX_LAYOUT_REFERENCE");
     missing = 1; assert(layout_from_driver(1, 1) == -1); missing = 0;
     wrong_kind = 1; assert(layout_from_driver(1, 1) == -1); wrong_kind = 0;
@@ -61,12 +62,24 @@ int main(void) {
     observed_size = 0; assert(layout_from_driver(1, 1) == -1); observed_size = 0x10000000;
     uint64_t saved = observed_mc; observed_mc = UINT64_MAX; assert(layout_from_driver(1, 1) == -1); observed_mc = saved;
     saved = observed_phys; observed_phys = UINT64_MAX & ~0xfffull; assert(layout_from_driver(1, 1) == -1); observed_phys = saved;
-    assert(vram_mc == ref_mc && fb_pa == ref_phys);
+    saved = observed_mc; observed_mc++; assert(layout_from_driver(1, 1) == -1); observed_mc = saved;
+    saved = observed_size; observed_size++; assert(layout_from_driver(1, 1) == -1); observed_size = saved;
+    saved = observed_mc; observed_mc = 1ull << 48; assert(layout_from_driver(1, 1) == -1); observed_mc = saved;
+    saved = observed_phys; observed_phys = (1ull << 48) - 0x1000000; assert(layout_from_driver(1, 1) == -1); observed_phys = saved;
+    assert(!vram_mc && !fb_pa);
     assert(layout_from_driver(1, 1) == 0 && vram_mc == observed_mc && fb_pa == observed_phys);
-    vram_mc = ref_mc; fb_pa = ref_phys; observed_mc = ref_mc; observed_phys = ref_phys;
+    observed_mc = ref_mc; observed_phys = ref_phys;
+    assert(layout_from_driver(1, 0) == -1); /* Matching bases do not validate a different extent. */
+    observed_size = 0x180000000ull;
     assert(layout_from_driver(1, 0) == 0 && vram_mc == ref_mc && fb_pa == ref_phys);
     assert(layout_from_driver(1, 1) == 0 && vram_mc == ref_mc && fb_pa == ref_phys);
-    puts("12 actual layout-gate cases passed; no IOKit connection or hardware");
+    observed_phys = 0x780000000ull; observed_size = 0x100000000ull;
+    assert(layout_from_driver(1, 0) == -1); /* The actual target geometry must not enter legacy experiments. */
+    assert(layout_from_driver(1, 1) == 0 && vram_mc == ref_mc && fb_pa == 0x780000000ull);
+    setenv("PHX_LAYOUT_REFERENCE", "1", 1);
+    assert(layout_from_driver(1, 0) == -1 && fb_pa == 0x780000000ull);
+    assert(layout_from_driver(1, 1) == -1 && fb_pa == 0x780000000ull);
+    puts("actual layout-gate cases passed; no IOKit connection or hardware");
     return 0;
 }
 '''
@@ -80,7 +93,7 @@ int main(void) {
             self.assertEqual(result.returncode, 0, result.stderr)
             result = subprocess.run([str(path / "gate")], capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("12 actual layout-gate cases passed", result.stdout)
+            self.assertIn("actual layout-gate cases passed", result.stdout)
 
 
 @unittest.skipIf(os.name == "nt", "Full fake-I/O entrypoint tests require POSIX")

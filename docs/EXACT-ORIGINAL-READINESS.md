@@ -8,6 +8,11 @@ The [earlier exact-original trial](EXACT-ORIGINAL-TRIAL.md) remains consumed.
 The successful basic compute workload applies to its first-stage boot; it is
 not evidence of a working accelerated desktop or general stability.
 
+The owner subsequently requested a [source correction for the known physical-layout
+risk](VRAM-LAYOUT-SAFETY.md). It changes downstream safety paths only; it does
+not change the original installation or the historical results below and does
+not reopen this consumed trial.
+
 ## Single behavioral change
 
 The installed upstream v0.4.0-alpha drivers, initialization helpers, firmware,

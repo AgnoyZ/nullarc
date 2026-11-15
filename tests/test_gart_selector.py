@@ -97,6 +97,12 @@ class GartSelectorTests(unittest.TestCase):
                                  ("reg_writes", "reg_reads", "selector_writes", "bank_writes", "ack_reads", "closes")])
                 self.assertIn("GPU execution unverified", result.stdout)
 
+    def test_target_4GiB_carveout_uses_its_own_PTEs_and_aperture_limit(self):
+        result, counts = self.invoke("target-carveout", False)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([188, 50, 2048, 1], [counts[key] for key in
+                         ("reg_writes", "reg_reads", "accepted_words", "closes")])
+
 
 if __name__ == "__main__":
     unittest.main()

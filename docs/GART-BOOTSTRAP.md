@@ -45,9 +45,11 @@ experiments. Explicit `gart`, `mes`, `sched-query`, `compute-probe` and
 `shader-probe` use the driver's published MC/backing bases and retain their full
 selector-116 snapshot/range/readiness checks; a non-reference backing address
 alone is not a reason to reject them. Missing, malformed, unaligned or wrapping
-published geometry still fails. They refuse `PHX_LAYOUT_REFERENCE=1`. Legacy
-commands retain their reference-address equality gate and have not gained
-target-independent GART/queue support.
+published geometry still fails. Since the [physical-layout safety correction](VRAM-LAYOUT-SAFETY.md),
+`PHX_LAYOUT_REFERENCE=1` is rejected in every mode. Legacy commands require the
+complete reference MC/backing/size tuple and have not gained target-independent
+GART/queue support. Runtime bases start at zero and are populated only from
+validated metadata; reference literals are comparison values, never defaults.
 
 1. Parse strict unsigned arguments before service lookup. Reject malformed,
    zero-size, unaligned/out-of-width spans and enabled `PTE_SYS`/`FAULT_DEFAULT`

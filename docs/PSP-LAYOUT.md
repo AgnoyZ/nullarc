@@ -75,9 +75,11 @@ Older scripts that directly create a ring or omit a TMR size fail by default.
 translation of legacy raw TOC/TMR commands. It supplies no implicit addresses or
 memory reservation and is not enabled merely by installing the new kext. An older
 kernel without selector 114 also rejects the new configuration request. Existing
-RADV selectors and structure sizes are unchanged. The raw-debug command paths
-remain research interfaces outside this managed layout contract; they are not
-safe orchestration shortcuts.
+RADV selectors and structure sizes are unchanged. Since the
+[physical-layout safety correction](VRAM-LAYOUT-SAFETY.md), raw PSP selector 107
+rejects arbitrary submissions. Its explicit legacy profile permits only the
+checked TOC/TMR translations; it cannot bypass the managed layout contract.
+Other privileged debug writes are not safe orchestration shortcuts.
 
 ## Verification and remaining work
 

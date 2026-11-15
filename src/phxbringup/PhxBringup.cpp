@@ -2099,8 +2099,8 @@ IOReturn PhxBringup::setupTmrLocked(uint32_t size, uint64_t out[4]) {
     return r;
 }
 
-// Selector 107: submit an arbitrary GPCOM command with six caller-supplied union dwords. For bring-up
-// experiments (SETUP_TMR / LOAD_TOC parameter sweeps) without rebuilding the kext.
+// Selector 107: compatibility aliases for managed TOC/TMR only. Arbitrary raw commands could
+// program another machine's physical addresses; use the checked layout/firmware interfaces.
 IOReturn PhxBringup::pspRaw(uint32_t cmdId, const uint32_t words[6], uint64_t out[4]) {
     if (!out) return kIOReturnBadArgument;
     for (unsigned i = 0; i < 4; ++i) out[i] = 0;
@@ -2111,7 +2111,7 @@ IOReturn PhxBringup::pspRaw(uint32_t cmdId, const uint32_t words[6], uint64_t ou
     IOReturn r = kIOReturnNotReady;
     if (ringMc && !pspSubmissionFaulted) {
         if (!legacyBootEnabled) {
-            r = pspRunCmd(cmdId, words, 6, out); // unchanged research interface, no managed readiness
+            r = kIOReturnUnsupported; // never pass unchecked address-bearing PSP words to firmware
         } else if (!pspLayoutConfigured) {
             r = kIOReturnNotReady;
         } else if (cmdId == PHX_PSP_LOAD_TOC_COMMAND) {

@@ -30,7 +30,7 @@ class GartBootstrapRunnerTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
         for fault in names:
             status, counts = expected_result(fault)
-            self.assertEqual(status == 0, fault in ("ok", "relocated", "env-zero", "ack-delayed", "sleep-eintr"))
+            self.assertEqual(status == 0, fault in ("ok", "relocated", "target-carveout", "env-zero", "ack-delayed", "sleep-eintr"))
             self.assertEqual(counts, check_result(result(status, counts), fault))
         for i in range(1, 189): self.assertIn(f"reg-write-{i}", names)
 
