@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "date": "2026-11-15",
+  "request": "one reboot acceleration test after original34-plus-VRAM-fix default branch switch",
+  "status_at_public_source_checkpoint": "prepared, not yet armed or dispatched",
+  "default_source_commit": "5805c05bed6cf0ce1e3fc28f8d088f6e5e296993",
+  "prior_headless_real_GPU_execution_verified": true,
+  "native_desktop_success_at_preparation": false,
+  "source_and_installation": {
+    "loaded_build": 34,
+    "four_installed_helpers_match_default_validation": true,
+    "kernel_accelerator_plugin_runtime_firmware_and_startup_unchanged": true,
+    "EFI_manifest_verified_read_only_and_unchanged": true,
+    "OS_version": "26.7.2",
+    "OS_build": "25G332"
+  },
+  "preparation": {
+    "prepared": true,
+    "current_build": 34,
+    "prior_actual_Metal_GPU_execution_verified": true,
+    "four_helpers_match_default_branch_validation": true,
+    "original_kernel_accelerator_runtime_and_startup_unchanged": true,
+    "fresh_launchd_preparation_role_passed": true,
+    "target_calls_in_preparation": 0,
+    "CPU_methods_passed": 41,
+    "pins": 417,
+    "ordinary_reboot_limit": 1,
+    "managed_recovery_reboot_limit": 1,
+    "automatic_retry": false,
+    "GPU_off_retained": true,
+    "desktop_armed": false,
+    "EFI_readback_unchanged": true
+  },
+  "CPU_checks": {
+    "methods_passed": 41,
+    "real_target_calls": 0,
+    "suite_counts": [
+      31,
+      10
+    ]
+  },
+  "limits": {
+    "ordinary_reboot": 1,
+    "desktop_initialization": 1,
+    "unchanged_Metal_probe": 1,
+    "independent_observation_seconds": 300,
+    "managed_recovery_reboot": 1,
+    "upstream_watchdogs_unchanged": true,
+    "observer_gates_original_first_IO": false,
+    "automatic_retry": false
+  },
+  "success_requires": [
+    "exact original34 loaded image and corrected helper pins",
+    "original startup queue outputs and adoption",
+    "unchanged Metal verifier observes real GPU-written value",
+    "native framebuffer and measured present progress",
+    "stable single WindowServer and no new diagnostic report"
+  ],
+  "private_material_published": false,
+  "binary_upload_added": false,
+  "actual_reboot_or_desktop_result_claimed": false
+}

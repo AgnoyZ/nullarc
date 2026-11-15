@@ -181,3 +181,26 @@ The expected restart time is approximately **17:50:50 +08:00**. This scheduler
 observation is not evidence that original build 34 has loaded or that the new
 headless/Metal test passed. Preserve the consumed restart intent and read the
 actual next-boot result/error; do not schedule again after a lost connection.
+
+## Fresh-boot result read back: GPU execution passed
+
+The actual postboot receipts were read on 2026-11-15 after the owner requested
+a new acceleration reboot test. The earlier ordinary restart did occur: the
+current boot began at **17:51:16 +08:00**, and the bounded headless attempt
+completed at approximately **17:53:03 +08:00**. The exact original build-34
+image and corrected helper identities passed admission. Compute and graphics
+queues returned their expected GPU-written values and both adoptions succeeded.
+The unchanged Metal verifier found the AMD device, completed a command and
+observed its expected GPU-written output. WindowServer stayed stable. There was
+no error or recovery intent, and the consumed observer retired its own job.
+
+Independent current-state reads still show build 34, the target geometry,
+the exact four corrected user files, NMXAccel/IOAccelerator and original Metal
+publication. PhxAMDFB is absent and the firmware framebuffer remains present:
+this is actual GPU/Metal execution evidence, **not accelerated desktop proof**.
+The old intent and completed test are preserved and will not be replayed.
+
+The owner's new reboot-test request creates a separate, single native-desktop
+attempt, described in [the desktop retest record](UPSTREAM34-DESKTOP-RETEST.md).
+Its preparation does not install a driver, modify the original startup or
+convert its pending result into success.

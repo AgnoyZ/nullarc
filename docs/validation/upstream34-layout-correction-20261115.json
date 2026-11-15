@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-15",
-  "scope": "original build-34 bundle and geometry-corrected original helpers installed/read back; fresh-boot headless test pending",
+  "scope": "original build34 + corrected user tools: completed fresh-boot headless GPU/Metal success read back; separate desktop retest prepared",
   "upstream_commit": "9dd76b604fca5e0125bd3caa5723df0f611ff27f",
   "upstream_tag": "v0.4.0-alpha",
   "branch": "downstream/780m-tahoe",
@@ -116,7 +116,7 @@
     "automatic_retry": false,
     "reboot_dispatched_at_documentation_checkpoint": false,
     "GPU_initialization_dispatched_at_documentation_checkpoint": false,
-    "actual_postboot_result_pending": true
+    "actual_postboot_result_pending": false
   },
   "restart_dispatch": {
     "caller_returned_zero": true,
@@ -125,9 +125,31 @@
     "dispatch_retried": false,
     "expected_restart_local_time_approximately": "2026-11-15T17:50:50.765403+08:00",
     "loaded_build_at_scheduler_check": 39,
-    "original34_fresh_boot_result_pending": true,
+    "original34_fresh_boot_result_pending": false,
     "GPU_off_retained": true,
     "display_arming_absent": true,
     "old_scopes_replayed": false
+  },
+  "actual_postboot_result_readback": {
+    "passed": true,
+    "boot_time_local": "2026-11-15T17:51:16+08:00",
+    "completed_at_approximately": "2026-11-15T17:53:03+08:00",
+    "exact_original_build34_loaded": true,
+    "corrected_helper_identities_verified": true,
+    "target_geometry_verified": true,
+    "compute_and_graphics_GPU_written_values_matched": true,
+    "both_queue_adoptions_succeeded": true,
+    "unchanged_Metal_verifier": {
+      "AMD_device": true,
+      "command_completed": true,
+      "GPU_result_matches": true
+    },
+    "WindowServer_stable": true,
+    "desktop_takeover_proven": false,
+    "firmware_framebuffer_retained": true,
+    "postboot_error_present": false,
+    "recovery_intent_present": false,
+    "old_observer_job_retired": true,
+    "old_scope_replayed": false
   }
 }
