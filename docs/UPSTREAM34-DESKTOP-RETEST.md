@@ -1,5 +1,13 @@
 # One original-build34 desktop acceleration reboot test
 
+Latest result, 2026-11-15: the final watchdog-correction attempt executed both
+GPU queues successfully but failed in CoreDisplay Metal-device creation and
+returned to the firmware desktop. A subsequently reproduced WindowServer
+runtime-directory permission defect was repaired locally. Its distinct next
+test is documented in [runtime access correction](UPSTREAM34-RUNTIME-ACCESS.md);
+the preparation checkpoints below are historical and do not claim desktop
+acceleration.
+
 ## Authorization and verified starting point
 
 On 2026-11-15, after changing the default branch to original build 34 plus the

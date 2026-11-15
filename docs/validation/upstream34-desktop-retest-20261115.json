@@ -59,7 +59,7 @@
   "private_material_published": false,
   "binary_upload_added": false,
   "actual_reboot_or_desktop_result_claimed": true,
-  "current_status": "diagnostic trial consumed with initializer status 1 before queues; separate two-shell correction installed and fresh observer prepared, not yet armed/dispatched at this source checkpoint",
+  "current_status": "watchdog-correction trial consumed: real compute/graphics queue outputs and adoption passed, WindowServer Metal-device creation failed and original fallback completed; runtime-parent permission defect repaired locally and distinct next trial prepared, not yet dispatched at the linked source checkpoint",
   "dispatch_readback": {
     "ordinary_reboot_requested_once": true,
     "caller_returncode": 0,
@@ -260,5 +260,6 @@
       "phxctl/phxctl": "4f64e320ba0a2acd43091380ede21de7d2fd732620273d64e3dd67af5168c9cd"
     },
     "contract_sha256": "156cf98302366cbfb890806a088408e65e15b518cc9ca193be4482e8e943f1fa"
-  }
+  },
+  "latest_runtime_access_validation": "upstream34-runtime-access-20261115.json"
 }
