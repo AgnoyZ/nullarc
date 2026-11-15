@@ -1,10 +1,12 @@
 # Original startup with publication-aware Metal observation
 
-Preparation snapshot, 2026-11-15: **a fresh external observer is staged but not
-armed.** It corrects the demonstrated premature Metal check in the
-[consumed exact-original trial](EXACT-ORIGINAL-TRIAL.md). No postboot success
-is claimed. This continues the owner's accepted entirely-original test under
-the same disclosed reference-layout risk; it does not reuse an old allowance.
+Execution assessed, 2026-11-15: **the publication-aware first boot passed the
+unchanged real Metal compute verifier. The conditional desktop boot reached
+PhxAMDFB but produced three WindowServer CoreDisplay assertion crashes and
+recovered to the firmware desktop.** This packet is consumed and closed.
+The [earlier exact-original trial](EXACT-ORIGINAL-TRIAL.md) remains consumed.
+The successful basic compute workload applies to its first-stage boot; it is
+not evidence of a working accelerated desktop or general stability.
 
 ## Single behavioral change
 
@@ -74,8 +76,96 @@ Fresh full-file comparisons passed after that classification. The root-owned
 packet pins **1,697 inputs**, including **1,656 frozen interpreter files**.
 Its LaunchDaemon/interpreter path executed the unarmed preparation role and
 exited with GPU-off retained and no display flags, GPU initialization or reboot
-request. The [sanitized record](validation/exact-original-readiness-20261115.json)
-distinguishes this preparation snapshot from future execution.
+request. Those are preparation observations, not the final activation state.
+The [sanitized record](validation/exact-original-readiness-20261115.json)
+separates them from the actual execution below.
+
+## Actual original Metal execution
+
+The arming and initial managed reboot request were consumed at
+**15:33:01 +08:00**. The initial caller returned zero without timing out. The
+new boot began at **15:34:25 +08:00** and the original startup completed its
+candidate initialization sequence. The external observer then waited
+**54.14 seconds** for the original plugin-name/class publication, observing
+the property at **15:35:38 +08:00**. This wait began after original startup;
+it is not a measurement of the entire driver's 60-second timer.
+
+At **15:35:41 +08:00**, the unchanged independent verifier returned zero and
+reported an AMD device, a completed command and matching GPU-written output.
+The pinned probe initializes its shared output to zero and requires its Metal
+kernel's expected value. Its runtime diagnostic identifies the native backend,
+ABI 1.12 and build 34. Original installed-input and loaded bring-up/accelerator
+identity checks passed. This confirms one basic real Metal compute workload
+in that boot, without certifying other workloads, scanout, frame pacing,
+power, thermal behavior or long-term stability. It also confirms that the
+previous premature no-device observation was not a valid post-publication
+Metal failure report.
+
+Only after this successful first-stage receipt and the original startup's
+one-shot flag did the observer consume one desktop-reboot intent. That
+caller's return-code receipt was not written; the subsequent desktop boot is
+independently identified. No second dispatch was made.
+
+## Actual desktop failure and evidence limits
+
+The desktop boot began at **15:36:04 +08:00**. Original startup observed
+PhxAMDFB on the panel, reported matching compute/graphics values and zero
+adoption/claim results, set the display gates and released the framebuffer hold
+at **15:36:16 +08:00**. The kernel records a normal sysctl hold release,
+approximately seven seconds after the boot hold was established, rather than
+a 120-second timeout release.
+
+Before the original 90-second desktop observation completed, its monitor
+reported three WindowServer crashes or hangs and invoked its existing M2
+failure recovery. The external observer recorded phase-two failure at
+**15:36:42 +08:00**. It never reached the second independent Metal probe or
+the final frame-progress/WindowServer stability checks. There is no successful
+desktop completion receipt.
+
+Three private crash reports were independently verified against this failed
+boot. All are `EXC_CRASH / SIGABRT` on the main thread through `__assert_rtn`
+and `CoreDisplay_CreateDisplayForCGXDisplayDevice`, during CoreDisplay display
+creation. Their assertion expression is not recovered. A time-range log query
+also returned events from the subsequent boot; requiring the failed boot,
+incident time window and kernel/WindowServer process leaves **2,427 records**
+and excludes **3,819 records from another boot**. Those excluded events are
+not used to diagnose this failure.
+
+The filtered incident log records a request for display mode zero followed by
+failure to obtain its mode information. The pinned original framebuffer only
+advertises/accepts mode one in its display-mode, pixel-information and timing
+methods. This is a display-mode compatibility lead, not a demonstrated cause
+of the CoreDisplay abort. The framework's assertion text remains private/redacted;
+neither accepting mode zero, changing timing answers nor extending the hold
+has been validated as a fix. The trace does not establish the earlier RADV
+cleanup/device-loss failure as the cause of this different incident. The
+accepted reference-layout risk also remains unresolved despite basic compute
+success.
+
+## Recovery and closed state
+
+The external observer consumed its single managed recovery intent after
+recording failure. The original script also retained its own M2 recovery
+request; these are accounted separately. The managed recovery caller's return
+status is unobserved and was not retried. A new boot beginning at
+**15:37:05 +08:00** matches the recovery-postboot receipt and skips original
+initialization because GPU-off is present.
+
+Independent readback verifies GPU-off with M2, one-shot and pending flags
+absent, IONDRVFramebuffer present, no NMXAccel/PhxAMDFB/IOAccelerator and one
+WindowServer stable across ten seconds. A fresh full release-file comparison
+still passes. All 1,697 pinned inputs and symlinks matched before witness
+retirement. The original bring-up image remains loaded; the unused accelerator
+image was observed matching the package earlier in recovery and was absent at
+the final read. Absence is not treated as a mismatched image.
+
+Only the completed external witness plist was archived with its expected hash
+and removed from its active LaunchDaemon path. Its contract, sources and
+execution receipts remain intact. This intentional location change is the
+sole retired input and is accounted for by the private closure receipt. No
+installed original driver/runtime/helper, EFI, partition, BIOS/security setting
+or unrelated NVRAM was changed. There is no initialization or recovery allowance
+left in this packet, and the next boot remains GPU-off.
 
 Read root-owned intent, publication, probe, stage and recovery receipts before
 continuing. Never dispatch again after an existing arm/reboot intent. Do not

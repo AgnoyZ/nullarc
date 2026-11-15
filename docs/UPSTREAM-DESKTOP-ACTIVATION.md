@@ -149,8 +149,11 @@ limits. It does not reopen the failed guarded packet or validate the layout.
 That exact-original startup subsequently completed, but its external Metal
 probe ran before the original driver's 60-second publication callback and
 triggered a verified GPU-off recovery. A separate [publication-aware trial](
-EXACT-ORIGINAL-READINESS.md) corrects the observation timing while retaining
-the original installed stack and all consumed-packet boundaries.
+EXACT-ORIGINAL-READINESS.md) corrected the observation timing and verified one
+original Metal compute workload. Its conditional desktop boot reached
+PhxAMDFB but produced three CoreDisplay assertion crashes and recovered to
+GPU-off. The installed original stack and all consumed-packet boundaries remain
+preserved; an accelerated desktop is still unverified.
 
 ## Preparation checks and rollback
 

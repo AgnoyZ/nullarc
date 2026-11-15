@@ -7,6 +7,9 @@ This packet is consumed. Neither Metal execution nor desktop takeover was
 verified. The [earlier guarded attempt](UPSTREAM-DESKTOP-ACTIVATION.md) also
 remains consumed; the [publication-aware follow-up](EXACT-ORIGINAL-READINESS.md)
 uses a separate packet.
+That follow-up subsequently verified one original Metal compute workload;
+its desktop stage failed in CoreDisplay and also recovered to GPU-off. These
+results do not retroactively turn this first packet's early probe into success.
 
 ## Original bytes and accepted risk
 
