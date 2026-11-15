@@ -14,6 +14,12 @@ KIQ selection failed.
 The command does not set up GART,
 bootstrap MES queues, execute shaders or enable display acceleration.
 
+The [2026-11-15 source comparison](UPSTREAM-STARTUP-COMPARISON.md) distinguishes
+upstream reference-machine acceleration from this fork's early desktop refusal.
+It also verifies that the pinned Phoenix power table lacks a generic GFXOFF
+status callback. Mailbox acknowledgment and sampled RLC flags must not be
+promoted to independently verified GFXOFF exit.
+
 ## Fixed-source review
 
 The implementation was checked against Linux commit

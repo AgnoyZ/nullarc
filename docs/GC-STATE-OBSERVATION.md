@@ -9,6 +9,11 @@ new boot is terminal for further GPU work. See [the target observations](
 DESKTOP-SELECTOR-PREFLIGHT.md#system-domain-target-result) remains consumed;
 this observation experiment did not write a selector or establish a driver fix.
 
+The subsequent [upstream/startup and power-field review](
+UPSTREAM-STARTUP-COMPARISON.md) adds file-only RLC decoding and verifies the
+Phoenix generic GFXOFF-query limitation. It reuses sealed historical files;
+no additional capture or hardware sequence was run.
+
 ## Source difference worth measuring
 
 The executed `gfx-power-sequence` finishes after firmware loading, RLC autoload,

@@ -25,6 +25,9 @@ REGISTERS = (
 )
 # Field names/masks reviewed against the pinned GC 11.0.0 header, not recipes.
 # Unknown bits are retained separately; no value is classified as a cause/fix.
+# RLC masks: Linux 7d0a66e4bb9081d75c82ec4957c50034cb0ea449,
+# drivers/gpu/drm/amd/include/asic_reg/gc/gc_11_0_0_sh_mask.h.
+# These sampled fields are not a Phoenix GFXOFF-state query (see GFX-POWER.md).
 FIELDS = {
     "GRBM_CNTL": {"READ_TIMEOUT": (0, 0xFF)},
     "CP_ME_CNTL": {"CE_HALT": (24, 0x01000000), "PFP_HALT": (26, 0x04000000),
@@ -45,6 +48,25 @@ FIELDS = {
         "CMP_HQD_REG_RESET": (2, 0x4), "CMP_INTR_REG_RESET": (3, 0x8),
         "CMP_HQD_QUEUE_DOORBELL_RESET": (4, 0x10), "GFX_RB_DOORBELL_RESET": (5, 0x20),
         "GFX_INTR_REG_RESET": (6, 0x40), "GFX_HQD_REG_RESET": (7, 0x80),
+    },
+    "RLC_PG_CNTL": {
+        "GFX_POWER_GATING_ENABLE": (0, 0x1), "GFX_PIPELINE_PG_ENABLE": (4, 0x10),
+    },
+    "RLC_CGCG_CGLS_CTRL": {"CGCG_EN": (0, 0x1), "CGLS_EN": (1, 0x2)},
+    "RLC_GPM_STAT": {
+        "RLC_BUSY": (0, 0x1), "GFX_POWER_STATUS": (1, 0x2),
+        "GFX_CLOCK_STATUS": (2, 0x4), "GFX_LS_STATUS": (3, 0x8),
+        "GFX_PIPELINE_POWER_STATUS": (4, 0x10), "CNTX_IDLE_BEING_PROCESSED": (5, 0x20),
+        "CNTX_BUSY_BEING_PROCESSED": (6, 0x40), "GFX_IDLE_BEING_PROCESSED": (7, 0x80),
+        "CMP_BUSY_BEING_PROCESSED": (8, 0x100), "SAVING_REGISTERS": (9, 0x200),
+        "RESTORING_REGISTERS": (10, 0x400), "GFX3D_BLOCKS_CHANGING_POWER_STATE": (11, 0x800),
+        "CMP_BLOCKS_CHANGING_POWER_STATE": (12, 0x1000), "STATIC_WGP_POWERING_UP": (13, 0x2000),
+        "STATIC_WGP_POWERING_DOWN": (14, 0x4000), "DYN_WGP_POWERING_UP": (15, 0x8000),
+        "DYN_WGP_POWERING_DOWN": (16, 0x10000), "ABORTED_PD_SEQUENCE": (17, 0x20000),
+        "CMP_power_status": (18, 0x40000), "GFX_LS_STATUS_3D": (19, 0x80000),
+        "GFX_CLOCK_STATUS_3D": (20, 0x100000), "MGCG_OVERRIDE_STATUS": (21, 0x200000),
+        "RLC_EXEC_ROM_CODE": (22, 0x400000), "FGCG_OVERRIDE_STATUS": (23, 0x800000),
+        "PG_ERROR_STATUS": (24, 0xFF000000),
     },
 }
 

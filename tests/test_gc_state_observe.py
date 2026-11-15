@@ -71,7 +71,14 @@ class GCStateObservationTests(unittest.TestCase):
                 self.assertEqual(19, len({item["index"] for item in data["registers"]}))
                 # Cross-check the independently specified file analyzer against actual
                 # collector output, including every index, in both explicit modes.
-                gc_state_compare.validate_observation(data, "baseline" if phase == "configured" else "psp")
+                values = gc_state_compare.validate_observation(data, "baseline" if phase == "configured" else "psp")
+                decoded = gc_state_compare.decode_fields(values)
+                self.assertEqual((values["RLC_GPM_STAT"] >> 24) & 0xFF,
+                                 decoded["RLC_GPM_STAT"]["fields"]["PG_ERROR_STATUS"])
+                self.assertEqual(values["RLC_PG_CNTL"] & 0xFFFFFFEE,
+                                 decoded["RLC_PG_CNTL"]["undecoded_bits"])
+                self.assertEqual(values["RLC_CGCG_CGLS_CTRL"] & 0xFFFFFFFC,
+                                 decoded["RLC_CGCG_CGLS_CTRL"]["undecoded_bits"])
                 self.assertNotIn("ready", result.stdout)
                 if fault == "all-zero-gc":
                     self.assertTrue(all(item["value"] == 0 for item in data["registers"][2:]))

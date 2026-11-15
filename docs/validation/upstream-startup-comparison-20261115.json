@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "date": "2026-11-15",
+  "scope": "fixed-source startup comparison and file-only RLC decoding",
+  "working_repository": "AgnoyZ/nullarc",
+  "branch": "downstream/780m-tahoe",
+  "parent_source_commit": "42a5583d187d342283afe8bf30e5d2ad81ae6097",
+  "nullarc_upstream_reference": {
+    "repository": "luuumi-dev/nullarc",
+    "commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+    "README_retrieved_again_and_matches_Git_object": true,
+    "reported_acceleration_scope": "upstream reference-machine results; owner also reports original acceleration",
+    "unmodified_upstream_success_on_this_laptop_independently_established": false,
+    "installer_byte_identical": true,
+    "installer_sha256": "7ac42efc1332958e32aeb6a027d6a6e5bbefb204563dd310a2acd96aead3887f"
+  },
+  "source_order_comparison": {
+    "upstream_full_sh_CP_setup_before_GART_MES": true,
+    "downstream_desktop_queue_idle_checks_before_CP_setup": true,
+    "physical_cause_established": false,
+    "register_sequence_changed": false
+  },
+  "linux_reference": {
+    "repository": "torvalds/linux",
+    "commit": "7d0a66e4bb9081d75c82ec4957c50034cb0ea449",
+    "paths_relative_to": "drivers/gpu/drm/amd",
+    "sha256": {
+      "include/asic_reg/gc/gc_11_0_0_sh_mask.h": "83dd0060886da2927e3f722b992af208e4d41999b0740123a770a6561f060c94",
+      "amdgpu/gfx_v11_0.c": "6b3dc555a2587666b46cdade8141966f49eaca71b40ad53b0a45b8624e5aeec9",
+      "pm/swsmu/smu13/smu_v13_0_4_ppt.c": "f6025d618d556655795d440ae90d32018acdd10cc809045b0237b4aadfd33835",
+      "pm/swsmu/amdgpu_smu.c": "12c7aaf404ad9365e59842a1892483a1c1dee0796517597c6639265c3469bd5d",
+      "pm/swsmu/smu13/smu_v13_0.c": "b07a78a0c46519057b688d1aedcdcca0295496500dd00b77595729125503aab6",
+      "amdgpu/amdgpu_gfx.c": "a93489ebf2d1dabb09c2c97c805f30eb3f0f951a1b31f613b818ae5b42889858",
+      "pm/amdgpu_dpm.c": "1f6002fffa8cd2b720cfb7176187f4a664bfb46a85aae31f70cd4d84bfa5c725",
+      "pm/swsmu/smu_cmn.c": "9d021a7381e292f822978866b87441e012b132a1c60eb4b052f88fc5e170ed1d"
+    },
+    "AMD_MIT_style_notices_reviewed": true,
+    "implementation_bodies_or_whole_headers_imported": false
+  },
+  "gfxoff_limit": {
+    "Phoenix_control_callback_present": true,
+    "Phoenix_status_callback_present": false,
+    "generic_status_wrapper_without_callback": "-EINVAL",
+    "mailbox_acknowledgment_is_independent_GFXOFF_status": false,
+    "RLC_flags_establish_GFXOFF_exit": false,
+    "target_RS64_mode_determined": false
+  },
+  "analyzer": {
+    "new_field_count": 29,
+    "new_register_decoders": [
+      "RLC_GPM_STAT",
+      "RLC_PG_CNTL",
+      "RLC_CGCG_CGLS_CTRL"
+    ],
+    "raw_values_preserved": true,
+    "unreviewed_control_bits_preserved": true,
+    "input_schema_or_acceptance_predicates_changed": false,
+    "hardware_access_backend": false,
+    "source_sha256": {
+      "tools/gc_state_compare.py": "102ed4177e807e726bf92efe32a069c5a52b2f95559903c2c80815a0b3bd8537",
+      "tests/test_gc_state_compare.py": "ec9869981fdcab2431fb235ecd61f23d922d30c8f4a805331cef169c7f691044",
+      "tests/test_gc_state_observe.py": "1314b665e745230f3c87c52ca08574afcd0382de1716a11debecc8edfb029944"
+    }
+  },
+  "historical_evidence": {
+    "archived_files_read": 2,
+    "both_match_existing_hash_receipts": true,
+    "original_scope_unchanged": true,
+    "new_capture_performed": false,
+    "same_boot_as_latest_desktop_failure": false,
+    "raw_register_values_or_dumps_published": false,
+    "instantaneous_field_summary": "post-power GFX power/clock/pipeline flags asserted; PG error and sampled transition fields zero; no readiness/cause inference"
+  },
+  "validation": {
+    "failure_first": {
+      "methods": 11,
+      "result": "expected failure before decoder change",
+      "missing_field_subtest_errors": 42
+    },
+    "focused_methods": 58,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "groups": {
+      "decoder": 11,
+      "collector": 7,
+      "desktop": 33,
+      "transport": 7
+    },
+    "independent_RLC_status_bit_positions": 32,
+    "nonzero_error_byte_tested": true,
+    "fake_IOKit_actual_collector_compatibility": true,
+    "fake_native_harness_sanitizers": [
+      "ASan",
+      "UBSan"
+    ],
+    "full_suite_rerun": false
+  },
+  "boundaries": {
+    "GPU_commands_run": false,
+    "installer_run": false,
+    "live_kernel_or_loaded_binary_identity_queried": false,
+    "drivers_or_helpers_installed": false,
+    "startup_or_EFI_or_security_changed": false,
+    "authorization_or_consumed_requests_changed": false,
+    "reboot_requested": false,
+    "acceleration_fix_or_desktop_success_claimed": false,
+    "OpenViking_rule_and_experience_lookup": "unavailable: no registered tools found"
+  }
+}

@@ -96,6 +96,74 @@ class GCStateComparisonTests(unittest.TestCase):
             self.assertTrue(all(v == 0 for v in decoded["fields"].values()))
             values[register] = 0
 
+    def test_rlc_gpm_independent_bit_positions_and_error_byte(self):
+        # Numeric oracle from the reviewed GC header, independent of FIELDS.
+        names = (
+            "RLC_BUSY", "GFX_POWER_STATUS", "GFX_CLOCK_STATUS", "GFX_LS_STATUS",
+            "GFX_PIPELINE_POWER_STATUS", "CNTX_IDLE_BEING_PROCESSED", "CNTX_BUSY_BEING_PROCESSED",
+            "GFX_IDLE_BEING_PROCESSED", "CMP_BUSY_BEING_PROCESSED", "SAVING_REGISTERS",
+            "RESTORING_REGISTERS", "GFX3D_BLOCKS_CHANGING_POWER_STATE", "CMP_BLOCKS_CHANGING_POWER_STATE",
+            "STATIC_WGP_POWERING_UP", "STATIC_WGP_POWERING_DOWN", "DYN_WGP_POWERING_UP",
+            "DYN_WGP_POWERING_DOWN", "ABORTED_PD_SEQUENCE", "CMP_power_status", "GFX_LS_STATUS_3D",
+            "GFX_CLOCK_STATUS_3D", "MGCG_OVERRIDE_STATUS", "RLC_EXEC_ROM_CODE", "FGCG_OVERRIDE_STATUS",
+        )
+        values = {name: 0 for name, _ in compare.REGISTERS}
+        for bit in range(32):
+            with self.subTest(bit=bit):
+                values["RLC_GPM_STAT"] = 1 << bit
+                expected = dict.fromkeys(names, 0)
+                expected["PG_ERROR_STATUS"] = (1 << (bit - 24)) if bit >= 24 else 0
+                if bit < 24:
+                    expected[names[bit]] = 1
+                decoded = compare.decode_fields(values)["RLC_GPM_STAT"]
+                self.assertEqual({"fields": expected, "undecoded_bits": 0}, decoded)
+        values["RLC_GPM_STAT"] = 0xA5000000 | sum(1 << bit for bit in (1, 2, 4, 9, 17, 20))
+        decoded = compare.decode_fields(values)["RLC_GPM_STAT"]
+        self.assertEqual(0xA5, decoded["fields"]["PG_ERROR_STATUS"])
+        self.assertEqual(1, decoded["fields"]["SAVING_REGISTERS"])
+        self.assertEqual(1, decoded["fields"]["ABORTED_PD_SEQUENCE"])
+        self.assertEqual(0, decoded["fields"]["RESTORING_REGISTERS"])
+
+    def test_rlc_enable_bits_remain_separate_from_undecoded_control_bits(self):
+        values = {name: 0 for name, _ in compare.REGISTERS}
+        cases = (
+            ("RLC_PG_CNTL", "GFX_POWER_GATING_ENABLE", "GFX_PIPELINE_PG_ENABLE", 0x1, 0x10, 0x80000002),
+            ("RLC_CGCG_CGLS_CTRL", "CGCG_EN", "CGLS_EN", 0x1, 0x2, 0x8001003C),
+        )
+        for register, first, second, first_bit, second_bit, unknown in cases:
+            for enabled in (0, first_bit, second_bit, first_bit | second_bit):
+                with self.subTest(register=register, enabled=enabled):
+                    values[register] = enabled | unknown
+                    decoded = compare.decode_fields(values)[register]
+                    self.assertEqual({first: int(bool(enabled & first_bit)),
+                                      second: int(bool(enabled & second_bit))}, decoded["fields"])
+                    self.assertEqual(unknown, decoded["undecoded_bits"])
+            values[register] = 0
+
+    def test_power_flags_and_errors_are_file_observations_without_readiness_inference(self):
+        # Synthetic inputs: asserted power/clock flags coexist with a PG error
+        # and an in-progress transition; the report must not promote them.
+        injected = {"RLC_GPM_STAT": 0x5A008016, "RLC_PG_CNTL": 0x11,
+                    "RLC_CGCG_CGLS_CTRL": 0x80000003}
+        def change(stage, data):
+            if stage == "power":
+                for row in data["registers"]:
+                    if row["name"] in injected:
+                        row["value"] = injected[row["name"]]
+        path, _ = self.fixture(change=change)
+        report = compare.compare(path)
+        power = report["phases"][-1]
+        self.assertEqual(0x5A, power["decoded"]["RLC_GPM_STAT"]["fields"]["PG_ERROR_STATUS"])
+        self.assertEqual(1, power["decoded"]["RLC_GPM_STAT"]["fields"]["DYN_WGP_POWERING_UP"])
+        for register, raw in injected.items():
+            self.assertEqual(raw, power["values"][register])
+        self.assertEqual(set(injected), {item["name"] for item in power["changes_from_previous"]})
+        self.assertFalse(report["hardware_readiness_proven"])
+        self.assertFalse(report["physical_cause_established"])
+        self.assertFalse(report["GPU_access_performed"])
+        self.assertFalse(report["boot_and_capture_provenance_verified"])
+        self.assertFalse(any("gfxoff" in name.lower() for name in report))
+
     def test_each_register_rejects_wrong_identity_shape_order_and_values(self):
         for ordinal in range(19):
             for key, value in (("name", "other"), ("index", -1), ("index", True), ("value", -1),
