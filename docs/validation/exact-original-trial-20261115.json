@@ -5,7 +5,11 @@
   "request": "Entire original stack, desktop takeover and reboot test",
   "known_reference_layout_memory_corruption_or_hang_risk_explicitly_accepted": true,
   "release": "v0.4.0-alpha",
-  "OS": {"version": "26.7.2", "build": "25G332", "architecture": "x86_64"},
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "architecture": "x86_64"
+  },
   "original_components": {
     "full_installed_file_comparison_passed": true,
     "loaded_bringup_image_matches_release": true,
@@ -31,7 +35,7 @@
     "software_recovery_guaranteed_during_kernel_or_bus_hard_hang": false
   },
   "preparation": {
-    "CPU_methods_passed": 18,
+    "CPU_methods_passed": 20,
     "CPU_checks_execute_real_GPU_or_shutdown_commands": false,
     "Metal_verifier_compiles": true,
     "Metal_verifier_executed": false,
@@ -42,7 +46,12 @@
     "off_marker_retained_at_snapshot": true,
     "M2_and_one_shot_arming_absent_at_snapshot": true,
     "GPU_initialization_commands_at_snapshot": 0,
-    "reboot_requests_at_snapshot": 0
+    "reboot_requests_at_snapshot": 0,
+    "prearm_management_gate_revision": 2,
+    "first_prearm_check_failed_before_arming_or_reboot": true,
+    "completed_one_shot_service_absence_and_disabled_override_cases_tested": true,
+    "old_unconsumed_contract_and_sources_preserved": true,
+    "GPU_or_initialization_checks_changed_by_management_revision": false
   },
   "outcome": {
     "postboot_assessed_in_this_record": false,

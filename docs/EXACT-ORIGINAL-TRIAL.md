@@ -79,13 +79,21 @@ experiments and installation allowances remain closed.
 
 ## Preparation evidence and rollback
 
-Eighteen CPU-only methods exercise the actual observer's phase admission,
+Twenty CPU-only methods exercise the actual observer's phase admission,
 candidate-output refusal, stale-log rejection, exclusive receipts, off/arming
 restoration, deadline closure and ambiguous shutdown handling. The fake process
 tests execute no real shutdown or GPU command. The independent Metal verifier
 compiles but has not executed during preparation. A metadata-parser error in
 the first staging read was inspected before retry: no trial packet/job or
 activation marker had been created; empty IORegistry output is now covered.
+
+The first pre-arming management check also stopped before creating any arming
+intent: completed one-shot jobs were absent from the launchd service list. Fresh
+readback verified no disabled override, no pending attempt and intact GPU-off
+state. A versioned preparation-only revision now accepts that idle/absent state
+while still rejecting a running or disabled job. Its two additional CPU checks
+pass. The old contract and sources are retained; no GPU initializer, hardware
+guard, installed original file or reboot allowance was changed by this revision.
 
 The root-owned packet pins **1,696 inputs**, including **1,656 frozen interpreter
 files**. Its witness LaunchDaemon was loaded once in the preparation boot and
