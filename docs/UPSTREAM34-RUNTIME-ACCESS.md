@@ -163,3 +163,17 @@ At this checkpoint it is unarmed and has requested no reboot. Its limits remain
 one ordinary desktop boot, one unchanged Metal probe, 300 seconds of independent
 observation and at most one managed recovery, with no automatic retry. All
 preceding scopes remain consumed.
+
+## Later fixed-cutoff observer trial accepted
+
+After the separate log-freshness correction, the single native-desktop trial
+completed real Metal execution with correct GPU-written output and measured
+frame progress **717 to 740**, with an unchanged single WindowServer and no new
+report. Independent readback at **21:48:46 +08:00 on 2026-11-15** confirmed the
+accelerator and native framebuffer were still active, the counter had reached
+**2156**, all original34 input pins matched and consumer file access remained
+**18/18**. Runtime bytes remain unchanged since the directory permission repair.
+See the [complete scoped result](UPSTREAM34-DESKTOP-RETEST.md#fixed-cutoff-trial-passed-independent-desktop-and-gpu-verification).
+This is one accepted desktop trial, not proof that the directory defect was
+the sole original cause or that all applications and long sessions are stable.
+The next boot remains GPU-off without persistent display arming.

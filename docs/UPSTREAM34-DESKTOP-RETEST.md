@@ -361,3 +361,39 @@ time; actual next-boot and desktop/Metal results remain pending. Normal restart
 dispatches remaining are **zero**, and this consumed packet must not be replayed.
 The same one-attempt, one-probe, 300-second observation and bounded-recovery
 limits remain in force. No initialization occurred in the preparation boot.
+
+## Fixed-cutoff trial passed independent desktop and GPU verification
+
+The native-panel startup on **2026-11-15** logged its header at **21:35:33
++08:00** and completed at **21:37:15**. Its initial boot-time snapshot was
+**21:35:29**; later `kern.boottime` readback was **21:35:31** for the same
+privately verified boot identity. The fixed reader retained its original
+boundary throughout, and the complete startup record remained visible.
+Original compute/graphics outputs, queue adoptions and accelerator claim passed.
+
+The unchanged Metal probe exited **0** with an AMD device, a completed command
+and matching GPU-written output. Independent frame samples approximately
+**10.286 seconds** apart increased from **717 to 740**. Both retained armed
+readback 1, AGDC 1, IOP 1 and hold 0. The same single WindowServer remained
+present, and its diagnostic-report set did not change. Native PhxAMDFB, NMXAccel
+and IOAccelerator were present; the firmware framebuffer was absent. The
+desktop-complete and trial-success receipts agree and were independently bound
+to the actual trial boot. Acceptance completed at **21:37:30 +08:00**. No
+managed recovery was requested.
+
+A separate readback at **21:48:46 +08:00** verified exact original build 34,
+image/geometry and all **2080** pinned inputs before retiring the idle external
+witness. Native framebuffer and accelerator were still active, the same
+WindowServer remained, the live present counter had reached **2156**, no new
+WindowServer report was found, and runtime consumer reads still passed **18/18**.
+Only the exact already-exited observer LaunchDaemon was archived and removed.
+Original startup, helpers and installed driver/runtime bytes were unchanged.
+This verification submitted no new GPU work, ran no additional Metal probe and
+requested no reboot.
+
+This establishes **one real accelerated native-desktop trial on this machine**,
+not general application compatibility, performance, recovery or long-term
+stability. The project remains experimental. GPU-off is retained for the next
+boot, M2/pending markers and the specific persistent display variable are
+absent, and the consumed packet cannot retry. Current-session acceleration
+remains active; a subsequent boot is deliberately not persistently armed.

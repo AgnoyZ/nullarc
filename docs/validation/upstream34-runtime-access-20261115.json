@@ -81,7 +81,7 @@
     "automatic_retry": false,
     "old_scopes_reopened": false
   },
-  "current_desktop_acceleration_verified": false,
+  "current_desktop_acceleration_verified": true,
   "directory_defect_is_sole_cause_proven": false,
   "raw_diagnostics_or_identifiers_published": false,
   "binary_publication_added": false,
@@ -156,5 +156,15 @@
     "managed_recovery_limit": 1,
     "automatic_retry": false,
     "old_scopes_reopened": false
+  },
+  "latest_verified_desktop_result": {
+    "record": "upstream34-desktop-retest-20261115.json",
+    "section": "startup_clock_trial_terminal_readback",
+    "verified_at": "2026-11-15T21:48:46.589653+08:00",
+    "single_trial_real_GPU_and_desktop_success": true,
+    "installed_runtime_bytes_unchanged": true,
+    "runtime_consumer_file_reads_passed": 18,
+    "next_boot_GPU_off": true,
+    "general_application_or_long_term_stability_claimed": false
   }
 }

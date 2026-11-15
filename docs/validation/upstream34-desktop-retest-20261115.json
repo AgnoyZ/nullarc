@@ -59,7 +59,7 @@
   "private_material_published": false,
   "binary_upload_added": false,
   "actual_reboot_or_desktop_result_claimed": true,
-  "current_status": "immutable startup cutoff observer consumed; one restart scheduled and independently verified; next-boot real desktop and Metal evidence pending",
+  "current_status": "single original34 native desktop trial passed real Metal GPU output, frame progress, stable WindowServer and no new reports; current native framebuffer and accelerator active at independent readback; next boot remains GPU-off; consumed external witness retired",
   "dispatch_readback": {
     "ordinary_reboot_requested_once": true,
     "caller_returncode": 0,
@@ -330,6 +330,37 @@
     "normal_reboot_dispatches_remaining": 0,
     "automatic_retry": false,
     "source_checkpoint": "c64cc4a5d8ed446b8575668f9a7ed30a0fb14100",
-    "actual_next_boot_result": "pending; scheduled restart is not observed boot or desktop success"
-  }
+    "actual_next_boot_result": "completed successfully; see startup_clock_trial_terminal_readback"
+  },
+  "startup_clock_trial_terminal_readback": {
+    "verified_at": "2026-11-15T21:48:46.589653+08:00",
+    "same_actual_trial_boot": true,
+    "initial_boot_time_snapshot_local": "2026-11-15T21:35:29+08:00",
+    "current_boot_time_readback_local": "2026-11-15T21:35:31+08:00",
+    "original_startup_complete_local": "2026-11-15T21:37:15+08:00",
+    "acceptance_complete_local": "2026-11-15T21:37:30.166957+08:00",
+    "loaded_build": 34,
+    "original_image_geometry_and_all_2080_pins_verified_before_retirement": true,
+    "Metal_original_publication_and_correct_GPU_written_result": true,
+    "Metal_returncode": 0,
+    "frame_before": 717,
+    "frame_after": 740,
+    "sample_interval_seconds": 10.285549879074097,
+    "single_WindowServer_unchanged": true,
+    "new_WindowServer_reports": 0,
+    "live_frame_count": 2156,
+    "native_framebuffer_and_accelerator_currently_active": true,
+    "runtime_consumer_checks_passed": 18,
+    "next_boot_GPU_off": true,
+    "persistent_display_arming_absent": true,
+    "no_pending_attempt": true,
+    "managed_recovery_requested": false,
+    "exact_idle_external_job_archived_and_removed": true,
+    "original_startup_and_helpers_unchanged": true,
+    "verification_GPU_calls": 0,
+    "verification_Metal_calls": 0,
+    "verification_reboot_requests": 0,
+    "automatic_retry": false
+  },
+  "latest_desktop_acceleration_verified": true
 }
