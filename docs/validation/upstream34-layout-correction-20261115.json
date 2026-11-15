@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "date": "2026-11-15",
+  "scope": "original build-34 kernel retained unchanged; geometry-corrected original user tools; source validation",
+  "upstream_commit": "9dd76b604fca5e0125bd3caa5723df0f611ff27f",
+  "upstream_tag": "v0.4.0-alpha",
+  "branch": "downstream/780m-tahoe",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "architecture": "x86_64"
+  },
+  "baseline": {
+    "requested_build": 34,
+    "kernel_SHA256": "4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412",
+    "kernel_binary_source_ABI_or_build_label_modified": false,
+    "actual_loaded_build_at_source_checkpoint": 39,
+    "prior_build39_smoke_failed": true,
+    "prior_smoke_completed_cases": 0,
+    "prior_smoke_job_retired": true,
+    "prior_corrected_probe_executed_live": false,
+    "prior_scope_replayed": false
+  },
+  "changed_upstream_files": [
+    "mesboot.c",
+    "phxctl.c",
+    "bringup5.sh",
+    "full.sh"
+  ],
+  "upstream_startup_success_order_preserved": true,
+  "geometry_from_driver_not_physical_literal_fallback": true,
+  "TMR_region_matches_original_raw_recipe": true,
+  "GART_entries_checked": 32768,
+  "default_page_VRAM_offset": "0x2440000",
+  "CPU_checks": {
+    "methods_passed": 12,
+    "skipped": 0,
+    "actual_original_and_patched_entrypoints": true,
+    "ASan_UBSan": true,
+    "real_IOKit_linked": false,
+    "real_GPU_execution": false,
+    "synthetic_shell_only": true,
+    "original_wrong_target_mapping_reproduced": true,
+    "native_helpers_compiled_x86_64_and_signed": true,
+    "native_build_existing_unused_variable_warning_retained": true,
+    "initial_compile_errors_corrected_offline": true,
+    "base_make_test_passed": false,
+    "base_make_test_failure": "unchanged test_wait_seq test_short_wait_fast_poll timed_out assertion",
+    "base_make_test_firmware_fixture_skips": true,
+    "external_watchdog_mode_shell_cases_passed": true
+  },
+  "source_SHA256": {
+    "tools/upstream34_layout/build.py": "1f3676c50db85497af6114ad638323ca3672e7958a9eef9be388c9a9f45933ab",
+    "tools/upstream34_layout/layout-fix.patch": "a730b04c5035c26d0a6a53e37a0fb1afdc31c6548e54a69002c68172cd4ecf93",
+    "tools/upstream34_layout/PhxUpstream34Layout.h": "7c4ede33ae2f1ced6589c6fbb05feb57f8d3732119443bc4fa61a56aa54a92a0",
+    "tests/test_upstream34_layout.py": "ae38de355daec1a8793203b63bafb1e910c934e63484f6523ad9c616da803e79",
+    "tests/fixtures/upstream34_fake_iokit.c": "5c64183d1009e4a514a12894d2e321a0aefcf5314a19ec1a325396f55dc603f4"
+  },
+  "binaries_SHA256": {
+    "mesboot": "78de366ae7bfe0e17d972d52316d5fb0b4564ee1aedf15f0e3627c91ccea763e",
+    "phxctl": "e1b37c5ca5268c006a1a85fe9c5c8e0e1e30b437d8ec0afe5de63ea8f2c74613"
+  },
+  "deployment": {
+    "installed_at_source_checkpoint": false,
+    "GPU_off_retained": true,
+    "GPU_execution_proven": false,
+    "desktop_takeover_proven": false,
+    "GPU_region_ownership_proven": false,
+    "binary_upload_added": false,
+    "old_scopes_reopened": false
+  }
+}

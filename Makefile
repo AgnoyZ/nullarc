@@ -79,3 +79,7 @@ $(TEST_BIN_DIR)/test_panel_timing: src/phxaccel/tests/panel_timing.cpp src/phxac
 .PHONY: test-panel-timing
 test-panel-timing: $(TEST_BIN_DIR)/test_panel_timing
 	./$(TEST_BIN_DIR)/test_panel_timing
+
+.PHONY: test-upstream34-layout
+test-upstream34-layout:
+	python3 tests/test_upstream34_layout.py

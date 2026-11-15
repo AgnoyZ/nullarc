@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-15",
-  "scope": "owner-requested matched bring-up deployment; load/layout/refusal smoke pending",
+  "scope": "historical downstream build-39 deployment; fresh-boot load observed; smoke failed; wrong baseline superseded by original-build-34 correction",
   "candidate_source_commit": "6ed22ce2038946ac800e13cee47364ffcae74e45",
   "branch": "downstream/780m-tahoe",
   "OS": {
@@ -38,7 +38,7 @@
     "matching_tools_deployed_in_separate_root_packet": true,
     "original_runtime_plugin_firmware_accelerator_scripts_startup_and_allowlist_unchanged": true,
     "GPU_off_retained": true,
-    "loaded_image_still_original_build": 34
+    "loaded_image_at_installation_checkpoint": 34
   },
   "verification": {
     "actual_swap_function_tempfile_cases_passed": 7,
@@ -53,9 +53,9 @@
   },
   "postboot": {
     "root_launchdaemon_interpreter_preparation_role_verified": true,
-    "fresh_boot_observed": false,
-    "candidate_loaded": false,
-    "smoke_dispatched": false,
+    "fresh_boot_observed": true,
+    "candidate_loaded": true,
+    "smoke_dispatched": true,
     "smoke_cases_completed": 0,
     "smoke_cases_planned": 6,
     "ordinary_reboot_limit": 1,
@@ -73,8 +73,14 @@
       "same_preparation_boot_at_scheduler_verification": true,
       "dispatch_retried": false,
       "expected_restart_local_time": "2026-11-15T17:04:22+08:00",
-      "fresh_boot_result_pending": true
-    }
+      "fresh_boot_result_pending": false
+    },
+    "loaded_build": 39,
+    "smoke_passed": false,
+    "initial_probe_exit": 75,
+    "postboot_job_retired": true,
+    "corrected_private_probe_executed_live": false,
+    "further_build39_testing_suspended": true
   },
   "boundaries": {
     "real_GPU_execution_proven": false,
@@ -86,5 +92,12 @@
     "OpenViking_lookup": "unavailable; no registered tools",
     "AuxKC_or_PhxAccel_or_runtime_rebuilt_or_replaced": false
   },
-  "rollback": "Restore only retained original PhxBringup after exact current EFI checks; retain GPU-off; no consumed scope replay."
+  "rollback": "Restore only retained original PhxBringup after exact current EFI checks; retain GPU-off; no consumed scope replay.",
+  "baseline_correction": {
+    "requested_upstream_build": 34,
+    "deployed_downstream_build": 39,
+    "wrong_baseline_acknowledged": true,
+    "old_scope_replayed": false,
+    "followup": "upstream34-layout-correction-20261115.json"
+  }
 }

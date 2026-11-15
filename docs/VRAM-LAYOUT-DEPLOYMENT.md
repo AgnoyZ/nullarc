@@ -1,7 +1,13 @@
 # Matched VRAM-layout deployment and load smoke
 
-Status, 2026-11-15: **the corrected PhxBringup is installed and independently
-read back; its fresh-boot load and layout smoke are pending**. This follows the
+Status update, 2026-11-15: **downstream build 39 loaded after the restart, but
+was the wrong baseline for the owner's requested original-build-34 correction**.
+The automatic smoke failed at its initial snapshot check with no completed
+cases; its job is retired and no corrected live probe was run. Continue with
+the [original-build-34 correction](UPSTREAM34-LAYOUT-CORRECTION.md), not another
+build-39 trial. The installation/restart checkpoints below are retained history.
+
+The downstream PhxBringup was installed and independently read back. This follows the
 owner's explicit deployment/test request after the [source correction](
 VRAM-LAYOUT-SAFETY.md). It is a new, bounded operation. All earlier desktop,
 original-only and selector trial packets remain closed.
@@ -121,3 +127,24 @@ scheduler is not proof that the restart occurred or that the candidate loaded.
 Read the one-use postboot result/error and actual loaded image before claiming
 any smoke pass or continuing to GPU initialization. Preserve the consumed
 restart intent even if the connection disappears.
+
+## Actual fresh-boot observation and baseline correction
+
+Read-only postboot inspection verified a fresh boot, the exact deployed image,
+build 39, the target 4-GiB geometry, GPU-off, one firmware framebuffer and no
+native framebuffer/accelerator. All 454 pinned inputs and the retained
+original system stack still matched. The one-use job removed its own plist.
+Its error receipt records initial probe exit 75 and zero completed smoke cases.
+
+The probe assumed selector 116 must start unconfigured. The driver may accept
+the retained legacy-layout device property at startup without initializing the
+GPU; that property and accepted metadata were observed. An offline corrected
+probe passed 16 fake-IOKit cases, but its actual selector-116 result was not
+obtained live. The initial exit cause therefore remains an expectation-mismatch
+lead, not a demonstrated hardware result or a smoke pass.
+
+The owner then identified the more fundamental baseline error: upstream is
+build 34; the selected candidate was existing downstream build 39 with many
+additional changes. Its further testing is suspended. The new correction
+preserves the unchanged original build-34 kernel and adjusts its user-space
+address consumers; no version-label substitution is used.

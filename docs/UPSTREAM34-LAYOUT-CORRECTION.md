@@ -1,0 +1,114 @@
+# Original build 34 with geometry-corrected user tools
+
+2026-11-15: the owner corrected the baseline after the prior deployment
+loaded downstream build 39. The requested candidate is **original upstream
+build 34**, with a narrow correction for this machine's physical backing and
+VRAM extent. Merely relabeling downstream build 39 would not satisfy that
+request. The prior packet and its failed initial smoke remain consumed;
+its corrected private probe has not been run live.
+
+## Baseline and scope
+
+The source recipe pins upstream v0.4.0-alpha commit
+`9dd76b604fca5e0125bd3caa5723df0f611ff27f`. The retained original PhxBringup
+binary has SHA-256
+`4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412`.
+Its kernel source, build label, selectors and binary are not modified by this
+correction. The installed original accelerator, plugin, runtime and firmware
+remain the retained release versions. The observed OS is macOS
+**26.7.2 / 25G332**, x86_64.
+
+Only two original user tools and two original shell scripts are patched:
+
+- `mesboot` reads the published MC base, physical backing, VRAM size and BAR
+  aperture. The first 128 MiB's PTEs and page-table base use that physical
+  backing. The system aperture uses the actual VRAM extent. Both default-page
+  registers use a zeroed page immediately after the PTE table and before the
+  original KIQ region, rather than reference-machine addresses.
+- `phxctl` supplies the geometry-derived TOC and TMR words to the script and
+  refuses stale raw TOC/TMR words. The original script's TMR offset/capacity
+  remain 128/64 MiB; replacing it with the original managed `tmr` command would
+  silently select a different 20-MiB/16-MiB region and is not this correction.
+- `bringup5.sh` retains destroy/create, TOC staging/submission, TMR submission,
+  all 17 firmware segments, RLC autoload and SMU `0x3`, `0x2`, `0x16(1)` in
+  the original successful order. Geometry admission precedes the first write.
+- `full.sh` retains the original power, doorbell/CP, GART, MES and requested
+  queue-step order. Both scripts now stop on a failing command/pipeline.
+  The helper wrappers also stop on transport/size, ABI or firmware-status
+  errors, and firmware staging refuses a short file before payload submission.
+
+The scripts retain their original watchdogs by default. A separate test runner
+may supply `PHX34_WATCHDOG_ACK` only after its independent deadline has actually
+acknowledged. In that mode the scripts require the acknowledgement file and
+skip their own shutdown/killall calls, leaving recovery to the single bounded
+runner. The GPU-command order is unchanged in either mode. The acknowledgement
+file alone is not a general safety credential; the root runner must verify its
+current-boot identity, ownership, pins and live deadline process before use.
+
+Both helpers require original build 34 and ABI 1.12, positive typed geometry,
+16-MiB-aligned bases/extent, checked 48-bit intervals, the original MC base and
+256-MiB CPU aperture, and space for the original regions. They do not use
+selectors 114/116 or import the downstream managed bootstrap. These constraints
+cover this original startup path, not every experimental environment override
+or an arbitrary GPU model. Operational execution must use the pinned clean
+environment, image and files.
+
+On this target the derived backing is `0x780000000`, extent 4 GiB, GART table
+physical address `0x782400000`, default page `0x782440000`, TMR physical address
+`0x788000000`, and system-aperture upper value `0x203fff`. No target physical
+literal is a mapping fallback. The unchanged original raw TMR words also
+encoded an incompatible physical address; changing only `mesboot`'s base
+would not fix that separate use.
+
+## Offline checks
+
+The [isolated recipe](../tools/upstream34_layout/README.md) never installs,
+opens a target GPU service or runs its built executables. It materializes
+only six pinned user-space inputs and applicable notices. A native x86_64
+build of both helpers is ad-hoc signed and strictly verified. The original
+unused-variable warning is retained. An initial offline compile found a missing
+CoreFoundation include and an overly old deployment target; these were corrected
+before the successful build. The failed attempt is retained privately.
+
+Twelve focused methods passed. The regression compiles the actual original and patched C entrypoints under
+ASan/UBSan, substitutes every IOKit function and does not link IOKit. It
+reproduces the original wrong mapping and checks every patched PTE, its first
+and last entries, table base, both aperture/default registers and zero-page
+writes. Bad/missing metadata, build 39, ABI errors, transport/size failures,
+stale raw TMR words, short firmware and firmware/SMU status errors are refused.
+Synthetic shell fixtures verify original successful ordering and terminal
+failure without invoking sudo, shutdown, firmware, MMIO or real GPU calls.
+The baseline `make test` also ran: six binaries passed (firmware-fixture cases
+were skipped), but the unchanged `test_wait_seq` short-wait timing assertion
+failed. The full base suite is not recorded as passing and its unrelated source
+was not changed.
+
+## Deployment and test boundaries
+
+At the source checkpoint, build 39 remains loaded, GPU-off is present, the
+original installed system stack still matches its retained package, and the
+prior smoke job is removed. Fresh source checks do not mean build 34 has
+already been restored or that acceleration works.
+
+A new bounded deployment must verify a fresh complete EFI backup/manifest,
+restore only the active PhxBringup bundle to the retained original build 34,
+retain the displaced image for rollback, and install only the four reviewed
+user-space files with independent readback. Preserve Windows/OpenCore,
+licences, firmware/runtime/plugin/accelerator, OS security and unrelated NVRAM.
+Keep GPU-off and all display-arming flags absent for the first test.
+
+Any new headless execution requires the exact original image after a fresh
+boot, matching files and geometry, a single-use intent and an independent
+deadline acknowledged before initialization. A real unchanged Metal verifier
+must complete and observe GPU-written output before claiming GPU execution.
+No desktop flag or automatic desktop-reboot transition is part of the first
+headless test. Preserve all failed receipts and stop rather than replaying a
+consumed operation. A software deadline cannot guarantee recovery from a hard
+hardware hang.
+
+Validated addresses are not proof that all chosen offsets are free of console
+or firmware allocations. This correction does not establish region ownership,
+fix the prior CoreDisplay assertion, or prove an accelerated desktop. No public
+binary upload is added. The root MIT/GPL-2.0 terms for these tools and existing
+per-file AMD headers/notices are preserved; no source from another licensed
+runtime component is copied. Full-stack publication restrictions remain.
