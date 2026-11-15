@@ -194,3 +194,79 @@ source branch remains pinned at `5805c05bed6cf0ce1e3fc28f8d088f6e5e296993`;
 these diagnostic files are from the downstream isolated recipe. Rollback
 restores only the four exact saved user files with GPU-off present and native
 display arming absent. The prior root packets and their receipts remain intact.
+
+## Diagnostic trial consumed: initializer exited before queue setup
+
+The newly prepared diagnostic trial was subsequently dispatched exactly once;
+its independent root-scheduler readback passed. The desktop boot began at
+**19:41:23 +08:00 on 2026-11-15**. PhxAMDFB took the panel, and all **17** fresh
+firmware loads returned zero transport and firmware status. The retained
+diagnostic now identifies an earlier failure: `bringup5.sh` exited with status
+**1**, and `full.sh` explicitly stopped before GPU queue initialization.
+The following selector 113 refusal returned `0xe00002d8`; this does not locate
+the earlier failing shell command. Original startup then reported that NMXAccel
+did not start and requested its own fallback restart. The external witness did
+not request managed recovery. No desktop-complete, Metal-exit or trial-success
+receipt exists. The original restart occurred before the witness saved its final
+failure block; the completed startup log was separately read back privately.
+
+The fallback boot began at **19:42:55 +08:00**. Exact original build 34 and the
+installed diagnostic stack passed readback. The firmware framebuffer is present;
+PhxAMDFB, NMXAccel and IOAccelerator are absent. One WindowServer is running.
+GPU-off is empty, and M2/pending markers and the specific display-arming variable
+are absent. This boot has **no active hardware acceleration**. The consumed
+scope's closed receipt prevents retry. Its idle, unregistered external witness
+plist was archived and removed after verifying that its processes were absent;
+original startup and all installed helpers stayed unchanged during retirement.
+The successful 17:51 headless GPU/Metal evidence remains historical and intact.
+
+## Narrow shell correction and fresh preparation
+
+Offline stubs reproduce a real strict-shell regression in both scripts:
+`killall shutdown` returning 1 for no matching process causes an otherwise
+successful script to exit silently. This is consistent with the retained
+status-1 failure but does **not** prove which command failed on that live boot.
+The correction accepts only exit 1 with the exact C-locale no-process diagnostic.
+Permission, empty, mixed and other errors remain terminal and are reported.
+The inherited ERR trap also reports the initializer's failing line and status.
+GPU-command order, metadata/ABI admission and watchdog arming are unchanged.
+
+Nineteen downstream methods and **20** actual default-entrypoint methods pass,
+including ASan/UBSan, both cancellation sites, nested initializer-to-queue order,
+and terminal genuine cancellation errors. The five original CPU executables
+also pass; external-firmware-dependent cases remain skipped. Native x86_64
+helper builds and strict signatures pass. Both binaries have the exact same
+hashes as the previously installed diagnostic binaries. These checks execute
+no GPU work and do not establish desktop acceleration.
+
+The broader downstream `make test` is **not fully green**: its separate,
+unchanged `test_wait_seq` failed the 500-microsecond short-wait assertion;
+a targeted rerun passed that case but failed the extended-wait sleep-count
+assertion. These scheduler-sensitive CPU checks are outside the original34
+helper path and were not modified or suppressed. This does not change the
+passing original five-executable or focused helper/observer results above.
+
+The default branch `upstream34/vram-layout-fix` now contains the same correction
+and retained diagnostics at `90bb06f6f9255cb5a16cc5eb87e78032566b2000`;
+its non-force remote update and independent unauthenticated SHA readback passed.
+Its complete `src/`, `install/` and licence trees still match upstream build 34.
+The branch name, public visibility, `main` and upstream history are preserved.
+
+Under the owner's continuing deployment/test request, a distinct new packet
+has now replaced **only two shell files**, with exact old-file backups and
+independent installed readback. Helper binaries, original kernel, accelerator,
+runtime, firmware, plugin and startup remain unchanged. EFI was verified
+read-only and left unchanged/unmounted. The new actual launchd preparation
+role passed with **zero GPU calls**, **42** CPU observer methods and **2087**
+pinned inputs. OS remains macOS 26.7.2 / 25G332.
+
+At this source checkpoint GPU-off is present, display is unarmed, and the new
+test has **not** dispatched a reboot. It permits one native-desktop boot, one
+unchanged Metal probe after startup evidence succeeds, a 300-second independent
+observation deadline and at most one managed recovery restart. Original startup
+watchdogs remain active. A detected original fallback does not immediately
+dispatch competing recovery, and later boots close the consumed scope. There
+is no automatic retry. Software timers cannot guarantee recovery from a hard
+hardware hang. Rollback restores only the two backed-up scripts with GPU-off
+present and display arming absent. Actual dispatch/next-boot receipts must be
+read before claiming a reboot or acceleration result.

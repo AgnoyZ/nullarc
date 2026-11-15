@@ -168,5 +168,18 @@
     "kernel_runtime_firmware_plugin_and_startup_unchanged": true,
     "GPU_calls": 0,
     "new_reboot_dispatched_at_source_checkpoint": false
+  },
+  "watchdog_trial_followup": {
+    "record": "upstream34-desktop-retest-20261115.json",
+    "latest_diagnostic_trial_consumed": true,
+    "current_firmware_desktop_acceleration": false,
+    "watchdog_shell_regression_reproduced_offline": true,
+    "exact_previous_live_failing_command_proven": false,
+    "two_shell_fix_installed_and_verified": true,
+    "binary_helpers_and_kernel_stack_unchanged": true,
+    "default_source_commit": "90bb06f6f9255cb5a16cc5eb87e78032566b2000",
+    "fresh_launchd_preparation_passed": true,
+    "preparation_GPU_calls": 0,
+    "new_reboot_dispatched_at_source_checkpoint": false
   }
 }

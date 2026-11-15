@@ -220,3 +220,16 @@ passed with no GPU call, while GPU-off remains present and display arming is
 absent. The new preparation/next-boot status is recorded separately in the
 desktop retest record; the preceding failed and successful attempts remain
 consumed historical evidence.
+
+The diagnostic trial was also consumed and returned to the firmware desktop
+at 19:42:55 +08:00 on 2026-11-15. It now retains an initializer status-1 failure
+before queue setup. Offline fixtures reproduce a strict-shell no-process
+watchdog-cancellation defect; they do not identify the exact untraced command
+on that boot. Both shell sites are corrected with narrow no-match handling,
+while genuine cancellation failures remain terminal. The default source branch
+has been synchronized at `90bb06f6f9255cb5a16cc5eb87e78032566b2000` with the
+same correction and diagnostics; upstream kernel/install/licence trees remain
+unchanged. A fresh separately bounded packet installed only the two scripts
+and passed its no-GPU launchd preparation role. The newest checkpoint and
+rollback are in the desktop retest record; no new reboot/result is claimed
+at that preparation checkpoint.

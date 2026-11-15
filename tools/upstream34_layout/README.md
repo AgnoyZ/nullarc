@@ -36,3 +36,18 @@ no reboot or GPU work had been dispatched. This recipe remains distinct from
 the default branch's pinned candidate. The failed trial, actual deployment and
 firmware-desktop state are recorded in
 [the retest result](../../docs/UPSTREAM34-DESKTOP-RETEST.md#consumed-trial-result-original-startup-requested-fallback).
+
+The later diagnostic boot also failed before queue setup. Offline tests
+reproduced a silent status-1 exit when no shutdown timer remained. Both shell
+cancellation sites now accept only the exact C-locale no-process diagnostic
+with status 1; other cancellation errors remain terminal and visible. An
+inherited ERR trap retains the initializer line/status for other failures.
+The nested shell fixture verifies original GPU ordering after the benign case
+and refuses actual cancellation errors before queue setup. Nineteen focused
+methods pass. This establishes a shell correction, not the precise untraced
+command from the failed live boot or accelerated desktop success.
+
+The same correction is synchronized to the default branch's actual entrypoints.
+A new distinct packet installed only the two shell files; both existing binary
+hashes remain unchanged. Its launchd preparation passed with no GPU work.
+Dispatch and actual postboot outcomes are separate from this preparation.
