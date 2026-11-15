@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "date": "2026-11-15",
+  "status": "source_CPU_ready_not_armed_no_target_result",
+  "parent_commit": "baa19dd0d29bf35d751f395ec7d45e583eb4be2b",
+  "upstream_reference_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+  "trial": {
+    "compile_define": "PHX_DESKTOP_CP_SETUP_FIRST_TRIAL=1",
+    "default": 0,
+    "invalid_values_rejected_by_compiler": true,
+    "only_changed_stage_order": "existing three doorbell/CP setup pairs before the four queue idle checks for desktop-init",
+    "all_setup_values_and_pair_order_preserved": true,
+    "ordinary_build_order_unchanged": true,
+    "terminal_preflight_and_claim_behavior_unchanged": true,
+    "full_upstream_reference_recipe_replayed": false,
+    "later_checked_selector_guards_retained": true,
+    "otherwise_identical_binary_to_last_target": false
+  },
+  "validation": {
+    "focused_methods": 135,
+    "groups": {
+      "desktop": 38,
+      "startup": 30,
+      "coordinator-runner": 6,
+      "coordinator-actual": 47,
+      "transport": 7,
+      "collector": 7
+    },
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "full_suite_rerun": false,
+    "failure_first": {
+      "old_order_failures": 2,
+      "method_count": 1,
+      "variants": 2
+    },
+    "setup_transport_or_reply_refusals": 24,
+    "both_success_layouts_compared": true,
+    "nonsetup_register_trace_digest_matches": true,
+    "native_architecture": "x86_64-apple-darwin",
+    "native_compile_and_strict_ad_hoc_signature_passed": true,
+    "real_native_binary_executed": false,
+    "fake_harness_sanitizers": [
+      "ASan",
+      "UBSan"
+    ],
+    "tested_source_sha256": {
+      "tools/phxctl/mesboot.c": "a26bd8f5a273342856a80bdb7c1ddc7410cd41af772690011a4fe832818f7df5",
+      "tests/test_desktop_entrypoint.c": "eb2303a21f91bf30bedab2bc5cbc505e5180892ae543d669891b279543ea2ead",
+      "tests/test_desktop_handoff.py": "9f31d7a68a3e5cb91fde085dc794d8787ccd349eeb7f39861a149f4046e74b0c"
+    }
+  },
+  "fresh_metadata": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "bringup_build": 39,
+    "same_boot_as_last_recovery": false,
+    "startup_changed_to_shell_entrypoint": true,
+    "off_marker_absent": true,
+    "one_accelerator_service_registered": true,
+    "native_framebuffer_service_present": false,
+    "firmware_framebuffer_count": 1,
+    "matching_initializer_or_reboot_process_present": false,
+    "old_immutable_admission_refused_before_preparation": true,
+    "other_six_installed_inputs_match_old_receipts": true,
+    "GPU_execution_established_by_registration": false
+  },
+  "new_authorization_scope": {
+    "ordinary_reboot_limit": 1,
+    "desktop_attempt_limit": 1,
+    "failure_or_timeout_recovery_reboot_limit": 1,
+    "independent_watchdog_seconds": 240,
+    "fresh_boot_required": true,
+    "current_boot_GPU_work_allowed": false,
+    "all_previous_requests_remain_closed": true,
+    "automatic_retry": false
+  },
+  "boundaries": {
+    "new_root_packet_prepared": false,
+    "GPU_commands": 0,
+    "driver_or_helper_installed": false,
+    "startup_or_arming_changed": false,
+    "reboot_dispatched": false,
+    "desktop_success_or_acceleration_claimed": false,
+    "raw_diagnostics_or_binaries_published": false,
+    "OpenViking_rule_and_experience_check": "unavailable; no registered tools found"
+  }
+}

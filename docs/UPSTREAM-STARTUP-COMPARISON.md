@@ -45,6 +45,11 @@ controlled test. Removing a refusal guard would only suppress the observation.
 The [transport audit](REGISTER-TRANSPORT-AUDIT.md) and [GART guard repair](
 GART-SELECTOR-GUARD.md) retain their separate evidence and limitations.
 
+The owner subsequently requested a test of this ordering difference. The
+[separate trial](DESKTOP-UPSTREAM-ORDER-TRIAL.md) preserves ordinary builds and
+uses an explicit compile-time CP-before-selection candidate, a new request and
+fresh-boot recovery; it does not reopen the historical desktop retest.
+
 ## What the historical power fields add
 
 Two archived observations from the earlier dedicated GC phase experiment were

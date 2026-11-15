@@ -42,12 +42,16 @@ class DesktopHandoffTests(unittest.TestCase):
                 fragments.extend(matches)
             (cls.directory / filename).write_text("\n".join(fragments))
         cls.provider, cls.entrypoint = cls.directory / "provider-fake", cls.directory / "entrypoint-fake"
+        cls.order_trial = cls.directory / "order-trial-fake"
         common = ["-g", "-Wall", "-Wextra", "-fsanitize=address,undefined", "-fno-sanitize-recover=all"]
         commands = [
             [cxx, "-std=c++17", "-Werror", *common, "-I" + str(ROOT / "src/phxbringup"),
              "-I" + str(cls.directory), str(ROOT / "tests/test_desktop_handoff.cpp"), "-o", str(cls.provider)],
             [compiler, "-std=c11", "-D_DEFAULT_SOURCE", *common, "-I" + str(ROOT / "tests/fake_iokit"),
              "-I" + str(ROOT / "tools/phxctl"), str(ROOT / "tests/test_desktop_entrypoint.c"), "-o", str(cls.entrypoint)],
+            [compiler, "-std=c11", "-D_DEFAULT_SOURCE", "-DPHX_DESKTOP_CP_SETUP_FIRST_TRIAL=1", *common,
+             "-I" + str(ROOT / "tests/fake_iokit"), "-I" + str(ROOT / "tools/phxctl"),
+             str(ROOT / "tests/test_desktop_entrypoint.c"), "-o", str(cls.order_trial)],
         ]
         for command in commands:
             result = subprocess.run(command, capture_output=True, text=True, timeout=90)
@@ -71,6 +75,79 @@ class DesktopHandoffTests(unittest.TestCase):
                    "desktop-vmid-preflight": "desktop VMID preflight:"}.get(command, "desktop handoff:")
         self.assertEqual(status == 0, success in result.stdout)
         return data
+
+    def order_case(self, fault="ok", status=0, command="desktop-init", variant="relocated", trial=True):
+        binary = self.order_trial if trial else self.entrypoint
+        result = subprocess.run([str(binary), variant, fault, command], capture_output=True, text=True,
+                                env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"}, timeout=15)
+        self.assertEqual(status, result.returncode, result.stderr)
+        summary = re.findall(r"^fake-desktop-summary (.*)$", result.stderr, re.M)
+        order = re.findall(r"^fake-desktop-order (.*)$", result.stderr, re.M)
+        self.assertEqual((1, 1), (len(summary), len(order)), result.stderr)
+        return json.loads(summary[0]), json.loads(order[0]), result
+
+    def test_order_trial_moves_only_three_setup_pairs_before_first_selection(self):
+        pairs = [[1, 0xDE0, 1], [0, 0xDE0, 1], [1, 0xA802, 0], [0, 0xA802, 0],
+                 [1, 0xA803, 0x01000000], [0, 0xA803, 0x01000000]]
+        for variant in ("reference", "relocated"):
+            with self.subTest(variant=variant):
+                normal, old, _ = self.order_case(variant=variant, trial=False)
+                trial, new, result = self.order_case(variant=variant)
+                self.assertEqual(normal, trial)
+                self.assertEqual(3, new["setup_writes"])
+                self.assertEqual(old["register_events"], new["register_events"])
+                self.assertEqual(old["nonsetup_hash"], new["nonsetup_hash"])
+                self.assertEqual([[0, 0xC807, 0], [0, 0xA900, 0]], new["first"][:2])
+                self.assertEqual(pairs, new["first"][2:8])
+                self.assertEqual([1, 0xA900, 13], new["first"][8])
+                self.assertEqual([1, 0xA900, 13], old["first"][2])
+                self.assertIn("desktop order trial: CP setup before queue idle checks", result.stderr)
+
+    def test_order_trial_setup_failures_stop_before_any_selection_or_GPU_memory(self):
+        for ordinal in range(1, 4):
+            for mode, status in (("write-status", 74), ("write-short", 74), ("write-long", 74),
+                                 ("write-immediate", 75), ("read-status", 74), ("read-short", 74),
+                                 ("read-long", 74), ("read-readback", 75)):
+                fault = "setup-" + mode + "-" + str(ordinal)
+                with self.subTest(fault=fault):
+                    data, order, _ = self.order_case(fault, status)
+                    self.assertEqual(ordinal, data["writes"])
+                    self.assertEqual(ordinal, order["setup_writes"])
+                    self.assertFalse(any(event[1] == 0xA900 and event[0] for event in order["first"]))
+                    self.assertEqual([0] * 7, [data[k] for k in
+                                     ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims", "closes")])
+
+    def test_order_trial_dual_zero_and_each_idle_selection_still_refuse(self):
+        cases = [("select-zero-readbacks", 1), ("restore-selection", 2), ("already-queue", 1)]
+        cases.extend(("selector-immediate-" + str(i), i) for i in range(1, 9))
+        for fault, selections in cases:
+            with self.subTest(fault=fault):
+                data, order, result = self.order_case(fault, 75)
+                self.assertEqual(3, order["setup_writes"])
+                self.assertEqual(3 + selections, data["writes"])
+                self.assertEqual([0] * 7, [data[k] for k in
+                                 ("vwrites", "scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims", "closes")])
+                self.assertNotIn("desktop handoff:", result.stdout)
+
+    def test_order_trial_preserves_terminal_preflights_and_claim_without_setup(self):
+        for command in ("desktop-preflight", "desktop-vmid-preflight", "desktop-claim"):
+            with self.subTest(command=command):
+                baseline, old, _ = self.order_case(command=command, trial=False)
+                trial, new, result = self.order_case(command=command)
+                self.assertEqual((baseline, old), (trial, new))
+                self.assertEqual(0, new["setup_writes"])
+                self.assertNotIn("desktop order trial:", result.stderr)
+
+    def test_order_trial_admission_refusals_precede_setup(self):
+        for fault, status in (("bad-count", 64), ("bad-argument", 64), ("env-override", 64),
+                              ("overlap", 75), ("pre-adopted", 75), ("psp-fault", 75),
+                              ("hello-status", 74), ("snapshot-status", 74), ("reserve-status", 74),
+                              ("already-mes", 75), ("already-selected", 75)):
+            with self.subTest(fault=fault):
+                data, order, _ = self.order_case(fault, status)
+                self.assertEqual(0, order["setup_writes"])
+                self.assertEqual(0, data["writes"])
+                self.assertEqual(0, data["vwrites"])
 
     def test_provider_reservation_covers_every_arena_and_doorbell(self):
         self.provider_case("arithmetic")

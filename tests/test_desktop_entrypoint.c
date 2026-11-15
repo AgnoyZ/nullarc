@@ -20,6 +20,9 @@ static struct PhxDesktopLayout saved;
 static uint32_t words[0x400000 / 4], registers[0x20000], banks[16][0x20000];
 static unsigned opens, snapshots, reservations, seals, claims, writes, vwrites, reads, scheduler_bells, compute_bells, graphics_bells, closes;
 static unsigned grbm_writes;
+static unsigned setup_writes, register_event_count;
+static uint32_t first_register_events[32][3];
+static uint64_t nonsetup_register_hash;
 static int terminal, preflight, vmid_preflight;
 static int is(const char *name) { return !strcmp(fault, name); }
 static int ordinal_fault(const char *name, unsigned ordinal) {
@@ -31,10 +34,32 @@ static int gart_selector_fault(const char *name) {
     char value[80]; assert(snprintf(value, sizeof(value), "gart-%s-%u", name, grbm_writes - 8) > 0);
     return is(value);
 }
+static int is_setup_register(uint32_t address) {
+    return address == 0xde0 || address == 0xa802 || address == 0xa803;
+}
+static void register_event(uint32_t operation, uint32_t address, uint32_t value) {
+    if (register_event_count < 32) {
+        first_register_events[register_event_count][0] = operation;
+        first_register_events[register_event_count][1] = address;
+        first_register_events[register_event_count][2] = value;
+    }
+    ++register_event_count;
+    if (!is_setup_register(address)) {
+        const uint32_t words[] = {operation, address, value};
+        for (unsigned i = 0; i < 3; ++i)
+            nonsetup_register_hash = (nonsetup_register_hash ^ words[i]) * 1099511628211ull;
+    }
+}
 static void summary(void) {
     fprintf(stderr, "fake-desktop-summary {\"opens\":%u,\"snapshots\":%u,\"reservations\":%u,\"seals\":%u,\"claims\":%u,"
         "\"writes\":%u,\"vwrites\":%u,\"reads\":%u,\"scheduler_bells\":%u,\"compute_bells\":%u,\"graphics_bells\":%u,\"closes\":%u}\n",
         opens, snapshots, reservations, seals, claims, writes, vwrites, reads, scheduler_bells, compute_bells, graphics_bells, closes);
+    fprintf(stderr, "fake-desktop-order {\"setup_writes\":%u,\"register_events\":%u,\"nonsetup_hash\":%llu,\"first\":[",
+            setup_writes, register_event_count, (unsigned long long)nonsetup_register_hash);
+    for (unsigned i = 0; i < register_event_count && i < 32; ++i)
+        fprintf(stderr, "%s[%u,%u,%u]", i ? "," : "", first_register_events[i][0],
+                first_register_events[i][1], first_register_events[i][2]);
+    fprintf(stderr, "]}\n");
 }
 static int fail(const char *name) { if (!is(name)) return 0; terminal = 1; return 5; }
 static uint32_t *reg(uint32_t address) {
@@ -154,6 +179,13 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
         if (vmid_preflight) {
             assert(writes < 2 && input[1] == (writes ? 0 : 0x10));
         }
+        register_event(1, (uint32_t)input[0], (uint32_t)input[1]);
+        if (is_setup_register((uint32_t)input[0])) {
+            ++setup_writes;
+            char name[80];
+            assert(snprintf(name, sizeof(name), "setup-write-status-%u", setup_writes) > 0);
+            if (is(name)) { ++writes; terminal = 1; return 5; }
+        }
         ++writes; if (fail("write-status")) return 5;
         if (ordinal_fault("vmid-write-status", writes)) { terminal = 1; return 5; }
         *reg((uint32_t)input[0]) = (uint32_t)input[1]; *output = input[1];
@@ -179,6 +211,18 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
             }
         }
         if (is("setup-readback") && input[0] == 0xde0) *output ^= 1;
+        if (is_setup_register((uint32_t)input[0])) {
+            char name[80];
+            const char *modes[] = {"short", "long", "immediate"};
+            for (unsigned i = 0; i < 3; ++i) {
+                assert(snprintf(name, sizeof(name), "setup-write-%s-%u", modes[i], setup_writes) > 0);
+                if (is(name)) {
+                    if (i == 0) --*output_count;
+                    else if (i == 1) ++*output_count;
+                    else *output ^= 1;
+                }
+            }
+        }
         return 0;
     }
     if (selector == SEL_DBG_VRAM_WRITE) {
@@ -231,6 +275,19 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
         if (fail("read-status")) return 5;
         if (ordinal_fault("vmid-read-status", reads)) { terminal = 1; return 5; }
         uint32_t value = *reg((uint32_t)input[0]);
+        if (is_setup_register((uint32_t)input[0])) {
+            char name[80];
+            const char *modes[] = {"status", "short", "long", "readback"};
+            for (unsigned i = 0; i < 4; ++i) {
+                assert(snprintf(name, sizeof(name), "setup-read-%s-%u", modes[i], setup_writes) > 0);
+                if (is(name)) {
+                    if (i == 0) { terminal = 1; return 5; }
+                    else if (i == 1) --*output_size;
+                    else if (i == 2) ++*output_size;
+                    else value ^= 1;
+                }
+            }
+        }
         if (ordinal_fault("vmid-read-short", reads)) --*output_size;
         if (ordinal_fault("vmid-read-long", reads)) ++*output_size;
         if (ordinal_fault("vmid-read-all-ones", reads)) value = UINT32_MAX;
@@ -247,6 +304,7 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
                 if (is(select_faults[i]) && grbm_writes == 1 + 2 * i) value ^= 1;
             if (is("restore-selection") && grbm_writes == 2) value = 13;
         }
+        register_event(0, (uint32_t)input[0], value);
         memcpy(output_data, &value, sizeof(value)); return 0;
     }
     assert(selector == SEL_DBG_VRAM_READ && input_count == 2 && input[0] + *output_size <= sizeof(words));

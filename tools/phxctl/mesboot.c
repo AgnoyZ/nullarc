@@ -19,6 +19,14 @@
 #include "mes_v11_api_def.h"
 #include "gfx11_shader_probe.h"
 
+/* Explicit experiment build only. Ordinary builds retain their existing order. */
+#ifndef PHX_DESKTOP_CP_SETUP_FIRST_TRIAL
+#define PHX_DESKTOP_CP_SETUP_FIRST_TRIAL 0
+#endif
+#if PHX_DESKTOP_CP_SETUP_FIRST_TRIAL != 0 && PHX_DESKTOP_CP_SETUP_FIRST_TRIAL != 1
+#error "PHX_DESKTOP_CP_SETUP_FIRST_TRIAL must be 0 or 1"
+#endif
+
 #define UC_TYPE 0x4E34384Eu
 #define SEL_HELLO 0
 #define SEL_READREGS 2
@@ -1308,6 +1316,28 @@ static int desktop_vmid_preflight(void)
    return 0;
 }
 
+static void desktop_cp_setup(void)
+{
+   const uint32_t setup[][2] = {{0x0de0, 1}, {SEG1(0x802), 0}, {SEG1(0x803), 0x01000000}};
+   for (unsigned i = 0; i < sizeof(setup) / sizeof(setup[0]); ++i) {
+      if (PHX_DESKTOP_CP_SETUP_FIRST_TRIAL)
+         fprintf(stderr, "desktop order trial: setup=%u register=0x%08x requested=0x%08x; begin\n",
+                 i + 1, setup[i][0], setup[i][1]);
+      const uint32_t immediate = wr(setup[i][0], setup[i][1]);
+      if (immediate != setup[i][1]) {
+         if (PHX_DESKTOP_CP_SETUP_FIRST_TRIAL)
+            fprintf(stderr, "desktop order trial: setup=%u write-readback=0x%08x; subsequent-read=not-performed\n",
+                    i + 1, immediate);
+         gpu_failure("desktop doorbell/CP setup readback");
+      }
+      const uint32_t observed = rd(setup[i][0]);
+      if (PHX_DESKTOP_CP_SETUP_FIRST_TRIAL)
+         fprintf(stderr, "desktop order trial: setup=%u write-readback=0x%08x readback=0x%08x\n",
+                 i + 1, immediate, observed);
+      if (observed != setup[i][1]) gpu_failure("desktop doorbell/CP setup readback");
+   }
+}
+
 /* No shell, watchdog, output filter, environment-selected engine or implicit layout.
  * Firmware/power completion precedes this stage. Display/recovery belong to the coordinator.
  */
@@ -1363,6 +1393,12 @@ static int desktop_command(int argc, char **argv)
    if (mes == UINT32_MAX || (mes & 0x3c000000u) || rd(SEG1(0x900)))
       gpu_failure("inactive MES and idle selection preconditions");
    if (!strcmp(argv[1], "desktop-vmid-preflight")) return desktop_vmid_preflight();
+    const int setup_first = PHX_DESKTOP_CP_SETUP_FIRST_TRIAL && !strcmp(argv[1], "desktop-init");
+    if (setup_first) {
+       fputs("desktop order trial: CP setup before queue idle checks; begin\n", stderr);
+       desktop_cp_setup();
+       fputs("desktop order trial: CP setup verified; next=queue-idle-checks\n", stderr);
+    }
    desktop_idle_queue(3, 1, SEG0(0x1fab));
    desktop_idle_queue(3, 0, SEG0(0x1fab));
    desktop_idle_queue(1, 0, SEG0(0x1fab));
@@ -1374,10 +1410,7 @@ static int desktop_command(int argc, char **argv)
       puts("desktop preflight: four queue selection/idle checks passed; no GART/MES/queue initialization; reservation abandoned, same-boot initialization unsupported");
       return 0;
    }
-   const uint32_t setup[][2] = {{0x0de0, 1}, {SEG1(0x802), 0}, {SEG1(0x803), 0x01000000}};
-   for (unsigned i = 0; i < sizeof(setup) / sizeof(setup[0]); ++i)
-      if (wr(setup[i][0], setup[i][1]) != setup[i][1] || rd(setup[i][0]) != setup[i][1])
-         gpu_failure("desktop doorbell/CP setup readback");
+    if (!setup_first) desktop_cp_setup();
    if (gart(6, argv) || mes_start(6, argv)) gpu_failure("desktop GART/MES initialization");
    const uint64_t lengths[] = {PHX_MES_QUEUE_ARENA_BYTES, PHX_MES_QUEUE_ARENA_BYTES,
        PHX_DESKTOP_COMPUTE_BYTES, PHX_DESKTOP_GRAPHICS_BYTES};
