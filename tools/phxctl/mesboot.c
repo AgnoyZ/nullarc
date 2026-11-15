@@ -266,6 +266,17 @@ static void gart_verify_addresses(const struct PhxGartLayout *layout, const stru
       if (rd(verify[i][0]) != verify[i][1]) gart_failure(75, "GART address register readback mismatch");
    if ((rd(SEG0(0x1688)) & 7) != 1) gart_failure(75, "context zero did not enter enabled flat-page-table mode");
 }
+static void gart_select_vmid(uint32_t vmid, const char *phase)
+{
+   const uint32_t requested = vmid << 4;
+   const uint32_t immediate = wr(SEG1(0x900), requested);
+   const uint32_t observed = rd(SEG1(0x900));
+   if (immediate != requested || observed != requested) {
+      fprintf(stderr, "mesboot gart-select: phase=%s me=0 pipe=0 queue=0 vmid=%u requested=0x%08x write-readback=0x%08x readback=0x%08x\n",
+              phase, vmid, requested, immediate, observed);
+      gart_failure(75, "VMID selection not confirmed");
+   }
+}
 static int gart(int argc, char **argv)
 {
    if (argc != 6) gart_failure(64, "requires virtual base, mapped bytes, table offset and default-page offset");
@@ -326,11 +337,11 @@ static int gart(int argc, char **argv)
    }
    // SH_MEM_CONFIG / SH_MEM_BASES per VMID as in gfx_v11_0_constants_init (trace 1.559162..)
    for (int v = 0; v < 16; v++) {
-      wr(SEG1(0x900), v << 4);
+      gart_select_vmid((uint32_t)v, "select");
       wr(0xa9e4, 0x0000c00c);
       if (v) wr(0xa9e3, v < 8 ? 0x20001000 : 0x00010002);
    }
-   wr(SEG1(0x900), 0);
+   gart_select_vmid(0, "restore");
    wr(SEG0(0x1e1f), rd(SEG0(0x1e1f)) | 0x8000);   // CP_DEBUG.CPG_UTCL1_ERROR_HALT_DISABLE (linux sets it with the gfxhub)
    gart_verify_addresses(&layout, &memory);
    wr(SEG0(0x16ab + 17), 0x00F80001);          // GCVM_INVALIDATE_ENG17_REQ (the engine amdgpu uses for gmc flushes)

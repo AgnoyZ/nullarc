@@ -135,6 +135,16 @@ sequence. The harness now asserts that this early close happens exactly once
 with no snapshot, register or memory access. This fixes the test's model, not
 the tool's ABI behavior. The initial run is not a GART suite pass.
 
+## Subsequent selector source repair, 2026-11-15
+
+The GART VMID loop now requires both immediate and independent selector
+readbacks before each banked write, and checks the final idle restoration.
+The successful path retains its register writes and adds 17 selector reads;
+mismatches terminate without continuing into invalidation or MES. The
+[source repair and CPU record](GART-SELECTOR-GUARD.md) is uninstalled and does
+not explain the latest physical failure, which occurred before GART. The
+historical target observations below are not reruns of this candidate.
+
 ## Later staged target observation, 2026-11-12
 
 With the installed PhxBringup candidate from `c5c22b4`, the separately compiled

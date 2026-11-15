@@ -31,13 +31,14 @@ def cases():
         yield f"vram-read-{index}"
         yield f"vram-bad-{index}"
     for index in range(1, 189): yield f"reg-write-{index}"
-    for index in range(1, 34): yield f"reg-read-{index}"
-    for index in range(20, 33): yield f"register-bad-{index}"
+    for index in range(1, 51): yield f"reg-read-{index}"
+    for index in range(37, 50): yield f"register-bad-{index}"
 
 
 def expected_result(fault):
     c = dict.fromkeys(("lookups", "opens", "hellos", "snapshots", "reg_reads", "vram_reads", "vram_writes",
-                       "accepted_words", "reg_writes", "ack_reads", "sleeps", "closes"), 0)
+                       "accepted_words", "reg_writes", "ack_reads", "sleeps", "closes",
+                       "selector_writes", "bank_writes"), 0)
     if fault.startswith("arg-") or fault in ("legacy-all", "env-pte", "env-default"): return 64, c
     c["lookups"] = 1
     if fault == "no-service": return 1, c
@@ -65,20 +66,29 @@ def expected_result(fault):
         c["vram_reads"] = index
         if fault == f"vram-read-{index}" or fault in ("vram-read-short", "vram-read-long"): return 74, c
         if fault == f"vram-bad-{index}": return 75, c
+    # Independent write-order oracle; each selector now has one checked read
+    # before its banked write (or before CP_DEBUG after idle restoration).
+    selectors = {139, 186} | {138 + 3 * vmid for vmid in range(1, 16)}
+    banked = {140} | {139 + 3 * vmid + word for vmid in range(1, 16) for word in (0, 1)}
     for index in range(1, 189):
+        if index - 1 in selectors:
+            c["reg_reads"] += 1
+            if fault == f"reg-read-{c['reg_reads']}": return 74, c
         if index == 187:
-            c["reg_reads"] = 19
-            if fault == "reg-read-19": return 74, c
+            c["reg_reads"] = 36
+            if fault == "reg-read-36": return 74, c
         if index == 188:
-            for read in range(20, 33):
+            for read in range(37, 50):
                 c["reg_reads"] = read
                 if fault == f"reg-read-{read}": return 74, c
                 if fault == f"register-bad-{read}": return 75, c
         c["reg_writes"] = index
         if fault == f"reg-write-{index}" or fault in ("write-short", "write-long"): return 74, c
+        if index in selectors: c["selector_writes"] += 1
+        if index in banked: c["bank_writes"] += 1
     polls = 1000 if fault in ("ack-timeout", "ack-wrong-bit") else 3 if fault in ("ack-delayed", "sleep-eintr") else 1
-    c.update(ack_reads=polls, reg_reads=32 + polls)
-    if fault == "reg-read-33": return 74, c
+    c.update(ack_reads=polls, reg_reads=49 + polls)
+    if fault == "reg-read-50": return 74, c
     if fault == "ack-all-ones": return 75, c
     if fault == "sleep-error":
         c["sleeps"] = 1

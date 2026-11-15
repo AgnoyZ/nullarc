@@ -51,7 +51,7 @@ class GartBootstrapRunnerTests(unittest.TestCase):
             self.assertEqual(0, counts["closes"])
 
     def test_readback_failure_precedes_invalidation(self):
-        for i in range(20, 33):
+        for i in range(37, 50):
             status, counts = expected_result(f"register-bad-{i}")
             self.assertEqual(75, status)
             self.assertEqual(187, counts["reg_writes"])
@@ -67,7 +67,7 @@ class GartBootstrapRunnerTests(unittest.TestCase):
         _, counts = expected_result("ok")
         self.assertEqual(188, counts["reg_writes"])
         self.assertEqual(2048, counts["accepted_words"])
-        self.assertEqual(33, counts["reg_reads"])
+        self.assertEqual(50, counts["reg_reads"])
 
     def test_runner_refuses_wrong_platform_before_staging(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch("test_gart_bootstrap.platform.system", return_value="Windows"):

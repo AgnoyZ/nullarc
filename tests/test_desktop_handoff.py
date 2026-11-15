@@ -213,6 +213,22 @@ class DesktopHandoffTests(unittest.TestCase):
                         self.assertNotIn("desktop preflight:", result.stdout)
                         self.assertNotIn("desktop handoff:", result.stdout)
 
+    def test_gart_selector_failure_never_reaches_MES_queues_or_handoff(self):
+        for variant in ("reference", "relocated"):
+            for mode in ("immediate", "readback", "zero"):
+                for ordinal in range(1, 18):
+                    vmid = ordinal - 1 if ordinal < 17 else 0
+                    if mode == "zero" and vmid == 0:
+                        continue
+                    with self.subTest(variant=variant, mode=mode, ordinal=ordinal):
+                        data = self.cli_case(f"gart-{mode}-{ordinal}", 75, variant=variant)
+                        prior_banks = 0 if ordinal == 1 else 2 * ordinal - 3 if ordinal < 17 else 31
+                        self.assertEqual([1, 2, 1, 149 + ordinal + prior_banks, 35 + ordinal, 3072],
+                                         [data[key] for key in
+                                          ("opens", "snapshots", "reservations", "writes", "reads", "vwrites")])
+                        self.assertEqual([0] * 6, [data[key] for key in
+                                         ("scheduler_bells", "compute_bells", "graphics_bells", "seals", "claims", "closes")])
+
     def test_target_zero_readbacks_stop_both_commands_after_first_KIQ_selection(self):
         for command in ("desktop-init", "desktop-preflight"):
             for variant in ("reference", "relocated"):

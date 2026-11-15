@@ -17,6 +17,7 @@ static struct PhxBootMemory observation;
 static uint64_t table_off = 0x700000, default_off = 0x710000, virtual_base = 0x4000000000ull;
 static uint32_t table_words[1024], default_words[1024], registers[0x20000];
 static unsigned lookups, opens, hellos, snapshots, reg_reads, vram_reads, vram_writes, accepted_words, reg_writes, ack_reads, sleeps, closes;
+static unsigned selector_writes, bank_writes;
 static int is(const char *name) { return !strcmp(fault, name); }
 static int indexed(const char *name, unsigned index) {
     char text[40]; snprintf(text, sizeof(text), "%s-%u", name, index); return is(text);
@@ -24,8 +25,8 @@ static int indexed(const char *name, unsigned index) {
 static void summary(void) {
     fprintf(stderr, "fake-gart-summary {\"lookups\":%u,\"opens\":%u,\"hellos\":%u,\"snapshots\":%u,"
         "\"reg_reads\":%u,\"vram_reads\":%u,\"vram_writes\":%u,\"accepted_words\":%u,\"reg_writes\":%u,"
-        "\"ack_reads\":%u,\"sleeps\":%u,\"closes\":%u}\n", lookups, opens, hellos, snapshots,
-        reg_reads, vram_reads, vram_writes, accepted_words, reg_writes, ack_reads, sleeps, closes);
+        "\"ack_reads\":%u,\"sleeps\":%u,\"closes\":%u,\"selector_writes\":%u,\"bank_writes\":%u}\n", lookups, opens, hellos, snapshots,
+        reg_reads, vram_reads, vram_writes, accepted_words, reg_writes, ack_reads, sleeps, closes, selector_writes, bank_writes);
 }
 static int fake_usleep(useconds_t delay) {
     assert(delay == 1000 && ack_reads && reg_writes == 188); ++sleeps;
@@ -92,6 +93,16 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
     if (is("write-long")) ++*output_count;
     registers[input[0]] = (uint32_t)input[1];
     output[0] = input[1];
+    if (input[0] == 0xa900) {
+        ++selector_writes;
+        assert(selector_writes <= 17);
+        assert(input[1] == (selector_writes == 17 ? 0 : (selector_writes - 1) * 16));
+        if (indexed("vmid-immediate", selector_writes) || indexed("vmid-both", selector_writes)) *output ^= 1;
+        if (indexed("vmid-both", selector_writes)) registers[0xa900] ^= 1;
+        if (indexed("vmid-zero", selector_writes)) registers[0xa900] = *output = 0;
+        if (indexed("vmid-ones-immediate", selector_writes)) *output = UINT32_MAX;
+    }
+    if (input[0] == 0xa9e4 || input[0] == 0xa9e3) ++bank_writes;
     return 0;
 }
 
@@ -120,6 +131,8 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
     assert(selector == SEL_READREGS && input_count == 3 && input[1] == 1 && input[2] == 0xffffffff && *output_size == 4);
     assert(input[0] < 0x20000); ++reg_reads;
     uint32_t value = registers[input[0]];
+    if (input[0] == 0xa900 && indexed("vmid-readback", selector_writes)) value ^= 1;
+    if (input[0] == 0xa900 && indexed("vmid-ones-readback", selector_writes)) value = UINT32_MAX;
     if (input[0] == 0x21a0) value = is("cp-busy") ? 1 : 0;
     if (input[0] == 0xee7e) value = is("rlc-not-ready") ? 0 : is("rlc-all-ones") ? UINT32_MAX : 0x80000000;
     if (!vram_writes && input[0] == 0x28e8 && is("context-zero-active")) value = 1;
@@ -137,12 +150,13 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
 }
 
 int main(int argc, char **argv) {
-    assert(argc == 2); fault = argv[1]; assert(atexit(summary) == 0);
+    assert(argc == 2 || (argc == 3 && !strcmp(argv[2], "relocated")));
+    fault = argv[1]; assert(atexit(summary) == 0);
     memset(table_words, 0xa5, sizeof(table_words)); memset(default_words, 0xa5, sizeof(default_words));
     observation = (struct PhxBootMemory){1, 7, 0x1000000000ull, 0x2000000000ull, 0x1000000, 0x1000000, 0x300000, 0,
         {1, 0x10000, 0x100000, 0x400000, 0x600000, 0x100000, {0, 0}}};
     char *va = "0x4000000000", *bytes = "0x5000", *table = "0x700000", *dummy = "0x710000";
-    if (is("relocated")) {
+    if (is("relocated") || argc == 3) {
         observation.mcBase = 0x234500000000ull; observation.physicalBase = 0x123400000000ull;
         table_off = 0x900000; default_off = 0x920000; virtual_base = 0x400000000000ull;
         table = "0x900000"; dummy = "0x920000"; va = "0x400000000000";

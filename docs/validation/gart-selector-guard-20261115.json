@@ -1,0 +1,189 @@
+{
+  "schema": 1,
+  "review_date": "2026-11-15",
+  "source_parent": "5e7abaabe366e32cd6a12cff2dd86df7eb530e34",
+  "status": "Uninstalled GART selector guard repair; CPU validation only; physical dual-zero cause unresolved",
+  "production_change": {
+    "file": "tools/phxctl/mesboot.c",
+    "new_helper": "gart_select_vmid",
+    "call_sites": [
+      "16-VMID SH_MEM loop",
+      "final idle restoration"
+    ],
+    "immediate_and_independent_readbacks_must_match_request": true,
+    "new_register_read_requests_on_success": 17,
+    "register_write_values_and_order_preserved": true,
+    "new_reset_power_retry_delay_timeout_or_cleanup": false,
+    "earlier_GART_mutations_rolled_back_on_failure": false,
+    "other_production_files_changed": false,
+    "before_source_sha256": "963cd20be985bc6d9f0151ebb788b2a34dc92636736f9f948c36cf68f6794708",
+    "after_source_sha256": "afa7c19113296ed0ed5885c96a45d891447bd9678ea3586f8c3e714d9ae476be",
+    "previous_desktop_idle_guard_repair_preserved": true,
+    "Linux_code_headers_binaries_or_new_register_definitions_imported": false
+  },
+  "failure_first_reproduction": {
+    "backend": "Actual CLI; fake IOKit, metadata, registers and VRAM; ASan/UBSan; no GPU",
+    "layouts": [
+      "reference",
+      "relocated"
+    ],
+    "VMID_selections": 16,
+    "final_idle_restorations": 1,
+    "mismatch_cases": 200,
+    "fault_modes": [
+      "immediate one-bit mismatch",
+      "subsequent one-bit mismatch",
+      "paired one-bit mismatch",
+      "paired zero for nonzero VMID only",
+      "all-ones immediate",
+      "all-ones subsequent"
+    ],
+    "before_fix_incorrect_successes": 200,
+    "after_fix_cases_passed": 200,
+    "after_fix_exit": 75,
+    "exact_diagnostics_and_terminal_IO_counts_checked": true,
+    "normal_layout_cases": 2,
+    "normal_register_writes": 188,
+    "normal_banked_writes": 31,
+    "normal_selector_writes": 17,
+    "normal_register_reads_before": 33,
+    "normal_register_reads_after": 50
+  },
+  "desktop_integration": {
+    "cases_passed": 98,
+    "layouts": 2,
+    "all_17_transitions_immediate_and_subsequent_faults": true,
+    "all_15_nonzero_requests_dual_zero_faults": true,
+    "terminal_exit": 75,
+    "exact_IO_counts_checked": true,
+    "MES_snapshot_queue_doorbell_seal_claim_or_checked_close_after_failure": false
+  },
+  "validation": {
+    "focused_Python_methods_passed": 66,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "checks": [
+      {
+        "test_file": "test_gart_selector.py",
+        "returncode": 0,
+        "seconds": 43.526,
+        "methods": 7,
+        "skips": 0
+      },
+      {
+        "test_file": "test_gart_bootstrap_runner.py",
+        "returncode": 0,
+        "seconds": 0.328,
+        "methods": 7,
+        "skips": 0
+      },
+      {
+        "test_file": "test_desktop_handoff.py",
+        "returncode": 0,
+        "seconds": 60.727,
+        "methods": 33,
+        "skips": 0
+      },
+      {
+        "test_file": "test_register_transport.py",
+        "returncode": 0,
+        "seconds": 5.468,
+        "methods": 7,
+        "skips": 0
+      },
+      {
+        "test_file": "test_native_include_graph.py",
+        "returncode": 0,
+        "seconds": 0.066,
+        "methods": 5,
+        "skips": 0
+      },
+      {
+        "test_file": "test_gc_state_observe.py",
+        "returncode": 0,
+        "seconds": 47.429,
+        "methods": 7,
+        "skips": 0
+      }
+    ],
+    "GART_case_matrix": {
+      "cases_passed": 336,
+      "all_register_write_error_positions": 188,
+      "all_register_read_error_positions": 50,
+      "full_count_oracle_checked": true,
+      "backend": "Actual CLI with fake IOKit; direct current-source compile and existing cases/check_result oracle"
+    },
+    "temporary_mutations": [
+      {
+        "mutation": "ignore-immediate",
+        "compiled": true,
+        "methods": 1,
+        "missed_refusals_detected": 34,
+        "errors": 0,
+        "skips": 0,
+        "executed_only_fake_IOKit": true
+      },
+      {
+        "mutation": "ignore-subsequent",
+        "compiled": true,
+        "methods": 1,
+        "missed_refusals_detected": 34,
+        "errors": 0,
+        "skips": 0,
+        "executed_only_fake_IOKit": true
+      }
+    ],
+    "native_compile_only": [
+      {
+        "source": "tools/phxctl/mesboot.c",
+        "compiled_linked": true,
+        "architecture": "x86_64",
+        "executed": false,
+        "profile": "existing CLI native recipe"
+      },
+      {
+        "source": "tools/phxctl/gc_state_observe.c",
+        "compiled_linked": true,
+        "architecture": "x86_64",
+        "executed": false,
+        "profile": "observer Wall/Wextra/Werror with existing unused-variable suppression"
+      }
+    ],
+    "new_strict_Werror_CLI_build_claimed": false,
+    "preparation_qualification": "Initial nested-unittest selection failed before compilation/test execution; recursive flattening fixed it before the retained failure-first run.",
+    "full_suite_rerun": false,
+    "hosted_workflow_manually_dispatched": false,
+    "input_sha256": {
+      "tools/phxctl/mesboot.c": "afa7c19113296ed0ed5885c96a45d891447bd9678ea3586f8c3e714d9ae476be",
+      "tools/test_gart_bootstrap.py": "2c7915fb4e8978bc68234cd779fc607e91afe949062f32f64d0b49c30dfb389a",
+      "tests/test_gart_bootstrap.c": "f2036d36824b8cecc0c5daa711d4d678a11cfe1aa0a239b398baa5588b239ad3",
+      "tests/test_gart_selector.py": "0b7c11350eecfde21d922cfe8ae4c7fe0c877d6030a54e7d8ace5b91a7f38a45",
+      "tests/test_gart_bootstrap_runner.py": "e8d5d6e3217a88195902b02ab0a502a89b47a439aee096c30f61b9c770d66f14",
+      "tests/test_desktop_entrypoint.c": "9987cb2226c8c82f2cdf9a0eb060b7297ba0f255c945908c8b1ae00f52143f38",
+      "tests/test_desktop_handoff.py": "be4c421503a893b7cff015ec64fc77927bcf50432c2c5635357ac71abe711656",
+      "tests/test_register_transport.py": "23d931a88007e9d159d16e87d3d381ec3540bd314dd45d363532fe37be264b46",
+      "tests/test_register_transport.cpp": "cb005af81e2a44094239491c7f54eaead41f4a8a64616da013c72f69ac1ea021",
+      "tests/test_native_include_graph.py": "cd5b4483daadd6880524f9b07df7cded04a92bdc3c740b6df8b9984f3f12d3ea",
+      "tests/test_gc_state_observe.py": "9b898463afec0bad435d6c8aa35fecb36d41196f449b8521266faa3ce011c96e",
+      "tests/test_gc_state_observe.c": "35804450195630a9fd48cd3b7df6136c6f7dbc6599d25e6d2e8503148613203e",
+      "tools/phxctl/gc_state_observe.c": "6de88228396bfc80fbc20930feb8d81f39af57725ff20d8dc22bd24f282b6889"
+    }
+  },
+  "hardware_and_preservation": {
+    "live_service_opened": false,
+    "GPU_commands": 0,
+    "candidate_signed_installed_or_executed": false,
+    "startup_arming_or_reboot": false,
+    "installed_driver_helper_EFI_security_or_proxy_changes": false,
+    "old_requests_or_recovery_budgets_replayed_rearmed_or_repinned": false,
+    "raw_target_data_or_binaries_published": false,
+    "latest_desktop_failure_was_before_GART": true,
+    "latest_target_record": "desktop-retest-target-20261115.json",
+    "new_OS_probe": false,
+    "physical_selector_cause_resolved": false,
+    "GPU_execution_or_desktop_success_proven": false
+  },
+  "next_step": "Continue offline access and initialization prerequisite analysis. A physical experiment requires a distinct reviewed scope binding the changed candidate, a fresh boot and independent recovery; old scopes remain consumed.",
+  "rollback": "Revert this source repair in a normal new commit; no installed component needs rollback. Preserve all historical target receipts and consumed authorizations."
+}

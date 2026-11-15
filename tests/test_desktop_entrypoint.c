@@ -26,6 +26,11 @@ static int ordinal_fault(const char *name, unsigned ordinal) {
     char value[80]; assert(snprintf(value, sizeof(value), "%s-%u", name, ordinal) > 0);
     return vmid_preflight && is(value);
 }
+static int gart_selector_fault(const char *name) {
+    if (grbm_writes < 9 || grbm_writes > 25) return 0;
+    char value[80]; assert(snprintf(value, sizeof(value), "gart-%s-%u", name, grbm_writes - 8) > 0);
+    return is(value);
+}
 static void summary(void) {
     fprintf(stderr, "fake-desktop-summary {\"opens\":%u,\"snapshots\":%u,\"reservations\":%u,\"seals\":%u,\"claims\":%u,"
         "\"writes\":%u,\"vwrites\":%u,\"reads\":%u,\"scheduler_bells\":%u,\"compute_bells\":%u,\"graphics_bells\":%u,\"closes\":%u}\n",
@@ -159,6 +164,8 @@ kern_return_t IOConnectCallScalarMethod(io_connect_t connection, uint32_t select
         if (ordinal_fault("vmid-write-all-ones", writes)) *output = UINT32_MAX;
         if (input[0] == SEG1(0x900)) {
             ++grbm_writes;
+            if (gart_selector_fault("immediate")) *output ^= 1;
+            if (gart_selector_fault("zero")) *reg((uint32_t)input[0]) = *output = 0;
             for (unsigned ordinal = 1; ordinal <= 8; ++ordinal) {
                 char name[64];
                 assert(snprintf(name, sizeof(name), "selector-immediate-%u", ordinal) > 0);
@@ -234,6 +241,7 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector,
         if ((is("vmid-select-readback") && reads == 3) ||
             (is("vmid-restore-readback") && reads == 4)) value ^= 1;
         if (input[0] == SEG1(0x900)) {
+            if (gart_selector_fault("readback")) value ^= 1;
             const char *select_faults[] = {"select-kiq", "select-scheduler", "select-compute", "select-graphics"};
             for (unsigned i = 0; i < 4; ++i)
                 if (is(select_faults[i]) && grbm_writes == 1 + 2 * i) value ^= 1;
