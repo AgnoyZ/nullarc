@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "hardware-gate-failed-data-integrity-default-promotion-held",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "source_base_commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "candidate": {
+    "kext_build": 34,
+    "ABI": "1.12",
+    "source_sha256": "9229d07d918a1fb326b22a7f7d7ecd6bb79d37d91accf1e09e9d41b2ab23cd14",
+    "executable_sha256": "4f3c7265bcf9b42d3518895e1d78fc512febb38040cf751b0da90d0d11ac6b3f",
+    "probe_executable_sha256": "74b72778b630e186da2a498f473ab8df5d70494029e03bc713e7b0de02e3c212",
+    "production_change": "elapsed-time accounting in doWaitSeq only",
+    "backport_source_committed": false
+  },
+  "initializer": {
+    "exit_code": 0,
+    "original_compute_and_graphics_outputs_passed": true,
+    "both_queue_adoptions_passed": true
+  },
+  "native_probe": {
+    "planned_dispatches": 96,
+    "submitted_dispatches": 2,
+    "fully_guarded_dispatches_verified": 1,
+    "second_dispatch_retirement_reported_complete": true,
+    "second_dispatch_first_mismatch_byte_offset": 8208,
+    "mismatch_in_output_region": true,
+    "actual_and_expected_bytes_logged": false,
+    "wait_observations": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 0,
+        "elapsed_ns": 3717
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 5179
+      },
+      {
+        "pass": 1,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 15619
+      }
+    ],
+    "single_client_PASS_present": false,
+    "concurrent_GPU_phase_started": false,
+    "CPU_load_workers_started": false,
+    "failed_probe_retained_resources_until_recovery": true
+  },
+  "supervision": {
+    "failure_detection": "35-second process gate expired because failed probe intentionally entered HOLD",
+    "primary_failure": "GPU-written output byte mismatch after reported fence retirement",
+    "witness_error": "coordinator and independent witness both attempted exclusive recovery.intent creation; one FileExistsError, exactly one recovery dispatched",
+    "recovery_completed_once": true,
+    "automatic_GPU_retry": false,
+    "consumed_job_removed": true
+  },
+  "recovery": {
+    "original_build34_image_independently_verified": true,
+    "complete_EFI_baseline_restored_before_GPU": true,
+    "EFI_baseline_file_count": 347,
+    "Microsoft_files_unchanged": 148,
+    "OpenCore_config_unchanged": true,
+    "protected_files_unchanged": 46,
+    "protected_library_links_unchanged": 2,
+    "security_and_kernel_collections_unchanged": true,
+    "GPU_off_retained": true,
+    "firmware_framebuffer_only": true,
+    "new_matching_diagnostic_reports": 0,
+    "raw_evidence_published": false
+  },
+  "acceptance": {
+    "hardware_gate_passed": false,
+    "default_source_promoted": false,
+    "wait_change_causality_established": false,
+    "same_repeated_buffer_probe_run_on_unmodified_build34": false,
+    "background_load_stability_established": false,
+    "FPS_measured": false,
+    "accelerated_desktop_HOLD_cleared": false
+  },
+  "private_receipt_hashes": {
+    "probe_stdout_sha256": "324898f7668b9de833667e38aab7764b38cdf1a67cad14ff93665ee70efae5b0",
+    "probe_stderr_sha256": "a43208e85b9d308b824a016cfea040bc37d7c9b62111be9c48eaa4da66d9f49d"
+  },
+  "limits": [
+    "One guarded shader dispatch passed; the second output mismatch prevents accepting the planned 96-dispatch gate.",
+    "The two-second timeout path was not reached; observed waits had zero and 50-microsecond budgets.",
+    "No raw diagnostics, firmware, EFI, UUIDs, personal paths or binaries are included.",
+    "A1/A2/corrected-A3 source migration is separate and remains on the default branch."
+  ],
+  "default_branch_checkpoint": {
+    "branch": "upstream34/vram-layout-fix",
+    "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "wait_fix_present": false
+  },
+  "offline_followup": {
+    "cache_visibility_or_buffer_reuse_cause_proven": false,
+    "same_probe_original34_control_still_required": true,
+    "failure_control_fixes": {
+      "native_HOLD_detected_without_35_second_delay": true,
+      "concurrent_recovery_processes_tested": 6,
+      "serialized_EFI_verifications": 1,
+      "mock_recovery_dispatches": 1,
+      "actual_recovery_dispatches_in_fixture": 0
+    },
+    "new_GPU_work": false,
+    "new_reboot_requested": false,
+    "consumed_root_packet_modified": false
+  }
+}
