@@ -550,3 +550,42 @@ initializer, live unload or reboot. A separately prepared, single-use loading
 trial must still pass the unchanged 120,000-milliHz baseline, timing consistency
 and real GPU/desktop gate. This is neither A3 acceptance nor an FPS result.
 Evidence: `validation/upstream34-backport-a3-refresh-install-20261116.json`.
+
+### A3 correction: distinct one-use boot witness independently prepared
+
+The corrected build now has a separate, not-yet-armed startup witness. All
+**70 CPU/permission tests** and **18 WindowServer access checks** passed.
+Independent readback verified **2,219 pinned files**, including 2,179 inherited
+pins after the original A3 job's verified retirement. Exactly two inherited
+hashes differ: the corrected accelerator image and its audited AuxKC. The
+original bring-up build/image/layout, A1 plugin, runtime/helpers, A2 backups
+and previous failure/recovery evidence remain protected.
+
+Preparation starts from the verified **GPU-off firmware desktop with no loaded
+PhxAccel**. It checks the current boot's kill-switch startup log, unchanged
+WindowServer and idle original startup job; it does not pretend this is the
+previous accepted accelerated A2 boot. The real frozen arming admission was
+independently executed through its last check before the first mutation.
+No initializer, GPU command or reboot ran during preparation. The existing
+startup files and their watchdog logic are unchanged.
+
+The contract retains the independently recorded A2 baseline of **2560 by 1600
+at 120,000 milliHz**, all earlier timing/clock checks, the loaded candidate and
+plugin identity checks, original queue results and the same real three-command
+Metal/IOSurface regression. It additionally saves a narrowly selected raw
+timing-property record **before** validation, so a rejected refresh can be
+inspected without replaying a trial. It still verifies stable timing, present
+and synthetic VBL progress, zero new transaction failures/copy skips, one
+stable WindowServer and no new matching diagnostic reports. This is not a
+direct live timing-callback test or an FPS measurement.
+
+The distinct scope permits one ordinary/native-desktop boot, one Metal-probe
+process (three commands, 15 seconds each, 55 seconds for the process), a
+300-second independent observation deadline, and at most one managed recovery
+reboot. It restores GPU-off and clears persistent display rearming after the
+original startup passes its off gate. A software deadline cannot guarantee
+recovery from a hard hardware hang. No consumed scope is replayed and no
+automatic GPU retry is permitted. At this checkpoint the new scope is
+**prepared, not armed**, and corrected A3 hardware acceptance remains pending.
+Evidence:
+`validation/upstream34-backport-a3-refresh-boot-preparation-20261116.json`.
