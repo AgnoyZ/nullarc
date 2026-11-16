@@ -76,9 +76,11 @@ also failed pass 1 and used its single recovery; that scope is closed and is not
 a passing canonical-probe or wait-candidate acceptance result. Its sanitized
 observations are recorded in
 [the separate diagnostic record](validation/upstream34-native-byte-diagnostic-20261116.json).
-A separate, offline-only [IB freshness diagnostic](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md)
+A separate [IB freshness diagnostic](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md)
 now provides explicit reuse/fresh policies and preserves the older build34 HOLD.
-It changes neither this canonical tool's CLI/acceptance path nor its cleanup.
+Its later reuse-only control reproduced the same pass/offset/byte failure and
+completed its single recovery; fresh policy remains untested. It changes neither
+this canonical tool's CLI/acceptance path nor its cleanup.
 
 After two complete verified passes, cleanup is CPU unmap, GPU unmap, BOFREE,
 CTX free, then client close. A failure at any cleanup step suppresses success

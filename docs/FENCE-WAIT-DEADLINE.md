@@ -312,11 +312,16 @@ The earlier candidate, identical-binary control and host-only records remain
 historical records; they have not been rewritten with the newly observed byte.
 
 A separate [two-policy IB freshness diagnostic](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md)
-is now prepared offline. It compares rewriting/reusing one IB slot with selecting
+compares rewriting/reusing one IB slot with selecting
 a pre-staged immutable slot while keeping the output BO/address and verification
-unchanged between those policies. Its new reuse fixture must reproduce the
-failure first. No new hardware scope is armed and no result from that tool is
-part of the historical trials above.
+unchanged between those policies. In a later, separate reuse-only build34 trial,
+its new fixture reproduced pass 1 / `0x2010` / actual `0xde` / expected `0xdf`
+after positive retirement. One recovery completed and the consumed startup job
+was removed; fresh policy was not run. This is a reproduced control signature,
+not proof of an IB/cache cause or acceptance of the timing candidate. See the
+[reuse control record](validation/upstream34-native-ib-reuse-control-20261116.json).
+No further hardware scope is armed, and the earlier historical trials above
+remain unchanged.
 
 ## Offline build40 validation boundary and rollback
 
