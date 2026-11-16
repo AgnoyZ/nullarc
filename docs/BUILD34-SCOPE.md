@@ -31,6 +31,12 @@ one upstream initialization lead available as original34-only offline tooling
 on this branch. It does not change the production helper/kernel, adopt a
 hardware fix or restore either withdrawn candidate.
 
+The subsequent [IB preamble diagnostic](BUILD34-IB-PREAMBLE-DIAGNOSTIC.md)
+investigates reused command memory through the existing original34 multiple-IB
+ABI. It adds isolated offline tooling and changes no kernel, production
+helper, native ABI or default wait/desktop policy. Its two policies require
+a fresh control before a separate treatment; CPU mocks are not GPU evidence.
+
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream
 PR16, PR19 with a tested zero-progress-write correction, PR15 and PR22. Each

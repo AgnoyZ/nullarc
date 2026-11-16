@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "date": "2026-11-17",
+  "result": "offline-checks-passed-not-an-IB-fix",
+  "branch": "upstream34/vram-layout-fix",
+  "source_parent": "e3793b976d134f836beb1e68f1d2b088e7c99323",
+  "approved_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "kernel_build_required": 34,
+  "offline": {
+    "actual_CXX_ASan_UBSan_scenarios": 4560,
+    "cases_per_policy_and_VA": 1140,
+    "policies": [
+      "control",
+      "memsync"
+    ],
+    "VA_models": [
+      "low",
+      "upper"
+    ],
+    "result_parser_regression_methods": 6,
+    "original_layout_regression_methods": 20,
+    "private_controller_mock_methods": 9,
+    "skipped_methods": 0,
+    "native_x86_64_compile": "passed",
+    "ad_hoc_signature_and_architecture": "passed",
+    "native_probe_executed": false,
+    "fake_IOKit_linked_real_device_frameworks": false,
+    "shader_ISA_executed": false,
+    "source_sha256": {
+      "tools/upstream34_layout/ib_preamble_probe.cpp": "d845d11c5693dcab51f26b8a9024d9749cd123fd9ba8855f842e6d02ef5025e5",
+      "tools/upstream34_layout/ib_preamble_packets.h": "afeabd4472965c7c19309d4311b68c1b6d409a55511cfd9d71141a6265ebbc32",
+      "tools/test_upstream34_ib_preamble.py": "d72f6173cd400cb768fa61cb3cb23eb540fe2bc007b65dfa7942c31c7054518f",
+      "tests/test_build34_ib_preamble.cpp": "5f9514d2791731f7fda643d18a309828cb5eece5963d6f5519c4d6f8237f73c9",
+      "tests/fake_build34_ib_preamble/CoreFoundation/CoreFoundation.h": "57ae4410c21ecaecc00b9ae02c489a947dd49af2580da0931a617027aa650138",
+      "tests/fake_build34_ib_preamble/IOKit/IOKitLib.h": "e62a62f5a1ee5b73acd830e1ed8be762e1ce1f1ab3397cda821a44825e9a38e6",
+      "tests/fake_build34_ib_preamble/mach/mach_time.h": "0fc63904e56d34cc549cb328a331895e2e894d131436aafa025741bf2614f2ae"
+    },
+    "recipe_sha256": "3146214a2b26b8f0f31df9e1fdfe39f3f2eed7497b0c13e9d5ebad09c76907f6",
+    "native_binary_sha256": "b15f94cd44827cb513fcfbdeb267e462e30b55c614d74ee111b65e1ae10f7b15",
+    "native_source_sha256": {
+      "tools/upstream34_layout/ib_preamble_probe.cpp": "d845d11c5693dcab51f26b8a9024d9749cd123fd9ba8855f842e6d02ef5025e5",
+      "tools/upstream34_layout/ib_preamble_packets.h": "afeabd4472965c7c19309d4311b68c1b6d409a55511cfd9d71141a6265ebbc32",
+      "src/phxbringup/PhxNativeABI.h": "cb37e93dcab4faf8c9e672ad04793f2e363ae1e815c9913251cebcff5cd42c90",
+      "src/amd/phx_topology.h": "28445bee8fc0f13a08aa52f114e4570ab6d6b8c068421dd10cf16023c06014d5",
+      "LICENSE": "02d7fa970640345480430e246356c99c23436800ef541d57e7217b1337793bf0",
+      "LICENSES/MIT.txt": "381b0b3a8bb7e1aa28502928f75e820339c5878e2bd95d18c25391647bc3c1fd",
+      "LICENSES/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3",
+      "THIRD_PARTY_NOTICES.md": "8a89a2766c5b8076afbbfa631c42953230e096477e04399324b075370b9431d4"
+    },
+    "tested_runner_sha256": "af8654a81c75debc63de875b5da6f9174343e39cd98bdb147b458c0672340daa",
+    "runner_trailing_blank_removed_after_matrix_AST_unchanged": true
+  },
+  "invariants": {
+    "kernel_unchanged": true,
+    "native_ABI_unchanged": true,
+    "production_helpers_unchanged": true,
+    "A1_A2_corrected_A3_preserved": true,
+    "licences_and_notices_unchanged": true,
+    "one_immutable_preamble_then_same_reused_IB": true,
+    "full_16KiB_guard_verification": true,
+    "faults_HOLD_before_followup_submit": true,
+    "stale_pattern_rejected_for_both_mock_policies": true,
+    "build41_and_build42_rejected_as_synthetic_identities": true
+  },
+  "primary_review": {
+    "Linux_commit": "adc218676eef25575469234709c2d87185ca223a",
+    "gfx_v11_0_blob": "d3e8be82a1727a7839040bb82291a742de4409e8",
+    "gfx_v11_0_sha256": "74dc38ba2d48b1e43db0bec0706a53385fb2f083b273a8f8f4ee2da5d3e06317",
+    "libdrm_reference": "2.4.123 tests/amdgpu/shader_code_gfx11.h",
+    "reference_shader_little_endian_sha256": "735ea6ea8faa4e398ee231d55e9f80ec5c577346c333533ab2417f9beb2b795c",
+    "AMD_2022_MIT_notice_retained": true,
+    "upstream_main_rechecked": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+    "upstream_PR18_rechecked_head": "54e894f6cda42d8e2ee243b966ec4659c8f42d6f"
+  },
+  "acceptance": {
+    "hardware_executed": false,
+    "IB_wrong_value_resolved": false,
+    "control_reproduced_on_new_fixture": false,
+    "treatment_hardware_passed": false,
+    "driver_deployed": false,
+    "desktop_acceleration_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_measured": false,
+    "HOLD_cleared": false,
+    "hardware_scope_armed": false,
+    "build41_build42_candidates_prepared": false,
+    "binary_uploaded": false,
+    "raw_diagnostics_published": false
+  },
+  "limitation": "Injected bytes and synthetic ABI/clock only. No GPU command fetch, cache/coherency, ISA or synchronization simulation; a fresh hardware control is required."
+}
