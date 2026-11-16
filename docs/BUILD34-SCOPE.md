@@ -36,6 +36,12 @@ investigates reused command memory through the existing original34 multiple-IB
 ABI. It adds isolated offline tooling and changes no kernel, production
 helper, native ABI or default wait/desktop policy. Its two policies require
 a fresh control before a separate treatment; CPU mocks are not GPU evidence.
+The first bounded NOP-head control subsequently passed both guarded
+dispatches and independent recovery. ACQUIRE_MEM was not run because that
+control did not reproduce the wrong value. A follow-up single/head/tail
+descriptor-order fixture keeps the arena identical and requires a new failing
+single-IB control before any further comparison; the production IB fault and
+all desktop/default-wait HOLDs remain unresolved.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

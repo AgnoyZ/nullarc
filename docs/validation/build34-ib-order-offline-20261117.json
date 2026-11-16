@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "date": "2026-11-17",
+  "result": "descriptor-order-fixture-offline-passed-not-an-IB-fix",
+  "branch": "upstream34/vram-layout-fix",
+  "source_parent": "4c778547411d6b451cb6a8b51c13472b3a0ae963",
+  "approved_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "kernel_build_required": 34,
+  "offline": {
+    "actual_CXX_ASan_UBSan_scenarios": 9120,
+    "cases_per_policy_and_VA": 1140,
+    "policies": [
+      "single",
+      "control",
+      "nop-tail",
+      "memsync"
+    ],
+    "VA_models": [
+      "low",
+      "upper"
+    ],
+    "result_parser_regression_methods": 8,
+    "original_layout_regression_methods": 20,
+    "private_controller_mock_methods": 11,
+    "skipped_methods": 0,
+    "case_isolation": "reset fake fixture per case; synthetic clock stays monotonic; no per-case fork or exec",
+    "separate_process_equivalence_cases": 64,
+    "scheduling": "background nice 15; serial fake-fixture cases",
+    "native_x86_64_compile": "passed",
+    "ad_hoc_signature_and_architecture": "passed",
+    "native_probe_executed": false,
+    "fake_IOKit_linked_real_device_frameworks": false,
+    "shader_ISA_executed": false,
+    "source_sha256": {
+      "tools/upstream34_layout/ib_preamble_probe.cpp": "c98d0051aeb60233f25f7640a49c3b65fd21c3839c7440d09546d6def552df64",
+      "tools/upstream34_layout/ib_preamble_packets.h": "afeabd4472965c7c19309d4311b68c1b6d409a55511cfd9d71141a6265ebbc32",
+      "tools/test_upstream34_ib_preamble.py": "c7fddbe22db8dc808c481caa5c23d0e05393bb2c19eed402e087b3b81f5128d2",
+      "tests/test_build34_ib_preamble.cpp": "a674c9a0f4007a5499b0be4bb3f3a8e45868a17ef1357dbaef6f59fc51bfcc77",
+      "tests/fake_build34_ib_preamble/CoreFoundation/CoreFoundation.h": "57ae4410c21ecaecc00b9ae02c489a947dd49af2580da0931a617027aa650138",
+      "tests/fake_build34_ib_preamble/IOKit/IOKitLib.h": "e62a62f5a1ee5b73acd830e1ed8be762e1ce1f1ab3397cda821a44825e9a38e6",
+      "tests/fake_build34_ib_preamble/mach/mach_time.h": "0fc63904e56d34cc549cb328a331895e2e894d131436aafa025741bf2614f2ae"
+    },
+    "recipe_sha256": "091e961adbabf853c3193173745decb3193f481bafd60c09dc50546751ae7cef",
+    "native_binary_sha256": "1b44fb5fd63bc8d759aab6c0e789789ccc8f58eace46fd42e57ef6a249faf9ee",
+    "native_source_sha256": {
+      "tools/upstream34_layout/ib_preamble_probe.cpp": "c98d0051aeb60233f25f7640a49c3b65fd21c3839c7440d09546d6def552df64",
+      "tools/upstream34_layout/ib_preamble_packets.h": "afeabd4472965c7c19309d4311b68c1b6d409a55511cfd9d71141a6265ebbc32",
+      "src/phxbringup/PhxNativeABI.h": "cb37e93dcab4faf8c9e672ad04793f2e363ae1e815c9913251cebcff5cd42c90",
+      "src/amd/phx_topology.h": "28445bee8fc0f13a08aa52f114e4570ab6d6b8c068421dd10cf16023c06014d5",
+      "LICENSE": "02d7fa970640345480430e246356c99c23436800ef541d57e7217b1337793bf0",
+      "LICENSES/MIT.txt": "381b0b3a8bb7e1aa28502928f75e820339c5878e2bd95d18c25391647bc3c1fd",
+      "LICENSES/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3",
+      "THIRD_PARTY_NOTICES.md": "8a89a2766c5b8076afbbfa631c42953230e096477e04399324b075370b9431d4"
+    }
+  },
+  "invariants": {
+    "kernel_unchanged": true,
+    "native_ABI_unchanged": true,
+    "production_helpers_unchanged": true,
+    "A1_A2_corrected_A3_preserved": true,
+    "licences_and_notices_unchanged": true,
+    "single_head_tail_arenas_identical": true,
+    "single_head_tail_differ_only_descriptor_count_or_order": true,
+    "full_16KiB_guard_verification": true,
+    "faults_HOLD_before_followup_submit": true,
+    "stale_pattern_rejected_for_every_mock_policy": true,
+    "build41_and_build42_rejected_as_synthetic_identities": true,
+    "batch_frames_complete_and_matching": true
+  },
+  "acceptance": {
+    "hardware_executed": false,
+    "IB_wrong_value_resolved": false,
+    "new_single_control_reproduced": false,
+    "new_tail_treatment_passed": false,
+    "production_fix_integrated": false,
+    "driver_deployed": false,
+    "desktop_acceleration_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_measured": false,
+    "HOLD_cleared": false,
+    "hardware_scope_armed": false,
+    "build41_build42_candidates_prepared": false,
+    "binary_uploaded": false,
+    "raw_diagnostics_published": false
+  },
+  "limitation": "Reset fake fixtures with injected bytes and synthetic ABI/clock, not GPU ISA/cache emulation. Separate process equivalence is checked on 64 selected cases. Earlier serial-exec and fork attempts were incomplete and are not counted. Fresh failing same-arena single-IB hardware control is required before head/tail treatment."
+}

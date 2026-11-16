@@ -59,12 +59,41 @@ class PreambleResultTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             runner.check_result(result, 'submit-2-status', 'control')
 
-    def test_stale_output_rejected_for_both_policies(self):
-        for policy in ('control', 'memsync'):
+    def test_stale_output_rejected_for_every_policy(self):
+        for policy in runner.POLICIES:
             self.assertIn('hold', runner.expected('stale-output-2')[1])
             result = self.result('stale-output-2', policy)
             result.stderr = ('FAIL: mismatch at byte 8208 (pass=1 actual=0xde expected=0xdf)\n' + result.stderr)
             runner.check_result(result, 'stale-output-2', policy)
+
+    def test_policy_markers_cannot_be_interchanged(self):
+        for actual in runner.POLICIES:
+            for requested in runner.POLICIES:
+                if actual == requested:
+                    runner.check_result(self.result(policy=actual), 'ok', requested)
+                else:
+                    with self.assertRaises(RuntimeError):
+                        runner.check_result(self.result(policy=actual), 'ok', requested)
+        with self.assertRaises(ValueError):
+            runner.marker('unknown')
+
+    def test_batch_requires_complete_matching_frames(self):
+        frame = 'fake-native-case-end {"index":0,"returncode":75}\n'
+        result = subprocess.CompletedProcess([], 0, 'output\n' + frame, 'error\n' + frame)
+        parsed = runner.batch_results(result, 1)
+        self.assertEqual((parsed[0].returncode, parsed[0].stdout, parsed[0].stderr), (75, 'output\n', 'error\n'))
+        for changed in (
+                subprocess.CompletedProcess([], 1, result.stdout, result.stderr),
+                subprocess.CompletedProcess([], 0, result.stdout, result.stderr + 'trailing'),
+                subprocess.CompletedProcess([], 0, result.stdout, result.stderr.replace(':75', ':0')),
+                subprocess.CompletedProcess([], 0, result.stdout.replace(':0,', ':1,'), result.stderr),
+                subprocess.CompletedProcess([], 0, result.stdout.replace(':0,', ':false,'), result.stderr),
+                subprocess.CompletedProcess([], 0, result.stdout, ''),
+        ):
+            with self.assertRaises(RuntimeError):
+                runner.batch_results(changed, 1)
+        with self.assertRaises(RuntimeError):
+            runner.batch_results(result, 2)
 
 
 if __name__ == '__main__':

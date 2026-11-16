@@ -90,7 +90,9 @@ struct Session {
     bool cpuMapped{false};
 };
 
-static int exercise(Session &s, bool execute, bool upper, bool memsync) {
+enum class PreamblePolicy { Single, NopHead, NopTail, MemSync };
+
+static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy) {
     const uint64_t helloIn[] = {PHXN_ABI_VERSION, PHXN_HELLO_F_MINOR};
     uint64_t hello[4]{};
     if (!call(s.connection, PHXN_SEL_HELLO, helloIn, 2, nullptr, 0, hello, 4, nullptr, 0)) return 74;
@@ -132,12 +134,13 @@ static int exercise(Session &s, bool execute, bool upper, bool memsync) {
     map.handle = s.handle; map.operation = PHX_AMDGPU_VA_OP_MAP; map.flags = PHX_AMDGPU_VM_PAGE_EXECUTABLE;
     map.va_address = s.gpuVA; map.map_size = bytes;
     if (!call(s.connection, PHXN_SEL_GEMVA, nullptr, 0, &map, sizeof(map), nullptr, 0, nullptr, 0)) return 74;
-    // Both policies rewrite and reuse slot 0; slot 1 remains guarded and unused.
-    // The only policy difference is this prewritten immutable eight-dword IB.
+    // Every policy stages the same arena and rewrites/reuses dispatch slot 0.
+    // Single/head/tail differ only in the number/order of submitted descriptors.
+    // MemSync changes the prewritten head IB bytes; it needs its own fresh control.
     constexpr size_t preambleOffset = 0x1400;
     const uint32_t noOperation[8] = {0xc0061000u, 0, 0, 0, 0, 0, 0, 0};
     const uint32_t acquireMemory[8] = {0xc0065800u, 0, 0xffffffffu, 0x00ffffffu, 0, 0, 10, 0xc3b1u};
-    const uint32_t *preamble = memsync ? acquireMemory : noOperation;
+    const uint32_t *preamble = policy == PreamblePolicy::MemSync ? acquireMemory : noOperation;
     static_assert(preambleOffset + sizeof(noOperation) <= 0x2000, "preamble fits command page");
     constexpr size_t ibOffset[2] = {0x1000, 0x1200};
     static_assert(ibOffset[1] + 320 <= 0x2000, "both IBs fit command page");
@@ -173,14 +176,20 @@ static int exercise(Session &s, bool execute, bool upper, bool memsync) {
         for (unsigned i = 0; i < 256; ++i) memcpy(expected + 0x2010 + i * 4, &pattern[i & 3], 4);
         struct Request { phxn_cs_in header; phxn_cs_ib ib[2]; } request{};
         static_assert(sizeof(Request) == 96, "two native IB request");
-        request.header.abi = PHXN_ABI_VERSION; request.header.ctx_id = s.context; request.header.num_ibs = 2;
-        request.ib[0].va_start = s.gpuVA + preambleOffset;
-        request.ib[0].ib_bytes = sizeof(noOperation);
-        request.ib[1].va_start = s.gpuVA + selected;
-        request.ib[1].ib_bytes = sizeof(packets[0]);
-        for (auto &ib : request.ib) ib.ip_type = PHX_AMDGPU_HW_IP_COMPUTE;
+        const bool single = policy == PreamblePolicy::Single;
+        const unsigned dispatchIndex = single || policy == PreamblePolicy::NopTail ? 0 : 1;
+        request.header.abi = PHXN_ABI_VERSION; request.header.ctx_id = s.context; request.header.num_ibs = single ? 1 : 2;
+        if (!single) {
+            request.ib[1 - dispatchIndex].va_start = s.gpuVA + preambleOffset;
+            request.ib[1 - dispatchIndex].ib_bytes = sizeof(noOperation);
+            request.ib[1 - dispatchIndex].ip_type = PHX_AMDGPU_HW_IP_COMPUTE;
+        }
+        request.ib[dispatchIndex].va_start = s.gpuVA + selected;
+        request.ib[dispatchIndex].ib_bytes = sizeof(packets[0]);
+        request.ib[dispatchIndex].ip_type = PHX_AMDGPU_HW_IP_COMPUTE;
+        const size_t requestBytes = sizeof(request.header) + request.header.num_ibs * sizeof(request.ib[0]);
         uint64_t sequence = 0;
-        if (!call(s.connection, PHXN_SEL_SUBMIT, nullptr, 0, &request, sizeof(request), &sequence, 1, nullptr, 0)) return 74;
+        if (!call(s.connection, PHXN_SEL_SUBMIT, nullptr, 0, &request, requestBytes, &sequence, 1, nullptr, 0)) return 74;
         if (!sequence || sequence == PHXN_SEQ_LAST || sequence <= previous) return reject("submitted sequence invalid");
         uint64_t waitOut[3]{};
         const uint64_t budgets[] = {0, 50000, PHXN_WAIT_CAP_NS};
@@ -243,10 +252,12 @@ static int finish(Session &s, int result, bool execute) {
 
 int main(int argc, char *argv[]) {
     const bool memsync = argc >= 2 && !strcmp(argv[1], "--run-memsync");
-    const bool execute = memsync || (argc >= 2 && !strcmp(argv[1], "--run-control"));
+    const bool single = argc >= 2 && !strcmp(argv[1], "--run-single");
+    const bool tail = argc >= 2 && !strcmp(argv[1], "--run-nop-tail");
+    const bool execute = memsync || single || tail || (argc >= 2 && !strcmp(argv[1], "--run-control"));
     const bool upper = argc == 3 && !strcmp(argv[2], "--upper");
     if ((argc != 2 && argc != 3) || (!execute && strcmp(argv[1], "--check")) || (argc == 3 && !upper)) {
-        fprintf(stderr, "usage: build34-ib-preamble-probe --check|--run-control|--run-memsync [--upper]\n"); return 64;
+        fprintf(stderr, "usage: build34-ib-preamble-probe --check|--run-single|--run-control|--run-nop-tail|--run-memsync [--upper]\n"); return 64;
     }
     utsname host{};
     if (uname(&host) || strcmp(host.sysname, "Darwin") || strcmp(host.machine, "x86_64") || strncmp(host.release, "25.", 3)) {
@@ -260,9 +271,12 @@ int main(int argc, char *argv[]) {
     const kern_return_t released = IOObjectRelease(service);
     if (opened != KERN_SUCCESS || !s.connection) return 74;
     if (released != KERN_SUCCESS) return finish(s, 74, false);
-    result = finish(s, exercise(s, execute, upper, memsync), execute);
+    const PreamblePolicy policy = single ? PreamblePolicy::Single : tail ? PreamblePolicy::NopTail :
+        memsync ? PreamblePolicy::MemSync : PreamblePolicy::NopHead;
+    result = finish(s, exercise(s, execute, upper, policy), execute);
     if (!result) {
-        if (execute) printf("DIAGNOSTIC-PASS: original34 preamble=%s; two guarded dispatches; no driver or display acceptance\n", memsync ? "memsync" : "control");
+        if (execute) printf("DIAGNOSTIC-PASS: original34 preamble=%s; two guarded dispatches; no driver or display acceptance\n",
+            single ? "single" : tail ? "nop-tail" : memsync ? "memsync" : "control");
         else puts("CHECK: target identity and ABI readiness only; no GPU work submitted");
     }
     return result;

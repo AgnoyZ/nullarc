@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 
@@ -131,10 +132,13 @@ EXTRA_CASES = (
 EXTRA_CASES += tuple(f'slot-{word}' for word in range(80))
 EXTRA_CASES += tuple(f'preamble-{stage}-{byte}' for stage in (1, 2) for byte in range(32))
 CASES = BASE_CASES + EXTRA_CASES
+POLICIES = ('single', 'control', 'nop-tail', 'memsync')
+EXEC_EQUIVALENCE_CASES = ('ok', 'arg-mode', 'info-build41', 'stale-output-2',
+                          'submit-2-status', 'byte-2-16383', 'wait-2-pending-cap', 'check-ok')
 
 
 def marker(policy):
-    if policy not in ('control', 'memsync'):
+    if policy not in POLICIES:
         raise ValueError('Unknown preamble policy')
     return f'DIAGNOSTIC-PASS: original34 preamble={policy}; two guarded dispatches; no driver or display acceptance'
 
@@ -218,6 +222,33 @@ def check_result(result, fault, policy):
     return {'events': events, 'wait_observations': waits}
 
 
+def batch_results(result, count):
+    """Require complete, matching frames from both streams before checking cases."""
+    if result.returncode:
+        raise RuntimeError('Mock batch process failed')
+    streams = []
+    for text in (result.stdout, result.stderr):
+        frames = []
+        start = 0
+        for match in re.finditer(r'^fake-native-case-end (\{[^\n]*\})\n', text, re.MULTILINE):
+            meta = json.loads(match[1])
+            if (set(meta) != {'index', 'returncode'} or type(meta['index']) is not int or
+                    type(meta['returncode']) is not int or meta['index'] != len(frames) or
+                    not 0 <= meta['returncode'] <= 255):
+                raise RuntimeError('Malformed mock batch frame')
+            frames.append((meta, text[start:match.start()]))
+            start = match.end()
+        if len(frames) != count or start != len(text):
+            raise RuntimeError('Incomplete or unframed mock output')
+        streams.append(frames)
+    parsed = []
+    for (out_meta, stdout), (err_meta, stderr) in zip(*streams):
+        if out_meta != err_meta:
+            raise RuntimeError('Mock stdout/stderr case mismatch')
+        parsed.append(subprocess.CompletedProcess([], out_meta['returncode'], stdout, stderr))
+    return parsed
+
+
 def exercise(out):
     compiler = shutil.which('clang++')
     if not compiler or platform.system() not in ('Darwin', 'Linux'):
@@ -240,10 +271,15 @@ def exercise(out):
             raise RuntimeError('Mock binary linked a real device framework')
     results = []
     for variant in ('low', 'upper'):
-        for policy in ('control', 'memsync'):
-            for fault in CASES:
-                result = subprocess.run([str(binary), variant, fault, policy], capture_output=True,
-                                        text=True, timeout=10, stdin=subprocess.DEVNULL)
+        for policy in POLICIES:
+            batch = subprocess.run([str(binary), '--batch', variant, policy, *CASES], capture_output=True,
+                                   text=True, timeout=180, stdin=subprocess.DEVNULL)
+            for fault, result in zip(CASES, batch_results(batch, len(CASES))):
+                if fault in EXEC_EQUIVALENCE_CASES:
+                    separate = subprocess.run([str(binary), variant, fault, policy], capture_output=True,
+                                              text=True, timeout=10, stdin=subprocess.DEVNULL)
+                    if (separate.returncode, separate.stdout, separate.stderr) != (result.returncode, result.stdout, result.stderr):
+                        raise RuntimeError(f'Batch/separate-process behavior differs: {variant}/{policy}/{fault}')
                 try:
                     checked = check_result(result, fault, policy)
                 except Exception as error:
@@ -258,6 +294,8 @@ def exercise(out):
               'source_sha256': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},
               'cases': results, 'sanitizers': 'ASan/UBSan', 'hardware_executed': False,
               'native_IOKit_linked': False, 'shader_executed': False,
+              'case_isolation': 'reset fake fixture per case; synthetic clock stays monotonic; no per-case fork or exec',
+              'separate_process_equivalence_cases': len(EXEC_EQUIVALENCE_CASES) * len(POLICIES) * 2,
               'limitation': 'Fake IOKit/CF, synthetic clock and injected bytes. No GPU ISA, cache/coherency or synchronization emulation; passing memsync is not a hardware result.'}
     (out / 'report.json').write_text(json.dumps(record, indent=2) + '\n')
     print(json.dumps({'result': 'passed', 'scenarios': len(results), 'hardware_executed': False}), flush=True)

@@ -19,6 +19,7 @@ static int fake_uname(struct utsname *);
 #undef pause
 #undef usleep
 static bool memsyncPolicy;
+static bool singlePolicy, tailPolicy;
 static unsigned waitAttempt;
 
 static std::string fault;
@@ -254,16 +255,19 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
     case PHXN_SEL_SUBMIT: {
         name = "submit-" + std::to_string(++submitted); event(name);
         assert(mapped && gpuMapped && submitted <= 2 && waited == submitted - 1);
-        assert(!in && !inCount && data && dataBytes == 96 && out && outCount && *outCount == 1 && !reply && !replyBytes);
+        assert(!in && !inCount && data && dataBytes == (singlePolicy ? 64 : 96) && out && outCount && *outCount == 1 && !reply && !replyBytes);
         phxn_cs_in header; phxn_cs_ib ib, preamble;
         memcpy(&header, data, 32);
-        memcpy(&preamble, static_cast<const uint8_t *>(data) + 32, 32);
-        memcpy(&ib, static_cast<const uint8_t *>(data) + 64, 32);
-        assert(preamble.va_start == virtualBase() + 0x1400 && preamble.ib_bytes == 32 &&
-            preamble.ip_type == 1 && !preamble.ip_instance && !preamble.ring && !preamble._pad && !preamble.flags);
+        const unsigned dispatchIndex = singlePolicy || tailPolicy ? 0 : 1;
+        memcpy(&ib, static_cast<const uint8_t *>(data) + 32 + dispatchIndex * 32, 32);
+        if (!singlePolicy) {
+            memcpy(&preamble, static_cast<const uint8_t *>(data) + 32 + (1 - dispatchIndex) * 32, 32);
+            assert(preamble.va_start == virtualBase() + 0x1400 && preamble.ib_bytes == 32 &&
+                preamble.ip_type == 1 && !preamble.ip_instance && !preamble.ring && !preamble._pad && !preamble.flags);
+        }
         uint64_t offset = 4096;
         waitAttempt = 0;
-        assert(header.abi == 1 && header.ctx_id == 7 && header.num_ibs == 2 && !header.flags && !header.fence_handle &&
+        assert(header.abi == 1 && header.ctx_id == 7 && header.num_ibs == (singlePolicy ? 1u : 2u) && !header.flags && !header.fence_handle &&
             !header.fence_offset && !header.reserved && !ib._pad && !ib.flags && ib.va_start == virtualBase() + offset &&
             ib.ib_bytes == 320 && ib.ip_type == 1 && !ib.ip_instance && !ib.ring);
         checkStaged(submitted - 1); out[0] = 0x100000000ull + submitted;
@@ -365,12 +369,21 @@ static void packetInputs() {
     assert(phxGfx11DispatchCommands(packet, 80, code, target, pattern) == 78);
     assert(packet[78] == 0xa5a5a5a5 && packet[79] == 0xa5a5a5a5 && packet[80] == 0xa5a5a5a5);
 }
-int main(int argc, const char *argv[]) {
-    assert(argc == 4); memsyncPolicy = !strcmp(argv[3], "memsync"); assert(memsyncPolicy || !strcmp(argv[3], "control"));
+static int runCase(int argc, const char *argv[]) {
+    // Only fake process/device storage is reset. No production cleanup runs on
+    // a held case. The synthetic clock remains monotonic across cases.
+    memsyncPolicy = singlePolicy = tailPolicy = false;
+    upper = failed = opened = mapped = gpuMapped = false;
+    waitAttempt = nextService = propertyLive = allocated = created = submitted = waited = 0;
+    mappedAddress = 0; property = {}; events.clear(); fault.clear();
+    memset(backing, 0, sizeof(backing));
+    assert(argc == 4); memsyncPolicy = !strcmp(argv[3], "memsync");
+    singlePolicy = !strcmp(argv[3], "single"); tailPolicy = !strcmp(argv[3], "nop-tail");
+    assert(memsyncPolicy || singlePolicy || tailPolicy || !strcmp(argv[3], "control"));
     upper = !strcmp(argv[1], "upper"); assert(upper || !strcmp(argv[1], "low")); fault = argv[2];
     packetInputs();
     const char *args[] = {"native-shader-probe", "--run", "--upper", "extra"}; int count = upper ? 3 : 2;
-    args[1] = memsyncPolicy ? "--run-memsync" : "--run-control";
+    args[1] = singlePolicy ? "--run-single" : tailPolicy ? "--run-nop-tail" : memsyncPolicy ? "--run-memsync" : "--run-control";
     if (is("legacy-fresh")) args[1] = "--run-fresh";
     if (is("legacy-reuse")) args[1] = "--run-reuse";
     if (is("legacy-publish")) args[1] = "--run-ib-publish";
@@ -394,4 +407,18 @@ int main(int argc, const char *argv[]) {
     for (size_t i = 0; i < events.size(); ++i) fprintf(stderr, "%s\"%s\"", i ? "," : "", events[i].c_str());
     fputs("]}\n", stderr);
     return result;
+}
+
+int main(int argc, const char *argv[]) {
+    if (argc == 4) return runCase(argc, argv);
+    assert(argc >= 5 && !strcmp(argv[1], "--batch"));
+    // One reset fake fixture per case, no process churn, threads or real IOKit.
+    // The runner also compares selected cases with separate process execution.
+    for (int i = 4; i < argc; ++i) {
+        const char *one[] = {argv[0], argv[2], argv[i], argv[3]};
+        const int result = runCase(4, one);
+        printf("fake-native-case-end {\"index\":%d,\"returncode\":%d}\n", i - 4, result);
+        fprintf(stderr, "fake-native-case-end {\"index\":%d,\"returncode\":%d}\n", i - 4, result);
+    }
+    return 0;
 }

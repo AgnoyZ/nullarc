@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "date": "2026-11-17",
+  "result": "NOP-head-two-dispatches-passed-and-recovered",
+  "branch": "upstream34/vram-layout-fix",
+  "source_commit": "4c778547411d6b451cb6a8b51c13472b3a0ae963",
+  "approved_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "probe_sha256": "b15f94cd44827cb513fcfbdeb267e462e30b55c614d74ee111b65e1ae10f7b15",
+  "kernel_build": 34,
+  "original34_exact_kernel_image": true,
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "native_trial": {
+    "policy": "control",
+    "descriptor_order": ["immutable-eight-dword-NOP-at-0x1400", "reused-80-dword-dispatch-at-0x1000"],
+    "initializations": 1,
+    "clients": 1,
+    "submitted_dispatches": 2,
+    "fully_verified_dispatches": 2,
+    "bytes_verified_after_each_dispatch": 16384,
+    "mismatch": null,
+    "waits": [
+      {"pass": 0, "budget_ns": 0, "busy": 1, "elapsed_ns": 3397},
+      {"pass": 0, "budget_ns": 50000, "busy": 0, "elapsed_ns": 8416},
+      {"pass": 1, "budget_ns": 0, "busy": 0, "elapsed_ns": 9568}
+    ],
+    "automatic_retry": false
+  },
+  "recovery": {
+    "independently_verified": true,
+    "recovery_boots": 1,
+    "GPU_calls_after_recovery": 0,
+    "GPU_off": true,
+    "firmware_framebuffer_only": true,
+    "consumed_job_removed": true,
+    "protected_files_unchanged": 46,
+    "protected_links_unchanged": 2,
+    "EFI_files_unchanged": 347,
+    "Microsoft_files_unchanged": 148,
+    "security_and_kernel_collections_unchanged": true,
+    "new_matching_reports": 0
+  },
+  "interpretation": {
+    "new_NOP_control_reproduced_wrong_value": false,
+    "ACQUIRE_MEM_hardware_treatment_run": false,
+    "ACQUIRE_MEM_causal_effect_established": false,
+    "CP_cache_root_cause_established": false,
+    "next_comparison": "same-arena-single-IB-control-before-fresh-head-tail-scope"
+  },
+  "acceptance": {
+    "IB_wrong_value_resolved": false,
+    "production_fix_integrated": false,
+    "default_wait_promoted": false,
+    "desktop_acceleration_enabled": false,
+    "desktop_HOLD_cleared": false,
+    "FPS_measured": false
+  },
+  "scope": {
+    "fresh_packet": true,
+    "old_scope_reused": false,
+    "driver_deployed": false,
+    "build41_build42_candidates": false,
+    "EFI_writes": 0,
+    "NVRAM_writes": 0,
+    "binary_uploaded": false,
+    "raw_diagnostics_published": false
+  }
+}

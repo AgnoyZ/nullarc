@@ -1,9 +1,10 @@
 # Original build34 IB preamble diagnostic
 
-Status on 2026-11-17: offline investigation, not a proven IB fix. The second
-reused-IB dispatch still has an unresolved first mismatch at BO byte `0x2010`:
-actual `0xde`, expected `0xdf`. The latest original34 prerequisite result is
-recorded in [the PR28 gate evidence](validation/build34-pr28-install-gate-20261117.json).
+Status on 2026-11-17: the bounded original34 NOP-head trial passed both guarded
+dispatches and independently verified recovery. This is a diagnostic result,
+not a proven IB fix. Earlier one-IB trials have an unresolved first mismatch at
+BO byte `0x2010`: actual `0xde`, expected `0xdf`, including
+[the PR28 gate](validation/build34-pr28-install-gate-20261117.json).
 Desktop acceleration and default wait promotion remain on HOLD. No FPS claim
 follows from these tools.
 
@@ -18,8 +19,8 @@ they do not establish its root cause. Only the first mismatching byte was
 reported, so the entire output must not be described as the old pattern.
 
 `tools/upstream34_layout/ib_preamble_probe.cpp` uses the existing multiple-IB
-native ABI with the exact original34 kernel. Both policies submit the same two
-IB descriptors, in this order, twice:
+native ABI with the exact original34 kernel. The original control/memsync pair
+submits the same two IB descriptors, in this order, twice:
 
 1. A prewritten immutable eight-dword preamble at BO offset `0x1400`.
 2. The 80-dword dispatch IB at `0x1000`, rewritten only before pass 1.
@@ -38,6 +39,46 @@ first completes; placing ACQUIRE_MEM in another IB is not proof that its
 invalidation precedes all relevant command fetches. A negative result would
 reject this placement for this trigger, not every possible synchronization
 fix. The existing ACQUIRE_MEM inside the dispatch IB is preserved.
+
+## NOP-head hardware result and descriptor-order follow-up
+
+The new NOP control did **not** reproduce the old wrong value. On original
+build34, macOS 26.7.2 (`25G332`), one initialization and one native client
+submitted two dispatches. Each passed the complete 16 KiB arena check. The
+first dispatch needed a 50 microsecond follow-up wait after a pending zero
+poll; the second completed at its zero poll. One recovery reboot returned to
+GPU-off with the firmware framebuffer. An independent verifier checked the
+new boot, original image, protected files, EFI/security state and absence of
+new matching crash reports, then removed the consumed one-use job. See the
+[sanitized hardware record](validation/build34-ib-preamble-control-20261117.json).
+
+Consequently the planned ACQUIRE_MEM treatment is blocked by its failed
+reproduction prerequisite. It was not run, and the NOP result cannot establish
+an ACQUIRE_MEM effect, a particular cache mechanism, a production fix or FPS.
+
+The next fixture revision adds two explicit policies without changing the
+production kernel, helpers or ABI:
+
+| CLI policy | Submitted descriptors | Staged NOP at `0x1400` |
+| --- | --- | --- |
+| `--run-single` | Reused dispatch IB only | Guarded but not submitted |
+| `--run-control` | NOP, then reused dispatch IB | Submitted first |
+| `--run-nop-tail` | Reused dispatch IB, then NOP | Submitted second |
+
+These three policies stage byte-identical arenas, use the same rewritten
+dispatch address and perform the same whole-arena checks and waits. Only
+descriptor count/order changes. Single versus head cannot distinguish an
+extra IB from its ring footprint or timing; head versus tail can test whether
+the NOP must precede the rewritten dispatch. Neither comparison directly
+observes CP fetches. The fourth policy, `--run-memsync`, remains available for
+offline checking but keeps its separate fresh failing-control prerequisite.
+
+A new single-IB scope must reproduce the original mismatch in this exact
+fixture before another head/tail hardware treatment can be interpreted. Each
+scope needs its own source/binary pins, fresh GPU-off boot, independent
+deadline and one-use recovery. A passing single-IB result instead stops that
+comparison and requires reassessing reproducibility; it is not permission to
+keep trying policies until one fails.
 
 ## Source review and licensing
 
@@ -95,17 +136,31 @@ was ad-hoc signed, and passed strict signature/architecture checks without
 execution. Protected production sources and licences remain unchanged. See
 [the offline validation record](validation/build34-ib-preamble-offline-20261117.json).
 
+The descriptor-order revision passed all 9,120 actual-C++ ASan/UBSan cases
+(1,140 for each of four policies and two VA models), eight result/framing
+regression methods, 20 original-layout methods and 11 private controller
+methods. The signed x86_64 diagnostic compiled without executing its native
+binary. See [the follow-up offline record](validation/build34-ib-order-offline-20261117.json).
+To avoid thousands of macOS process launches, the mock resets its fake
+device/process storage between serial cases; its synthetic clock stays
+monotonic. Complete case frames are checked independently on stdout/stderr,
+and 64 selected cases must match separate-process execution byte for byte.
+Earlier incomplete serial-exec/fork attempts are not counted. Tests run with
+background scheduling and nice 15; this is not a measured desktop-latency claim.
+
 ## Hardware scope and recovery
 
 The source addition neither installs/loads a driver nor creates a startup job,
 initializes the GPU or arms execution. Build41/build42 remain withdrawn and
 are rejected as synthetic identities before any context/BO allocation.
 
-A subsequent original34 hardware comparison requires a fresh separate bounded
-scope for each policy. First reproduce the wrong value with the new NOP
-control and complete its recovery. Only then consider a separate treatment
-from a fresh GPU-off boot. Verify the exact original kernel image, ABI 1.12,
-PCI `1002:1900`, native readiness, source/binary hashes, unchanged protected
+Each original34 hardware comparison requires a fresh separate bounded scope
+for each policy. The original NOP-head scope recorded above is consumed; it did not
+reproduce the fault, so its memsync treatment cannot proceed. For the new
+descriptor-order fixture, first reproduce the fault with `--run-single` and
+complete independent recovery. Only then consider a separately pinned head or
+tail scope from a fresh GPU-off boot. Verify the exact original kernel image,
+ABI 1.12, PCI `1002:1900`, native readiness, source/binary hashes, unchanged protected
 files, EFI and security state, and an independent live recovery witness before
 GPU work. Limit each scope to one original initialization, one client, two
 dispatches, and at most one recovery reboot. Do not reuse any consumed packet.
