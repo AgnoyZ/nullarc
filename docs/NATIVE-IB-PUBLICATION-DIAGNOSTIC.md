@@ -1,10 +1,13 @@
 # Selective CPU IB publication diagnostic
 
-Status on 2026-11-16: **offline diagnostic; not hardware-tested**. The earlier
+Status on 2026-11-16: **one bounded hardware trial per policy completed; both
+failed pass 1 output integrity**. Selective IB `CLFLUSH` plus `MFENCE` did not
+eliminate the mismatch; it is not adopted as a production fix. The earlier
 [paired trial](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md#original-build34-fresh-comparison)
 failed its reused/rewritten IB policy and passed its immutable fresh-slot policy.
-That comparison motivates a narrower test; it does not establish a production
-cache defect. Both earlier scopes are consumed and may not be replayed.
+That comparison motivated this narrower test; neither pair establishes a
+production cache defect. All four policy scopes are consumed and may not be
+replayed.
 
 ## Submission-path review
 
@@ -40,7 +43,7 @@ shader notice and public-binary publication restrictions remain unchanged.
 The source review did not establish a packet-encoding correction that explains
 the observed mismatch. It therefore makes no production kernel, PTE, cache-mode
 or fence change. An in-IB barrier's presence alone cannot show which bytes the
-command processor fetched. The next diagnostic targets CPU-side publication
+command processor fetched. This diagnostic targets CPU-side publication
 without changing GPU packet order or selecting a different IB address.
 
 ## Two policies, one narrow operation difference
@@ -104,7 +107,8 @@ focused tests passed (nine canonical, seven previous freshness and seven new
 publication tests), along with 48 actual-C++ ASan/UBSan regression scenarios
 for the previous freshness tool. The real x86_64 IOKit/CoreFoundation build
 passed with warnings treated as errors. Disassembly confirmed the architecture
-primitives were compiled and test CPU hooks were absent; the binary was not run.
+primitives were compiled and test CPU hooks were absent; that offline
+compile-only binary was not run.
 
 The existing manual source workflow adds this fake-CPU/fake-IOKit test only.
 It does not execute the native tool or add its binary to public packaging.
@@ -123,15 +127,54 @@ clang++ -arch x86_64 -std=c++17 -Wall -Wextra -Werror \
 Source hashes, exact case accounting and build evidence are in
 [the validation record](validation/native-ib-publication-diagnostic-20261116.json).
 
-Any future hardware comparison must first reproduce the control with this new
-source/binary under independent containment, then use a separately bounded
-publication-only scope with the same binary. Old consumed packets are not
-controllers for this tool. No initializer, new runtime job, installation or
-recovery is armed by this change. A passing publication trial would prioritize
-CPU-side IB visibility, while still coupling cache writeback/invalidation with
-the added fence and timing. It would not distinguish those effects or establish
-a global cache policy. A failure would not prove that CPU visibility is correct
-or justify changing packet bits.
+## Original build34 hardware comparison
+
+The later hardware pair ran on macOS 26.7.2, build `25G332`, using the same exact
+loaded original build34 executable. A separate runtime binary was built from
+clean committed source `4724ee5833e846e96340d224028acd71041c0c93`; the original
+offline compile-only binary remained unexecuted. Both policies used that same
+new runtime executable, SHA256
+`2dafa897c7df387e098c647d3628958c2edf5fcc6bd146c3da0b3a02fb73d70f`,
+with identical source/header hashes, fixture and zero BO-flush settings.
+
+The new `control` ran first and reproduced the earlier failure signature.
+Independent result, retirement and final recovery checks completed before the
+separate `ib-publish` scope was prepared. Each scope allowed one original
+initialization, at most two low-VA dispatches and one recovery reboot; neither
+scope could launch a subsequent GPU trial.
+
+| Policy, one trial each | Pass 0 | Pass 1 | Wait durations, in call order |
+| --- | --- | --- | --- |
+| `control`: rewrite/reuse slot 0 | Full 16-KiB comparison passed | Positive retirement, then `0xde` instead of `0xdf` at `0x2010` | 3,506 / 17,533 / 8,606 ns |
+| `ib-publish`: same slot, plus five IB-only flushes and fence | Full 16-KiB comparison passed | Positive retirement, then the same `0xde` instead of `0xdf` at `0x2010` | 7,524 / 21,730 / 9,357 / 13,224 ns |
+
+Both scopes passed original compute/graphics output and queue-adoption checks.
+Both reached the second dispatch, retained resources immediately on validation
+failure, and completed their one recovery. The recovery observers made zero
+GPU calls. Independent checks confirmed 347 EFI files (including 148 Microsoft
+files), 46 protected files, two links and security/kernel collections unchanged,
+with no new matching diagnostic reports. Both consumed startup jobs were
+removed. Final readback confirmed GPU-off, the firmware framebuffer, and no
+active probe or shutdown process. No driver installation, EFI replacement,
+tuning write or preliminary reboot occurred.
+
+The publication path is bound by the exact source, policy argument and second
+dispatch; its CPU instructions/cache effects were not separately instrumented
+on hardware. The treatment flushed only the rewritten IB, not shader, output,
+inactive IB or the whole BO. Its negative result does **not** prove CPU
+visibility correct or identify GPU cache/prefetch, address reuse or execution/
+fence ordering as the cause. One trial per policy across separate initialization
+and boot scopes is not a statistical study. It provides no basis for adopting
+global cache flushing or changing PM4 bits.
+
+See the [new-source control record](validation/upstream34-native-ib-publication-control-20261116.json)
+and [publication treatment record](validation/upstream34-native-ib-publication-trial-20261116.json).
+The treatment record binds the exact control record hash. The earlier
+reuse/fresh records and offline validation record remain unchanged. Neither
+new scope exercised a two-second-cap wait, CPU load, concurrent clients, GUI
+responsiveness or FPS. No further hardware scope is armed; neither consumed
+packet may be replayed. Further source investigation must precede another
+separately bounded experiment.
 
 Default retains A1/A2/corrected-A3 at `64f3d99`. Wait promotion and accelerated
 desktop remain on HOLD. No GUI stability, FPS, two-second-cap wait or wait-fix

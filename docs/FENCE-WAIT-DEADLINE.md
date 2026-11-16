@@ -349,10 +349,18 @@ made. No further hardware scope is armed, and the earlier historical trials
 above remain unchanged.
 
 The subsequent [CPU IB publication diagnostic](NATIVE-IB-PUBLICATION-DIAGNOSTIC.md)
-prepares that narrower question offline: both policies rewrite/reuse the same
-slot, and only one adds five IB-only CPU cache-line flushes plus a fence before
-the second submission. Upstream review did not establish a packet correction;
-this adds no production kernel/cache change or passing hardware gate.
+tested that narrower question after offline preparation: both policies
+rewrite/reuse the same slot, and only one adds five IB-only CPU cache-line
+flushes plus a fence before the second submission. Its new-source control first
+reproduced the mismatch and was independently recovered/retired. The separately
+bounded publication treatment then failed the same pass 1 / `0x2010` / actual
+`0xde` / expected `0xdf` after positive retirement. It too completed independent
+recovery/retirement; the targeted operation did not eliminate the mismatch.
+Neither policy reached a two-second-cap wait. Both startup jobs were removed,
+GPU-off was verified, and no further trial is armed. See the
+[publication treatment record](validation/upstream34-native-ib-publication-trial-20261116.json).
+Upstream review did not establish a packet correction; these results add no
+production kernel/cache change or passing wait/desktop hardware gate.
 
 ## Offline build40 validation boundary and rollback
 

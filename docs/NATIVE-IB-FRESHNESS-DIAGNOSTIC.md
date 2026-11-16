@@ -184,8 +184,12 @@ HOLD remains in force.
 
 A subsequent [selective CPU IB publication diagnostic](NATIVE-IB-PUBLICATION-DIAGNOSTIC.md)
 keeps the reused IB address and changes only targeted CPU cache maintenance
-before the second submission. It is offline preparation, not another hardware
-result or a production cache fix; both policy scopes above remain consumed.
+before the second submission. Its later new-source control and publication
+treatment both failed pass 1 at `0x2010` with actual `0xde`, expected `0xdf`,
+after positive retirement. Five IB-only `CLFLUSH` operations plus `MFENCE` did
+not eliminate that signature. Both new scopes were independently recovered and
+retired; this result does not prove a specific cache cause or accept a production
+fix. The earlier pair and both policy scopes above remain unchanged and consumed.
 
 ## Host validation and rollback
 

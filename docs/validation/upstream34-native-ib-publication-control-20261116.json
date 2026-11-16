@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "original34-CPU-IB-publication-control-reproduced-output-integrity-failure",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "default_branch_checkpoint": {
+    "branch": "upstream34/vram-layout-fix",
+    "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "wait_fix_present": false,
+    "modified_by_this_trial": false
+  },
+  "scope": {
+    "owner_authorized": true,
+    "kext_build": 34,
+    "ABI": "1.12",
+    "CPU_IB_policy": "control",
+    "current_boot_initializations": 1,
+    "maximum_single_client_dispatches": 2,
+    "preliminary_reboots": 0,
+    "EFI_or_kext_replacements": 0,
+    "CPU_load_workers": 0,
+    "concurrent_client_phases": 0,
+    "tuning_writes": 0,
+    "desktop_takeover": false,
+    "recovery_boot_limit": 1,
+    "scope_consumed": true,
+    "publication_policy_executed": false
+  },
+  "source_and_binary": {
+    "diagnostic_source_commit": "4724ee5833e846e96340d224028acd71041c0c93",
+    "original_executable_sha256": "4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412",
+    "diagnostic_source_sha256": "b5995cb380366c5385d2f22159ffb6401d1aed0bf96692f675bb5408879c14e5",
+    "architecture_header_sha256": "ff3ac0dc502ef3264951b897fd11ed492e75bbc8280d763e80d1f5c6a17e4396",
+    "diagnostic_executable_sha256": "2dafa897c7df387e098c647d3628958c2edf5fcc6bd146c3da0b3a02fb73d70f",
+    "clean_committed_source_build": true,
+    "runtime_binary_rebuilt_separately_from_offline_compile_only_binary": true,
+    "source_matches_offline_validated_source": true,
+    "driver_ABI_shader_or_licenses_changed": false
+  },
+  "fixture": {
+    "contexts": 1,
+    "GTT_BO_bytes": 16384,
+    "pre_staged_IB_byte_offsets": [
+      4096,
+      4608
+    ],
+    "IB_bytes_each": 320,
+    "submitted_IB_byte_offset_both_passes": 4096,
+    "second_pass_rewrites_slot_0": true,
+    "inactive_slot_1_guarded_not_submitted": true,
+    "output_byte_offset": 8208,
+    "output_bytes": 1024,
+    "output_reinitialized_each_pass": true,
+    "CPU_IB_cache_line_flushes": 0,
+    "added_CPU_publication_fences": 0
+  },
+  "initializer": {
+    "exit_code": 0,
+    "original_compute_graphics_and_queue_adoptions_passed": true
+  },
+  "native_probe": {
+    "submitted_dispatches": 2,
+    "fully_guarded_dispatches_verified": 1,
+    "full_validation_extent_bytes_per_dispatch": 16384,
+    "first_mismatch": {
+      "pass_zero_based": 1,
+      "BO_relative_byte_offset": 8208,
+      "actual_byte": 222,
+      "expected_byte": 223
+    },
+    "second_dispatch_retirement_reported_complete": true,
+    "wait_observations": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 3506
+      },
+      {
+        "pass": 0,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 17533
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 0,
+        "elapsed_ns": 8606
+      }
+    ],
+    "two_second_cap_wait_calls": 0,
+    "DIAGNOSTIC_PASS_present": false,
+    "exercise_failure_resources_held_until_recovery": true,
+    "immediate_HOLD_detection": true
+  },
+  "read_only_after_initialization": {
+    "values": {
+      "debug.phxbos_flush": 0,
+      "debug.phxbos_flush_bytes": 0,
+      "debug.phx_hang_kills": 0
+    },
+    "capture_precedes_native_probe": true
+  },
+  "supervision": {
+    "independent_deadline_seconds": 300,
+    "serialized_single_recovery": true,
+    "recovery_boots_used": 1,
+    "automatic_GPU_retry": false,
+    "recovery_boot_GPU_calls": 0,
+    "consumed_job_removed": true,
+    "private_evidence_preserved": true
+  },
+  "recovery": {
+    "original_build34_exact_image": true,
+    "EFI_unchanged_files": 347,
+    "Microsoft_files_unchanged": 148,
+    "OpenCore_configuration_unchanged": true,
+    "protected_files_unchanged": 46,
+    "protected_links_unchanged": 2,
+    "security_and_kernel_collections_unchanged": true,
+    "GPU_off_and_firmware_framebuffer_retained": true,
+    "new_matching_diagnostic_reports": 0,
+    "raw_evidence_published": false
+  },
+  "final_readback": {
+    "GPU_off": true,
+    "firmware_framebuffer_only": true,
+    "active_probe_or_shutdown": false,
+    "consumed_job_removed": true,
+    "protected_files_and_links_unchanged": true,
+    "security_unchanged": true,
+    "GPU_calls_this_boot": 0,
+    "additional_GPU_trial_started": false,
+    "CPU_IB_policy": "control",
+    "publication_policy_executed": false
+  },
+  "interpretation": {
+    "new_control_reproduced_previous_failure_signature": true,
+    "publication_policy_hardware_tested_by_this_scope": false,
+    "specific_cache_root_cause_established": false,
+    "wait_candidate_hardware_gate_passed": false,
+    "default_promotion_permitted": false,
+    "background_GUI_stability_established": false,
+    "FPS_measured": false,
+    "accelerated_desktop_HOLD_cleared": false
+  },
+  "private_receipt_hashes": {
+    "probe_stdout_sha256": "3f2eb6b51d98f0b6dd972358d5da37dc1ee68e5953877d19d42b9485a4d1b04d",
+    "probe_stderr_sha256": "bf4bd3a6b04d0cb765ed657c54501c2eb97676f74d7e62d190b3319fea06cb44"
+  },
+  "limits": [
+    "This new-source control reproduced pass-1 byte 0x2010 actual 0xde versus expected 0xdf after retirement; it does not identify which CPU/GPU cache or ordering mechanism caused the mismatch.",
+    "No publication operation, production driver change, CPU-load phase, concurrent client, accelerated desktop, FPS or full two-second-cap wait was tested.",
+    "One recovery reboot returned initialized hardware to GPU-off after the validation failure. The observer performed no GPU calls, and the one-use startup job was removed.",
+    "The consumed control packet must not be replayed or used to launch a publication-policy trial. Such a comparison requires its own bounded scope with the same source/binary.",
+    "No raw logs, machine identifiers, personal paths, EFI, firmware or binaries are exported."
+  ]
+}
