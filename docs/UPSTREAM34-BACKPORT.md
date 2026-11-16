@@ -353,3 +353,34 @@ are absent, and no A3 startup observation has been armed. A separate fresh-boot
 test must verify actual A3 loading, timing-property consistency and the retained
 GPU/desktop regression before reporting A3 hardware success. Evidence:
 `validation/upstream34-backport-a3-install-20261116.json`.
+
+### A3: independent one-use fresh-boot observation prepared
+
+The fresh A3 witness passed **68 CPU/permission tests**, its actual launchd
+preparation role and a separate execution of all real arming admission checks
+up to the first mutation. It checks **2,180 fixed inputs**, retaining 2,136
+inherited pins after verified retirement of the A2 witness. Only two inherited
+hashes differ: the installed accelerator image and the already-audited AuxKC.
+All 18 WindowServer access checks pass and the original post-startup watchdog
+is preserved. Preparation has performed zero GPU commands and no reboot.
+
+In addition to the same loaded-image, startup/queues, real Metal, native
+framebuffer, frame-progress, stable WindowServer and diagnostic checks used by
+A2, this trial reads the new timing registry properties twice. It requires the
+accepted **2560 by 1600 / 120,000 milliHz** geometry/refresh to stay unchanged.
+A validated timing must have bounded totals and the matching estimated pixel
+clock; a legacy fallback must have no estimated-clock property. The snapshots
+must agree across the GPU/frame observation. This observer does not open an
+exclusive framebuffer connection, directly call the timing callback, program
+a display mode or write MMIO. The actual callback remains covered by the
+separate 59-assertion production-method host test; the registry check must not
+be presented as a direct live callback test or physical clock measurement.
+
+Limits remain one ordinary/native-desktop reboot, one three-command Metal
+probe with its 55-second process bound, a 300-second independent observation
+deadline, and at most one managed recovery reboot. Original startup/watchdogs
+remain in place; software timers cannot guarantee recovery from a hard hang.
+GPU-off and persistent-display-arming cleanup remain mandatory. At this source
+checkpoint the packet is **not armed**, the kernel still runs A2, and A3
+hardware success is pending. Evidence:
+`validation/upstream34-backport-a3-boot-preparation-20261116.json`.
