@@ -1,12 +1,13 @@
 # Isolated build-34 A1/A2/A3 backports
 
-Latest hardware disposition, **2026-11-16 12:49 +08:00**: A1 and cumulative
-A1+A2 passed their bounded real-GPU gates. A3 **failed** fresh-boot timing
-admission before its Metal probe; it is not accepted for adoption. The exact
-accepted A2 kext and AuxKC have been restored on disk. The current recovery
-session uses the firmware framebuffer with PhxAccel not loaded and GPU-off
-present; restoring disk files is not evidence of A2 being loaded again.
-The consumed A3 witness is retired, with no automatic retry. The chronological
+Latest disposition, **2026-11-16 after correction installation**: A1 and
+cumulative A1+A2 passed their bounded real-GPU gates. Original A3 **failed**
+fresh-boot timing admission before its Metal probe and was rolled back. Its
+2-second sampling correction passed the source/native gate and is now
+**installed-awaiting-reboot**, with the accepted A2 bundle/cache backed up.
+The current recovery session uses the firmware framebuffer with PhxAccel not
+loaded and GPU-off present. Corrected A3 loading and hardware acceptance remain
+pending. The consumed original A3 witness is retired; the chronological
 source/preparation checkpoints below retain their original scope.
 
 Subsequent correction: a 2-second read-only measurement window passed the
@@ -521,3 +522,31 @@ and single-use boot contract must use distinct private scopes, preserve the
 original failure/recovery receipts, and retain the 120,000-milliHz acceptance
 baseline. Evidence:
 `validation/upstream34-backport-a3-refresh-correction-20261116.json`.
+
+### A3 correction: installation independently verified; not loaded
+
+After source correction `4279b23` was synchronized, a distinct installer scope
+admitted the exact previous failed-trial retirement, recovery boot, verified
+A2 disk restoration, firmware framebuffer and unloaded accelerator state.
+Fourteen CPU admission/cache tests passed, including refusal of an unverified
+rollback, another boot, a still-loaded accelerator or changed cached records.
+All 180 source/protected hashes match the new successful gate. The original
+failed trial, rollback scopes and inactive bundles remain intact.
+
+Atomic bundle exchange installed the exact corrected native artifact. A
+matching KDK built a private AuxKC with normal approval checks; this time the
+active cache did not change concurrently. The published active cache matches
+the private build byte for byte. Independent readback verified all 416 cached
+records, with only the intended accelerator image changed and all 415 unrelated
+records identical. It also checked bundle signatures/manifests, exact A2 bundle
+and cache backups, cache metadata, security settings, Boot/System KCs and
+unchanged startup/runtime inputs. The new frozen disk rollback helper passed
+its zero-write preflight against this installed state.
+
+The corrected candidate remains **installed-awaiting-reboot**. PhxAccel is
+not loaded, GPU-off is present, display-arming/pending markers are absent, and
+the firmware desktop is retained. Installation/readback issued no GPU command,
+initializer, live unload or reboot. A separately prepared, single-use loading
+trial must still pass the unchanged 120,000-milliHz baseline, timing consistency
+and real GPU/desktop gate. This is neither A3 acceptance nor an FPS result.
+Evidence: `validation/upstream34-backport-a3-refresh-install-20261116.json`.
