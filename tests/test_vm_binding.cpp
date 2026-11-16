@@ -1,6 +1,7 @@
 // Actual staged method bodies; only IOKit/MMIO/retirement observations are faked.
 #include "PhxHardwarePolicy.hpp"
 #include "PhxNativeABI.h"
+#include "PhxIbFetchSync.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -180,13 +181,14 @@ int main(int argc, char **argv) {
             }
             if (success) {
                 assert(result == kIOReturnSuccess && seq == 43 && p.gSeq == 43 && p.flushes == 2);
-                assert(p.gq[0].tail == 1 && p.gq[0].wptr == 12 && p.hwv[0].lastSeq == 43);
+                assert(p.gq[0].tail == 1 && p.gq[0].wptr == 20 && p.hwv[0].lastSeq == 43);
                 assert(p.vm[0].lastSeq == 43);
                 const uint32_t *words = reinterpret_cast<const uint32_t *>(p.memory.words.data()) + 0x4000 / 4;
-                const uint32_t packet[] = {0xc0023f00, 0x400000, 0, 4u | (1u << 23) | (8u << 24),
+                const uint32_t packet[] = {0xc0065800, 0, 0xffffffff, 0xffffff, 0, 0, 10, 0xc3b1,
+                    0xc0023f00, 0x400000, 0, 4u | (1u << 23) | (8u << 24),
                     0xc0064900, 0x06603514, 0x40000000, 0x6100, 1, 43, 0, 0};
                 assert(std::memcmp(words, packet, sizeof(packet)) == 0);
-                assert(p.memory.words[(0x6000 + 16) / 8] == 12 && p.bells.words[1] == 12);
+                assert(p.memory.words[(0x6000 + 16) / 8] == 20 && p.bells.words[1] == 20);
             }
             assert(p.mutex == 0);
         } else {

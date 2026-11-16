@@ -36,8 +36,9 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
 #include "PhxHardwarePolicy.hpp"
 #include "PhxBoPolicy.hpp"
 #include "PhxAllocationDiagnostic.hpp"
+#include "PhxIbFetchSync.h"
 
-#define PHX_KEXT_BUILD 40u
+#define PHX_KEXT_BUILD 41u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -1511,7 +1512,8 @@ IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, 
         IOLockUnlock(gpuLock); return kIOReturnNotReady;
     }
     GpuQueue &q = gq[queue];
-    const uint32_t need = n * 4 + 8;
+    const uint32_t syncDw = PHX_IB_FETCH_SYNC && !q.gfx ? phxIbFetchSyncDwords : 0;
+    const uint32_t need = syncDw + n * 4 + 8;
     if (q.ringDw < need + 16 || (q.ringDw & (q.ringDw - 1))) {
         IOLockUnlock(gpuLock); return kIOReturnBadArgument;
     }
@@ -1553,6 +1555,10 @@ IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, 
         return kIOReturnBusy;
     }
     uint32_t k = 0;
+    // A barrier inside an IB cannot precede that IB's own fetch. Keep the
+    // experimental compute prefix on the ring, before any user IB is emitted.
+    for (uint32_t i = 0; i < syncDw; ++i)
+        ringPut(q, k++, phxIbFetchSyncPacket[i]);
     for (uint32_t i = 0; i < n; i++) {
         ringPut(q, k++, 0xC0023F00);                               // INDIRECT_BUFFER
         // the CP wants the canonical (sign-extended) address: an upper-half IB (bit 47, where RADV puts them) with a

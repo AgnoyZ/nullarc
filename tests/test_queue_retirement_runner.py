@@ -67,7 +67,13 @@ class QueueRetirementRunnerTests(unittest.TestCase):
     def test_cases_and_ci_wiring(self):
         self.assertEqual(len(CASES), len(set(CASES)))
         harness = (ROOT / 'tests/test_queue_retirement.cpp').read_text(encoding='utf-8')
-        for case in CASES: self.assertIn('"' + case + '"', harness)
+        for case in CASES:
+            if case.startswith('packet-'):
+                # Packet variants share the parameterized actual-method path;
+                # test_ib_fetch_sync_runner independently checks the full set.
+                self.assertIn('test.rfind("packet-", 0)', harness)
+            else:
+                self.assertIn('"' + case + '"', harness)
         self.assertIn('python3 tools/test_queue_retirement.py', (ROOT / '.github/workflows/build.yml').read_text(encoding='utf-8'))
 
 

@@ -2,6 +2,7 @@
 #include "PhxHardwarePolicy.hpp"
 #include "PhxNativeABI.h"
 #include "PhxAllocationDiagnostic.hpp"
+#include "PhxIbFetchSync.h"
 #include <atomic>
 #include <cassert>
 #include <cstdint>
@@ -144,6 +145,63 @@ int main(int argc, char **argv) {
             assert(p.mutex.acquisitions == (test == "read-no-lock" ? 0u : 1u));
             assert(!p.binds && !p.reaps && !p.flushes);
         }
+    } else if (test.rfind("packet-", 0) == 0) {
+        const bool control = test.find("control") != std::string::npos;
+        const bool gfx = test.find("graphics") != std::string::npos;
+        const bool upper = test.find("upper") != std::string::npos;
+        const bool wrap = test.find("wrap") != std::string::npos;
+        const bool shortRing = test.find("short-ring") != std::string::npos;
+        const bool spaceBoundary = test.find("space-") != std::string::npos;
+        const bool spaceShort = test.find("space-short") != std::string::npos;
+        const uint32_t count = test.find("max") != std::string::npos ? PHXN_MAX_IBS :
+            test.find("multi") != std::string::npos ? 3 : 1;
+        const uint32_t prefix = !control && !gfx ? 8 : 0;
+        const uint32_t needed = prefix + count * 4 + 8;
+        if (gfx) { q.gfx = true; p.gq[1] = q; p.gq[0].ready = false; }
+        auto &selected = p.gq[gfx ? 1 : 0];
+        if (wrap) selected.wptr = selected.doneEnd = selected.ringDw - 4;
+        if (shortRing) selected.ringDw = 32;
+        if (spaceBoundary) {
+            selected.ringDw = 64;
+            history(p, {42}, 0, gfx ? 1 : 0);
+            selected.wptr = selected.fend[0] = 64 - 16 - needed + (spaceShort ? 4 : 0);
+            p.memory.words[selected.fenceOff / 8] = 41;
+        }
+        std::vector<uint64_t> vas(count); std::vector<uint32_t> sizes(count);
+        for (uint32_t i = 0; i < count; ++i) {
+            vas[i] = (upper ? 0x800000400000ull : 0x400000ull) + i * 0x1000;
+            sizes[i] = 80 + i;
+        }
+        auto expected = p.memory.words; const auto bells = p.bells.words;
+        const auto start = selected.wptr;
+        const auto initialTail = selected.tail;
+        uint64_t seq = UINT64_MAX;
+        const bool refused = (shortRing && needed + 16 > selected.ringDw) || spaceShort;
+        assert(p.gpuSubmit(1, gfx, vas.data(), sizes.data(), count, &seq) ==
+               (spaceShort ? kIOReturnBusy : refused ? kIOReturnBadArgument : kIOReturnSuccess));
+        if (refused) {
+            assert(seq == UINT64_MAX && p.gSeq == 42 && selected.wptr == start && selected.tail == initialTail);
+            assert(p.memory.words == expected && p.bells.words == bells && !p.binds && !p.flushes);
+        } else {
+            std::vector<uint32_t> packet;
+            if (prefix) packet = {0xc0065800, 0, 0xffffffff, 0xffffff, 0, 0, 10, 0xc3b1};
+            for (uint32_t i = 0; i < count; ++i) {
+                const uint64_t va = upper ? vas[i] | 0xffff000000000000ull : vas[i];
+                const uint32_t ib[] = {0xc0023f00, static_cast<uint32_t>(va), static_cast<uint32_t>(va >> 32),
+                    sizes[i] | (gfx ? 0 : 1u << 23) | 8u << 24};
+                packet.insert(packet.end(), ib, ib + 4);
+            }
+            const uint32_t release[] = {0xc0064900, 0x06603514, 0x40000000, 0x6100, 1, 43, 0, 0};
+            packet.insert(packet.end(), release, release + 8);
+            assert(packet.size() == needed);
+            auto *words = reinterpret_cast<uint32_t *>(expected.data()) + selected.ringOff / 4;
+            for (unsigned i = 0; i < packet.size(); ++i) words[(start + i) & (selected.ringDw - 1)] = packet[i];
+            expected[(selected.wbOff + 16) / 8] = start + needed;
+            assert(p.memory.words == expected && selected.wptr == start + needed);
+            assert(p.bells.words[selected.dbByte / 8] == selected.wptr && seq == 43 && p.gSeq == 43);
+            assert(selected.fend[initialTail] == selected.wptr && selected.fseq[initialTail] == seq && selected.fvmid[initialTail] == 8);
+            assert(p.binds == 1 && p.flushes == 2 && selected.tail == initialTail + 1 && !selected.head);
+        }
     } else if (test.rfind("submit-", 0) == 0) {
         uint64_t va = 0x400000, seq = UINT64_MAX; uint32_t dw = 4, count = 1, handle = 1;
         const uint64_t *vas = &va; const uint32_t *sizes = &dw; uint64_t *out = &seq;
@@ -189,21 +247,22 @@ int main(int argc, char **argv) {
             history(p, rows); fence = 0; p.completeOnDelay = test == "submit-late-completion";
             if (!p.completeOnDelay) expected = kIOReturnBusy;
         }
-        if (test == "submit-ring-full") { q.ringDw = 32; history(p, {42}); q.wptr = q.fend[0] = 16; fence = 41; expected = kIOReturnBusy; }
+        if (test == "submit-ring-full") { q.ringDw = 64; history(p, {42}); q.wptr = q.fend[0] = 40; fence = 41; expected = kIOReturnBusy; }
         if (test == "submit-bind-refused") { p.bindRefused = true; expected = kIOReturnBusy; }
         const auto memory = p.memory.words, bells = p.bells.words;
         const auto initialSeq = p.gSeq, initialWptr = q.wptr, initialDone = q.doneEnd, initialFloor = q.retiredSeq;
         const auto initialHead = q.head, initialTail = q.tail;
         assert(p.gpuSubmit(handle, gfx, vas, sizes, count, out) == expected);
         if (expected == kIOReturnSuccess) {
-            assert(seq == initialSeq + 1 && p.gSeq == seq && q.wptr == initialWptr + 12 && q.tail == initialTail + 1);
+            assert(seq == initialSeq + 1 && p.gSeq == seq && q.wptr == initialWptr + 20 && q.tail == initialTail + 1);
             assert(q.fseq[initialTail & 63] == seq && q.fend[initialTail & 63] == q.wptr);
             assert(q.fvmid[initialTail & 63] == 8);
             assert(p.vm[0].lastSeq == seq && p.hwv[0].lastSeq == seq && p.binds == 1 && p.flushes == 2);
-            const uint32_t expectedPacket[] = {0xc0023f00, 0x400000, 0, 4u | (1u << 23) | (8u << 24),
+            const uint32_t expectedPacket[] = {0xc0065800, 0, 0xffffffff, 0xffffff, 0, 0, 10, 0xc3b1,
+                0xc0023f00, 0x400000, 0, 4u | (1u << 23) | (8u << 24),
                 0xc0064900, 0x06603514, 0x40000000, 0x6100, 1, static_cast<uint32_t>(seq), static_cast<uint32_t>(seq >> 32), 0};
             const uint32_t *words = reinterpret_cast<const uint32_t *>(p.memory.words.data()) + q.ringOff / 4;
-            for (unsigned i = 0; i < 12; ++i) assert(words[(initialWptr + i) & (q.ringDw - 1)] == expectedPacket[i]);
+            for (unsigned i = 0; i < 20; ++i) assert(words[(initialWptr + i) & (q.ringDw - 1)] == expectedPacket[i]);
             assert(p.memory.words[(q.wbOff + 16) / 8] == q.wptr && p.bells.words[q.dbByte / 8] == q.wptr);
             if (test == "submit-retires-history" || test == "submit-index-wrap" || test == "submit-retired-floor" || test == "submit-late-completion") {
                 assert(q.head == initialTail && q.retiredSeq == initialSeq && q.doneEnd == initialWptr);
@@ -282,7 +341,7 @@ int main(int argc, char **argv) {
         start.store(true, std::memory_order_release);
         one.join(); two.join(); reader.join();
         assert(p.gSeq == 42 + 256 && p.gpuRetired() == p.gSeq && p.binds == 256 && p.flushes == 512);
-        assert(p.vm[0].lastSeq == p.gSeq && p.hwv[0].lastSeq == p.gSeq && q.wptr == 12 * 256 && q.tail == 256);
+        assert(p.vm[0].lastSeq == p.gSeq && p.hwv[0].lastSeq == p.gSeq && q.wptr == 20 * 256 && q.tail == 256);
         assert(p.mutex.acquisitions >= 256 * 2 + 2049 && !p.delays);
         assert(p.killedVmids.empty());
     } else { std::cerr << "Unknown case: " << test << '\n'; return 2; }

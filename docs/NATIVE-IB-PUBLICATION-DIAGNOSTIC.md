@@ -185,3 +185,8 @@ The subsequent [upstream solution review](UPSTREAM-SOLUTION-AUDIT-20261116.md)
 found no established fix for this native signature. It ranks a minimal MEC
 doorbell-range initialization candidate separately from BO lifetime, memory
 pressure and application-only IOSurface/cache changes; none is adopted here.
+
+The later [pre-IB compute synchronization candidate](IB-FETCH-SYNC.md) moves
+an additional synchronization operation onto the kernel ring before user IB
+emission. It includes isolated build34-derived control/sync kernel builds and
+offline packet/space tests; no hardware result is established by that preparation.

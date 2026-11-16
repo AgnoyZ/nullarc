@@ -35,6 +35,12 @@ CASES = (
     'hang-progress', 'hang-disabled', 'hang-no-lock', 'hang-stopping', 'hang-stop-after-lock',
     'hang-no-mmio', 'hang-no-aperture', 'hang-invalid-history', 'hang-future-fence',
     'hang-index-wrap', 'hang-invalid-vmid', 'hang-both-queues', 'concurrent-submit-retire-hang',
+    'packet-compute', 'packet-compute-upper', 'packet-compute-wrap', 'packet-compute-short-ring',
+    'packet-compute-multi', 'packet-compute-max', 'packet-compute-max-wrap',
+    'packet-graphics', 'packet-graphics-upper', 'packet-graphics-wrap', 'packet-graphics-short-ring',
+    'packet-graphics-multi', 'packet-graphics-max', 'packet-graphics-max-wrap',
+    'packet-compute-space-exact', 'packet-compute-space-short',
+    'packet-graphics-space-exact', 'packet-graphics-space-short',
 )
 
 

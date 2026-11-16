@@ -90,3 +90,8 @@ test-upstream34-layout:
 test-upstream34-mec-range:
 	python3 -m unittest discover -s tests -p test_upstream34_mec_range_runner.py -v
 	python3 tools/test_upstream34_mec_range.py --out build/upstream34-mec-range-host-tests
+
+.PHONY: test-ib-fetch-sync
+test-ib-fetch-sync:
+	python3 -m unittest discover -s tests -p test_ib_fetch_sync_runner.py -v
+	python3 tools/test_ib_fetch_sync.py --out build/ib-fetch-sync-host-tests

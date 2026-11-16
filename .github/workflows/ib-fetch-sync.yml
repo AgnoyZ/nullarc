@@ -1,0 +1,29 @@
+name: Pre-IB compute visibility candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-candidate:
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate actual compute and graphics packet/space paths
+        run: make test-ib-fetch-sync
+      - name: Retain full downstream queue and VM regressions
+        run: |
+          python3 tools/test_queue_retirement.py --out build/ib-fetch-queue
+          python3 tools/test_vm_binding.py --out build/ib-fetch-vm
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: acidanthera/MacKernelSDK
+          ref: 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          path: build-sdk
+          persist-credentials: false
+      - name: Compile and sign the build34-derived control and sync kexts only
+        run: python3 tools/upstream34_layout/ib_fetch_sync.py build/ib-fetch-build34 --sdk build-sdk
+      # No driver loading, native probe execution, reboot or artifact upload.

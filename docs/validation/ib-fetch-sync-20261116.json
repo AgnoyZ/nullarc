@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "offline-pre-IB-compute-sync-candidate-validated-hardware-pending",
+  "review_parent_commit": "7ef3aa6634c9de47bfe4a65e586aa57ee1d212d1",
+  "downstream_source_build": {
+    "before": 40,
+    "after": 41,
+    "compute_prefix_dwords": 8,
+    "graphics_prefix_dwords": 0,
+    "reservation_and_write_pointer_include_prefix": true,
+    "once_before_first_IB": true,
+    "policy_macro": "PHX_IB_FETCH_SYNC",
+    "default_policy": 1,
+    "control_policy": 0
+  },
+  "packet_dwords": [
+    3221641216,
+    0,
+    4294967295,
+    16777215,
+    0,
+    0,
+    10,
+    50097
+  ],
+  "primary_reference": {
+    "tag": "v6.12",
+    "commit": "adc218676eef25575469234709c2d87185ca223a",
+    "files": {
+      "drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c": {
+        "sha256": "74dc38ba2d48b1e43db0bec0706a53385fb2f083b273a8f8f4ee2da5d3e06317",
+        "license_header_reviewed": "MIT-style permission/warranty notice",
+        "commit_addressed_content_matches_tag_download": true,
+        "implementation_or_header_copied": false
+      },
+      "drivers/gpu/drm/amd/amdgpu/amdgpu_ib.c": {
+        "sha256": "3ad28f135d332cb49aed6035539fc7bfda760e3b585ea1028426c89fb7b6d267",
+        "license_header_reviewed": "MIT-style permission/warranty notice",
+        "commit_addressed_content_matches_tag_download": true,
+        "implementation_or_header_copied": false
+      },
+      "drivers/gpu/drm/amd/amdgpu/nvd.h": {
+        "sha256": "f65a105dfceff3bc03b3e02ac52ed18586586a5866135170a3239ec77fbe29c8",
+        "license_header_reviewed": "MIT-style permission/warranty notice",
+        "commit_addressed_content_matches_tag_download": true,
+        "implementation_or_header_copied": false
+      }
+    }
+  },
+  "source_provenance": {
+    "external_implementation_or_header_copied": false,
+    "independently_encoded_reviewed_fields": true,
+    "applicable_component_license": "MIT OR GPL-2.0-only",
+    "license_files_modified": false,
+    "tested_files_sha256": {
+      "src/phxbringup/PhxBringup.cpp": "17169e7bf1c725e6025c1f5f9b9e158106b792e4a9f810997acd5e62d9bdaffc",
+      "src/phxbringup/PhxIbFetchSync.h": "14b4c9204b9db704b10623d7931e001a7657718d76b4ae8eb2c98513c5a856ba",
+      "tests/test_queue_retirement.cpp": "5578760ebb9f9823158c24a198cf6cdbdbfb68cb72d2adbbba327114d223cb83",
+      "tests/test_queue_retirement_runner.py": "865b70b0c132ba09ddd23fd7302ba114c85a8da346a3e704b2c342018ee8e60e",
+      "tests/test_vm_binding.cpp": "ce99e2caf56e24e51e4dac4d448c03fea7222728004c58e917816063db590fed",
+      "tools/test_queue_retirement.py": "eb1e51249386743bfd19b14506bdf52523fb35e30ba4ae6ca82f3190cb465b9e",
+      "tools/test_ib_fetch_sync.py": "b8c02d80faaa0e44979dce4aa514dc94374c2f4eafbbadf5b73e51db79c02609",
+      "tests/test_ib_fetch_sync_runner.py": "92a10759c3be2ee921d9903757f8a2bba0e0b277b157fe8a17461372cadd2911",
+      "tools/upstream34_layout/ib_fetch_sync.py": "0f836494c429674fe30cee5ea821c291215bc56d53d2fc44b2397cc1202dff35",
+      ".github/workflows/ib-fetch-sync.yml": "cfe826a3a986f9761960ab3df2805b8c09c8fd0f678c4d8cf755fa56d3a01ba9",
+      "Makefile": "406376ec601288efba50ebcd92bb850f5bb7e6b3413b4252f024ee4bbc89f8e6"
+    }
+  },
+  "isolated_original_build34_derivative": {
+    "base_commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "base_source_sha256": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+    "candidate_build": 42,
+    "original_build34_image": false,
+    "candidate_source_sha256": "f069ebd8bed25bd9b46ce0c55681eb3ddac7595bcfdaf0aed8245530ecf94eee",
+    "header_sha256": "14b4c9204b9db704b10623d7931e001a7657718d76b4ae8eb2c98513c5a856ba",
+    "recipe_sha256": "0f836494c429674fe30cee5ea821c291215bc56d53d2fc44b2397cc1202dff35",
+    "exact_four_site_round_trip_verified": true,
+    "same_source_for_both_policies": true,
+    "policies": {
+      "control": 0,
+      "fetch-sync": 1
+    },
+    "wait_fix_or_MEC_range_included": false,
+    "ordinary_helpers_modified": false,
+    "runtime_compatible_initializer_and_HOLD_probe_admission_still_required": true
+  },
+  "host_validation": {
+    "supported_python": "Python 3.13.18",
+    "full_Python_tests_passed": 757,
+    "full_Python_final_status": "OK",
+    "full_Python_log_sha256": "e615bec41965d113ed18c993e09b41dde6bfd5482220f8c5d1252b2c25d7a74d",
+    "new_Python_methods_in_full_suite": 6,
+    "actual_submit_packet_matrix_scenarios_passed": 72,
+    "matrix_variants": [
+      "downstream-sync",
+      "downstream-control",
+      "build34-sync",
+      "build34-control"
+    ],
+    "matrix_cases_per_variant": 18,
+    "exact_matrix_without_duplicates_verified": true,
+    "packet_report_sha256": "d0104e8aecaf193f3239e15762c9714941780a52de942bc601b8031be72ee6e3",
+    "previous_actual_compute_packet_failed_specific_new_assertion": true,
+    "this_does_not_reproduce_GPU_wrong_value": true,
+    "invalid_policy_compile_refusals": 2,
+    "existing_actual_method_suites": {
+      "queue": {
+        "scenarios_passed": 104,
+        "report_sha256": "778458667ff05856158352beab7502094da5570db8d7a5ed3ec84d1f202781d4"
+      },
+      "vm": {
+        "scenarios_passed": 71,
+        "report_sha256": "ad59f9fba26d676c13056ad3cd59f511830465ee46800e6584ebdf5f8059236b"
+      },
+      "context": {
+        "scenarios_passed": 123,
+        "report_sha256": "f15be20e846fa0d1ddbd62c71ec41c8a09965266c9e2d56dd055b078839bb4f9"
+      },
+      "bo": {
+        "scenarios_passed": 82,
+        "report_sha256": "f3849ed4d37eca624fc6edc0c6bf606b094fd9ee81074ec14ce837f238971a8d"
+      }
+    },
+    "ASan": true,
+    "UBSan": true,
+    "fake_aperture_VMID_binding_completion_and_doorbell": true,
+    "full_GPU_cache_or_prefetch_model": false
+  },
+  "native_compile_only": {
+    "SDK_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "downstream_build41_sha256": "8b9f3b0b9798a80a531b8ac60d25ef1dc6fbc222437f62044fe582901f74499b",
+    "build42_pair_sha256": {
+      "control": "5723ff7ff7c401bbca1867aae0dbb854e9f7173539fdda2b423d98c2e5eedfdc",
+      "fetch-sync": "147b19ce2dbb2566ee4ceb1f7df232e5adcd254513e061174799c94f9e251b18"
+    },
+    "all_three_compile_link_codesign_verify_x86_64_passed": true,
+    "warning_messages_match_previous_baseline": true,
+    "warning_count_per_build": 3,
+    "warning_messages": [
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]"
+    ],
+    "complete_new_packet_constant_occurrences": {
+      "build42_control": 0,
+      "build42_sync": 1
+    },
+    "executed_or_loaded": false
+  },
+  "superseded_preparation_attempts": [
+    {
+      "operation": "first build34-derived export/compile",
+      "outcome": "stopped before link: missing companion src/amd/phx_topology.h",
+      "correction": "export pinned companion header and assert its presence",
+      "corrected_compile_and_matrix_passed": true
+    },
+    {
+      "operation": "initial full unit run under system Python 3.9.6",
+      "outcome": "one error from unsupported Path.write_text(newline=...) and one failure from literal-only case-name contract",
+      "correction": "use previously validated Python 3.13.18; support the independently enumerated parameterized packet case set",
+      "corrected_full_757_test_run_passed": true
+    }
+  ],
+  "historical_evidence_sha256_unchanged": {
+    "upstream34-native-ib-reuse-control-20261116.json": "c1043c2ac0829fd01bcaf8c43680aa399bb342935ee9980ea0226d626979837e",
+    "upstream34-native-ib-fresh-control-20261116.json": "ce3246019d2ec032a1d68d3cb6a05f368ac0ced58a3d367bf42df9f7526432c9",
+    "native-ib-publication-diagnostic-20261116.json": "77948d30d5a95d64bbc85d1bf968ff1caa026dc4171d7be40378037726bbc1d7",
+    "upstream34-native-ib-publication-control-20261116.json": "06bd0ea496b8cca057fa2f0c6351deb8e30d906e199f80e4e479b8018fbfb34e",
+    "upstream34-native-ib-publication-trial-20261116.json": "2e8e4c16b8655afd3bc36c6c7f3e586d9c734680a2f7cb51814e5571fcb21f36"
+  },
+  "preservation": {
+    "default_branch": "upstream34/vram-layout-fix",
+    "default_commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "ABI_user_IB_payload_addresses_PTE_fence_wait_power_or_doorbell_range_changed": false,
+    "downstream_preexisting_unaccepted_wait_change_preserved": true,
+    "ordinary_initializer_and_frozen_probes_unchanged": true
+  },
+  "execution_boundary": {
+    "GPU_calls": 0,
+    "native_checks_or_probes_run": 0,
+    "driver_installations_or_loads": 0,
+    "real_startup_jobs_created": 0,
+    "reboots": 0,
+    "old_consumed_packets_replayed": false,
+    "new_hardware_scope_armed": false,
+    "IB_wrong_value_fixed_on_hardware": false,
+    "specific_root_cause_proven": false,
+    "wait_candidate_accepted": false,
+    "accelerated_desktop_hold": true,
+    "FPS_or_GUI_improvement_claimed": false,
+    "default_promotion": false,
+    "manual_workflow_dispatched": false,
+    "public_binary_uploads": 0
+  }
+}
