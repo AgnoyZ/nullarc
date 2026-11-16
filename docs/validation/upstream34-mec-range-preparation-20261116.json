@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "offline-MEC-doorbell-range-candidate-only",
+  "review_parent_commit": "1d3f7b92efc6b2110ad80c70ef05491067e732b1",
+  "source_provenance": {
+    "base_commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "reference_PR_head": "9f37791bb816092df580f3cb62a9db1e2357fb8f",
+    "base_inputs_sha256": {
+      "mesboot.c": "7a1e4de45589a40b3259bd33a790d9d537498e139fa56719145438801320a21f",
+      "PhxUpstream34Layout.h": "2f7e3124a99e97469debc9ee5d9bb760092c769ef530f99814257bc314f54de1",
+      "mes_v11_api_def.h": "7b1b1e895e0faba305f1832bb815c617b51cbbdc6701dea4aa2084b52806b71a",
+      "csb_gfx11.h": "f7400527d24ec6a60200ab670a2a78ac0f123d11dda4cc6b745a48e7b1e0d805"
+    },
+    "recipe_sha256": "f3ad559c23b14be119ea240097802fbfac143b5f1d0402aa2c8dcb9b024cac4f",
+    "trial_header_sha256": "3216e5ba6898d5aafbeb80ed3108fa03a3975fed5a4c60150c49be3fc6580081",
+    "candidate_mesboot_sha256": "b15cfec9e0b709117b88c3c640a1c8b208a0c4b8598cd91e494ac9550c8077fb",
+    "notices_sha256": {
+      "LICENSE": "02d7fa970640345480430e246356c99c23436800ef541d57e7217b1337793bf0",
+      "THIRD_PARTY_NOTICES.md": "8a89a2766c5b8076afbbfa631c42953230e096477e04399324b075370b9431d4",
+      "LICENSES/MIT.txt": "381b0b3a8bb7e1aa28502928f75e820339c5878e2bd95d18c25391647bc3c1fd",
+      "LICENSES/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3"
+    },
+    "supported_command": "kiqsched",
+    "policy_macro": "PHX34_MEC_RANGE_TRIAL",
+    "policies": {
+      "control": 0,
+      "mec-range": 1
+    },
+    "kernel_or_default_modified": false,
+    "installed": false,
+    "GPU_executed": false
+  },
+  "tested_files_sha256": {
+    "tools/upstream34_layout/mec_range.py": "f3ad559c23b14be119ea240097802fbfac143b5f1d0402aa2c8dcb9b024cac4f",
+    "tools/upstream34_layout/PhxMecDoorbellRangeTrial.h": "3216e5ba6898d5aafbeb80ed3108fa03a3975fed5a4c60150c49be3fc6580081",
+    "tools/test_upstream34_mec_range.py": "bcdd64cb5deb0771d639a9ca9f2d7ab0b79dc07cca17d70200212f9defb122b6",
+    "tests/fixtures/upstream34_mec_range_fake_iokit.c": "adc06e92471831bd7894bde0cb591f62958651c63761be31d65e660b1cd83908",
+    "tests/test_upstream34_mec_range_runner.py": "dc40d74415d40ee30197830c850db160a32796f3e442ef0d2bd397529ada7bee"
+  },
+  "generated_source_insertions": {
+    "sched_test": "checked range hook before sched_init",
+    "main": "shared kiqsched-only argument admission before device lookup",
+    "exact_round_trip_to_pinned_source": true
+  },
+  "treatment_operations": {
+    "order": [
+      "UPPER",
+      "LOWER"
+    ],
+    "register_dword_offsets": [
+      12381,
+      12380
+    ],
+    "values_in_bytes": [
+      1104,
+      0
+    ],
+    "new_register_writes": 2,
+    "new_separate_register_reads": 2,
+    "write_return_readbacks_also_checked": true,
+    "retry_or_live_rollback": false
+  },
+  "local_validation": {
+    "new_Python_tests_passed": 7,
+    "new_Python_tests_skipped": 0,
+    "actual_C_ASan_UBSan_scenarios_passed": 140,
+    "cases_per_policy": {
+      "control": 60,
+      "mec-range": 80
+    },
+    "exact_expected_case_set_without_duplicates": true,
+    "expected_refusal_scenarios": 138,
+    "missing_nonboolean_policy_compile_refusals": 3,
+    "fake_CLI_links_real_IOKit": false,
+    "fake_CLI_stop_boundary": "first scheduler MQD write; no completion model",
+    "unchanged_KIQ_prefix": {
+      "register_reads": 2,
+      "register_writes": 23,
+      "VRAM_writes": 1598
+    },
+    "existing_layout_shell_tests_passed": 19,
+    "existing_desktop_evidence_tests_passed": 9,
+    "existing_startup_evidence_tests_passed": 9,
+    "native_x86_64_compile_codesign_verify_lipo_passed": true,
+    "native_executables_run": false,
+    "baseline_warning_messages": [
+      "unused variable 'val' [-Wunused-variable]"
+    ],
+    "both_native_policies_match_baseline_warning": true,
+    "manual_CI_dispatched": false
+  },
+  "native_compile_only_binaries_sha256": {
+    "mesboot-mec-range": "30a37a5a90a6bcb0c8023083c549351f66ac68d6fc870b393f7e695cb359ca31",
+    "mesboot-control": "18b2f416f48988773d4d8945d2efa5152970f42fdd61896bc56c0ad89647517c"
+  },
+  "historical_evidence_sha256_unchanged": {
+    "upstream34-native-ib-reuse-control-20261116.json": "c1043c2ac0829fd01bcaf8c43680aa399bb342935ee9980ea0226d626979837e",
+    "upstream34-native-ib-fresh-control-20261116.json": "ce3246019d2ec032a1d68d3cb6a05f368ac0ced58a3d367bf42df9f7526432c9",
+    "native-ib-publication-diagnostic-20261116.json": "77948d30d5a95d64bbc85d1bf968ff1caa026dc4171d7be40378037726bbc1d7",
+    "upstream34-native-ib-publication-control-20261116.json": "06bd0ea496b8cca057fa2f0c6351deb8e30d906e199f80e4e479b8018fbfb34e",
+    "upstream34-native-ib-publication-trial-20261116.json": "2e8e4c16b8655afd3bc36c6c7f3e586d9c734680a2f7cb51814e5571fcb21f36"
+  },
+  "last_recorded_hardware_OS": {
+    "version": "26.7.2",
+    "build": "25G332",
+    "queried_again_for_this_offline_preparation": false
+  },
+  "preservation": {
+    "default_branch": "upstream34/vram-layout-fix",
+    "default_commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "ordinary_downstream_mesboot_changed": false,
+    "kernel_source_or_build_marker_changed": false,
+    "license_files_changed": false,
+    "AMD_header_MIT_notices_retained": true
+  },
+  "execution_boundary": {
+    "GPU_calls": 0,
+    "native_device_checks_run": 0,
+    "GPU_initializations": 0,
+    "native_dispatches": 0,
+    "driver_or_helper_installations": 0,
+    "startup_jobs_created": 0,
+    "reboots": 0,
+    "hardware_scope_armed": false,
+    "consumed_scopes_replayed": false,
+    "hardware_acceptance": false,
+    "native_IB_mismatch_fixed": false,
+    "background_GUI_or_FPS_improvement_claimed": false,
+    "wait_candidate_promoted": false,
+    "accelerated_desktop_hold": true,
+    "public_binary_uploads": 0
+  }
+}

@@ -159,3 +159,10 @@ historical evidence hashes, Markdown links, JSON parsing and `git diff --check`.
 No production code changed, so GPU or prior A1/A2/A3 tests are not rerun. Raw API
 responses remain ignored and private. Documentation rollback is a normal revert
 of this review commit; there is no installed or default-branch change to undo.
+
+## Subsequent source preparation
+
+The later [range-only build34 candidate](MEC-DOORBELL-RANGE-TRIAL.md) isolates
+priority 1 in generated control/trial user helpers. Its source preparation and
+offline results are separate from this audit; it does not adopt the whole PR,
+promote default or establish a hardware fix.

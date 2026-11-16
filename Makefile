@@ -85,3 +85,8 @@ test-upstream34-layout:
 	python3 tests/test_upstream34_layout.py
 	python3 tests/test_upstream34_desktop_evidence.py
 	python3 tests/test_upstream34_startup_evidence.py
+
+.PHONY: test-upstream34-mec-range
+test-upstream34-mec-range:
+	python3 -m unittest discover -s tests -p test_upstream34_mec_range_runner.py -v
+	python3 tools/test_upstream34_mec_range.py --out build/upstream34-mec-range-host-tests

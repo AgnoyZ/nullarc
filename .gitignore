@@ -32,6 +32,8 @@ tests/fixtures/*
 !tests/fixtures/packaging_only.c
 !tests/fixtures/radv_cmd_buffer_constructor.c
 !tests/fixtures/radv_iokit_transport.c
+# Synthetic IOKit source, not a downloaded firmware/diagnostic fixture.
+!tests/fixtures/upstream34_mec_range_fake_iokit.c
 
 # Reference dumps and vendor assets if downloaded locally
 reference/
