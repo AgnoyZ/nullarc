@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "original34-IB-fresh-policy-passed-two-guarded-dispatches",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "default_branch_checkpoint": {
+    "branch": "upstream34/vram-layout-fix",
+    "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "wait_fix_present": false,
+    "modified_by_this_trial": false
+  },
+  "scope": {
+    "owner_authorized": true,
+    "kext_build": 34,
+    "ABI": "1.12",
+    "current_boot_initializations": 1,
+    "policy": "fresh",
+    "maximum_single_client_dispatches": 2,
+    "preliminary_reboots": 0,
+    "EFI_or_kext_replacements": 0,
+    "CPU_load_workers": 0,
+    "concurrent_client_phases": 0,
+    "tuning_writes": 0,
+    "desktop_takeover": false,
+    "recovery_boot_limit": 1,
+    "reuse_policy_reexecuted": false,
+    "scope_consumed": true
+  },
+  "source_and_binary": {
+    "diagnostic_source_commit": "06cf679b5ec7830a540e1176e28b2ce731a7f3d8",
+    "original_executable_sha256": "4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412",
+    "diagnostic_source_sha256": "d26d2796c479a42ce38bd569f2669db85e27d4dbdc9a5ee9cbd3c5bd6db1b97f",
+    "diagnostic_executable_sha256": "58ecc533768f7843df2cff9d2b83631b87d0b92c8a744726fe88a3d31abb43d6",
+    "source_matches_offline_validated_snapshot": true,
+    "exact_same_original_image_source_and_binary_as_reuse_control": true,
+    "repository_diagnostic_probe_executed": true,
+    "canonical_acceptance_probe_executed": false,
+    "driver_ABI_shader_and_licenses_changed": false
+  },
+  "comparison_fixture": {
+    "contexts": 1,
+    "GTT_BO_bytes": 16384,
+    "pre_staged_IB_byte_offsets": [
+      4096,
+      4608
+    ],
+    "IB_bytes_each": 320,
+    "first_pass_IB_slot": 0,
+    "second_pass_IB_slot": 1,
+    "slot_0_rewritten_before_second_pass": false,
+    "both_IB_slots_immutable_during_probe": true,
+    "common_output_byte_offset": 8208,
+    "output_bytes": 1024,
+    "output_reinitialized_before_each_dispatch": true,
+    "new_fixture_identical_to_previous_frozen_probe": false
+  },
+  "paired_reuse_control": {
+    "record": "upstream34-native-ib-reuse-control-20261116.json",
+    "record_sha256": "c1043c2ac0829fd01bcaf8c43680aa399bb342935ee9980ea0226d626979837e",
+    "trials_per_policy": 1,
+    "different_initialization_and_boot_scopes": true,
+    "reuse_submitted_dispatches": 2,
+    "reuse_fully_verified_dispatches": 1,
+    "reuse_first_mismatch": {
+      "pass_zero_based": 1,
+      "BO_relative_byte_offset": 8208,
+      "actual_byte": 222,
+      "expected_byte": 223
+    },
+    "reuse_second_dispatch_retirement_reported_complete": true,
+    "fresh_submitted_dispatches": 2,
+    "fresh_fully_verified_dispatches": 2,
+    "controlled_policy_difference": "pass 1 rewrites/resubmits slot 0 in reuse; fresh leaves both pre-staged IBs unchanged and submits slot 1"
+  },
+  "initializer": {
+    "exit_code": 0,
+    "original_compute_and_graphics_outputs_passed": true,
+    "both_queue_adoptions_passed": true
+  },
+  "native_probe": {
+    "submitted_dispatches": 2,
+    "fully_guarded_dispatches_verified": 2,
+    "full_validation_extent_bytes_per_dispatch": 16384,
+    "wait_observations": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 25037
+      },
+      {
+        "pass": 0,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 35226
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 0,
+        "elapsed_ns": 42479
+      }
+    ],
+    "two_second_cap_wait_calls": 0,
+    "DIAGNOSTIC_PASS_present": true,
+    "stderr_empty": true,
+    "exercise_and_cleanup_passed": true,
+    "WindowServer_unchanged_during_trial": true
+  },
+  "read_only_after_initialization": {
+    "values": {
+      "debug.phxbos_flush": 0,
+      "debug.phxbos_flush_bytes": 0,
+      "debug.phx_hang_kills": 0
+    },
+    "capture_precedes_native_probe": true
+  },
+  "supervision": {
+    "cross_process_clock": "unrebased mach_absolute_time ticks with timebase, boot and nonce validation",
+    "independent_deadline_seconds": 300,
+    "serialized_single_recovery": true,
+    "recovery_boots_used": 1,
+    "recovery_reason": "successful diagnostic followed by return to GPU-off; not a probe failure",
+    "automatic_GPU_retry": false,
+    "recovery_boot_GPU_calls": 0,
+    "consumed_job_removed": true,
+    "private_evidence_preserved": true
+  },
+  "recovery": {
+    "original_build34_exact_image": true,
+    "EFI_unchanged_files": 347,
+    "Microsoft_files_unchanged": 148,
+    "OpenCore_configuration_unchanged": true,
+    "protected_files_unchanged": 46,
+    "protected_links_unchanged": 2,
+    "security_and_kernel_collections_unchanged": true,
+    "GPU_off_and_firmware_framebuffer_retained": true,
+    "new_matching_diagnostic_reports": 0,
+    "raw_evidence_published": false
+  },
+  "final_readback": {
+    "GPU_off": true,
+    "firmware_framebuffer_only": true,
+    "active_probe_or_shutdown": false,
+    "consumed_job_removed": true,
+    "protected_files_and_links_unchanged": true,
+    "security_unchanged": true,
+    "GPU_calls_this_boot": 0,
+    "additional_GPU_trial_started": false,
+    "fresh_policy_executed": true
+  },
+  "interpretation": {
+    "new_reuse_control_reproduced_previous_failure_signature": true,
+    "fresh_policy_hardware_tested": true,
+    "fresh_policy_passed_this_bounded_trial": true,
+    "rewritten_or_reused_IB_path_prioritized_for_followup": true,
+    "specific_IB_or_cache_root_cause_established": false,
+    "stale_CPU_cache_proven": false,
+    "stale_GPU_IB_fetch_proven": false,
+    "GPU_execution_or_fence_ordering_cause_proven": false,
+    "general_driver_correctness_established": false,
+    "wait_candidate_hardware_gate_passed": false,
+    "wait_candidate_default_promotion_permitted": false,
+    "background_load_stability_established": false,
+    "FPS_measured": false,
+    "accelerated_desktop_HOLD_cleared": false
+  },
+  "private_receipt_hashes": {
+    "probe_stdout_sha256": "9636262ae1327cd72c3c6c9e9e4213fc117d89cbccef95fe6e88dac8c1decc28",
+    "probe_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "limits": [
+    "One bounded original34 trial per policy: reuse failed pass 1 at 0x2010; fresh passed both complete 16-KiB comparisons. The scopes used separate initializations and boots, not a repeated statistical study.",
+    "The controlled policy couples rewriting/reusing slot 0 with selecting immutable slot 1. It does not separately isolate command modification, IB address reuse, CPU-to-GPU visibility, GPU cache/prefetch or result/fence ordering.",
+    "The paired result prioritizes the rewritten/reused-IB path for investigation. It does not establish a particular cache cause or justify global cache flushing or production packet changes.",
+    "No two-second-cap wait, CPU-load, concurrent-client, accelerated-desktop or FPS test was exercised. This diagnostic success does not accept or promote the wait fix.",
+    "The single recovery reboot after the successful diagnostic returned initialized hardware to GPU-off; it was not recovery from a fresh-probe failure. The observer performed zero GPU calls, and the consumed startup job was removed.",
+    "No further GPU trial is armed. Do not replay either consumed packet. No raw diagnostics, firmware, EFI, image identifiers, personal paths or binaries are included."
+  ]
+}

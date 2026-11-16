@@ -78,9 +78,14 @@ observations are recorded in
 [the separate diagnostic record](validation/upstream34-native-byte-diagnostic-20261116.json).
 A separate [IB freshness diagnostic](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md)
 now provides explicit reuse/fresh policies and preserves the older build34 HOLD.
-Its later reuse-only control reproduced the same pass/offset/byte failure and
-completed its single recovery; fresh policy remains untested. It changes neither
-this canonical tool's CLI/acceptance path nor its cleanup.
+Its later reuse-only control reproduced the same pass/offset/byte failure; the
+separate fresh-only trial passed both complete 16-KiB comparisons with the same
+source/binary and output address. Each scope completed one recovery and removed
+its consumed startup job. This prioritizes the rewritten/reused-IB path for
+investigation without identifying a cache cause or accepting the wait fix. See
+the [paired comparison](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md#original-build34-fresh-comparison)
+and [fresh record](validation/upstream34-native-ib-fresh-control-20261116.json).
+It changes neither this canonical tool's CLI/acceptance path nor its cleanup.
 
 After two complete verified passes, cleanup is CPU unmap, GPU unmap, BOFREE,
 CTX free, then client close. A failure at any cleanup step suppresses success

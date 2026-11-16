@@ -1,9 +1,11 @@
 # Two-policy native IB freshness diagnostic
 
-Status on 2026-11-16: **reuse control reproduced the output-integrity failure;
-fresh policy has not been hardware-tested**. Initial tool preparation was
-offline. The later, separately bounded reuse trial and its completed recovery
-are recorded below; the driver and default branch remain unchanged.
+Status on 2026-11-16: **reuse failed its second dispatch; the separate fresh
+trial passed both guarded dispatches** with the same original build34 image,
+diagnostic source and binary. Each policy consumed its own bounded scope and
+completed one recovery reboot. The comparison prioritizes the rewritten/reused-IB
+path for investigation; it does not establish a specific cache cause or accept
+the wait candidate. The driver and default branch remain unchanged.
 
 The original build34 byte diagnostic verified pass 0, then reported positive
 retirement with actual `0xde` versus expected `0xdf` at the first output byte on
@@ -90,11 +92,11 @@ wait candidate's 96-dispatch gate, or a frame-rate/stability measurement.
 3. If both fail, result visibility, execution and fence/data ordering remain
    open. Fresh mode does not prove that all CPU/GPU cache paths are correct.
 
-The earlier byte diagnostic and the reuse control below have each consumed
-their separate one-init/one-recovery scopes. No runtime controller, startup job
-or further trial remains armed. A future fresh-policy comparison needs a new
-bounded scope; do not automatically chain policies or promote the wait fix
-because a diagnostic marker appears.
+The earlier byte diagnostic, reuse control and fresh comparison have each
+consumed their separate one-init/one-recovery scopes. No runtime controller,
+startup job or further trial remains armed. Any additional GPU experiment needs
+a new bounded scope; do not replay either policy's consumed packet or promote
+the wait fix because a diagnostic marker appears.
 
 ## Original build34 reuse control
 
@@ -111,7 +113,8 @@ passed. The new two-pre-staged-IB fixture then submitted two dispatches:
 This reproduces the previous failure's pass, offset and observed byte with the
 new reuse fixture. It establishes the control needed for a future fresh
 comparison, but does not show which commands the GPU fetched or prove that the
-whole previous output was returned. Fresh policy was not run. The two-second
+whole previous output was returned. Fresh policy was not run in that scope;
+the separate later comparison follows below. The two-second
 wait budget, CPU-load/concurrent-client phases, accelerated desktop and FPS
 were not tested, and the wait candidate is not accepted by this result.
 
@@ -124,6 +127,60 @@ No new matching diagnostic report was found. The consumed startup job was
 removed; GPU-off and the firmware framebuffer remain in place, with no active
 probe or shutdown process. See the
 [sanitized reuse record](validation/upstream34-native-ib-reuse-control-20261116.json).
+
+## Original build34 fresh comparison
+
+The separately continued fresh-only trial used macOS 26.7.2 / 25G332 and the
+exact same original build34 image, diagnostic source and executable as the
+reproduced reuse control. It performed one initialization and at most two
+single-client dispatches. Original compute/graphics outputs and both queue
+adoptions passed. No EFI/kext replacement, preliminary reboot, tuning write,
+CPU-load worker, concurrent client or display takeover was added.
+
+Both pre-staged IBs remained unchanged. Pass 0 submitted slot 0 at `0x1000`;
+pass 1 submitted slot 1 at `0x1200`. Both dispatches verified the complete
+16-KiB BO, including the shared output at `0x2010`, code, both IBs and guards.
+The successful cleanup completed, stderr was empty, and the tool printed its
+fresh-policy `DIAGNOSTIC-PASS` marker. WindowServer's PID stayed unchanged
+during the trial.
+
+| Pass (zero based) | Budget | Pending | Elapsed |
+| --- | --- | --- | --- |
+| 0 | 0 ns | yes | 25,037 ns |
+| 0 | 50,000 ns | no | 35,226 ns |
+| 1 | 0 ns | no | 42,479 ns |
+
+The two-second cap path was not reached. The same three read-only tunables were
+zero after initialization and before the probe. This is a two-dispatch
+diagnostic result, not the wait candidate's 96-dispatch acceptance gate or a
+background-load, desktop-stability or FPS measurement.
+
+| Policy, one trial each | Pass 0 | Pass 1 |
+| --- | --- | --- |
+| Reuse: rewrite/resubmit slot 0 | Full 16-KiB comparison passed | Positive retirement, then `0xde` instead of `0xdf` at `0x2010` |
+| Fresh: select immutable slot 1 | Full 16-KiB comparison passed | Full 16-KiB comparison passed |
+
+This pair supports investigating command modification and IB-address reuse
+before adding a broad cache-flush workaround. The policy couples two factors:
+rewriting/reusing slot 0 versus selecting immutable slot 1. The two trials also
+used separate initialization and boot scopes. One trial per policy does not
+separately identify CPU-to-GPU visibility, GPU caching/prefetch, or execution
+and fence/data ordering, and does not prove general driver correctness.
+
+After successful native cleanup, the controller requested its one authorized
+recovery reboot to return initialized hardware to GPU-off. This was planned
+state restoration, not a fresh-probe failure. The recovery observer performed
+zero GPU calls. Independent result, retirement and final readbacks confirmed
+the exact original image, 347 EFI files (including 148 Microsoft files), 46
+protected files, two links and security/kernel collections unchanged. No new
+matching diagnostic report was found. The consumed startup job was removed;
+GPU-off and the firmware framebuffer were verified, with no active probe or
+shutdown process. Neither consumed policy packet may be replayed.
+
+See the [sanitized fresh record](validation/upstream34-native-ib-fresh-control-20261116.json).
+The earlier reuse and byte-diagnostic records remain unchanged. Default stays
+on A1/A2/corrected-A3; the wait correction is not promoted and accelerated-desktop
+HOLD remains in force.
 
 ## Host validation and rollback
 
@@ -153,8 +210,8 @@ runner tests passed. Both C++ matrices used ASan/UBSan. An x86_64 build linked
 against real IOKit/CoreFoundation also compiled with warnings treated as errors.
 At that offline checkpoint the binary had not been executed, and private
 watchdog/controller helper regressions used mocked recovery dispatches only.
-The later real reuse execution is recorded separately above; its runtime scope
-is now consumed and its startup job has been removed.
+The later real reuse and fresh executions are recorded separately above; both
+runtime scopes are consumed and their startup jobs have been removed.
 The manual source-test workflow also runs the fake-IOKit simulation; no real
 diagnostic `--run-*` command is added to CI.
 The native framework build step itself is compile-only. No new binary is included in
@@ -162,8 +219,8 @@ automatic packaging, installation or public artifact uploads. The reference
 shader and AMD notice remain unchanged; [existing provenance](GFX11-SHADER-PROBE.md#provenance-and-licenses)
 and the repository's component licenses still apply.
 
-Source rollback is a normal revert of this diagnostic-only change. The reuse
+Source rollback is a normal revert of this diagnostic-only change. Each policy
 trial completed its single recovery and removed its consumed startup job; no
-driver or EFI replacement was made.
+driver or EFI replacement was made in either trial.
 Default stays on A1/A2/corrected-A3; wait promotion and accelerated-desktop HOLD
 remain unchanged.

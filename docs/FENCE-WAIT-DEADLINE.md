@@ -11,6 +11,11 @@ A later logging-only build34 diagnostic captured pass 1's first output byte:
 actual `0xde`, expected `0xdf`. It matches pass 0's expected first byte, but
 does not establish stale-cache, stale-command or fence-ordering causation. See
 [the byte diagnostic below](#original-build34-byte-diagnostic).
+The subsequent two-policy diagnostic reproduced that failure with a rewritten
+IB, while its separate fresh-IB trial passed two complete guarded dispatches.
+This prioritizes the rewritten/reused-IB path for investigation; it does not
+pass the wait candidate's separate hardware gate. See
+[the paired comparison](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md#original-build34-fresh-comparison).
 The cumulative A1/A2/A3 native-desktop candidate remains on HOLD after the
 post-gate WindowServer watchdog. This change does not establish the cause of
 that hang or demonstrate a frame-rate or interactive-latency improvement.
@@ -282,7 +287,7 @@ diagnostic report was found. The consumed job was removed and GPU-off plus the
 firmware framebuffer remain. The one-init/one-probe/one-recovery scope is closed;
 no follow-up GPU trial is armed.
 
-The offline investigation order is now:
+At the byte-diagnostic checkpoint, the offline investigation order was:
 
 1. **Repeated-buffer and command freshness.** The probe rewrites the same BO and
    embeds each pass's pattern directly in its IB. Audit CPU-to-GPU IB visibility,
@@ -317,11 +322,31 @@ a pre-staged immutable slot while keeping the output BO/address and verification
 unchanged between those policies. In a later, separate reuse-only build34 trial,
 its new fixture reproduced pass 1 / `0x2010` / actual `0xde` / expected `0xdf`
 after positive retirement. One recovery completed and the consumed startup job
-was removed; fresh policy was not run. This is a reproduced control signature,
-not proof of an IB/cache cause or acceptance of the timing candidate. See the
+was removed; fresh policy was not run in that scope. This is a reproduced
+control signature. See the
 [reuse control record](validation/upstream34-native-ib-reuse-control-20261116.json).
-No further hardware scope is armed, and the earlier historical trials above
-remain unchanged.
+
+The separately continued fresh-only trial then used the exact same original34
+image, source and binary. Its two immutable pre-staged IBs were selected in
+sequence, and both complete 16-KiB comparisons passed, including the same
+re-poisoned output address. It used three wait calls (25,037 ns, 35,226 ns and
+42,479 ns); no two-second-cap wait was reached. Successful native cleanup was
+followed by one planned recovery reboot to restore GPU-off. The observer made
+zero GPU calls; independent result, retirement and final checks passed, with
+the same protected manifests preserved and no new matching diagnostic report.
+The consumed startup job was removed. See the
+[fresh comparison record](validation/upstream34-native-ib-fresh-control-20261116.json).
+
+The next investigation priority is the rewritten/reused-IB path: command
+modification and IB-address reuse are coupled in this comparison and need
+separate source-level review before choosing a fix. CPU-to-GPU visibility,
+GPU caching/prefetch and execution/fence ordering remain possible explanations.
+One trial per policy, in separate initialization/boot scopes, cannot establish
+a specific root cause. The wait backport's full hardware gate remains a later
+requirement; neither this result nor its short waits measures background-load
+stability, GUI responsiveness or FPS. No production cache or packet change was
+made. No further hardware scope is armed, and the earlier historical trials
+above remain unchanged.
 
 ## Offline build40 validation boundary and rollback
 
