@@ -623,3 +623,19 @@ GPU retry or replay of a consumed scope occurred during this clock correction.
 At this checkpoint the new scope is **prepared, not armed**; actual corrected
 A3 loading and GPU/desktop acceptance are still pending. Evidence:
 `validation/upstream34-backport-a3-refresh-clock-preparation-20261116.json`.
+
+
+### A3 correction: frozen-clock single reboot dispatch verified
+
+After the shared-clock preparation was synchronized as `eeb9583`, the new
+one-use arming script ran under the exact frozen witness interpreter. It
+completed arming and requested one ordinary reboot. Independent same-boot
+readback verified exactly one daemonized root shutdown scheduler, successful
+parent exit, specific native-display arming and the existing M2 marker. The
+initial safety timer still had **177.47 seconds** remaining; it had not expired
+immediately. No GPU initializer ran in the preparation boot. This is the first
+reboot request for the corrected build; the earlier clock-failed arming scope
+had requested none and remains retired. Hardware acceptance and actual loaded
+image/timing/GPU results are **pending fresh-boot receipts**, not implied by
+this dispatch. Evidence:
+`validation/upstream34-backport-a3-refresh-boot-dispatch-20261116.json`.

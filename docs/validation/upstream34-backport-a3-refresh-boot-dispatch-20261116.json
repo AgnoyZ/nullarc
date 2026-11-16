@@ -1,0 +1,22 @@
+{
+  "result": "single-corrected-A3-reboot-dispatch-independently-verified",
+  "contract_sha256": "2e8cd7ed69968f3bd9b77b01a45e8087e498a1b375c8eb0044d79750d38667d1",
+  "frozen_interpreter_used": true,
+  "shared_clock_safety_timer_remaining_seconds": 177.4719324290004,
+  "parent_returncode": 0,
+  "exact_daemonized_root_shutdown_schedulers": 1,
+  "specific_native_display_arming_verified": true,
+  "existing_M2_marker_verified": true,
+  "GPU_initializer_invoked_in_preparation_boot": false,
+  "initial_reboot_requests": 1,
+  "automatic_retry": false,
+  "hardware_result_pending": true,
+  "A3_hardware_test_passed": false,
+  "FPS_measured": false,
+  "verified_local": "2026-11-16T13:19:48.896816+08:00",
+  "date": "2026-11-16",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "source_checkpoint": "4279b238bc76e4a78a4f42394a1170f926131431",
+  "stage": "A3-refresh-correction-boot-dispatch"
+}
