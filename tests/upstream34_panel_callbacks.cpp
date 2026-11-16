@@ -40,15 +40,21 @@ struct MockPCI {
 static constexpr unsigned counter = 0x34c0 + 0x1b4c;
 static IOMemoryMap *activeMap;
 static uint64_t clockNow;
-static uint32_t frameAdvance;
-static unsigned sleeps;
+static uint32_t rateMilliHz, fixedFrameAdvance;
+static int counterPhase;
+static uint64_t extraSleepNs;
+static unsigned sleeps, sleptMilliseconds;
 static bool changeMode, zeroElapsed;
 static uint64_t mach_absolute_time() { return clockNow; }
 static void absolutetime_to_nanoseconds(uint64_t value, uint64_t *out) { *out = value; }
 static void IOSleep(unsigned milliseconds) {
-    assert(milliseconds == 200); ++sleeps;
-    if (!zeroElapsed) clockNow += uint64_t(milliseconds) * 1000000;
-    activeMap->regs[counter] = (activeMap->regs[counter] + frameAdvance) & 0xffffff;
+    assert(milliseconds == 200 || milliseconds == 2000); ++sleeps;
+    sleptMilliseconds += milliseconds;
+    const uint64_t elapsed = uint64_t(milliseconds) * 1000000 + extraSleepNs;
+    if (!zeroElapsed) clockNow += elapsed;
+    const uint32_t frames = fixedFrameAdvance != UINT32_MAX ? fixedFrameAdvance
+        : uint32_t(int64_t(elapsed * rateMilliHz / 1000000000000ULL) + counterPhase);
+    activeMap->regs[counter] = (activeMap->regs[counter] + frames) & 0xffffff;
     if (changeMode) ++activeMap->regs[0x34c0 + 0x1b2a];
 }
 struct Fixture {
@@ -63,7 +69,8 @@ struct Fixture {
         const uint32_t values[] = {0xa9f,0x00700a70,0x00200000,1,0x69d,0x005b069b,0x00060000,1,0x11201,0,0};
         for (unsigned i = 0; i < 11; ++i) memory.regs[0x34c0 + offsets[i]] = values[i];
         pci.mapping = &memory; activeMap = &memory; clockNow = 1000000;
-        frameAdvance = 24; sleeps = 0; changeMode = zeroElapsed = false;
+        rateMilliHz = 120000; fixedFrameAdvance = UINT32_MAX; counterPhase = 0;
+        extraSleepNs = 0; sleeps = sleptMilliseconds = 0; changeMode = zeroElapsed = false;
     }
     // ACTUAL_REFRESH_METHOD
     // ACTUAL_TIMING_METHOD
@@ -78,11 +85,18 @@ static void fallback(Fixture &f) {
     check(std::memcmp(&info, &expected, sizeof info) == 0);
 }
 int main() {
+    // Replay the logged 25-frame / 200,965-us input with a one-frame endpoint
+    // phase. At 2 s the corresponding synthetic input is 241 / 2,000,965 us.
+    // The assumed 120-Hz clock here is a CPU model, not a panel-rate finding.
+    Fixture replay; extraSleepNs = 965000; counterPhase = 1; replay.measureRefresh();
+    std::fprintf(stderr, "short-window regression replay: %u mHz\n", replay.fRefreshMilliHz);
+    check(replay.fRefreshMilliHz == 120000 && replay.fPanelTimingValid);
+
     Fixture good; auto expectedRegisters = good.memory.regs;
-    expectedRegisters[counter] = 24;
+    expectedRegisters[counter] = 240;
     good.measureRefresh();
     check(good.fPanelTimingValid && good.fRefreshMilliHz == 120000 && good.fFrameNs == 8333333);
-    check(good.fHTotal == 2720 && good.fVTotal == 1694 && sleeps == 1 && good.memory.releases == 1);
+    check(good.fHTotal == 2720 && good.fVTotal == 1694 && sleeps == 1 && sleptMilliseconds == 2000 && good.memory.releases == 1);
     check(good.memory.regs == expectedRegisters); // Only the CPU fake's frame counter update is permitted.
     IOTimingInformation info; std::memset(&info, 0xa5, sizeof info);
     check(good.getTimingInfoForDisplayMode(1, &info) == kIOReturnSuccess);
@@ -114,8 +128,30 @@ int main() {
     Fixture interlaced; interlaced.memory.regs[0x34c0 + 0x1b44] = 1; interlaced.measureRefresh(); fallback(interlaced);
     Fixture variable; variable.memory.regs[0x34c0 + 0x1b33] = 1; variable.measureRefresh(); fallback(variable);
     Fixture wrongArea; wrongArea.fWidth = 1920; wrongArea.measureRefresh(); fallback(wrongArea);
-    Fixture slow; frameAdvance = 3; slow.measureRefresh(); fallback(slow);
-    Fixture highRate; frameAdvance = 100; highRate.measureRefresh(); fallback(highRate);
+    Fixture slow; fixedFrameAdvance = 3; slow.measureRefresh(); fallback(slow);
+    Fixture highRate; rateMilliHz = 500000; highRate.measureRefresh(); fallback(highRate);
     Fixture noTime; zeroElapsed = true; noTime.measureRefresh(); fallback(noTime);
+
+    const uint32_t standardRates[] = {48000,50000,60000,75000,90000,100000,120000,144000,165000,240000};
+    for (uint32_t rate : standardRates) {
+        for (int phase : {-1, 0, 1}) {
+            for (uint64_t extra : {0ULL, 965000ULL, 1000000000ULL}) {
+                Fixture f; rateMilliHz = rate; counterPhase = phase; extraSleepNs = extra;
+                f.memory.regs[counter] = 0xfffff8;
+                auto expected = f.memory.regs;
+                const uint64_t elapsed = 2000000000ULL + extra;
+                const uint32_t advance = uint32_t(int64_t(elapsed * rate / 1000000000000ULL) + phase);
+                expected[counter] = (expected[counter] + advance) & 0xffffff;
+                f.measureRefresh();
+                check(f.fPanelTimingValid && f.fRefreshMilliHz == rate);
+                check(f.fFrameNs == 1000000000000ULL / rate);
+                check(f.fPanelTiming.pixelClock == (2720ULL * 1694 * rate + 500) / 1000);
+                check(sleeps == 1 && sleptMilliseconds == 2000 && f.memory.releases == 1);
+                check(f.memory.regs == expected);
+            }
+        }
+    }
+    Fixture nonstandard; rateMilliHz = 130000; nonstandard.measureRefresh();
+    check(nonstandard.fPanelTimingValid && nonstandard.fRefreshMilliHz == 130000);
     std::printf("actual refresh/timing callbacks: %u CPU assertions passed\n", checks);
 }

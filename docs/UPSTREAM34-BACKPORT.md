@@ -9,6 +9,11 @@ present; restoring disk files is not evidence of A2 being loaded again.
 The consumed A3 witness is retired, with no automatic retry. The chronological
 source/preparation checkpoints below retain their original scope.
 
+Subsequent correction: a 2-second read-only measurement window passed the
+complete source/native gate, including a pre-fix failing input replay and 511
+callback assertions. This is not hardware acceptance; the failed A3 trial
+remains consumed. Installation/loading of the correction is a separate stage.
+
 Owner request: 2026-11-16. Candidate branch: `backport/upstream34-a1-a3`,
 based on default checkpoint `90bb06f6f9255cb5a16cc5eb87e78032566b2000`.
 The default branch itself is unchanged. Complete A1 tests before changing A2,
@@ -471,3 +476,48 @@ or promote this cumulative A3 source branch as hardware accepted. No FPS,
 physical scanout cadence, sleep/wake or long-duration stability claim follows
 from this attempt. Public sanitized evidence:
 `validation/upstream34-backport-a3-hardware-20261116.json`.
+
+### A3 correction: bounded longer sampling passed the source/native gate
+
+The owner's subsequent continue request starts correction work rather than
+replaying the failed trial. A new production-method CPU regression first
+reproduced **124,399 milliHz** and failed with the original 200 ms code. The
+correction changes the single sleep duration to **2,000 ms** and documents why.
+The actual elapsed-time denominator, 2-percent standard-rate snapping, rate
+bounds, mode snapshots and detailed-timing decoder are unchanged. No MMIO
+write, forced 120-Hz value, threshold widening, A1/A2 pool/alias change or
+bring-up/ABI change is introduced. The extra nominal boot measurement delay
+is 1.8 seconds; actual startup latency remains to be tested.
+
+With a one-frame endpoint offset and 965 extra microseconds, the CPU model's
+corresponding two-second sample produces **120,000 milliHz** after the existing
+snap. This models a possible quantization failure; it does not establish the
+failed trial's physical clock or explain every source of timing error. One
+frame is about 0.42 percent at 120 Hz over two seconds, and about 1.04 percent
+at the lowest snapped rate of 48 Hz, within the existing 2-percent threshold.
+
+The expanded actual-method harness passed **511 ASan/UBSan assertions**,
+including 90 combinations of all ten standard rates, minus/zero/plus-one-frame
+phase, counter wrap, and nominal/965-microsecond/one-second sleep overshoot.
+It checks the complete fake register array for unintended writes, measured
+elapsed-time use, frame duration, pixel-clock arithmetic and exact one-sleep
+release behavior. A 130-Hz nonstandard rate remains unsnapped. Original map,
+mode-change, inactive/interlaced/variable, bounds and callback fallback cases
+remain covered, along with the separate 43-case decoder fixture.
+
+The cumulative **15-check** native gate passed on macOS 26.7.2 / 25G332.
+Baseline/A1/A2 regressions, full native plugin/accelerator compilation, strict
+signatures and x86_64 checks passed. All **171** protected baseline files and
+all production inputs except the framebuffer file match the earlier A3 gate;
+the A2 extracted pool/alias methods remain unchanged. The existing plugin
+still emits 336 compiler warnings; the accelerator emits zero. This locally
+modified source remains under the existing component licence and notices,
+which are unchanged. No external code or binary was copied.
+
+At this source checkpoint the correction is **not installed or hardware
+accepted**. The previous exact A2 disk restoration and GPU-off firmware
+session remain the last verified hardware state. Any subsequent installation
+and single-use boot contract must use distinct private scopes, preserve the
+original failure/recovery receipts, and retain the 120,000-milliHz acceptance
+baseline. Evidence:
+`validation/upstream34-backport-a3-refresh-correction-20261116.json`.

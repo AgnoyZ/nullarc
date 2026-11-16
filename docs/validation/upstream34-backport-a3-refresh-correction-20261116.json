@@ -1,0 +1,134 @@
+{
+  "stage": "a3",
+  "baseline": "90bb06f6f9255cb5a16cc5eb87e78032566b2000",
+  "result": "passed",
+  "upstream_kernel_build": 34,
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+  "checks": [
+    {
+      "name": "baseline-unit",
+      "exit_code": 0,
+      "log_sha256": "ad2fcbc6c0dbf4d6464d93c2f362b696c1124a00cabde9410b9055ad65ba044e"
+    },
+    {
+      "name": "baseline-layout",
+      "exit_code": 0,
+      "log_sha256": "a6635dfa8a2f6514bfc314ab914d4c54b80ab2eb3ae2d6e00b592e0063f925df"
+    },
+    {
+      "name": "sampler-keys",
+      "exit_code": 0,
+      "log_sha256": "3ee331b435137164422d62db610a6b01cdde4668ad4876e344c85d8772e417bb"
+    },
+    {
+      "name": "surface-keys",
+      "exit_code": 0,
+      "log_sha256": "98a4b418c45c3a58ed9321a24e0bbce018fcdccf28eddf13c0026e7a5a30fee0"
+    },
+    {
+      "name": "descriptor-masks",
+      "exit_code": 0,
+      "log_sha256": "b21406ee68c650f4c9047ed23fa2a7a3806f0a71c153a1bc42fe8bf454343aa6"
+    },
+    {
+      "name": "native-plugin-build",
+      "exit_code": 0,
+      "log_sha256": "5cbbd3e6932a601711691790852b4607610a2f5fa75ded457d07da76981e5a7d"
+    },
+    {
+      "name": "native-plugin-sign",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-plugin-signature",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-plugin-arch",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "framebuffer-methods",
+      "exit_code": 0,
+      "log_sha256": "9be3962efe692967a1b72083b51a53639078fc3c4fd04d9ca2275d2689b4f8de"
+    },
+    {
+      "name": "panel-timing-methods",
+      "exit_code": 0,
+      "log_sha256": "ae6ae904efbff95e7bc3231cc5c80349082bed22f0e737b08f683ef3dcd5bf52"
+    },
+    {
+      "name": "native-accelerator-build",
+      "exit_code": 0,
+      "log_sha256": "da3180fa5d2f0ae44fb4d321ed79469ea82d5ffc45145de0dfce4834a0389656"
+    },
+    {
+      "name": "native-accelerator-signature",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-accelerator-arch",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "diff-whitespace",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "hardware_executed": false,
+  "installed": false,
+  "plugin_loaded": false,
+  "fps_measured": false,
+  "source_sha256": {
+    "src/nmplugin/NVMTLEventSync.m": "9b6ad5bfe9f65f00bcaf57106a14240f04dd94ec47f6956f768a5f670264f07f",
+    "src/nmplugin/NVMTLObjects.m": "a9404474144d48b06560698203081e5a144cb40028197c0c223f2f7ee4995567",
+    "src/nmplugin/nvmtl_sampler_key.h": "c5aa2f4f7900abead21b2fb486f413ce16ba6747295f8865cff6089ece546b2e",
+    "src/nmplugin/nvmtl_surface_key.h": "de4157a84d82917cebd580ec13d778b0cff0817d6a84975df7b7ea1f7351ed66",
+    "src/nmplugin/nvmtl_vk.c": "db894d5d958de775aab0a2259b625a4875f92bb183a14217bb93584d956ead58",
+    "src/nmplugin/nvmtl_vk.h": "c08a7abfd550cbdbb2eece73105e967b237ad160b579d6763fba6a1d17867c0d",
+    "src/phxaccel/PhxHardwarePolicy.hpp": "b98b0e7803a42d34f02e17fd97801dc7cc2c02bbe75d896368001fcb7195677e",
+    "src/phxaccel/accel/phx_panel_timing.h": "940cf03cada4fc876733dfae95a0b6112d6324baceb781c2e19b0d99f872859b",
+    "src/phxaccel/accel/phxfb.cpp": "5883d6bdd0f53a8c6d16f015d2f0ed98da90731b83ad7a2b92d10dc80d746c50"
+  },
+  "previous_stage": "a2",
+  "previous_stage_receipt_sha256": "af7c9195f9df672f16c516d28a3da2dee29bc5565c35e10b24dc75e4bf856c55",
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "plugin_sha256": "0b70f97447329f26c934150c1392bb8451d9d0b3f7abaa9c5383ad4849a32ccd",
+  "accelerator_sha256": "165527e59e3356884680f17a6a6a1c2388e5933cb8ac02fd07987be45c10a5ad",
+  "date": "2026-11-16",
+  "revision": "A3-refresh-window-correction",
+  "original_failed_A3_source_checkpoint": "d40d2ecaf232b94b9b91c2360310b70c40fd32b2",
+  "protected_baseline_files_verified": 171,
+  "production_files_changed_since_failed_A3": [
+    "src/phxaccel/accel/phxfb.cpp"
+  ],
+  "measurement_window_ms_before": 200,
+  "measurement_window_ms_after": 2000,
+  "standard_rate_snap_percent_unchanged": 2,
+  "CPU_callback_assertions": 511,
+  "standard_rate_phase_oversleep_combinations": 90,
+  "decoder_fixture_cases": 43,
+  "expected_pre_fix_regression_failure": {
+    "result": "expected-pre-fix-regression-failure",
+    "observed_refresh_milliHz": 124399,
+    "expected_refresh_milliHz": 120000,
+    "assertion_process_signal": "SIGABRT",
+    "extracted_production_harness_sha256": "e4ba5d07a50ff367cf99af095ab35ec6ba18cb01fe98818cd4795727d8d60e87",
+    "hardware_executed": false
+  },
+  "installed_on_disk": false,
+  "hardware_acceptance": false,
+  "automatic_GPU_retry": false,
+  "native_plugin_compiler_warnings": 336,
+  "native_accelerator_compiler_warnings": 0,
+  "callback_harness_sha256": "0c2161e0f5e6f80966c5fd679cd01a5a785177e13739164c18381315fd8de6a7"
+}

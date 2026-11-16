@@ -262,7 +262,10 @@ class PhxAMDFB : public IOFramebuffer {
     // The firmware lit the panel at its native refresh, which the VBL timer and the mode must report: they said 60 Hz while
     // the panel scanned at 120 (OTG frame counter: 392 frames in 3.28 s), and WindowServer composited at 60 fps (2026-10-20).
     // Read-only: OTG0's H/V totals (DCN 3.1.4: segment 2 base 0x34c0 + 0x1b2a / 0x1b2f) and its frame counter (+0x1b4c)
-    // over ~200 ms, snapped to a standard rate when within 2 %.
+    // over ~2 s, snapped to a standard rate when within the existing 2 %.
+    // Integer frame-counter endpoints can differ by one frame: at 120 Hz,
+    // 200 ms has ~4.2 % quantization, but 2 s has ~0.42 % (and ~1.04 % at
+    // the lowest snapped rate, 48 Hz). Use actual elapsed time after sleeping.
     void measureRefresh() {
         IOMemoryMap *mm = fPCI ? fPCI->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress5) : nullptr;
         if (!mm || mm->getLength() < 0x5100u * 4) { OSSafeReleaseNULL(mm); PFBLOG("refresh: no MMIO view, 60 Hz assumed"); return; }
@@ -270,7 +273,7 @@ class PhxAMDFB : public IOFramebuffer {
         const auto timingBefore = phx::readOtgTiming(r);
         const uint32_t ctl = r[0x34c0 + 0x1b41], ht = r[0x34c0 + 0x1b2a] + 1, vt = r[0x34c0 + 0x1b2f] + 1;
         const uint32_t c0 = r[0x34c0 + 0x1b4c] & 0xffffff; const uint64_t t0 = mach_absolute_time();
-        IOSleep(200);
+        IOSleep(2000);
         const uint32_t c1 = r[0x34c0 + 0x1b4c] & 0xffffff; const uint64_t t1 = mach_absolute_time();
         const auto timingAfter = phx::readOtgTiming(r);
         mm->release();
