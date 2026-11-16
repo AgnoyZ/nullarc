@@ -74,7 +74,13 @@ class ContextRetirementRunnerTests(unittest.TestCase):
         harness = (ROOT / 'tests/test_context_retirement.cpp').read_text(encoding='utf-8')
         for fault in BACKING_FAULTS:
             self.assertIn('"' + fault + '"', harness)
-        for case in CASES[55:]:
+        # These legacy cases intentionally exercise a shared default branch.
+        implicit_cases = {'defer-pending', 'client-close-pending', 'stop-active',
+                          'stop-pending', 'host-pins-preserved'}
+        self.assertTrue(implicit_cases.issubset(CASES))
+        for case in CASES:
+            if case in implicit_cases:
+                continue
             if case.startswith(('clear-root-', 'clear-used-', 'clear-cached-')) and any(case.endswith('-' + fault) for fault in BACKING_FAULTS):
                 continue
             self.assertIn('"' + case + '"', harness)

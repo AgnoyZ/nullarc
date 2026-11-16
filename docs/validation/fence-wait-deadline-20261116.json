@@ -76,5 +76,17 @@
     "No measured frame-rate, interactive-latency or hardware-stability improvement.",
     "The plugin outer timeout and in-flight resource lifetime on terminal failure remain unresolved.",
     "No deployment of downstream build40 into the distinct build34 baseline trial."
-  ]
+  ],
+  "prior_canonical_attempt": {
+    "source_commit": "be9d0ccb187bda611325cb5a9ecd1939d506b05f",
+    "status": "intentionally-interrupted-after-known-runner-contract-failure",
+    "suite": "python-source-tests",
+    "exit_code": -2,
+    "completed_ok_cases_before_interrupt": 368,
+    "observed_failure": "test_ci_and_lifetime_scenarios: fixed CASES[55:] index shifted onto implicit host-pins-preserved case",
+    "production_source_changed_for_this_failure": false,
+    "log_sha256": "b8c414cc63503aa93b6ade84f3d73fe2c1182a26ccea1afafd7116e3889f5bfd",
+    "runner_contract_fix_direct_development_check": "passed",
+    "full_rerun": "pending"
+  }
 }

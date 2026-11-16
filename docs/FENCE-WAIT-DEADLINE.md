@@ -89,6 +89,9 @@ The original method SHA-256 was
 The first harness draft had two additional failures because its completion
 expectation did not match the fixture's global sequence; correcting that test
 fixture before editing production code left exactly the four failures above.
+An initial committed-source check also exposed the runner contract's fixed
+case-list index. It now checks the full list with named exceptions for legacy
+default-branch cases, so inserting a case cannot shift that boundary again.
 Final checks and source-bound results are recorded in
 `validation/fence-wait-deadline-20261116.json` after execution.
 
