@@ -204,3 +204,38 @@ are not established by this test. A2 and A3 are not installed by this A1 stage.
 On failure, restore the original bundle using the private verified atomic
 exchange rollback, then recheck its exact manifest and signature; do not retry
 GPU work automatically or advance to A2.
+
+### A2: installed on disk; candidate kernel not yet loaded or hardware-accepted
+
+After the successful A1 hardware receipt was synchronized, the exact A2 native
+build artifact was installed through a verified atomic kext-bundle exchange.
+The original bundle and original AuxKC both have independently checked private
+backups. A matching 26.7.2 / 25G332 KDK produced a private auxiliary collection,
+using the existing auxiliary identifiers and approval checks. No authorization
+check was skipped. Inspection accepted all 416 cached extension records: only
+the accelerator image changed, with all 415 unrelated records identical.
+Only then was the candidate AuxKC atomically published with its original
+ownership, permissions, flags and extended attributes.
+
+An initial verification attempt refused trailing column-alignment whitespace
+in an unchanged AppleMobileDevice path. It restored the original kext and never
+published its cache. After an independent exact restoration check, the parser
+was corrected to strip only trailing spaces/tabs from the path column. Tests
+still reject real version, path and image changes. A distinct second scope
+completed installation; the first receipt remains intact and was not replayed.
+
+Post-installation and interruption readbacks verified the candidate bundle and
+cache, both original backups and the inactive original exchange bundle. The
+loaded accelerator is still the original image in the same accepted desktop
+boot. GPU-off remains present, native-display arming and pending markers are
+absent, and security settings, Boot/System KCs, startup and runtime inputs are
+unchanged. The private root-owned disk rollback script passed a zero-write
+preflight; it restores the exact original AuxKC and bundle, without live unload,
+GPU commands or reboot. A changed/consumed state requires inspection before any
+further write. Public evidence:
+`validation/upstream34-backport-a2-install-20261116.json`.
+
+This is **installed-awaiting-reboot**, not A2 hardware acceptance. No A2 GPU
+test or reboot has occurred at this checkpoint, and A3 is not installed.
+A separate one-use startup observation and an exact loaded-image check are
+required before running the bounded GPU regression or advancing to A3.
