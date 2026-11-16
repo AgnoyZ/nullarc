@@ -589,3 +589,37 @@ automatic GPU retry is permitted. At this checkpoint the new scope is
 **prepared, not armed**, and corrected A3 hardware acceptance remains pending.
 Evidence:
 `validation/upstream34-backport-a3-refresh-boot-preparation-20261116.json`.
+
+### A3 correction: pre-reboot clock-domain failure closed; new scope prepared
+
+The first corrected-build arming caller used system Python 3.9.6, while its
+frozen deadline witness uses Python 3.13.18. Actual child-process measurements
+showed different monotonic reference points: the former began near zero while
+the latter was already over 2,200 seconds. Passing the caller's absolute
+monotonic deadline to that witness was invalid. Its requested 180-second timer
+expired **0.737 seconds after its acknowledgement** and cleaned up arming.
+The arming caller failed its NVRAM readback assertion before removing GPU-off
+or requesting a reboot. The exact failed NVRAM response was not saved, so it
+cannot independently establish every detail of the readback failure; the
+cross-clock deadline defect itself was reproduced directly.
+
+Independent readback verified the unchanged boot, all 2,219 pins, GPU-off,
+absent display arming/pending state, unloaded PhxAccel and firmware framebuffer.
+There was **no reboot request, desktop attempt or GPU probe**. After the timer
+exited, that consumed external job was archived and removed; its failure and
+expiry receipts remain intact. This was a control-plane admission failure,
+not another measured rejection of the corrected driver's refresh behavior.
+
+A distinct scope now requires the arming script to run under the **exact
+frozen witness interpreter**, rejecting another executable before mutation.
+The real complete pre-mutation arming admission passed under that interpreter;
+a real wrong-interpreter invocation was refused. A parent/child execution
+using the frozen interpreter independently verified a common monotonic clock.
+All **72 CPU/permission tests**, **18 WindowServer access checks** and **2,224
+pinned inputs** passed, including the archived failed-arming evidence. The
+corrected driver artifact, AuxKC, A2 rollback target, 120,000-milliHz baseline,
+probe limits and single-boot/recovery limits are unchanged. No driver rebuild,
+GPU retry or replay of a consumed scope occurred during this clock correction.
+At this checkpoint the new scope is **prepared, not armed**; actual corrected
+A3 loading and GPU/desktop acceptance are still pending. Evidence:
+`validation/upstream34-backport-a3-refresh-clock-preparation-20261116.json`.
