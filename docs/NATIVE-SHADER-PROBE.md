@@ -58,6 +58,14 @@ Malformed ABI/VA/BO/mapping/sequence/output replies stop the run. If any step
 fails, only the CPU view is unmapped and the client is closed; no speculative
 GPU unmap/free/retry is issued. The kernel's existing pending retirement and
 quarantine paths remain responsible for uncertain backing.
+Byte mismatches report the BO-relative offset, zero-based dispatch pass, actual
+byte and expected byte. The actual value is captured once for both comparison
+and reporting; this diagnostic does not establish cache coherence or the cause
+of a mismatch. This close path depends on those downstream lifetime protections:
+the older original build34 requires a separate reviewed HOLD adapter that retains
+failed GPU resources until bounded recovery. The original34 control and elapsed
+wait candidate used identical frozen adapters; see
+[their comparison](FENCE-WAIT-DEADLINE.md#original-build34-control).
 
 After two complete verified passes, cleanup is CPU unmap, GPU unmap, BOFREE,
 CTX free, then client close. A failure at any cleanup step suppresses success

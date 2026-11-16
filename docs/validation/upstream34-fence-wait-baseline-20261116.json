@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "original34-same-probe-control-failed-output-integrity",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "default_branch_checkpoint": {
+    "branch": "upstream34/vram-layout-fix",
+    "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "wait_fix_present": false
+  },
+  "control": {
+    "kext_build": 34,
+    "ABI": "1.12",
+    "original_executable_sha256": "4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412",
+    "probe_executable_sha256": "74b72778b630e186da2a498f473ab8df5d70494029e03bc713e7b0de02e3c212",
+    "identical_probe_binary_to_wait_candidate": true,
+    "current_boot_initializations": 1,
+    "preliminary_reboots": 0,
+    "EFI_or_kext_replacements": 0,
+    "single_client_only": true,
+    "CPU_load_workers": 0,
+    "tuning_writes": 0
+  },
+  "initializer": {
+    "exit_code": 0,
+    "original_compute_and_graphics_outputs_passed": true,
+    "both_queue_adoptions_passed": true
+  },
+  "native_probe": {
+    "planned_dispatches": 32,
+    "submitted_dispatches": 2,
+    "fully_guarded_dispatches_verified": 1,
+    "each_dispatch_checked_bytes": 16384,
+    "output_bytes": 1024,
+    "second_dispatch_retirement_reported_complete": true,
+    "second_dispatch_first_mismatch_byte_offset": 8208,
+    "same_failure_pass_and_offset_as_wait_candidate": true,
+    "actual_and_expected_bytes_logged": false,
+    "wait_observations": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 5560
+      },
+      {
+        "pass": 0,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 15549
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 7635
+      },
+      {
+        "pass": 1,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 12904
+      }
+    ],
+    "two_second_cap_wait_calls": 0,
+    "PASS_present": false,
+    "failed_probe_resources_retained_until_recovery": true
+  },
+  "read_only_after_initialization": {
+    "user_client_sysctls_registered_before_capture": true,
+    "values": {
+      "debug.phxbos_flush": 0,
+      "debug.phxbos_flush_bytes": 0,
+      "debug.phx_hang_kills": 0
+    },
+    "capture_precedes_native_probe": true,
+    "values_during_or_after_failed_probe_captured": false
+  },
+  "supervision": {
+    "HOLD_detected_immediately_without_35_second_process_timeout": true,
+    "serialized_recovery_dispatch": true,
+    "recovery_boots_used": 1,
+    "automatic_GPU_retry": false,
+    "recovery_boot_GPU_calls": 0,
+    "consumed_job_removed": true,
+    "private_evidence_preserved": true
+  },
+  "recovery": {
+    "original_build34_exact_image_independently_verified": true,
+    "EFI_files_unchanged": 347,
+    "Microsoft_files_unchanged": 148,
+    "OpenCore_configuration_unchanged": true,
+    "protected_files_unchanged": 46,
+    "protected_library_links_unchanged": 2,
+    "security_and_kernel_collections_unchanged": true,
+    "GPU_off_retained": true,
+    "firmware_framebuffer_only": true,
+    "new_matching_diagnostic_reports": 0,
+    "raw_evidence_published": false
+  },
+  "interpretation": {
+    "observed_failure_exclusive_to_wait_correction": false,
+    "root_cause_established": false,
+    "cache_or_stale_data_cause_proven": false,
+    "candidate_hardware_gate_passed": false,
+    "candidate_default_promotion_permitted": false,
+    "background_load_stability_established": false,
+    "FPS_measured": false,
+    "accelerated_desktop_HOLD_cleared": false
+  },
+  "private_receipt_hashes": {
+    "probe_stdout_sha256": "2d0107d33cad4f25e3a7d67300ddf8dc10d5f6520331ef60425bbf52dbbb1c78",
+    "probe_stderr_sha256": "a43208e85b9d308b824a016cfea040bc37d7c9b62111be9c48eaa4da66d9f49d"
+  },
+  "limits": [
+    "The same frozen probe fails on both original34 and the minimal elapsed-wait candidate at pass1/output offset0x2010. This does not establish the cause or certify either implementation.",
+    "The two-second timeout path and concurrent/background-load phases were not exercised.",
+    "The read-only sysctl values were captured after initializer registration and before the native probe; they are not measurements taken during the failed submission.",
+    "One recovery was used; the consumed startup observer performed no GPU initialization or submission after reboot.",
+    "No raw diagnostics, firmware, EFI, image identifiers, personal paths or binaries are included."
+  ]
+}

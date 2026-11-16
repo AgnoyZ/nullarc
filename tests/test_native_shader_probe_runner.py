@@ -2,6 +2,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -74,6 +75,43 @@ class NativeShaderProbeRunnerTests(unittest.TestCase):
             dispatch = header.split('static inline unsigned phxGfx11DispatchCommands(')[1].split('static inline unsigned phxGfx11ClearCommands(')[0]
             self.assertNotIn('0xc0064900u', dispatch)
             self.assertIn('0xc0064900u', header.split('static inline unsigned phxGfx11ClearCommands(')[1])
+
+    def test_actual_probe_reports_observed_and_expected_bytes_without_retry(self):
+        # Exercise real C++ reads of injected memory, including the original34
+        # failure offset. No hardware, GPU ISA, device open or real IOKit call.
+        compiler = shutil.which('clang++')
+        self.assertIsNotNone(compiler)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); stage = root / 'stage'; prepare(stage)
+            binary = root / 'native-shader-simulation'
+            subprocess.run([compiler, '-std=c++17', '-Wall', '-Wextra', '-Werror', '-g',
+                '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
+                '-I' + str(ROOT / 'tests/fake_native_iokit'),
+                '-I' + str(stage / 'src/phxbringup'), '-I' + str(stage / 'tools/phxctl'),
+                str(ROOT / 'tests/test_native_shader_probe.cpp'), '-o', str(binary)],
+                check=True, capture_output=True, text=True, timeout=120)
+            corruptions = (
+                ('code-1-0', 0, 0, 0x07, 0x06),
+                ('ib-1-0', 4096, 0, 0x01, 0x00),
+                ('output-1-0', 8208, 0, 0xdf, 0xde),
+                ('output-2-0', 8208, 1, 0xde, 0xdf),
+                ('output-2-255', 9228, 1, 0x0d, 0x0c),
+                ('byte-2-16383', 16383, 1, 0xa4, 0xa5),
+            )
+            for variant in ('low', 'upper'):
+                for fault, offset, stage_index, actual, expected in corruptions:
+                    with self.subTest(variant=variant, fault=fault):
+                        result = subprocess.run([str(binary), variant, fault],
+                            capture_output=True, text=True, timeout=15)
+                        check_result(result, fault)
+                        self.assertIn(f'mismatch at byte {offset} (pass={stage_index} '
+                            f'actual=0x{actual:02x} expected=0x{expected:02x})', result.stderr)
+                        self.assertEqual(1, result.stderr.count('mismatch at byte '))
+                for fault in ('ok', 'check-ok'):
+                    result = subprocess.run([str(binary), variant, fault],
+                        capture_output=True, text=True, timeout=15)
+                    check_result(result, fault)
+                    self.assertNotIn('mismatch at byte ', result.stderr)
 
     def test_real_iokit_cxx_recipe_and_ci_never_run_dispatch(self):
         command = native_shader_command(Path('stage with spaces'), Path('native probe'))

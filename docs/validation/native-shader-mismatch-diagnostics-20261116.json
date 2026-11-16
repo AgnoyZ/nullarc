@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "host-validation-passed-diagnostics-only",
+  "source_sha256": {
+    "tools/native_shader_probe.cpp": "89f40d19aa2fd4768ccea3d654b5cb6cca25abcc14d829dda5f00f480a21fe17",
+    "tests/test_native_shader_probe_runner.py": "3b5277ee140408112f8d2032f1af451fb4302252bac3cf48b0e126be7b8144cf",
+    "tools/phxctl/gfx11_shader_probe.h": "eb149f8747332471f8f9c92754c43f51bc209c439fbd297b2404eb232dbba5a1"
+  },
+  "scope": {
+    "production_driver_changed": false,
+    "packet_builder_changed": false,
+    "data_patterns_or_acceptance_conditions_changed": false,
+    "failure_log_records_single_observed_byte": true,
+    "frozen_hardware_trial_probe_modified": false
+  },
+  "host_validation": {
+    "focused_Python_tests_passed": 9,
+    "exact_byte_diagnostic_fault_cases": 12,
+    "success_or_check_no_mismatch_log_cases": 4,
+    "actual_Cpp_ASan_UBSan_simulations": 1970,
+    "VA_variants": [
+      "low",
+      "upper"
+    ],
+    "native_repository_probe_compiled": true,
+    "native_build34_HOLD_adapter_compiled": true,
+    "native_compiled_binaries_executed": false,
+    "hardware_executed": false,
+    "shader_executed": false,
+    "GPU_submissions": 0
+  },
+  "build34_HOLD_adapter": {
+    "private_source_sha256": "daa5873df30f50ba35902eef9d36b31ebea89235ca0fa5f4a331d9c99c27c340",
+    "same_comparison_and_diagnostic_block_as_tested_source": true,
+    "only_change_to_frozen_probe_source_is_mismatch_diagnostic_loop": true,
+    "guarded_dispatch_limit": 32,
+    "inter_dispatch_pause_us": 250000,
+    "failure_retains_connection_and_mappings": true,
+    "original34_ABI_header_used": true,
+    "shader_and_layout_headers_equal_frozen_probe_inputs": true,
+    "native_compile_only": true,
+    "target_tested": false,
+    "new_trial_armed": false
+  },
+  "validation_boundary": [
+    "Initial direct-tree tests refused source export because of uncommitted tracked edits; the passing run used a separate clean snapshot with the exact hashes above.",
+    "The original default lacks downstream layout helper headers; the adapter was compiled with the original34 ABI header and unchanged source-pinned helper/shader headers.",
+    "Host simulations inject GPU data; no GPU ISA, GPUVM translation or target driver execution is established.",
+    "No default wait-fix promotion, installation, new hardware test or additional recovery is part of this diagnostic change."
+  ]
+}

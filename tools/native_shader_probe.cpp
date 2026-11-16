@@ -165,9 +165,14 @@ static int exercise(Session &s, bool execute, bool upper) {
             return reject("positive retirement not established");
         __sync_synchronize();
         const volatile uint8_t *actual = reinterpret_cast<const volatile uint8_t *>(s.cpu);
-        for (size_t i = 0; i < bytes; ++i) if (actual[i] != expected[i]) {
-            fprintf(stderr, "FAIL: native shader output/code/IB/guard mismatch at byte %zu\n", i);
-            return 75;
+        for (size_t i = 0; i < bytes; ++i) {
+            const uint8_t observed = actual[i];
+            if (observed != expected[i]) {
+                fprintf(stderr, "FAIL: native shader output/code/IB/guard mismatch at byte %zu "
+                    "(pass=%u actual=0x%02x expected=0x%02x)\n", i, pass,
+                    static_cast<unsigned>(observed), static_cast<unsigned>(expected[i]));
+                return 75;
+            }
         }
         previous = sequence;
     }

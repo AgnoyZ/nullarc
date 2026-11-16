@@ -4,6 +4,9 @@ Status on 2026-11-16: **downstream build40 remains an offline candidate**.
 A separate minimal build34 backport was boot-tested and failed its native output
 integrity gate; it is **not accepted or promoted to the default branch**. See
 [the build34 trial below](#separate-build34-backport-hardware-trial).
+An identical-probe original build34 control subsequently reproduced the same
+second-dispatch failure; neither result establishes its cause or accepts the
+wait candidate.
 The cumulative A1/A2/A3 native-desktop candidate remains on HOLD after the
 post-gate WindowServer watchdog. This change does not establish the cause of
 that hang or demonstrate a frame-rate or interactive-latency improvement.
@@ -155,14 +158,77 @@ The consumed launch job was removed. GPU-off and the firmware framebuffer remain
 the wait backport stays out of the default branch. A1/A2/corrected-A3 source
 migration is retained, with the previous accelerated-desktop HOLD unchanged.
 
-The identical repeated-buffer probe has not yet been run against unmodified
-build34 as a control. That comparison is needed before attributing this output
-failure to the wait change. Cache visibility, buffer reuse and fence/data ordering
-are investigation leads, not established causes. Do not bypass the integrity
-check, globally enable costly cache flushing, or claim a frame-rate/stability fix
-from these observations. Sanitized source/image hashes and exact observations
-are in [the build34 failure record](validation/upstream34-fence-wait-20261116.json);
-raw diagnostics, image identifiers, firmware, EFI and binaries remain private.
+Sanitized source/image hashes and exact observations from this candidate trial
+remain in [the build34 failure record](validation/upstream34-fence-wait-20261116.json).
+That historical record predates the separate original34 control below; it has not
+been relabeled as a passing candidate result.
+
+## Original build34 control
+
+On 2026-11-16 the owner authorized one current-boot initialization/adoption of
+the already loaded original build34, the **identical frozen probe executable**,
+and at most one recovery reboot. There was no preliminary reboot, EFI/kext
+replacement, desktop takeover, tuning write, CPU load or concurrent GPU client.
+Independent admission verified the original image, ABI 1.12, target geometry,
+firmware framebuffer and startup containment before initialization.
+
+The original compute/graphics checks and both queue adoptions passed. The native
+probe again verified all 16 KiB on pass 0, then reported positive retirement but
+an output mismatch at `0x2010` on pass 1. Two dispatches were submitted; one was
+fully verified. Four wait observations were captured:
+
+| Pass (zero based) | Budget | Pending | Elapsed |
+| --- | --- | --- | --- |
+| 0 | 0 ns | yes | 5,560 ns |
+| 0 | 50,000 ns | no | 15,549 ns |
+| 1 | 0 ns | yes | 7,635 ns |
+| 1 | 50,000 ns | no | 12,904 ns |
+
+The two-second cap path was not reached. After initializer/client registration,
+read-only values of `debug.phxbos_flush`, `debug.phxbos_flush_bytes` and
+`debug.phx_hang_kills` were all zero. These were captured **before** the native
+probe, not during or after its failing submission. Their values alone do not
+prove a cache or hang-recovery cause. Source inspection also shows an
+`ACQUIRE_MEM` cache synchronization packet in the shared shader command builder
+and a kernel `RELEASE_MEM` completion packet; their presence does not certify
+hardware visibility or ordering.
+
+The corrected monitor detected the explicit FAIL/HOLD immediately, retained the
+probe's connection/mappings and dispatched one serialized recovery. The startup
+observer recorded the original image and performed no GPU retry. Independent
+post-recovery verification confirmed all 347 EFI files, 148 Microsoft files,
+OpenCore configuration, 46 protected files, two library links and security/kernel
+collections unchanged, with no new matching diagnostic report. The consumed job
+was removed. GPU-off and the firmware framebuffer remain.
+
+This establishes that the observed failure is **not exclusive to the wait
+correction**. It does not identify whether the probe, repeated-buffer visibility,
+GPU execution or fence/data ordering is responsible, and does not pass the
+candidate's separate 96-dispatch acceptance gate. The wait backport remains
+isolated; default stays at `64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c` with
+A1/A2/corrected-A3 retained and accelerated-desktop HOLD unchanged.
+See [the original34 control record](validation/upstream34-fence-wait-baseline-20261116.json).
+
+Both frozen hardware probes logged only the first mismatching offset, not the
+actual/expected bytes. The repository probe now records the zero-based pass and
+the **single observed byte used in the failing comparison**, plus its expected
+byte. This is a failure-log change only: packet generation, data patterns,
+submission count, waits, full-byte verification and cleanup are unchanged. It
+does not modify or retroactively enrich either frozen hardware trial. Host fault
+injection checks the exact diagnostic for shader, IB, output and guard corruption
+in both VA variants. Any new hardware diagnostic trial must preserve build34's
+failure HOLD; the repository probe's normal close path is not a safe substitute
+for that adapter on this older kernel.
+The passing clean-snapshot checks comprise nine focused Python tests, 1,970
+actual-C++ ASan/UBSan simulations and native compilation of both the repository
+probe and a private build34 HOLD adapter. Neither compiled native binary was
+executed. Source hashes and validation limits are in
+[the diagnostic validation record](validation/native-shader-mismatch-diagnostics-20261116.json).
+
+Cache visibility, buffer reuse and fence/data ordering remain investigation
+leads. Do not bypass the integrity check, globally enable costly cache flushing,
+or claim a frame-rate/stability fix. Raw diagnostics, image identifiers,
+firmware, EFI and binaries remain private.
 
 ## Offline build40 validation boundary and rollback
 
