@@ -384,3 +384,17 @@ GPU-off and persistent-display-arming cleanup remain mandatory. At this source
 checkpoint the packet is **not armed**, the kernel still runs A2, and A3
 hardware success is pending. Evidence:
 `validation/upstream34-backport-a3-boot-preparation-20261116.json`.
+
+
+### A3: single reboot dispatch independently verified; hardware result pending
+
+After preparation evidence was synchronized as `ae962dc`, the one-use arming
+role completed and requested one ordinary reboot. Independent same-boot readback
+verified the exact daemonized root shutdown scheduler, its successful parent
+exit, the specific native-display arming and the existing M2 marker. No GPU
+initializer ran in the preparation boot, and no automatic retry is permitted.
+The on-disk A3 candidate awaits actual fresh-boot loading; the running kernel
+was still A2 at dispatch readback. The 300-second observation and at-most-one
+managed recovery limits remain in force. This dispatch is **not A3 hardware
+acceptance**; next-boot receipts must establish the outcome. Evidence:
+`validation/upstream34-backport-a3-boot-dispatch-20261116.json`.

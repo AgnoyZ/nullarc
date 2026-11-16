@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-16",
+  "stage": "a3-boot-dispatch",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "result": "independently-verified-initial-A3-reboot-scheduled",
+  "initial_reboot_request_count": 1,
+  "daemonized_root_scheduler_exact": true,
+  "shutdown_parent_returncode": 0,
+  "same_preparation_boot": true,
+  "GPU_initialization_in_preparation_boot": false,
+  "A3_installed_on_disk": true,
+  "loaded_accelerator_still_A2": true,
+  "A3_hardware_result_pending": true,
+  "automatic_retry": false,
+  "observation_seconds": 300,
+  "managed_recovery_reboot_limit": 1,
+  "A3_hardware_test_passed": false
+}
