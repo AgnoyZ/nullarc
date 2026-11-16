@@ -103,6 +103,8 @@ jobs:
         run: python3 tools/test_native_shader_probe.py --out build/native-shader-probe-tests
       - name: Exercise both IB freshness policies with fake IOKit and GPU writes
         run: python3 tools/test_native_ib_freshness.py --out build/native-ib-freshness-tests
+      - name: Exercise selective CPU IB publication with fake CPU and IOKit operations
+        run: python3 tools/test_native_ib_publication.py --out build/native-ib-publication-tests
   macos-kexts:
     runs-on: macos-15-intel
     timeout-minutes: 90

@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "offline-selective-CPU-IB-publication-diagnostic-validated",
+  "default_branch_checkpoint": {
+    "branch": "upstream34/vram-layout-fix",
+    "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "wait_fix_present": false,
+    "modified_by_this_change": false
+  },
+  "scope": {
+    "production_kernel_ABI_shader_or_cache_mode_changed": false,
+    "new_standalone_diagnostic": true,
+    "GPU_calls": 0,
+    "native_modes_executed": [],
+    "driver_or_EFI_installations": 0,
+    "initializations": 0,
+    "runtime_jobs_armed": 0,
+    "reboots": 0,
+    "previous_hardware_scopes_consumed": true,
+    "previous_hardware_records_sha256": {
+      "upstream34-native-ib-reuse-control-20261116.json": "c1043c2ac0829fd01bcaf8c43680aa399bb342935ee9980ea0226d626979837e",
+      "upstream34-native-ib-fresh-control-20261116.json": "ce3246019d2ec032a1d68d3cb6a05f368ac0ced58a3d367bf42df9f7526432c9"
+    }
+  },
+  "primary_source_review": {
+    "tag": "v6.12",
+    "commit": "adc218676eef25575469234709c2d87185ca223a",
+    "files": {
+      "drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c": {
+        "sha256": "74dc38ba2d48b1e43db0bec0706a53385fb2f083b273a8f8f4ee2da5d3e06317",
+        "license_header_reviewed": "MIT-style permission/warranty notice",
+        "commit_addressed_content_matches_tag_download": true,
+        "implementation_or_header_copied": false
+      },
+      "drivers/gpu/drm/amd/amdgpu/amdgpu_ib.c": {
+        "sha256": "3ad28f135d332cb49aed6035539fc7bfda760e3b585ea1028426c89fb7b6d267",
+        "license_header_reviewed": "MIT-style permission/warranty notice",
+        "commit_addressed_content_matches_tag_download": true,
+        "implementation_or_header_copied": false
+      },
+      "drivers/gpu/drm/amd/amdgpu/nvd.h": {
+        "sha256": "f65a105dfceff3bc03b3e02ac52ed18586586a5866135170a3239ec77fbe29c8",
+        "license_header_reviewed": "MIT-style permission/warranty notice",
+        "commit_addressed_content_matches_tag_download": true,
+        "implementation_or_header_copied": false
+      }
+    }
+  },
+  "submission_review": {
+    "default_kernel_build": 34,
+    "downstream_kernel_build": 40,
+    "compute_IB_header_VALID_and_VMID_fields_match_reviewed_reference": true,
+    "selected_64bit_RELEASE_MEM_fields_match_reviewed_reference": true,
+    "local_ACQUIRE_MEM_location": "inside diagnostic IB",
+    "upstream_ring_mem_sync_is_conditional_on_AMDGPU_IB_FLAG_EMIT_MEM_SYNC": true,
+    "mandatory_missing_prefix_established": false,
+    "probe_GCR_CNTL": "0xc381",
+    "reference_GCR_CNTL": "0xc3b1",
+    "additional_reference_GCR_fields": [
+      "GLM_WB",
+      "GLM_INV"
+    ],
+    "probe_COHER_SIZE_HI": "0xff",
+    "reference_sync_COHER_SIZE_HI": "0xffffff",
+    "these_differences_establish_a_fix": false,
+    "BO_flush_default_mode": 0,
+    "specific_root_cause_established": false,
+    "external_implementation_or_header_copied": false
+  },
+  "controlled_diagnostic": {
+    "CLI_policies": [
+      "--run-control",
+      "--run-ib-publish"
+    ],
+    "contexts": 1,
+    "GTT_BO_bytes": 16384,
+    "pre_staged_IB_byte_offsets": [
+      4096,
+      4608
+    ],
+    "submitted_IB_byte_offset_both_passes": 4096,
+    "rewritten_IB_bytes": 320,
+    "second_pass_rewrites_slot_0_in_both_policies": true,
+    "inactive_slot_1_guarded_not_submitted": true,
+    "common_output_byte_offset": 8208,
+    "output_bytes": 1024,
+    "output_reinitialized_each_pass": true,
+    "full_validation_extent_bytes_per_dispatch": 16384,
+    "publication_only_before_second_submit": true,
+    "publication_operations": [
+      "CLFLUSH line +0",
+      "CLFLUSH line +64",
+      "CLFLUSH line +128",
+      "CLFLUSH line +192",
+      "CLFLUSH line +256",
+      "MFENCE"
+    ],
+    "line_bytes_required": 64,
+    "CPU_capability_checked_before_device_enumeration": true,
+    "publication_of_shader_output_inactive_IB_or_whole_BO": false,
+    "dispatch_limit": 2,
+    "wait_budgets_ns": [
+      0,
+      50000,
+      2000000000
+    ],
+    "inter_dispatch_pause_us": 250000,
+    "exercise_failure_HOLD_preserved": true,
+    "old_helpers_unchanged": [
+      "reject",
+      "pciValue",
+      "targetService",
+      "call",
+      "finish"
+    ],
+    "canonical_acceptance_changed": false
+  },
+  "source_binding": {
+    "base_commit": "792fbb78bde31a3c9bf03924a132b5cae6cf56b8",
+    "clean_source_only_snapshot_commit": "bd14503d2d2ec9cc846e133a271de96cf3151a62",
+    "source_sha256": {
+      ".github/workflows/build.yml": "cdd3a941f7e3b03fe09ce84fb49d49930abc5f60a6884f67b2ce93cb57b63ed9",
+      "tests/test_native_shader_probe.cpp": "b42e4841adbfc426c194f1571266739493626c186aa9eb02765a1f906594f6ee",
+      "tools/native_ib_publication_probe.cpp": "b5995cb380366c5385d2f22159ffb6401d1aed0bf96692f675bb5408879c14e5",
+      "tools/test_native_ib_publication.py": "0eac8813e5223b305abb8f448b96ff05ad8cce86d8b1d2886c3da5a82345ab14",
+      "tests/test_native_ib_publication_runner.py": "5c568d5c033d7e8fc4f34db0f6d5370ac261f512b71c44b7c9b7af54f06e2721",
+      "tools/phxctl/ib_publication_arch.h": "ff3ac0dc502ef3264951b897fd11ed492e75bbc8280d763e80d1f5c6a17e4396",
+      "tests/fake_native_iokit/ib_publication_arch.h": "30595078a4e70602f95d9d0886fdaeca28d0146534c02d5680697f22abb49deb",
+      "tests/fake_native_iokit/mach/mach_time.h": "0fc63904e56d34cc549cb328a331895e2e894d131436aafa025741bf2614f2ae",
+      "src/phxbringup/PhxNativeABI.h": "05c1feb4a825e6bf8b3212a2b46275430bf51c03a36753509594c66e5bbeaef6",
+      "tools/phxctl/gfx11_shader_probe.h": "eb149f8747332471f8f9c92754c43f51bc209c439fbd297b2404eb232dbba5a1"
+    },
+    "source_hashes_match_final_files": true,
+    "old_freshness_probe_sha256": "d26d2796c479a42ce38bd569f2669db85e27d4dbdc9a5ee9cbd3c5bd6db1b97f",
+    "reviewed_kernel_source_sha256": {
+      "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+      "792fbb78bde31a3c9bf03924a132b5cae6cf56b8": "2b62e0aa9d8c0a282dd5a4b91782da9dcb13da86ecaa1fc7396a42b05700a1e0"
+    }
+  },
+  "host_validation": {
+    "actual_CXX_new_diagnostic": {
+      "scenarios": 4316,
+      "cases_per_policy_and_VA": 1079,
+      "policies": [
+        "control",
+        "ib-publish"
+      ],
+      "VA_variants": [
+        "low",
+        "upper"
+      ],
+      "exact_Cartesian_set_without_duplicates_verified": true,
+      "ASan": true,
+      "UBSan": true,
+      "CPU_cache_operations_mocked": true,
+      "real_IOKit_or_GPU_used": false
+    },
+    "focused_unit_tests": {
+      "canonical": 9,
+      "previous_freshness": 7,
+      "new_publication": 7,
+      "total": 23
+    },
+    "old_freshness_actual_CXX_regression": {
+      "scenarios": 48,
+      "VA_variants": [
+        "low",
+        "upper"
+      ],
+      "policies": [
+        "reuse",
+        "fresh"
+      ],
+      "ASan": true,
+      "UBSan": true,
+      "hardware_executed": false
+    },
+    "native_framework_build": {
+      "result": "compiled-only-not-executed",
+      "architecture": "x86_64",
+      "frameworks": [
+        "IOKit",
+        "CoreFoundation"
+      ],
+      "warnings_as_errors": true,
+      "native_architecture_header_compiled": true,
+      "CLFLUSH_MFENCE_CPUID_present_in_disassembly": true,
+      "fake_CPU_hooks_linked": false,
+      "binary_sha256": "03ccac6f99026e6d5e2e315e1c6aa4b0b5f96bea9340726a1b3fc2b54cee5186",
+      "native_modes_executed": [],
+      "GPU_calls": 0
+    }
+  },
+  "interpretation": {
+    "CPU_publication_hypothesis_hardware_tested": false,
+    "new_control_reproduced_hardware_failure": false,
+    "new_publication_policy_hardware_passed": false,
+    "hardware_or_cache_model_validated": false,
+    "wait_candidate_hardware_gate_passed": false,
+    "wait_candidate_default_promotion_permitted": false,
+    "FPS_measured": false,
+    "background_GUI_stability_established": false,
+    "accelerated_desktop_HOLD_cleared": false
+  },
+  "limits": [
+    "The earlier reused/fresh-slot hardware pair motivates this diagnostic; it does not establish a CPU cache or GPU IB-fetch cause.",
+    "The publication policy changes five CPU IB cache-line flushes and a fence as one treatment. It changes no GPU packet bits, PTEs, result address, shader, wait policy or global BO-cache setting.",
+    "Host tests mock CPU capability/cache operations and inject separate CPU-publication, stale-IB-fetch and stale-output models. Their outcomes are assumptions, not hardware evidence or a GPU ISA/cache model.",
+    "Native compilation and disassembly establish buildability and primitive presence, not execution or cache correctness. No native mode, including --check, was run.",
+    "A future bounded comparison must first reproduce the new control before a separately bounded publication trial with the same binary. Neither earlier consumed packet may be replayed; no new runtime scope is armed.",
+    "No installed driver, EFI, security configuration or default branch changed; no raw machine logs, identifiers, firmware or binary is published."
+  ]
+}

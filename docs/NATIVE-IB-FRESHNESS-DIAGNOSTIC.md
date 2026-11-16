@@ -182,6 +182,11 @@ The earlier reuse and byte-diagnostic records remain unchanged. Default stays
 on A1/A2/corrected-A3; the wait correction is not promoted and accelerated-desktop
 HOLD remains in force.
 
+A subsequent [selective CPU IB publication diagnostic](NATIVE-IB-PUBLICATION-DIAGNOSTIC.md)
+keeps the reused IB address and changes only targeted CPU cache maintenance
+before the second submission. It is offline preparation, not another hardware
+result or a production cache fix; both policy scopes above remain consumed.
+
 ## Host validation and rollback
 
 `tools/test_native_ib_freshness.py` compiles the actual new C++ source through

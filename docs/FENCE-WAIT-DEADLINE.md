@@ -348,6 +348,12 @@ stability, GUI responsiveness or FPS. No production cache or packet change was
 made. No further hardware scope is armed, and the earlier historical trials
 above remain unchanged.
 
+The subsequent [CPU IB publication diagnostic](NATIVE-IB-PUBLICATION-DIAGNOSTIC.md)
+prepares that narrower question offline: both policies rewrite/reuse the same
+slot, and only one adds five IB-only CPU cache-line flushes plus a fence before
+the second submission. Upstream review did not establish a packet correction;
+this adds no production kernel/cache change or passing hardware gate.
+
 ## Offline build40 validation boundary and rollback
 
 Run the canonical committed-source harness and source checks from a clean tree:

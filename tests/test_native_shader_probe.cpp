@@ -1,4 +1,7 @@
 // Runs the actual userspace probe with injected ABI responses; no ISA execution.
+#if defined(PHX_IB_CPU_PUBLICATION_DIAGNOSTIC)
+#define PHX_IB_FRESHNESS_DIAGNOSTIC
+#endif
 #include <assert.h>
 #include <stdlib.h>
 #include <string>
@@ -15,7 +18,9 @@ static int fake_usleep(useconds_t delay) { assert(delay == 250000); return 0; }
 static int fake_uname(struct utsname *);
 #define uname fake_uname
 #define main native_probe_main
-#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+#if defined(PHX_IB_CPU_PUBLICATION_DIAGNOSTIC)
+#include "../tools/native_ib_publication_probe.cpp"
+#elif defined(PHX_IB_FRESHNESS_DIAGNOSTIC)
 #include "../tools/native_ib_freshness_probe.cpp"
 #else
 #include "../tools/native_shader_probe.cpp"
@@ -27,6 +32,11 @@ static int fake_uname(struct utsname *);
 #undef usleep
 static bool freshPolicy;
 static unsigned waitAttempt;
+#ifdef PHX_IB_CPU_PUBLICATION_DIAGNOSTIC
+static bool publicationPolicy;
+static unsigned publicationLines;
+static bool publicationFenced;
+#endif
 #endif
 
 static std::string fault;
@@ -38,6 +48,13 @@ alignas(4096) static uint8_t backing[16384];
 static bool is(const std::string &name) { return fault == name; }
 static void event(const std::string &name) { events.push_back(name); }
 static uint64_t virtualBase() { return upper ? 0xffffc02134500000ull : 0x402134500000ull; }
+#ifdef PHX_IB_CPU_PUBLICATION_DIAGNOSTIC
+bool phxIbClflushCapability(unsigned *lineBytes) {
+    event("cpu-clflush-capability");
+    *lineBytes = is("cpu-line-zero") ? 0 : is("cpu-line-32") ? 32 : is("cpu-line-128") ? 128 : 64;
+    return !is("cpu-no-clflush");
+}
+#endif
 static int fake_uname(struct utsname *host) {
     event("host");
     strcpy(host->sysname, is("host-linux") ? "Linux" : "Darwin");
@@ -164,6 +181,19 @@ static void checkStaged(unsigned pass) {
     }
     assert(!memcmp(image, backing, sizeof(image)));
 }
+#ifdef PHX_IB_CPU_PUBLICATION_DIAGNOSTIC
+void phxIbClflushLine(const volatile void *line) {
+    assert(publicationPolicy && submitted == 1 && waited == 1 && opened && mapped && gpuMapped);
+    assert(publicationLines < 5 && !publicationFenced);
+    assert(reinterpret_cast<uintptr_t>(line) == reinterpret_cast<uintptr_t>(backing + 0x1000 + publicationLines * 64));
+    checkStaged(1); // Rewritten commands and re-poisoned output must precede the first flush.
+    event("ib-clflush-" + std::to_string(publicationLines++));
+}
+void phxIbPublicationFence() {
+    assert(publicationLines == 5 && !publicationFenced && submitted == 1 && waited == 1);
+    publicationFenced = true; event("ib-publication-fence");
+}
+#endif
 kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, const uint64_t *in, uint32_t inCount,
     const void *data, size_t dataBytes, uint64_t *out, uint32_t *outCount, void *reply, size_t *replyBytes) {
     assert(connection == 99 && opened && !failed);
@@ -276,6 +306,10 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         assert(header.abi == 1 && header.ctx_id == 7 && header.num_ibs == 1 && !header.flags && !header.fence_handle &&
             !header.fence_offset && !header.reserved && !ib._pad && !ib.flags && ib.va_start == virtualBase() + offset &&
             ib.ib_bytes == 320 && ib.ip_type == 1 && !ib.ip_instance && !ib.ring);
+#ifdef PHX_IB_CPU_PUBLICATION_DIAGNOSTIC
+        if (submitted == 1 || !publicationPolicy) assert(!publicationLines && !publicationFenced);
+        else assert(publicationLines == 5 && publicationFenced);
+#endif
         checkStaged(submitted - 1); out[0] = 0x100000000ull + submitted;
         if (is(name + "-zero")) out[0] = 0;
         if (is(name + "-last")) out[0] = UINT64_MAX;
@@ -314,6 +348,12 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &pattern[i & 3], 4);
 #ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
         // Explicitly injected stale-data models, not ISA/cache emulation.
+#ifdef PHX_IB_CPU_PUBLICATION_DIAGNOSTIC
+        if (pass == 1 && is("stale-ib-cpu-2") && !publicationPolicy) {
+            const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
+            for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &previous[i & 3], 4);
+        }
+#endif
         if (pass == 1 && (is("stale-output-2") || (is("stale-ib-fetch-2") && !freshPolicy))) {
             const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
             for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &previous[i & 3], 4);
@@ -382,7 +422,11 @@ static void packetInputs() {
     assert(packet[78] == 0xa5a5a5a5 && packet[79] == 0xa5a5a5a5 && packet[80] == 0xa5a5a5a5);
 }
 int main(int argc, const char *argv[]) {
-#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+#if defined(PHX_IB_CPU_PUBLICATION_DIAGNOSTIC)
+    assert(argc == 4); freshPolicy = false; publicationPolicy = !strcmp(argv[3], "ib-publish");
+    assert(publicationPolicy || !strcmp(argv[3], "control"));
+    assert(!publishRewrittenIb(0) && !publishRewrittenIb(1) && !publishRewrittenIb(UINTPTR_MAX & ~uintptr_t(63)));
+#elif defined(PHX_IB_FRESHNESS_DIAGNOSTIC)
     assert(argc == 4); freshPolicy = !strcmp(argv[3], "fresh"); assert(freshPolicy || !strcmp(argv[3], "reuse"));
 #else
     assert(argc == 3); upper = !strcmp(argv[1], "upper"); assert(upper || !strcmp(argv[1], "low")); fault = argv[2];
@@ -390,7 +434,11 @@ int main(int argc, const char *argv[]) {
     upper = !strcmp(argv[1], "upper"); assert(upper || !strcmp(argv[1], "low")); fault = argv[2];
     packetInputs();
     const char *args[] = {"native-shader-probe", "--run", "--upper", "extra"}; int count = upper ? 3 : 2;
-#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+#if defined(PHX_IB_CPU_PUBLICATION_DIAGNOSTIC)
+    args[1] = publicationPolicy ? "--run-ib-publish" : "--run-control";
+    if (is("legacy-fresh")) args[1] = "--run-fresh";
+    if (is("legacy-reuse")) args[1] = "--run-reuse";
+#elif defined(PHX_IB_FRESHNESS_DIAGNOSTIC)
     args[1] = freshPolicy ? "--run-fresh" : "--run-reuse";
 #endif
     if (is("check-ok")) args[1] = "--check";
