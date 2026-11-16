@@ -6,6 +6,19 @@ installed or loaded and no new GPU execution or reboot was performed during
 source preparation. The default branch remains at `64f3d99` with
 A1/A2/corrected-A3; wait promotion and accelerated desktop remain on HOLD.
 
+## Build34 baseline requirement
+
+On 2026-11-16 the owner specified that all local hardware tests and future
+development use PhxBringup build34 as the baseline. The approved source
+checkpoint is `upstream34/vram-layout-fix` at
+`64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c`, including A1/A2/corrected-A3.
+Derive each isolated fix from that checkpoint without mixing unrelated
+downstream wait, lifecycle, ABI or initialization changes. The existing
+build41/build42 candidates remain experimental and do not replace build34 as
+the baseline. Candidate identifiers remain distinct from the source baseline;
+this requirement does not rename either candidate or authorize installation,
+loading, GPU execution or reboot.
+
 ## Why this change
 
 The [freshness comparison](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md) reproduced pass 1's
