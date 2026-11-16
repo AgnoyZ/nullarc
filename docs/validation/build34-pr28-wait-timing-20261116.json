@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "result": "passed-host-and-compile-only",
+  "branch": "upstream34/vram-layout-fix",
+  "parent": "dd32109ed02c37f8e536a061c530aafa3b7f96de",
+  "approved_source_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "kernel_build": 34,
+  "build41_build42_withdrawn": true,
+  "upstream": {
+    "pr": 28,
+    "head": "317092664427f3fe7650f5fa08e8fe1b7ba011df",
+    "base": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+    "git_blob": "3aa722a87c7976aa2554dbae9c90e562f2eea20c",
+    "sha256": "82dba18f9ee5c6e6850cbde71ee9a927aabca01b4ccf75a1d2ab33482b39c463",
+    "state": "open",
+    "result": "PASS"
+  },
+  "original_wait_guard": {
+    "result": "reproduced-unbounded-wait",
+    "guarded_exit": 90,
+    "condition_wait_calls_without_completion": 4,
+    "source": "pinned PR28 wait block",
+    "hardware_executed": false
+  },
+  "controls": {
+    "default_enabled": false,
+    "opt_in": "NVMTL_SURFACE_COMMIT_WAIT=1",
+    "kill_switch": "presence of NVMTL_NO_SURFACE_COMMIT_WAIT",
+    "WindowServer": "always excluded",
+    "default_budget_ms": 250,
+    "accepted_budget_ms": [
+      1,
+      2000
+    ],
+    "invalid_budget": "default 250; never infinite",
+    "clock": "dispatch_time(DISPATCH_TIME_NOW) deadline; local CLOCK_UPTIME_RAW elapsed samples"
+  },
+  "checks": {
+    "new_tests": "10 passed; ASan/UBSan; 25 isolated CPU case processes and production wiring checks",
+    "synthetic_elapsed_samples": "75 ms elapsed samples with 8 ms requested budget recorded as 75000 us; not actual hardware overshoot evidence",
+    "publication_completion": "after simulated copy/publication and completion-ready; excludes handler execution",
+    "timeout_state": "pending parts, resource identity, reservation, status and error retained; late completion works",
+    "worker_reentrancy": "actual queue-specific identity and inherited target skip; label collision does not skip",
+    "multiple_waiters": "8 awakened by one completion group leave",
+    "error_state": "terminal error not relabelled success",
+    "A1_sampler_surface_descriptor_masks": "passed",
+    "previous_PR15_16_19_22": "4 combined tests passed",
+    "A2_framebuffer_alias": "passed; 3646 CPU assertions plus policy tests",
+    "corrected_A3_panel": "43 timing cases and 511 callback assertions passed",
+    "native_plugin_compile": "passed; identical 336-warning multiset to unchanged default",
+    "release_build_signature_arch_entry_points": "passed; x86_64; macOS15 minimum; NVMTL_RELEASE=1; unguarded availability errors enabled",
+    "protected_inputs": {
+      "result": "PASS",
+      "base": "dd32109ed02c37f8e536a061c530aafa3b7f96de",
+      "protected_inputs_checked": 177,
+      "only_new_source_delta": [
+        "src/nmplugin/NVMTLEventSync.m",
+        "src/nmplugin/NVMTLObjects.h",
+        "src/nmplugin/NVMTLObjects.m"
+      ],
+      "A1_writer_registry_functions_unchanged": true,
+      "previous_four_PR_changes_preserved": true,
+      "kernel_ABI_phxctl_phxaccel_licenses_unchanged": true
+    },
+    "git_diff_check": "passed"
+  },
+  "source_sha256": {
+    "src/nmplugin/NVMTLEventSync.m": "5bd4d3fdec30c72de05c989d5171602a433199746b619a8a56be60a81920f291",
+    "src/nmplugin/NVMTLObjects.h": "b6da2094f3c0a2639e63c0fffc22800f340cdf300a7ffd27f58780f4c11687b8",
+    "src/nmplugin/NVMTLObjects.m": "bbc81778f1caade0553a0b404a24d8b51aad5ae8617294a9ecd8ac14f4f27b34"
+  },
+  "test_inputs_sha256": {
+    "tests/test_nmplugin_surface_commit_wait.py": "ee4d936a67058d417dbdfdba7053713fce7d4d9f5ecef70018f48d132027d5c8",
+    "tests/surface_commit_wait/fixtures.m": "3d0b1616bc563fe866d85ae1ad0197e6dbbed8c3775ffd900c09492e29ea7b29",
+    "tests/surface_commit_wait/cases.m": "3e3476024a803f92a4773d2a83ce9101246ae6dc8e19ba370ef0c1c9919e83af"
+  },
+  "local_evidence_sha256": {
+    "wait-host.log": "25963473cbd4a329ee456d63fe0e4c54340057574b445037db220add86fb5d5d",
+    "regressions.log": "2c834025538fcb1d5624aab694407c2f821365365a66eaaf986c81ee73555788",
+    "compile-validation-private.json": "da2195f8698d26b8ba28e2e9caf64cb965341c56fbc42e47e57a7d8707ba6a9d",
+    "protected-inputs-private.json": "00eefdf13b1cd9b1e6b63297b4918d1c48972769fa9c432689bb0eda3006e6fc"
+  },
+  "environment": {
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+  },
+  "license": "nmplugin PolyForm-Noncommercial-1.0.0 retained; no external library or binary copied",
+  "GPU_executed": false,
+  "plugin_loaded": false,
+  "installed": false,
+  "rebooted": false,
+  "FPS_measured": false,
+  "binaries_uploaded": false,
+  "wait_promotion": "HOLD; default off",
+  "accelerated_desktop": "HOLD",
+  "native_fence_timing": "unchanged",
+  "IB_wrong_value": "unresolved",
+  "camera_or_UI_fix_verified": false,
+  "contract_limit": "expiry explicitly leaves publication unconfirmed; asynchronous commit state remains; no unconditional publication-before-return guarantee on expiry",
+  "rollback": "git revert this isolated source commit; no deployment to undo"
+}

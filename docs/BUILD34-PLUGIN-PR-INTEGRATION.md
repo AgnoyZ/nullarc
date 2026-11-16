@@ -92,6 +92,10 @@ remain on HOLD. PR28's synchronous commit wait is deferred for separate
 analysis because it can directly affect blocking and UI latency. Kernel,
 initialization, power and SDMA changes are outside this batch.
 
+The owner's later PR28 wait-timing request is tracked in the separate
+[bounded, default-off source adaptation](BUILD34-PR28-WAIT-TIMING.md). It does
+not change the results or hardware limits recorded for this four-PR batch.
+
 ## License and rollback
 
 The four changed plugin files retain their existing

@@ -85,6 +85,10 @@ test-nmplugin-descriptor-mask:
 test-upstream34-plugin-prs:
 	python3 tests/test_upstream34_plugin_prs.py
 
+.PHONY: test-nmplugin-surface-commit-wait
+test-nmplugin-surface-commit-wait:
+	python3 tests/test_nmplugin_surface_commit_wait.py
+
 $(TEST_BIN_DIR)/test_upstream34_alias_policy: tests/test_upstream34_alias_policy.cpp src/phxaccel/PhxHardwarePolicy.hpp Makefile | $(TEST_BIN_DIR)
 	$(CXX) -std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined \
 		-fno-sanitize-recover=all -fno-omit-frame-pointer $< -o $@

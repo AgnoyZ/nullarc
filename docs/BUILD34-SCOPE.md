@@ -39,3 +39,10 @@ applied. This extends only four nmplugin source files from the accepted
 checkpoint; original34 kernel, ABI, production helper and A1/A2/corrected-A3
 behavior remain preserved. It is source integration, not hardware promotion:
 the IB result and existing GPU/desktop HOLDs remain unchanged.
+
+The subsequent PR28 wait-timing request adds a separately tested,
+[bounded publication-wait source adaptation](BUILD34-PR28-WAIT-TIMING.md).
+It remains explicitly opt-in and always excludes WindowServer. Expiry is
+reported as publication unconfirmed and does not retire pending work or forge
+completion. This does not promote the default wait policy, change the native
+fence timing, authorize deployment/GPU work or resolve the existing HOLDs.
