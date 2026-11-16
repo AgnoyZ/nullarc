@@ -25,3 +25,8 @@ GPU test was executed and no reboot was requested during that preparation or
 this scope correction. Old one-use hardware scopes remain consumed. Existing
 installation, recovery, privacy, licensing and explicit-execution boundaries
 continue to apply; this scope correction does not arm a new hardware trial.
+
+The subsequent [MEC range diagnostic](BUILD34-MEC-RANGE-DIAGNOSTIC.md) keeps
+one upstream initialization lead available as original34-only offline tooling
+on this branch. It does not change the production helper/kernel, adopt a
+hardware fix or restore either withdrawn candidate.

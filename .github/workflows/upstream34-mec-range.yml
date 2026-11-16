@@ -1,0 +1,22 @@
+name: Original build34 MEC range source candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-candidate:
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          # The recipe reads the fixed default-branch checkpoint, not a moving ref.
+          fetch-depth: 0
+      - name: Exercise pinned source and actual CLI with fake IOKit only
+        run: make test-upstream34-mec-range
+      - name: Retain original layout and shell refusal regressions
+        run: make test-upstream34-layout
+      - name: Compile and sign the two native helpers without executing them
+        run: python3 tools/upstream34_layout/mec_range.py build/upstream34-mec-range-native --compile
+      # No native helper execution, installation, firmware or binary artifact upload.

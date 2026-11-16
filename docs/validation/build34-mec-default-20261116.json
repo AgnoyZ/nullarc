@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "passed-offline-original34-diagnostic-only",
+  "branch": "upstream34/vram-layout-fix",
+  "approved_source_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "source_parent": "1ce58b16bce585d079273871a1b390f63d16a6c8",
+  "host": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "architecture": "x86_64"
+  },
+  "upstream_recheck": {
+    "checked_at": "2026-11-16T21:56:44.742254+08:00",
+    "main_commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+    "main_commit_UTC": "2026-11-09T00:59:45Z",
+    "kernel_same_as_default34": true,
+    "kernel_sha256": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+    "PR": 14,
+    "PR_head": "9f37791bb816092df580f3cb62a9db1e2357fb8f",
+    "PR_state": "open",
+    "PR_merged": false
+  },
+  "diagnostic": {
+    "fixed_source_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "source_inputs_sha256": {
+      "mesboot.c": "7a1e4de45589a40b3259bd33a790d9d537498e139fa56719145438801320a21f",
+      "PhxUpstream34Layout.h": "2f7e3124a99e97469debc9ee5d9bb760092c769ef530f99814257bc314f54de1",
+      "mes_v11_api_def.h": "7b1b1e895e0faba305f1832bb815c617b51cbbdc6701dea4aa2084b52806b71a",
+      "csb_gfx11.h": "f7400527d24ec6a60200ab670a2a78ac0f123d11dda4cc6b745a48e7b1e0d805"
+    },
+    "protected_production_file_count": 47,
+    "protected_production_inputs_sha256": "3376808bee49c9dd07c8746f75ff8efae0a262e95f280f175265170053f038c4",
+    "candidate_mesboot_sha256": "b15cfec9e0b709117b88c3c640a1c8b208a0c4b8598cd91e494ac9550c8077fb",
+    "native_user_helper_binaries_sha256": {
+      "mesboot-mec-range": "30a37a5a90a6bcb0c8023083c549351f66ac68d6fc870b393f7e695cb359ca31",
+      "mesboot-control": "18b2f416f48988773d4d8945d2efa5152970f42fdd61896bc56c0ad89647517c"
+    },
+    "policies": {
+      "control": 0,
+      "mec-range": 1
+    },
+    "command": "kiqsched",
+    "source_insertions": 2,
+    "upper_register_dword": 12381,
+    "upper_value_byte_offset": 1104,
+    "lower_register_dword": 12380,
+    "lower_value_byte_offset": 0,
+    "ordinary_initialization_modified": false,
+    "kernel_ABI_modified": false
+  },
+  "checks": {
+    "source_and_result_methods": 8,
+    "actual_C_ASan_UBSan_cases": 148,
+    "actual_C_cases_by_policy": {
+      "control": 64,
+      "mec-range": 84
+    },
+    "exact_case_set_verified_without_duplicates": true,
+    "compile_policy_refusals": 3,
+    "original_layout_shell_methods": 20,
+    "skipped_methods": 0,
+    "linked_real_IOKit_in_host_tests": false,
+    "native_compile_signed_signature_arch_verified": 2,
+    "native_warning_per_policy": "unchanged unused val",
+    "complete_src_and_production_helpers_and_licenses_match_checkpoint": true,
+    "manual_workflow_dispatched": false
+  },
+  "source_sha256": {
+    "Makefile": "9603b0e5482272e54f1c41bdd7cae22f2fa58cbbcd8a77aaf5661cd69ad06ed4",
+    ".github/workflows/upstream34-mec-range.yml": "5176bfab182b5d04710f4578a6eab4d247fb0cd03b1a6ff4736e1e40ea1cb8c0",
+    "tools/upstream34_layout/mec_range.py": "ece685b3e70efb4e9dd13b0c92c09c4189ca97c38e93b46f2b494987df75c941",
+    "tools/upstream34_layout/PhxMecDoorbellRangeTrial.h": "3216e5ba6898d5aafbeb80ed3108fa03a3975fed5a4c60150c49be3fc6580081",
+    "tools/test_upstream34_mec_range.py": "8e863275653c06f32f704fdf6393b8260642522e3d28a5adcfb15e95afe49893",
+    "tests/test_upstream34_mec_range_runner.py": "b1a92202ad88b7ece2e525d9e73a375081372c7051f28daac39d877a6db99e27",
+    "tests/fixtures/upstream34_mec_range_fake_iokit.c": "ebd3a828c754202d452f89b11741a62181b11432372c3f8ee785c21f5412bed9"
+  },
+  "local_check_receipts": [
+    {
+      "name": "mec-source-and-actual-CLI",
+      "exit_code": 0,
+      "log_sha256": "908609f3bd47616287d8df6d41a164a7b76f1212045e752bcde885741d0fd9c8"
+    },
+    {
+      "name": "original-layout-shell",
+      "exit_code": 0,
+      "log_sha256": "37a73cca328a113ad66f92531c6fea798fb73453a17a255fc9a7eb2b31a6d887"
+    },
+    {
+      "name": "native-original34-user-helper-pair",
+      "exit_code": 0,
+      "log_sha256": "0a32a4d16da2a908ef3adb14b169979ad8c532497a7efcbf3aacdca87fe0248c"
+    },
+    {
+      "name": "diff-whitespace",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "execution_boundary": {
+    "native_binaries_executed": false,
+    "driver_compiled": false,
+    "installed": false,
+    "loaded": false,
+    "GPU_executed": false,
+    "startup_job_created": false,
+    "new_hardware_scope_armed": false,
+    "reboot_requested": false,
+    "withdrawn_build41_build42_candidates_prepared_or_compiled": false,
+    "raw_diagnostics_or_binaries_published": false
+  },
+  "interpretation": {
+    "IB_wrong_value_fixed": false,
+    "CP_idle_validated": false,
+    "wait_promotion": "HOLD",
+    "accelerated_desktop": "HOLD",
+    "background_GUI_stability_validated": false,
+    "FPS_measured": false,
+    "experimental_range_writes_adopted_in_production_helper": false
+  },
+  "rollback": "Normal revert of the isolated diagnostic tooling addition; no installed changes.",
+  "limits": [
+    "Actual C entrypoints execute only with fake IOKit and stop at the first scheduler MQD write; no GPU or CP model is hardware evidence.",
+    "All old one-use policy scopes remain consumed. A new separately bounded original34 control must reproduce the fault and complete recovery before a separately authorized treatment.",
+    "The range-only upstream lead is unproven for this native IB trigger. No clock, power, scheduler-mask, timer, wait, lifetime, ABI, PTE or kernel packet change is included."
+  ]
+}
