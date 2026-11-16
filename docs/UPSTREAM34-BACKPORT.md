@@ -1,8 +1,30 @@
 # Isolated build-34 A1/A2/A3 backports
 
-Latest disposition, **2026-11-16 at 13:29 +08:00**: A1, then cumulative A1+A2,
-then **corrected A1+A2+A3 passed their bounded real-GPU gates** on macOS
-26.7.2 / 25G332. The corrected A3 image is installed and loaded in the native
+Latest disposition, **2026-11-16 after the 13:41:42 +08:00 watchdog**:
+**HOLD the cumulative candidate for the native accelerated desktop.** The owner
+reported mouse/GUI stutter during background work. A later WindowServer report
+from the same boot as the successful short trial records its main thread
+unresponsive for 40 seconds. Exact-image symbolication finds the compositor
+waiting for plugin scheduling while the plugin execution queue waits for a
+RADV/native-kext GPU fence. Another graphical process is in the same RADV wait
+path. The instruction or resource hazard responsible, and attribution to
+A1/A2/A3 versus the inherited stack, are not established.
+
+The machine subsequently booted at **13:42:23**; the new startup honored the
+existing GPU-off marker and now uses the firmware framebuffer, with no native
+framebuffer or accelerator nodes. The corrected candidate remains installed on
+disk but is not active as an accelerated desktop. The reboot initiator is not
+established: no managed recovery request or original hang-watchdog reboot
+receipt exists. Diagnosis issued no GPU submissions, initializer, live unload,
+driver write, security change or reboot. Keep GPU-off and the existing rollback
+copies; do not automatically rearm this consumed trial. The prior bounded
+functional results remain historical evidence and are **not daily-stability
+acceptance**. Evidence:
+`validation/upstream34-backport-post-gate-watchdog-20261116.json`.
+
+Earlier bounded checkpoint, **2026-11-16 at 13:29 +08:00**: A1, then cumulative
+A1+A2, then **corrected A1+A2+A3 passed their bounded real-GPU gates** on macOS
+26.7.2 / 25G332. The corrected A3 image was installed and loaded in the native
 accelerated desktop after the 13:21:10 boot. Timing is 2560 by 1600 at
 120,000 milliHz, with stable validated totals and a consistent estimated clock.
 One three-command Metal/IOSurface probe passed; desktop transactions continued
@@ -16,7 +38,7 @@ backups remain available. GPU-off is restored and persistent display arming is
 absent for a conservative next boot. The default branch is unchanged. These
 results establish bounded execution, not an FPS gain, physical scanout-rate
 measurement, long-duration stability or sleep/wake validation. The chronological
-checkpoints below retain their original scope. Latest sanitized evidence:
+checkpoints below retain their original scope. Evidence for that checkpoint:
 `validation/upstream34-backport-a3-refresh-hardware-20261116.json`.
 
 Owner request: 2026-11-16. Candidate branch: `backport/upstream34-a1-a3`,
@@ -704,3 +726,68 @@ separate direct live callback invocation was made. No game FPS, physical
 scanout cadence, sleep/wake or long-duration stability result is claimed.
 Sanitized evidence:
 `validation/upstream34-backport-a3-refresh-hardware-20261116.json`.
+
+### Post-gate background-work stutter: WindowServer watchdog; desktop held
+
+The owner reported mouse and GUI stutter after the preceding short regression.
+At 13:38:37 a system snapshot still showed **68.35 percent CPU idle**, roughly
+**10 GB unused memory**, zero swap usage and no recorded thermal warning. At
+13:39:17 the prior accelerated session still had zero transaction failures and
+copy skips, one unchanged WindowServer and no new matching diagnostics. These
+snapshots precede the failure; they are not a synchronized capture and cannot
+exclude transient CPU contention or establish the watchdog's cause. In
+particular, zero display-copy errors do not establish GPU-fence progress.
+
+The **13:41:42.7421** WindowServer watchdog report belongs to the exact earlier
+corrected-A3 trial boot. It identifies the main thread as unresponsive for
+**40 seconds**. Symbolication against locally verified matching plugin/RADV
+images resolves the main-thread plugin frames to:
+
+```text
+commitAndWaitUntilSubmitted
+  -> waitUntilScheduled
+```
+
+The execution queue is not ready to schedule further work; its captured chain
+includes:
+
+```text
+nvmtl_pump_buffers -> nvmtlAdvancePart -> nvmtl_gsub_finish
+  -> nvmtl_vk_submit_finish -> vk_common_WaitForFences
+  -> __vk_sync_wait_many -> vk_drm_syncobj_wait_many -> sync_wait
+  -> acd_backend_wait_seq -> acd_kext_wait_seq -> IOKit call
+```
+
+The report also contains one other graphical process waiting in the same RADV
+native sequence-wait function. This identifies a blocked submission/completion
+path, not the first offending GPU instruction, a proven queue deadlock, or a
+specific A1/A2/A3 regression. No new GPU workload was submitted to reproduce it.
+The inherited `nvmtl_vk_submit_finish` wait policy is unchanged from the default
+baseline: absent an environment override, WindowServer has a 5-second budget
+but a ten-budget, nominal **50-second** give-up point. That exceeds the observed
+40-second watchdog interval. The actual failed process's environment was not
+captured. The native wait caps each request at two seconds but counts requested
+sleep/delay durations rather than actual elapsed time; scheduler overshoot can
+stretch that request. Neither source observation alone proves the initiating
+failure. Shortening a timeout without preserving uncertain in-flight resources
+or merely changing the VBL/SSE knobs is not an established repair.
+
+The next actual boot at **13:42:23** honored GPU-off. Independent readback finds
+**zero** PhxAMDFB, NMXAccel and IOAccelerator nodes and **one** firmware
+framebuffer. Native display arming, M2 and pending markers are absent. The
+original startup files and the installed corrected accelerator/AuxKC still
+match their recorded inputs. No prior-trial recovery intent or original
+hang-watchdog reboot record exists, so this document does not claim the agent
+or either watchdog initiated the reboot. The short trial is not replayed, and
+its earlier success/failure receipts are preserved.
+
+The A1/A2/A3 implementation order remains useful source history, but the
+**daily native-desktop adoption recommendation is suspended for the entire
+cumulative stack**. Highest priority is now a controlled multi-client
+submission/fence-progress investigation with actual elapsed wait deadlines,
+safe retention on uncertainty and input/compositor latency evidence. The current
+firmware session is containment and is not evidence that accelerated GUI
+stutter is fixed. No direct firmware/native interactive A/B, FPS gain,
+long-duration stability or sleep/wake result is claimed. Public evidence is a
+sanitized summary; raw reports, process/image identifiers and address-bearing
+stackshots remain local.

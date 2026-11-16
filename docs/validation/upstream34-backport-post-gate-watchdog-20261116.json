@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-16",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "result": "hold-native-desktop-after-post-gate-WindowServer-watchdog",
+  "source_candidate_commit": "4279b238bc76e4a78a4f42394a1170f926131431",
+  "prior_bounded_gate_commit": "294a62c31ca8eda35e03188bb6f4bd043c5a7100",
+  "earlier_bounded_gate_retained_as_historical": true,
+  "user_report": "Mouse and GUI stutter during background tasks",
+  "watchdog_local": "2026-11-16T13:41:42.7421+08:00",
+  "same_boot_as_earlier_corrected_A3_trial": true,
+  "WindowServer_main_thread_no_checkin_seconds": 40,
+  "symbolication_images_match_exact_local_files": true,
+  "WindowServer_main_plugin_stack": [
+    "-[NVMTLCommandBuffer waitUntilScheduled]",
+    "-[NVMTLCommandBuffer commitAndWaitUntilSubmitted]"
+  ],
+  "WindowServer_execution_plugin_stack": [
+    "nvmtl_vk_submit_finish",
+    "nvmtl_gsub_finish",
+    "-[NVMTLCommandBuffer(EventSubmission) nvmtlAdvancePart]",
+    "__nvmtl_pump_buffers_block_invoke_2"
+  ],
+  "WindowServer_execution_RADV_stack": [
+    "iokit_call",
+    "kcall",
+    "acd_kext_wait_seq",
+    "acd_backend_wait_seq",
+    "sync_wait",
+    "vk_drm_syncobj_wait_many",
+    "__vk_sync_wait_many",
+    "vk_common_WaitForFences"
+  ],
+  "additional_processes_observed_in_same_RADV_wait_seq": 1,
+  "CPU_load_snapshot_before_hang": {
+    "local": "2026-11-16T13:38:37+08:00",
+    "CPU_idle_percent": 68.35,
+    "unused_memory_approx_GB": 10,
+    "swap_used_MB": 0,
+    "recorded_thermal_warning": false,
+    "not_a_time_synchronized_causal_capture": true
+  },
+  "last_counter_snapshot_before_hang": {
+    "local": "2026-11-16T13:39:17+08:00",
+    "failed_transactions": 0,
+    "copy_skips": 0,
+    "new_relevant_reports": 0,
+    "these_counts_do_not_exclude_later_GPU_fence_stalls": true
+  },
+  "inherited_source_wait_policy": {
+    "WindowServer_default_budget_ms": 5000,
+    "give_up_multiplier": 10,
+    "default_nominal_give_up_ms": 50000,
+    "actual_process_environment_not_captured": true,
+    "kernel_max_requested_wait_ns": 2000000000,
+    "kernel_wait_uses_sum_of_requested_delays_instead_of_actual_elapsed_time": true,
+    "source_policy_not_proven_trigger_of_this_failure": true
+  },
+  "subsequent_boot_local": "2026-11-16T13:42:23+08:00",
+  "subsequent_boot_is_new": true,
+  "reboot_initiator_not_established": true,
+  "prior_trial_managed_recovery_not_requested": true,
+  "original_hang_watchdog_reboot_receipt_absent": true,
+  "current_native_node_counts": {
+    "PhxAMDFB": 0,
+    "NMXAccel": 0,
+    "IOAccelerator": 0,
+    "IONDRVFramebuffer": 1
+  },
+  "current_desktop": "firmware-framebuffer-GPU-off",
+  "current_startup_kill_switch_verified": true,
+  "candidate_still_installed_on_disk": true,
+  "GPU_off_present": true,
+  "persistent_display_arming_absent": true,
+  "pending_absent": true,
+  "original_startup_unchanged": true,
+  "diagnosis_GPU_submissions": 0,
+  "diagnosis_initializers": 0,
+  "diagnosis_reboots_requested": 0,
+  "diagnosis_security_changes": 0,
+  "diagnosis_driver_writes": 0,
+  "isolated_cause_between_A1_A2_A3_not_established": true,
+  "daily_desktop_recommendation": "hold-entire-cumulative-candidate-pending-controlled-multi-client-fence-and-latency-validation",
+  "limitations": [
+    "A symbolicated wait stack identifies where progress is blocked, not the GPU instruction or resource hazard that caused it",
+    "The previous idle-resource and zero-error snapshots precede the watchdog and are not synchronized proof of its cause",
+    "Firmware fallback is containment; it is not a verified acceleration fix",
+    "No controlled A1/A2/A3 or firmware/native interactive A/B was run",
+    "No runtime knobs, live unload, GPU retry, initializer or reboot was requested during diagnosis"
+  ],
+  "verified_local": "2026-11-16T13:53:51.825051+08:00"
+}
