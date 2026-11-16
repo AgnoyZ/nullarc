@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "offline-validation-passed-not-hardware-tested",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "default_branch_checkpoint": {
+    "branch": "upstream34/vram-layout-fix",
+    "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "wait_fix_present": false,
+    "modified_by_this_change": false
+  },
+  "comparison": {
+    "target_kext_build": 34,
+    "ABI": "1.12",
+    "policies": ["reuse", "fresh"],
+    "maximum_dispatches_per_invocation": 2,
+    "contexts": 1,
+    "GTT_BO_bytes": 16384,
+    "pre_staged_IB_byte_offsets": [4096, 4608],
+    "IB_bytes_each": 320,
+    "common_output_byte_offset": 8208,
+    "output_bytes": 1024,
+    "full_validation_extent_bytes": 16384,
+    "controlled_factor": "rewrite and reuse slot 0 versus select immutable pre-staged slot 1 on pass 1",
+    "new_reuse_fixture_identical_to_previous_frozen_probe": false,
+    "new_reuse_must_reproduce_before_fresh_comparison": true,
+    "canonical_acceptance_probe_changed": false,
+    "driver_ABI_shader_and_licenses_changed": false
+  },
+  "source_binding": {
+    "base_commit": "e0f7bf757a0792656d6ed94168d482c0fcfc6211",
+    "clean_source_only_validation_snapshot": "ca79c02def2c22b0e44138a5a57641505f8dcc40",
+    "final_source_files_match_tested_snapshot": true,
+    "source_sha256": {
+      "tools/native_ib_freshness_probe.cpp": "d26d2796c479a42ce38bd569f2669db85e27d4dbdc9a5ee9cbd3c5bd6db1b97f",
+      "tools/test_native_ib_freshness.py": "30536d6c2392ce5784083e291c0c4a2cd6959504b24b1627cc0ec20462a30bff",
+      "tests/test_native_shader_probe.cpp": "36e27ceeba5bb2d9dd850e989397dcb88f5fa25234ca2ef3fc5dc830ad61c1ef",
+      "tests/test_native_ib_freshness_runner.py": "03b3f2769a02168785aa5bc23e271e400b339cf988820f2f164dc30111346164",
+      "tests/fake_native_iokit/mach/mach_time.h": "0fc63904e56d34cc549cb328a331895e2e894d131436aafa025741bf2614f2ae",
+      "src/phxbringup/PhxNativeABI.h": "05c1feb4a825e6bf8b3212a2b46275430bf51c03a36753509594c66e5bbeaef6",
+      "tools/native_shader_probe.cpp": "89f40d19aa2fd4768ccea3d654b5cb6cca25abcc14d829dda5f00f480a21fe17",
+      "tools/phxctl/gfx11_shader_probe.h": "eb149f8747332471f8f9c92754c43f51bc209c439fbd297b2404eb232dbba5a1"
+    },
+    "identity_ABI_transport_helpers_identical_to_reviewed_build34_adapter": true,
+    "finish_and_failure_HOLD_identical_to_reviewed_build34_adapter": true
+  },
+  "host_validation": {
+    "focused_runner_tests": {
+      "result": "passed",
+      "new_diagnostic_tests": 7,
+      "canonical_tests": 9,
+      "total": 16
+    },
+    "actual_Cpp_diagnostic_ASan_UBSan": {
+      "result": "passed",
+      "cases_per_policy_and_VA": 1072,
+      "policies": ["reuse", "fresh"],
+      "VA_variants": ["low", "upper"],
+      "scenarios": 4288,
+      "complete_Cartesian_set_and_no_duplicates_verified": true,
+      "extra_IB_word_faults_per_combination": 80,
+      "legacy_run_refused_before_device_access": true,
+      "pending_wait_budget_order_and_positive_retirement_checked": true,
+      "exercise_failure_HOLD_and_no_further_cleanup_checked": true,
+      "injected_stale_output_and_stale_IB_fetch_models": true,
+      "report_sha256": "51090b5e32fc29b2342cffb7b7bf1195d5fd5b3014b3f819eefbb21d583921ba"
+    },
+    "actual_Cpp_canonical_ASan_UBSan_regression": {
+      "result": "passed",
+      "cases_per_VA": 985,
+      "VA_variants": ["low", "upper"],
+      "scenarios": 1970,
+      "complete_Cartesian_set_and_no_duplicates_verified": true,
+      "report_sha256": "9aae80f1944e21746f36dffb81749d3e3beef5d1cf32ae2fc9268ba30fd3999c"
+    },
+    "native_framework_build": {
+      "result": "passed",
+      "architecture": "x86_64",
+      "real_IOKit_CoreFoundation_linked": true,
+      "warnings_as_errors": true,
+      "binary_sha256": "58ecc533768f7843df2cff9d2b83631b87d0b92c8a744726fe88a3d31abb43d6",
+      "compiled_only": true,
+      "binary_executed_including_check_mode": false
+    },
+    "private_controller_helper_regression": {
+      "result": "passed",
+      "clock_child_processes": 3,
+      "invalid_clock_samples_rejected": 6,
+      "competing_recovery_processes": 6,
+      "mocked_recovery_dispatches": 1,
+      "immediate_HOLD_detection": true,
+      "recovery_observer_GPU_retry_refused": true,
+      "unapproved_prepare_refused": true,
+      "actual_system_commands": 0,
+      "controller_runtime_scope_pending": true,
+      "new_root_packet_or_startup_job_present": false
+    },
+    "CI_new_step": "manual source-tests workflow, fake IOKit simulation only"
+  },
+  "operations_for_this_change": {
+    "native_probe_executions_including_check_mode": 0,
+    "GPU_initializations": 0,
+    "GPU_dispatches": 0,
+    "driver_installations": 0,
+    "EFI_or_kext_replacements": 0,
+    "reboots": 0,
+    "desktop_takeover": false,
+    "public_binary_uploads": 0,
+    "raw_evidence_published": false
+  },
+  "acceptance": {
+    "GPU_cache_root_cause_established": false,
+    "wait_candidate_hardware_gate_passed": false,
+    "wait_candidate_default_promotion_permitted": false,
+    "background_load_stability_established": false,
+    "FPS_measured": false,
+    "accelerated_desktop_HOLD_cleared": false
+  },
+  "limits": [
+    "Fake IOKit, a synthetic clock and injected GPU results test the actual C++ control flow, not GPU ISA execution, GPUVM translation or real cache coherence.",
+    "The new reuse fixture pre-stages both IBs and stops after two dispatches; it must reproduce the previous failure before a fresh-policy result can narrow that failure.",
+    "A future fresh-policy pass would not distinguish rewritten-command visibility from command caching or prefetch, and would not establish driver, desktop, frame-rate or long-run stability acceptance.",
+    "The earlier hardware scope is closed and consumed. The new private controller remains unarmed, and preparation remains blocked pending a new explicitly bounded runtime scope.",
+    "No raw diagnostics, firmware, EFI, image identifiers, personal paths or binaries are included."
+  ]
+}

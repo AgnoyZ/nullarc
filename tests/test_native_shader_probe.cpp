@@ -4,12 +4,30 @@
 #include <string>
 #include <vector>
 #include <sys/utsname.h>
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+#include <unistd.h>
+struct TrialHold {};
+static int fake_pause() { throw TrialHold{}; }
+static int fake_usleep(useconds_t delay) { assert(delay == 250000); return 0; }
+#define pause fake_pause
+#define usleep fake_usleep
+#endif
 static int fake_uname(struct utsname *);
 #define uname fake_uname
 #define main native_probe_main
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+#include "../tools/native_ib_freshness_probe.cpp"
+#else
 #include "../tools/native_shader_probe.cpp"
+#endif
 #undef main
 #undef uname
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+#undef pause
+#undef usleep
+static bool freshPolicy;
+static unsigned waitAttempt;
+#endif
 
 static std::string fault;
 static bool upper, failed, opened, mapped, gpuMapped;
@@ -112,7 +130,7 @@ static kern_return_t respond(const std::string &name, uint32_t *count, size_t *s
     }
     return 0;
 }
-static void checkStaged(unsigned pass) {
+static void independentPacket(uint8_t *destination, unsigned pass) {
     const uint32_t pattern[] = {0x7800c0deu ^ pass, 0x13579bdfu + pass, 0x2468ace0u ^ (pass << 16), 0xc001d00du - pass};
     const uint64_t code = virtualBase() & ((1ull << 48) - 1), target = code + 0x2010;
     const uint32_t packet[] = {
@@ -129,9 +147,18 @@ static void checkStaged(unsigned pass) {
         0xc0017602u, 0x215, 0, 0xc0031502u, 1, 1, 1, 1, 0xffff1000u, 0xffff1000u
     };
     static_assert(sizeof(packet) == 320, "independent native IB recipe");
+    memcpy(destination, packet, sizeof(packet));
+}
+static void checkStaged(unsigned pass) {
+    const uint32_t pattern[] = {0x7800c0deu ^ pass, 0x13579bdfu + pass, 0x2468ace0u ^ (pass << 16), 0xc001d00du - pass};
     uint8_t image[16384]; memset(image, 0xa5, sizeof(image)); memset(image, 0, 8192);
     memcpy(image, phxGfx11ClearShader, sizeof(phxGfx11ClearShader));
-    memcpy(image + 4096, packet, sizeof(packet));
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+    independentPacket(image + 0x1000, freshPolicy ? 0 : pass);
+    independentPacket(image + 0x1200, 1);
+#else
+    independentPacket(image + 4096, pass);
+#endif
     for (unsigned i = 0; i < 256; ++i) {
         const uint32_t value = ~pattern[i & 3]; memcpy(image + 0x2010 + i * 4, &value, 4);
     }
@@ -147,6 +174,9 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         assert(in && inCount == 2 && in[0] == 1 && in[1] == PHXN_HELLO_F_MINOR && !data && !dataBytes &&
             out && outCount && *outCount == 4 && !reply && !replyBytes);
         out[0] = PHXN_ABI_VERSION | (uint64_t)PHXN_ABI_MINOR << 16; out[1] = 12; out[2] = 64; out[3] = 8;
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+        out[1] = 34;
+#endif
         if (is("hello-abi")) ++out[0];
         if (is("hello-limit")) --out[2];
         if (is("hello-vmid")) --out[3];
@@ -156,6 +186,9 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         assert(!in && !inCount && !data && !dataBytes && !out && !outCount && reply && replyBytes && *replyBytes == 192);
         auto &info = *static_cast<phxn_info *>(reply); info = {};
         info.abi_version = 1; info.kext_build = 12; info.vmid = 8; info.gc_version = (11u << 16) | 1;
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+        info.kext_build = 34;
+#endif
         info.reserved[2] = PHXN_ABI_MINOR; info.max_ibs = 64;
         info.flags = PHXN_INFO_NATIVE_BOOT | PHXN_INFO_S1B_POSITIVE;
         info.va_low_first = 0x402134500000ull; info.va_low_last = info.va_low_first + 0xffff;
@@ -235,8 +268,13 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         assert(!in && !inCount && data && dataBytes == 64 && out && outCount && *outCount == 1 && !reply && !replyBytes);
         phxn_cs_in header; phxn_cs_ib ib;
         memcpy(&header, data, 32); memcpy(&ib, static_cast<const uint8_t *>(data) + 32, 32);
+        uint64_t offset = 4096;
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+        if (freshPolicy && submitted == 2) offset = 0x1200;
+        waitAttempt = 0;
+#endif
         assert(header.abi == 1 && header.ctx_id == 7 && header.num_ibs == 1 && !header.flags && !header.fence_handle &&
-            !header.fence_offset && !header.reserved && !ib._pad && !ib.flags && ib.va_start == virtualBase() + 4096 &&
+            !header.fence_offset && !header.reserved && !ib._pad && !ib.flags && ib.va_start == virtualBase() + offset &&
             ib.ib_bytes == 320 && ib.ip_type == 1 && !ib.ip_instance && !ib.ring);
         checkStaged(submitted - 1); out[0] = 0x100000000ull + submitted;
         if (is(name + "-zero")) out[0] = 0;
@@ -245,11 +283,27 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         break;
     }
     case PHXN_SEL_WAITSEQ: {
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+        if (!waitAttempt) ++waited;
+        name = "wait-" + std::to_string(waited); event(name);
+        const uint64_t budget[] = {0, 50000, PHXN_WAIT_CAP_NS};
+        assert(waitAttempt < 3 && in && in[1] == budget[waitAttempt]);
+        const unsigned attempt = waitAttempt++;
+#else
         name = "wait-" + std::to_string(++waited); event(name);
+#endif
         const uint64_t sequence = 0x100000000ull + waited;
-        assert(waited == submitted && in && inCount == 3 && in[0] == sequence && in[1] == PHXN_WAIT_CAP_NS && !in[2] &&
+        assert(waited == submitted && in && inCount == 3 && in[0] == sequence && !in[2] &&
             !data && !dataBytes && out && outCount && *outCount == 3 && !reply && !replyBytes);
+#ifndef PHX_IB_FRESHNESS_DIAGNOSTIC
+        assert(in[1] == PHXN_WAIT_CAP_NS);
+#endif
         out[0] = 0; out[1] = out[2] = sequence;
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+        if ((is(name + "-pending-short") && attempt == 0) || (is(name + "-pending-cap") && attempt < 2)) {
+            out[0] = 1; --out[1]; break;
+        }
+#endif
         if (is(name + "-timeout")) out[0] = 1;
         if (is(name + "-retired")) --out[1];
         if (is(name + "-last")) out[1] = UINT64_MAX;
@@ -258,6 +312,17 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         const unsigned pass = waited - 1;
         const uint32_t pattern[] = {0x7800c0deu ^ pass, 0x13579bdfu + pass, 0x2468ace0u ^ (pass << 16), 0xc001d00du - pass};
         for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &pattern[i & 3], 4);
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+        // Explicitly injected stale-data models, not ISA/cache emulation.
+        if (pass == 1 && (is("stale-output-2") || (is("stale-ib-fetch-2") && !freshPolicy))) {
+            const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
+            for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &previous[i & 3], 4);
+        }
+        if (fault.compare(0, 5, "slot-") == 0 && pass == 1) {
+            const unsigned index = static_cast<unsigned>(std::stoul(fault.substr(5)));
+            assert(index < 80); backing[0x1200 + index * 4] ^= 1;
+        }
+#endif
         for (const auto &prefix : {std::string("code"), std::string("ib"), std::string("output"), std::string("byte")}) {
             const std::string start = prefix + "-" + std::to_string(waited) + "-";
             if (fault.compare(0, start.size(), start) == 0) {
@@ -317,18 +382,40 @@ static void packetInputs() {
     assert(packet[78] == 0xa5a5a5a5 && packet[79] == 0xa5a5a5a5 && packet[80] == 0xa5a5a5a5);
 }
 int main(int argc, const char *argv[]) {
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+    assert(argc == 4); freshPolicy = !strcmp(argv[3], "fresh"); assert(freshPolicy || !strcmp(argv[3], "reuse"));
+#else
     assert(argc == 3); upper = !strcmp(argv[1], "upper"); assert(upper || !strcmp(argv[1], "low")); fault = argv[2];
+#endif
+    upper = !strcmp(argv[1], "upper"); assert(upper || !strcmp(argv[1], "low")); fault = argv[2];
     packetInputs();
     const char *args[] = {"native-shader-probe", "--run", "--upper", "extra"}; int count = upper ? 3 : 2;
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+    args[1] = freshPolicy ? "--run-fresh" : "--run-reuse";
+#endif
     if (is("check-ok")) args[1] = "--check";
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+    if (is("legacy-run")) args[1] = "--run";
+#endif
     if (is("arg-missing")) count = 1;
     if (is("arg-mode")) args[1] = "--wat";
     if (is("arg-option")) { count = 3; args[2] = "--wat"; }
     if (is("arg-many")) count = 4;
     char *arguments[4];
     for (unsigned i = 0; i < 4; ++i) arguments[i] = const_cast<char *>(args[i]);
-    const int result = native_probe_main(count, arguments);
+    int result;
+#ifdef PHX_IB_FRESHNESS_DIAGNOSTIC
+    try {
+        result = native_probe_main(count, arguments);
+        assert(!propertyLive && !opened && !mapped);
+    } catch (const TrialHold &) {
+        // Test-only escape from pause(): production keeps the process/resources.
+        assert(opened && !propertyLive); event("hold"); result = failed ? 74 : 75;
+    }
+#else
+    result = native_probe_main(count, arguments);
     assert(!propertyLive && !opened && !mapped);
+#endif
     fputs("fake-native-shader-summary {\"events\":[", stderr);
     for (size_t i = 0; i < events.size(); ++i) fprintf(stderr, "%s\"%s\"", i ? "," : "", events[i].c_str());
     fputs("]}\n", stderr);

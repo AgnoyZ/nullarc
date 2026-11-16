@@ -101,6 +101,8 @@ jobs:
         run: python3 tools/test_shader_probe.py --out build/shader-probe-tests
       - name: Exercise native GPUVM shader acceptance with fake IOKit and GPU writes
         run: python3 tools/test_native_shader_probe.py --out build/native-shader-probe-tests
+      - name: Exercise both IB freshness policies with fake IOKit and GPU writes
+        run: python3 tools/test_native_ib_freshness.py --out build/native-ib-freshness-tests
   macos-kexts:
     runs-on: macos-15-intel
     timeout-minutes: 90

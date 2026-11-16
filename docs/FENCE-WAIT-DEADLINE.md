@@ -311,6 +311,13 @@ remains in force. Sanitized hashes, observations and explicit limits are in
 The earlier candidate, identical-binary control and host-only records remain
 historical records; they have not been rewritten with the newly observed byte.
 
+A separate [two-policy IB freshness diagnostic](NATIVE-IB-FRESHNESS-DIAGNOSTIC.md)
+is now prepared offline. It compares rewriting/reusing one IB slot with selecting
+a pre-staged immutable slot while keeping the output BO/address and verification
+unchanged between those policies. Its new reuse fixture must reproduce the
+failure first. No new hardware scope is armed and no result from that tool is
+part of the historical trials above.
+
 ## Offline build40 validation boundary and rollback
 
 Run the canonical committed-source harness and source checks from a clean tree:
