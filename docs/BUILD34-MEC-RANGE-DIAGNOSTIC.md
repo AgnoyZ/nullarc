@@ -1,8 +1,9 @@
 # Default build34 MEC range diagnostic
 
-Status on 2026-11-16: the separately authorized original34 control reproduced
-the reused-IB wrong value and completed recovery. The MEC-range treatment has
-not run. This diagnostic does not establish a fix for the native reused-IB
+Status on 2026-11-16: separately authorized original34 control and MEC-range
+treatment scopes both reproduced the same reused-IB wrong value and completed
+recovery. The range-only treatment did not fix this trigger. This diagnostic
+does not establish a fix for the native reused-IB
 wrong value, mouse/GUI stalls or FPS.
 The default branch remains `upstream34/vram-layout-fix`, with the accepted
 A1/A2/corrected-A3 changes. Build41/build42 remain withdrawn.
@@ -198,4 +199,46 @@ All raw logs, register samples, firmware, binaries and machine identifiers
 remain private. This control is consumed. Any MEC-range treatment needs a
 different explicit single-use scope with the same common observations and an
 independent recovery path; it cannot be started by this control. IB repair,
+wait promotion and accelerated desktop remain on HOLD.
+
+## Single-use MEC-range treatment result
+
+After the control was retired, the owner explicitly authorized a different
+single-use treatment: one original34 initialization, at most two guarded
+dispatches and at most one recovery reboot. It used default commit
+`fef96cc64dc82ce2cf7c1b98aaa0f1bef025c60a`, the same original34 driver image,
+frozen native probe, original initialization stages and common observations.
+The actual OS remained macOS 26.7.2, build `25G332`. No driver deployment,
+global-helper replacement, CPU load, concurrent client or display takeover
+was performed.
+
+The helper's only treatment was the proposed upper/lower MEC range writes
+with immediate and separate readbacks. The pre-treatment range matched the
+control. All six post-adoption samples retained the proposed range, different
+from the control; original compute, graphics and adoption checks also passed.
+Nevertheless, native pass 0 passed and pass 1 failed at `0x2010`, actual
+`0xde`, expected `0xdf`: exactly the control's mismatch. The native probe
+entered HOLD without a retry. The treatment does not establish global CP/GPU
+idle, and range readbacks do not establish native integrity.
+
+One recovery reboot returned to the original34 GPU-off/firmware-framebuffer
+state. Independent result and final checks passed, and the consumed job was
+removed. The retirement tool call timed out after 30 seconds, so its completed
+exclusive retirement receipt was observed before the final check; retirement
+and GPU work were not retried. EFI's 347 files (148 Microsoft files), 46
+protected files, two links, security settings and kernel collections remained
+unchanged. No new matching diagnostic report was found. Raw evidence remains
+private; see the [sanitized treatment record](validation/build34-mec-treatment-20261116.json).
+
+The private controller checks included rejection of an unexpected pre-range,
+refusal to submit if the target range was not retained, and the existing
+single-use recovery/HOLD protections. Three CPU-only executions of the actual
+verifier result/export code covered mismatch, bounded PASS and an incomplete
+initialization, including a regression for the previous export-stage shadowing
+error. These are containment checks, not simulated hardware validation.
+
+For this specific reused-IB trigger, the measured range-only intervention is
+insufficient. This does not test or reject every other change in upstream
+PR #14. Do not adopt the range writes into ordinary initialization or claim
+an IB, GUI-stability or FPS fix from this result. Both new scopes are consumed;
 wait promotion and accelerated desktop remain on HOLD.
