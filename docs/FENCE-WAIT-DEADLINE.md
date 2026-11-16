@@ -7,6 +7,10 @@ integrity gate; it is **not accepted or promoted to the default branch**. See
 An identical-probe original build34 control subsequently reproduced the same
 second-dispatch failure; neither result establishes its cause or accepts the
 wait candidate.
+A later logging-only build34 diagnostic captured pass 1's first output byte:
+actual `0xde`, expected `0xdf`. It matches pass 0's expected first byte, but
+does not establish stale-cache, stale-command or fence-ordering causation. See
+[the byte diagnostic below](#original-build34-byte-diagnostic).
 The cumulative A1/A2/A3 native-desktop candidate remains on HOLD after the
 post-gate WindowServer watchdog. This change does not establish the cause of
 that hang or demonstrate a frame-rate or interactive-latency improvement.
@@ -222,13 +226,90 @@ for that adapter on this older kernel.
 The passing clean-snapshot checks comprise nine focused Python tests, 1,970
 actual-C++ ASan/UBSan simulations and native compilation of both the repository
 probe and a private build34 HOLD adapter. Neither compiled native binary was
-executed. Source hashes and validation limits are in
+executed during that host validation. The separate authorized adapter trial
+below subsequently failed the output gate. Source hashes and host-validation limits are in
 [the diagnostic validation record](validation/native-shader-mismatch-diagnostics-20261116.json).
 
 Cache visibility, buffer reuse and fence/data ordering remain investigation
 leads. Do not bypass the integrity check, globally enable costly cache flushing,
 or claim a frame-rate/stability fix. Raw diagnostics, image identifiers,
 firmware, EFI and binaries remain private.
+
+## Original build34 byte diagnostic
+
+The owner separately authorized one current-boot original34 initialization,
+the logging-enhanced single-client HOLD adapter with a maximum of 32 dispatches,
+and at most one recovery. No EFI/kext replacement, preliminary reboot, desktop
+takeover, tuning, CPU workers or concurrent-client phase was performed. Exact
+original build34 and probe hashes were independently admitted on macOS
+26.7.2 / 25G332. The sole probe-source delta from the prior frozen control is
+the single-read mismatch log described above; its packet builder, buffer layout,
+patterns, waits, 250-ms inter-dispatch pause and failure HOLD are unchanged.
+
+Original compute/graphics outputs and both queue adoptions passed. Pass 0
+verified all 16 KiB. Pass 1 reported positive retirement and stopped at the first
+output byte, BO-relative offset `0x2010`:
+
+| Observation | Byte |
+| --- | --- |
+| Pass 1 actual, captured once by the failing comparison | `0xde` |
+| Pass 1 expected, low byte of `0x7800c0de ^ 1` | `0xdf` |
+| Pass 0 expected first output byte | `0xde` |
+| Pass 1 complement-initialized first output byte | `0x20` |
+
+Only this first mismatching byte was logged; the rest of the output was not
+captured. The CPU comparison matched the current expected code, IB and guard
+prefix through byte 8207 before failing at 8208. That confirms neither which
+commands the GPU fetched nor visibility of the complete GPU result. In particular,
+one byte matching the previous pattern does not prove the entire previous output
+was replayed or that CPU cache invalidation is the missing operation.
+
+| Pass (zero based) | Budget | Pending | Elapsed |
+| --- | --- | --- | --- |
+| 0 | 0 ns | yes | 6,482 ns |
+| 0 | 50,000 ns | no | 29,897 ns |
+| 1 | 0 ns | yes | 8,265 ns |
+| 1 | 50,000 ns | no | 22,171 ns |
+
+The two-second cap path was not reached. The same three read-only tunables were
+zero after initialization and before the probe; no failing-submission or
+post-failure sample was collected. Immediate FAIL/HOLD detection preserved the
+connection and mappings. One serialized recovery completed; the startup observer
+performed no GPU work. Independent result, retirement and final-state checks
+verified the original image, 347 EFI files, 148 Microsoft files, 46 protected
+files, two links and security/kernel collections unchanged. No new matching
+diagnostic report was found. The consumed job was removed and GPU-off plus the
+firmware framebuffer remain. The one-init/one-probe/one-recovery scope is closed;
+no follow-up GPU trial is armed.
+
+The offline investigation order is now:
+
+1. **Repeated-buffer and command freshness.** The probe rewrites the same BO and
+   embeds each pass's pattern directly in its IB. Audit CPU-to-GPU IB visibility,
+   GPU command/constant fetching and GPU-to-CPU output visibility together. A
+   future diagnostic must isolate one of these directions with one controlled
+   change and independent expected data; this run cannot choose a cache fix.
+2. **Execution and retirement ordering.** Keep a correct-output requirement
+   separate from sequence completion. Audit the compute IB and kernel completion
+   fence path before treating retirement as proof that the new pattern ran.
+3. **Elapsed-wait acceptance.** The original kernel and the timer candidate have
+   both failed the same repeated-dispatch integrity gate. Keep the timing backport
+   isolated until its own full gate passes; a byte observation on original34
+   cannot accept it or establish a mouse/GUI/frame-rate improvement.
+
+Source review of the default build34 confirms `doSubmit` and successful
+`doWaitSeq` call `flushBos()`, while that helper returns immediately for mode 0.
+The IB builder already emits `ACQUIRE_MEM`, and `gpuSubmit` appends `RELEASE_MEM`.
+These facts explain why both visibility directions and ordering remain open;
+they do not justify globally enabling costly BO flushing or changing packet bits
+without a controlled test. No production code or tuning changed in this trial.
+
+The default branch remains `64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c` with
+A1/A2/corrected-A3. Wait promotion remains blocked and accelerated-desktop HOLD
+remains in force. Sanitized hashes, observations and explicit limits are in
+[the byte diagnostic record](validation/upstream34-native-byte-diagnostic-20261116.json).
+The earlier candidate, identical-binary control and host-only records remain
+historical records; they have not been rewritten with the newly observed byte.
 
 ## Offline build40 validation boundary and rollback
 

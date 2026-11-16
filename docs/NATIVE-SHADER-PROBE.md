@@ -4,7 +4,12 @@
 the Darwin RADV backend. Unlike the raw VMID0 debug-ring shader probe, this
 candidate allocates a client context and GTT BO, maps GPU virtual addresses,
 submits an indirect buffer and waits for the native retirement sequence.
-**No target execution has been verified. This is not an installable driver.**
+**The canonical probe has no accepted target run. This is not an installable driver.**
+A separate build34 HOLD adapter verified one dispatch and failed the second;
+its logging-enhanced diagnostic captured actual `0xde` versus expected `0xdf`
+at offset `0x2010`. The first failing byte matches the previous pass's expected
+byte, without establishing the cause. See
+[the build34 byte diagnostic](FENCE-WAIT-DEADLINE.md#original-build34-byte-diagnostic).
 
 ## Preconditions and scope
 
@@ -66,6 +71,11 @@ the older original build34 requires a separate reviewed HOLD adapter that retain
 failed GPU resources until bounded recovery. The original34 control and elapsed
 wait candidate used identical frozen adapters; see
 [their comparison](FENCE-WAIT-DEADLINE.md#original-build34-control).
+The later logging-only adapter preserved the same packets, guards and HOLD. It
+also failed pass 1 and used its single recovery; that scope is closed and is not
+a passing canonical-probe or wait-candidate acceptance result. Its sanitized
+observations are recorded in
+[the separate diagnostic record](validation/upstream34-native-byte-diagnostic-20261116.json).
 
 After two complete verified passes, cleanup is CPU unmap, GPU unmap, BOFREE,
 CTX free, then client close. A failure at any cleanup step suppresses success
@@ -100,7 +110,8 @@ event transcript, exact C++/ABI/header hashes, eight runner outcomes and
 preflight completed successfully, which requires real-framework C++17
 compilation and check-only refusal 4. This is an observed step result;
 the full native build and detailed binary/hash reports remain unverified.
-No probe has executed GPU work on the target laptop.
+That CI validation performed no GPU work on the target laptop. The later manual
+build34 adapter trials above are separate failed hardware-integrity results.
 
 The first source CI (`41170266892`, code `6cea778`) compiled the actual C++
 probe but failed its test accounting for a parsed wrong vendor: the identity

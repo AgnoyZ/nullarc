@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "original34-logging-diagnostic-failed-output-integrity",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "default_branch_checkpoint": {
+    "branch": "upstream34/vram-layout-fix",
+    "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "wait_fix_present": false
+  },
+  "scope": {
+    "owner_authorized": true,
+    "kext_build": 34,
+    "ABI": "1.12",
+    "current_boot_initializations": 1,
+    "maximum_single_client_dispatches": 32,
+    "preliminary_reboots": 0,
+    "EFI_or_kext_replacements": 0,
+    "CPU_load_workers": 0,
+    "concurrent_client_phases": 0,
+    "tuning_writes": 0,
+    "desktop_takeover": false,
+    "recovery_boot_limit": 1
+  },
+  "source_and_binary": {
+    "original_executable_sha256": "4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412",
+    "private_HOLD_probe_source_sha256": "daa5873df30f50ba35902eef9d36b31ebea89235ca0fa5f4a331d9c99c27c340",
+    "private_HOLD_probe_executable_sha256": "94511a7df42b1fba559bcfd3cfc4685158bdda000ce72fde8fc7e76a462e9b3f",
+    "sole_source_change_from_prior_frozen_probe": "capture the same mismatching observed byte once and log pass/actual/expected",
+    "shader_packets_layout_patterns_waits_and_HOLD_unchanged": true,
+    "repository_probe_executed": false
+  },
+  "initializer": {
+    "exit_code": 0,
+    "original_compute_and_graphics_outputs_passed": true,
+    "both_queue_adoptions_passed": true
+  },
+  "native_probe": {
+    "submitted_dispatches": 2,
+    "fully_guarded_dispatches_verified": 1,
+    "output_bytes": 1024,
+    "second_dispatch_retirement_reported_complete": true,
+    "first_mismatch": {
+      "pass_zero_based": 1,
+      "BO_relative_byte_offset": 8208,
+      "actual_byte": 222,
+      "expected_byte": 223,
+      "matches_previous_pass_expected_first_byte": true,
+      "current_pass_poison_first_byte": 32,
+      "matches_current_pass_poison": false,
+      "whole_output_captured": false
+    },
+    "CPU_visible_prefix_verified_bytes_before_first_mismatch": 8208,
+    "wait_observations": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 6482
+      },
+      {
+        "pass": 0,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 29897
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 8265
+      },
+      {
+        "pass": 1,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 22171
+      }
+    ],
+    "two_second_cap_wait_calls": 0,
+    "PASS_present": false,
+    "failed_probe_resources_retained_until_recovery": true,
+    "full_validation_extent_bytes": 16384
+  },
+  "read_only_after_initialization": {
+    "user_client_sysctls_registered_before_capture": true,
+    "values": {
+      "debug.phxbos_flush": 0,
+      "debug.phxbos_flush_bytes": 0,
+      "debug.phx_hang_kills": 0
+    },
+    "capture_precedes_native_probe": true,
+    "values_during_or_after_failed_probe_captured": false
+  },
+  "supervision": {
+    "cross_process_clock": "unrebased mach_absolute_time ticks with timebase, boot and nonce validation",
+    "independent_deadline_seconds": 300,
+    "HOLD_detected_immediately": true,
+    "serialized_single_recovery": true,
+    "recovery_boots_used": 1,
+    "automatic_GPU_retry": false,
+    "recovery_boot_GPU_calls": 0,
+    "consumed_job_removed": true,
+    "private_evidence_preserved": true
+  },
+  "recovery": {
+    "original_build34_exact_image": true,
+    "EFI_unchanged_files": 347,
+    "Microsoft_files_unchanged": 148,
+    "OpenCore_configuration_unchanged": true,
+    "protected_files_unchanged": 46,
+    "protected_links_unchanged": 2,
+    "security_and_kernel_collections_unchanged": true,
+    "GPU_off_and_firmware_framebuffer_retained": true,
+    "new_matching_diagnostic_reports": 0,
+    "raw_evidence_published": false
+  },
+  "interpretation": {
+    "first_byte_matches_previous_pattern": true,
+    "whole_output_equals_previous_pattern_proven": false,
+    "root_cause_established": false,
+    "stale_CPU_cache_proven": false,
+    "stale_GPU_IB_fetch_proven": false,
+    "GPU_execution_or_fence_ordering_cause_proven": false,
+    "candidate_hardware_gate_passed": false,
+    "candidate_default_promotion_permitted": false,
+    "background_load_stability_established": false,
+    "FPS_measured": false,
+    "accelerated_desktop_HOLD_cleared": false
+  },
+  "private_receipt_hashes": {
+    "probe_stdout_sha256": "658adaae6a335c0d422795a428f9051d7af3744f99e5f1edb4af76ef4ec3b805",
+    "probe_stderr_sha256": "bf4bd3a6b04d0cb765ed657c54501c2eb97676f74d7e62d190b3319fea06cb44"
+  },
+  "limits": [
+    "The first failing byte matches the previous pass; only that byte is logged, not a whole-output dump or proof of a cache root cause.",
+    "CPU-visible code/IB/guard bytes before offset 8208 matched the current expected contents; this does not show what the GPU fetched.",
+    "The original control and wait candidate already failed at the same pass/offset, but those frozen probes did not log actual/expected bytes.",
+    "The two-second timeout path, concurrent clients and CPU-load phase were not exercised. This diagnostic cannot accept the wait candidate.",
+    "One initialization and one recovery scope are consumed. No GPU retry occurred after recovery; no more trial is armed.",
+    "No raw diagnostics, firmware, EFI, image identifiers, personal paths or binaries are included."
+  ],
+  "offline_source_audit": {
+    "default_kernel_source_sha256": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+    "dispatch_helper_source_sha256": "eb149f8747332471f8f9c92754c43f51bc209c439fbd297b2404eb232dbba5a1",
+    "doSubmit_calls_flushBos": true,
+    "completed_doWaitSeq_calls_flushBos": true,
+    "flushBos_mode_zero_returns_without_cache_flush": true,
+    "dispatch_IB_contains_ACQUIRE_MEM": true,
+    "kernel_appends_RELEASE_MEM": true,
+    "packet_presence_proves_visibility": false,
+    "production_source_or_tuning_changed": false
+  },
+  "controller_host_regression": {
+    "result": "passed",
+    "enhanced_probe_pinned": true,
+    "single_use_admission_present": true,
+    "immediate_HOLD_detection": true,
+    "clock_child_processes": 3,
+    "invalid_samples_rejected": 6,
+    "competing_recovery_processes": 6,
+    "mocked_recovery_dispatches": 1,
+    "recovery_observer_no_GPU_retry": true,
+    "actual_system_commands": 0,
+    "GPU_calls": 0,
+    "EFI_writes": 0
+  }
+}
