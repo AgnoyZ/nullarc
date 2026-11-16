@@ -239,3 +239,45 @@ This is **installed-awaiting-reboot**, not A2 hardware acceptance. No A2 GPU
 test or reboot has occurred at this checkpoint, and A3 is not installed.
 A separate one-use startup observation and an exact loaded-image check are
 required before running the bounded GPU regression or advancing to A3.
+
+### A2: fresh one-use boot observation prepared
+
+A new root-owned external witness has passed its actual launchd preparation
+role and independent readback. It verifies **2,137 pinned files**, including
+2,079 inherited inputs after removing the independently archived, retired job.
+Only the three authorized inherited file hashes differ: the A1 plugin image and
+the A2 kext's image/Info.plist. The complete A1/A2 installed bundles, inactive
+original bundles, original backups, candidate AuxKC, original helpers/firmware,
+runtime, frozen interpreter and unchanged bring-up image are checked.
+All **61 CPU/permission tests** and **18 WindowServer access checks** passed;
+preparation has issued zero GPU commands and no reboot.
+
+The initial unarmed preparation was retired with no reboot or GPU attempt:
+its idle-only dispatch template did not admit the original startup's legitimate
+long-running post-startup watchdog. A distinct new packet verifies that
+watchdog's exact launchd PID/command, current accepted startup block, unchanged
+WindowServer, no pending initialization and the existing successful boot
+receipts. It preserves the watchdog. Unknown running jobs remain a refusal.
+The full real arming admission was independently executed up to, but excluding,
+its first mutation. No consumed prior trial is replayed.
+
+The packet permits one ordinary reboot/native-desktop attempt, one GPU-probe
+process (three commands, each with a 15-second completion deadline and a
+55-second outer process limit), a 300-second independent observation deadline,
+and at most one managed recovery reboot. It uses the existing startup and its
+specific one-boot display arming; it never invokes an initializer in the
+preparation boot, resets NVRAM, writes EFI or changes OS security. The witness
+restores GPU-off and removes persistent display rearming after original startup
+crosses its off-marker gate. Software deadlines cannot guarantee recovery from
+a hard hardware hang.
+
+Acceptance requires original queue/adoption evidence, the actual loaded A2
+kernel identity, original Metal publication, the retained A1 plugin's actual
+loaded identity and correct real GPU output, native framebuffer, increasing
+present and VBL counters, no new failed/copy-skipped transactions during the
+sample, one stable WindowServer and no new matching diagnostic reports. FPS
+and physical panel cadence are not measured. Arming/dispatch receipts and the
+actual next-boot result must be read before claiming a restart or A2 hardware
+success. **At this preparation checkpoint the packet is not armed and A3 is
+not installed.** Evidence:
+`validation/upstream34-backport-a2-boot-preparation-20261116.json`.
