@@ -1,4 +1,9 @@
-# Default branch: original build 34 plus the VRAM layout correction
+# Original build-34 / VRAM-layout baseline checkpoint
+
+This document records historical checkpoint `90bb06f`. Subsequent owner-authorized
+A1/A2/corrected-A3 default-branch changes are recorded in
+[UPSTREAM34-BACKPORT](UPSTREAM34-BACKPORT.md). The unchanged-source claims below
+refer to that original checkpoint, not the current plugin/accelerator sources.
 
 ## Source identity
 

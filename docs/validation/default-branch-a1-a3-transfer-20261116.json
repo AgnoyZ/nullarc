@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-16",
+  "delivery_branch": "upstream34/vram-layout-fix",
+  "baseline": "90bb06f6f9255cb5a16cc5eb87e78032566b2000",
+  "candidate_commit": "6f593b54457ceba5a378e88f2279eeadac4c9390",
+  "transfer_method": "fast-forward-existing-validated-candidate-history-and-update-documentation",
+  "existing_candidate_commits_preserved": 18,
+  "source_commits": {
+    "a1": "11cb1445b90dc3620afef313f1a811eb3b27e7d7",
+    "a2": "79c0a0f486cc9e0e4bbbde80916cc495b9043127",
+    "a3_original": "d40d2ecaf232b94b9b91c2360310b70c40fd32b2",
+    "a3_correction": "4279b238bc76e4a78a4f42394a1170f926131431"
+  },
+  "production_source_sha256": {
+    "src/nmplugin/NVMTLEventSync.m": "9b6ad5bfe9f65f00bcaf57106a14240f04dd94ec47f6956f768a5f670264f07f",
+    "src/nmplugin/NVMTLObjects.m": "a9404474144d48b06560698203081e5a144cb40028197c0c223f2f7ee4995567",
+    "src/nmplugin/nvmtl_sampler_key.h": "c5aa2f4f7900abead21b2fb486f413ce16ba6747295f8865cff6089ece546b2e",
+    "src/nmplugin/nvmtl_surface_key.h": "de4157a84d82917cebd580ec13d778b0cff0817d6a84975df7b7ea1f7351ed66",
+    "src/nmplugin/nvmtl_vk.c": "db894d5d958de775aab0a2259b625a4875f92bb183a14217bb93584d956ead58",
+    "src/nmplugin/nvmtl_vk.h": "c08a7abfd550cbdbb2eece73105e967b237ad160b579d6763fba6a1d17867c0d",
+    "src/phxaccel/PhxHardwarePolicy.hpp": "b98b0e7803a42d34f02e17fd97801dc7cc2c02bbe75d896368001fcb7195677e",
+    "src/phxaccel/accel/phx_panel_timing.h": "940cf03cada4fc876733dfae95a0b6112d6324baceb781c2e19b0d99f872859b",
+    "src/phxaccel/accel/phxfb.cpp": "5883d6bdd0f53a8c6d16f015d2f0ed98da90731b83ad7a2b92d10dc80d746c50"
+  },
+  "matches_corrected_A3_source_receipt": true,
+  "protected_baseline_areas_unchanged": [
+    "src/phxbringup",
+    "tools/phxctl",
+    "LICENSE",
+    "LICENSES",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "owner_explicitly_waived_repeat_tests": true,
+  "additional_tests_after_no_retest_instruction": 0,
+  "additional_builds_after_no_retest_instruction": 0,
+  "transfer_installed": false,
+  "transfer_loaded": false,
+  "transfer_GPU_executed": false,
+  "transfer_rebooted": false,
+  "prior_hardware_evidence_sha256": {
+    "docs/validation/upstream34-backport-a1-hardware-20261116.json": "287644d487cc123491b2599132a79bea8cf9810f3c388f396a5197db674cf47a",
+    "docs/validation/upstream34-backport-a2-hardware-20261116.json": "c20f1b1578d6bb5a81f7a255e5c3fd1d985b824cba9436ead0e0666928236ede",
+    "docs/validation/upstream34-backport-a3-refresh-correction-20261116.json": "cd29f266dcbc69c243b20abe9a908be6cd8885589d955217c5bec4832f82ab83",
+    "docs/validation/upstream34-backport-a3-refresh-hardware-20261116.json": "80884278d566741c46a4313a89f37ba0631cd9fdb94cb7a26f0af1a53fd503b0",
+    "docs/validation/upstream34-backport-post-gate-watchdog-20261116.json": "8f42369c3ebaa20f8b57c6fc9e5347f5d2504b2a0e41e7b26b7c19fae5539aac"
+  },
+  "native_desktop_adoption": "HOLD-after-post-gate-WindowServer-watchdog",
+  "FPS_improvement_claimed": false,
+  "unrelated_downstream_changes_merged": false,
+  "fence_wait_deadline_fix_included": false
+}

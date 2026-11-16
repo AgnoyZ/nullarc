@@ -1,17 +1,19 @@
-> **当前为独立回移候选 `backport/upstream34-a1-a3`。** 从默认分支分出，
-> A1 → A2 → A3 已依次通过主机测试与原生构建；build 34 的 PhxBringup、ABI 和启动工具保持不变。
-> 主机测试与原生构建不代表已安装或通过真实 GPU 验证。
-> 进度、测试与回退见 [UPSTREAM34-BACKPORT](docs/UPSTREAM34-BACKPORT.md)。
+> **默认分支 `upstream34/vram-layout-fix`：build 34 基线＋显存地址修复＋A1/A2/修正版 A3。**
+> 2026-11-16 已将 `backport/upstream34-a1-a3` 的既有提交与实机验证记录迁入，
+> 包含 A3 的 2 秒采样修正；按所有者要求，迁入操作不再重复测试。
+> PhxBringup、内核 ABI 和启动工具保持基线不变；插件与加速器源码已包含指定回移。
+> **候选在短时实机通过后发生 WindowServer watchdog，原生加速桌面继续 HOLD。**
+> 迁入不代表卡顿已解决或帧率提高；本次不安装、加载或重启。
+> [回移内容、既有验证与回退](docs/UPSTREAM34-BACKPORT.md) ·
+> [原始显存修复基线](docs/UPSTREAM34-LAYOUT-CORRECTION.md)。
+> 以下上游参考机器的表现不代表本机长期稳定性或本次迁入的帧率结果。
 >
-> **此 fork 的默认分支：原版 build 34＋显存地址修复。** 基于上游
-> `v0.4.0-alpha`（`9dd76b6`），内核、加速器和 Metal 插件源码保持原版；
-> 仅修复用户态启动工具中的显存映射及必要的错误检查。
-> [修复范围与验证边界](docs/UPSTREAM34-LAYOUT-CORRECTION.md)。
-> 以下上游参考机器的加速表现不代表本机已通过测试。
->
-> **Fork default: upstream build 34 plus the VRAM layout correction.**
-> Development work remains on `downstream/780m-tahoe`. No binaries are published
-> by this branch, and local GPU/desktop success is not established by CPU tests.
+> **Default: build-34 baseline, VRAM layout correction and A1/A2/corrected A3.**
+> The existing candidate commits and hardware records are preserved. No repeat
+> testing is required for this source transfer. Native accelerated desktop
+> adoption remains on HOLD after the post-gate WindowServer watchdog.
+> General downstream development remains on `downstream/780m-tahoe`.
+> This branch publishes no binaries.
 
 <p align="center">
   <picture>

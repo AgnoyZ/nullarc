@@ -1,4 +1,30 @@
-# Isolated build-34 A1/A2/A3 backports
+# Default-branch build-34 A1/A2/A3 backports
+
+Default-branch delivery, **2026-11-16**: the owner requested promotion of the
+already hardware-tested A1, A2 and corrected A3 to `upstream34/vram-layout-fix`,
+explicitly without repeat testing. The default branch fast-forwards from
+`90bb06f6f9255cb5a16cc5eb87e78032566b2000` through all 18 existing candidate
+commits to `6f593b54457ceba5a378e88f2279eeadac4c9390`, retaining their original
+order, source gates, hardware trials, correction and subsequent HOLD record.
+The delivery documentation commit adds no driver changes. All nine changed
+production source files are byte-identical to the corrected-A3 source receipt.
+PhxBringup, native ABI, user tools, licence files and third-party notices remain
+baseline-identical. No additional tests, builds, installation, loading, GPU work
+or reboot are performed after the owner's no-retest instruction.
+
+Promoted changes:
+
+- **A1** (`11cb144`): reusable sampler/surface keys and descriptor masks.
+- **A2** (`79c0a0f`): checked framebuffer pool release/fallback and bounded alias retry.
+- **Corrected A3** (`d40d2ec` plus `4279b23`): read-only panel timing with the
+  two-second refresh sample; the rejected short-window-only A3 is not the final tree.
+
+Existing real-GPU results below are retained in their original scope, including
+the later watchdog. They are not a new runtime acceptance or an FPS claim.
+Source-transfer evidence: [default-branch-a1-a3-transfer-20261116.json](validation/default-branch-a1-a3-transfer-20261116.json).
+Normal source rollback reverts dependent stages in reverse order; it does not
+restore installed bundles or AuxKC. This transfer preserves the existing GPU-off
+state and runtime backups. The native accelerated desktop remains on **HOLD**.
 
 Latest disposition, **2026-11-16 after the 13:41:42 +08:00 watchdog**:
 **HOLD the cumulative candidate for the native accelerated desktop.** The owner
@@ -35,16 +61,16 @@ recorded. Its separate 2-second sampling correction passed all 15 source/native
 checks and this new one-use boot trial. The external trial job is now retired,
 the original startup/watchdog remains unchanged, and exact A2 bundle/cache
 backups remain available. GPU-off is restored and persistent display arming is
-absent for a conservative next boot. The default branch is unchanged. These
-results establish bounded execution, not an FPS gain, physical scanout-rate
+absent for a conservative next boot. At that trial checkpoint the default branch
+was unchanged. These results establish bounded execution, not an FPS gain, physical scanout-rate
 measurement, long-duration stability or sleep/wake validation. The chronological
 checkpoints below retain their original scope. Evidence for that checkpoint:
 `validation/upstream34-backport-a3-refresh-hardware-20261116.json`.
 
 Owner request: 2026-11-16. Candidate branch: `backport/upstream34-a1-a3`,
 based on default checkpoint `90bb06f6f9255cb5a16cc5eb87e78032566b2000`.
-The default branch itself is unchanged. Complete A1 tests before changing A2,
-then complete A2 tests before changing A3. Each stage is a separate commit.
+At the original candidate checkpoint the default branch was unchanged. Complete
+A1 tests before changing A2, then complete A2 tests before changing A3. Each stage is a separate commit.
 
 All three source/native gates passed in that order. A1 checkpoint: `11cb144`;
 A2 checkpoint: `79c0a0f`; A3 is the final cumulative candidate. Reproduce A1/A2
