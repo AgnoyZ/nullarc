@@ -1,0 +1,78 @@
+{
+  "date": "2026-11-16",
+  "stage": "a2",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "source_checkpoint": "79c0a0f486cc9e0e4bbbde80916cc495b9043127",
+  "result": "passed-bounded-fresh-boot-A2-hardware-validation",
+  "verified_local": "2026-11-16T12:15:44.953583+08:00",
+  "trial_boot_local": "2026-11-16T12:12:11+08:00",
+  "acceptance_local": "2026-11-16T12:14:13.833117+08:00",
+  "fresh_boot": true,
+  "loaded_A2_image_exact": true,
+  "original_bringup_build": 34,
+  "original_bringup_identity_and_geometry_exact": true,
+  "contract_pins_verified_before_retirement": 2137,
+  "probe": {
+    "target_PCI_verified": true,
+    "loaded_plugin_image_verified": true,
+    "completed_commands": 3,
+    "sampler_slots": [
+      0,
+      15
+    ],
+    "IOSurface_sampled_pixels": 32,
+    "verified_channels": 128
+  },
+  "probe_exit": 0,
+  "frames": {
+    "before": 3810,
+    "after": 4691,
+    "delta": 881,
+    "interval_seconds": 12.966278791427612,
+    "VBL_delta": 1553,
+    "failed_transactions": 0,
+    "copy_skips": 0,
+    "single_WindowServer_unchanged": true,
+    "new_matching_diagnostic_reports": 0
+  },
+  "native_framebuffer_active": true,
+  "original_queue_results_and_adoption_passed": true,
+  "original_backups_still_exact": true,
+  "security_and_Boot_System_KCs_unchanged": true,
+  "windowserver_file_access_checks": 18,
+  "GPU_off_restored": true,
+  "persistent_display_arming_absent": true,
+  "pending_absent": true,
+  "managed_recovery_requested": false,
+  "external_idle_job_archived_and_removed": true,
+  "verification_GPU_calls": 0,
+  "verification_reboot_requests": 0,
+  "A3_installed": false,
+  "FPS_measured": false,
+  "kernel_observations": {
+    "read_only_kernel_log_check": true,
+    "alias_sample_results": [
+      {
+        "matching": 4096,
+        "sampled": 4096,
+        "nonzero": 14,
+        "accepted_by_production_condition": true
+      }
+    ],
+    "pool_sizes_MB_observed": [
+      512
+    ],
+    "alias_metadata_wait_observed": false,
+    "pool_release_refusals_observed": 0,
+    "GPU_calls": 0,
+    "FPS_measured": false
+  },
+  "automatic_retry": false,
+  "limitations": [
+    "Transaction and synthetic VBL counters are not physical scanout or game FPS measurements",
+    "A bounded fresh-boot regression does not establish long-duration stability or sleep/wake",
+    "The accepted A1 plugin is retained; this is cumulative A1+A2 acceptance",
+    "No automatic GPU retry was performed; A3 was not installed at this checkpoint"
+  ]
+}

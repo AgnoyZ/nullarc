@@ -281,3 +281,40 @@ actual next-boot result must be read before claiming a restart or A2 hardware
 success. **At this preparation checkpoint the packet is not armed and A3 is
 not installed.** Evidence:
 `validation/upstream34-backport-a2-boot-preparation-20261116.json`.
+
+### A2: fresh-boot loading and bounded real GPU/desktop regression passed
+
+The one initial reboot was dispatched once and its daemonized root scheduler
+was independently verified. The actual fresh boot began at **12:12:11 +08:00
+on 2026-11-16**. The witness accepted the trial at 12:14:13; independent
+readback completed at 12:15:44. Both the exact A2 accelerator image and the
+unchanged original build-34 bring-up image/geometry were verified in the loaded
+kernel. Original startup completed its expected compute/graphics results,
+queue adoption and accelerator claim without fallback.
+
+The retained A1 plugin passed the identical real GPU regression in a new
+process: PCI 1002:1900 and the actual plugin image matched, three commands
+completed, and all 128 channels from IOSurface sampler slots 0/15 matched.
+The native framebuffer and accelerator were active, with the firmware
+framebuffer absent. Across a 12.966-second observation interval, present
+transactions increased from **3,810 to 4,691** and synthetic VBL ticks increased
+by 1,553. Failed transaction and copy-skip counters were both zero, the same
+single WindowServer remained active, and no new matching diagnostic report was
+found. These counters are **not a physical scanout or game FPS measurement**.
+
+Read-only current-boot kernel logs also show a 512 MB pool and an alias check
+with **4,096/4,096 matching samples, 14 nonzero**. This satisfies the production
+alias acceptance condition; no pool-release refusal was observed. It does not
+exercise every allocator boundary or demonstrate a causal FPS improvement.
+
+Independent readback checked all 2,137 contract pins before retiring only the
+idle external witness. Both original rollback bundles/cache remain exact;
+security settings and Boot/System KCs are unchanged. GPU-off is restored,
+native-display arming and pending markers are absent, and no managed recovery
+was requested. Readback itself performed no GPU submission or reboot. Public
+evidence: `validation/upstream34-backport-a2-hardware-20261116.json`.
+
+This passes the bounded cumulative A1+A2 fresh-boot regression, permitting A3
+installation after this evidence is synchronized. Long-duration stability,
+sleep/wake and FPS remain unmeasured. At this A2 acceptance checkpoint **A3 is
+not installed**; no A3 hardware success is implied.
