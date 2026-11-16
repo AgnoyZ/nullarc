@@ -318,3 +318,38 @@ This passes the bounded cumulative A1+A2 fresh-boot regression, permitting A3
 installation after this evidence is synchronized. Long-duration stability,
 sleep/wake and FPS remain unmeasured. At this A2 acceptance checkpoint **A3 is
 not installed**; no A3 hardware success is implied.
+
+### A3: disk installation independently verified; loaded kernel still A2
+
+A2 hardware evidence was synchronized as `fa14637` before A3 installation.
+All 180 A3 source/protected hashes still match its successful 15-check native
+gate, and eight focused installer admission/cache tests passed. The exact A3
+artifact was installed by atomic bundle exchange with the accepted A2 bundle
+and AuxKC backed up. A matching KDK built a separate private candidate cache
+without an authorization-skip option; no GPU initialization or reboot occurred.
+
+During that build the active AuxKC changed concurrently. The worker correctly
+refused publication and refused to overwrite the then-unrecognized cache; its
+failure/recovery-needed receipts remain unchanged. Independent readback found
+the intended A3 image and all 415 unrelated cached records unchanged, with no
+added or removed identifier. The active/private caches differ as binary files
+but their complete 416-record inspections match. Metadata, security settings,
+protected files and both A2 rollback backups also match. System logs contain
+concurrent kernelmanagerd requests, including an initial approval refusal and a
+later reboot-required response; the exact writer is not conclusively
+attributed. No approval bypass or security-setting change was performed.
+
+After freezing the active cache hash, rechecking every record, signature,
+protected input and backup, independent installation acceptance retained that
+verified cache without another cache write. A separate acceptance receipt
+supersedes the interrupted worker outcome without rewriting it. The root-owned
+A3 rollback helper passed its zero-write preflight against this exact state;
+its target is the successfully tested A2 bundle/cache. A2's own original-build34
+backups are preserved separately.
+
+The disk state is **A3 installed-awaiting-reboot**. The active kernel remains
+the exact accepted A2 image. GPU-off is present, display arming/pending markers
+are absent, and no A3 startup observation has been armed. A separate fresh-boot
+test must verify actual A3 loading, timing-property consistency and the retained
+GPU/desktop regression before reporting A3 hardware success. Evidence:
+`validation/upstream34-backport-a3-install-20261116.json`.
