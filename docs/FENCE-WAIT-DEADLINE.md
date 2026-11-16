@@ -92,8 +92,18 @@ fixture before editing production code left exactly the four failures above.
 An initial committed-source check also exposed the runner contract's fixed
 case-list index. It now checks the full list with named exceptions for legacy
 default-branch cases, so inserting a case cannot shift that boundary again.
-Final checks and source-bound results are recorded in
-`validation/fence-wait-deadline-20261116.json` after execution.
+Committed-source validation at `688e0cee0bbda3516e2de1f9ef38c4e9e3da572f` passed:
+
+- 729 Python source/runner tests, plus the focused six-test runner contract.
+- 123 context/wait, 82 BO, 86 queue-retirement and 71 VM-binding
+  ASan/UBSan cases: 362 actual-method scenarios in total.
+- Native build40 kernel compilation/linking against the pinned SDK. Three
+  shadow warnings are in unchanged queue adoption/submission code.
+- `git diff --check`, exact case sets and source/method/harness hash binding.
+
+Source-bound results and the interrupted earlier check are recorded in
+`validation/fence-wait-deadline-20261116.json`. All GPU/hardware flags
+remain false. The passing rerun supersedes the earlier runner-contract failure.
 
 ## Validation boundary and rollback
 

@@ -54,10 +54,79 @@
       "_mach_absolute_time",
       "_absolutetime_to_nanoseconds"
     ],
-    "warning_count": 3
+    "warning_count": 3,
+    "source_file_sha256": "2b62e0aa9d8c0a282dd5a4b91782da9dcb13da86ecaa1fc7396a42b05700a1e0",
+    "warnings": "Three shadow warnings in unchanged queue adoption/submission code; no warnings in changed wait method."
   },
   "canonical_committed_source_validation": {
-    "status": "pending"
+    "status": "passed",
+    "source_commit": "688e0cee0bbda3516e2de1f9ef38c4e9e3da572f",
+    "python_version": "3.13.18",
+    "suites": [
+      {
+        "suite": "python-context-contract",
+        "exit_code": 0,
+        "elapsed_seconds": 2.856,
+        "log_sha256": "df1d44f0455cbc034455a5faf4dbe521e27e58d466931126450def670aa8a248",
+        "tests_run": 6,
+        "unittest_final_status": "OK"
+      },
+      {
+        "suite": "context",
+        "exit_code": 0,
+        "elapsed_seconds": 26.063,
+        "log_sha256": "e3ca73e22fef84ca0e685bacdb96ef59e422e057866ff2e414d4b738fdca812f",
+        "cases": 123,
+        "all_cases_passed": true,
+        "hardware_executed": false,
+        "report_sha256": "e3ca73e22fef84ca0e685bacdb96ef59e422e057866ff2e414d4b738fdca812f"
+      },
+      {
+        "suite": "bo",
+        "exit_code": 0,
+        "elapsed_seconds": 18.731,
+        "log_sha256": "67ad8ef3e80b5b6b9d3ff57866689aafbe5a13bad51eb73aa09c46d45ee12640",
+        "cases": 82,
+        "all_cases_passed": true,
+        "hardware_executed": false,
+        "report_sha256": "67ad8ef3e80b5b6b9d3ff57866689aafbe5a13bad51eb73aa09c46d45ee12640"
+      },
+      {
+        "suite": "queue",
+        "exit_code": 0,
+        "elapsed_seconds": 19.189,
+        "log_sha256": "6904dd36ebf415c350adb379c4b6de67d596e14f52aa50d860445d5faab4eb84",
+        "cases": 86,
+        "all_cases_passed": true,
+        "hardware_executed": false,
+        "report_sha256": "6904dd36ebf415c350adb379c4b6de67d596e14f52aa50d860445d5faab4eb84"
+      },
+      {
+        "suite": "vm-binding",
+        "exit_code": 0,
+        "elapsed_seconds": 13.421,
+        "log_sha256": "74249d0530fb2ba599f3835b924999ad9ab68367b21a8ff46ec42655246702ed",
+        "cases": 71,
+        "all_cases_passed": true,
+        "hardware_executed": false,
+        "report_sha256": "74249d0530fb2ba599f3835b924999ad9ab68367b21a8ff46ec42655246702ed"
+      },
+      {
+        "suite": "python-source-tests",
+        "exit_code": 0,
+        "elapsed_seconds": 443.636,
+        "log_sha256": "512ee401068c14aebc1a086c9a41723e46902150fd87c05384ceb82c0c9758e4",
+        "tests_run": 729,
+        "unittest_final_status": "OK"
+      }
+    ],
+    "hardware_executed": false,
+    "kernel_loaded": false,
+    "exact_case_lists_verified_against_committed_runners": true,
+    "actual_method_source_and_harness_hashes_match_development_regression": true,
+    "total_actual_method_sanitizer_cases": 362,
+    "production_source_sha256": "2b62e0aa9d8c0a282dd5a4b91782da9dcb13da86ecaa1fc7396a42b05700a1e0",
+    "git_diff_check": "passed"
   },
   "default_branch_unchanged": {
     "branch": "upstream34/vram-layout-fix",
@@ -87,6 +156,24 @@
     "production_source_changed_for_this_failure": false,
     "log_sha256": "b8c414cc63503aa93b6ade84f3d73fe2c1182a26ccea1afafd7116e3889f5bfd",
     "runner_contract_fix_direct_development_check": "passed",
-    "full_rerun": "pending"
+    "full_rerun": "passed"
+  },
+  "read_only_final_system_state": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "native_node_counts": {
+      "PhxAMDFB": 0,
+      "NMXAccel": 0,
+      "IOAccelerator": 0,
+      "IONDRVFramebuffer": 1
+    },
+    "firmware_framebuffer_GPU_off_confirmed": true,
+    "changed_extracted_production_methods": [
+      "IOAccelPhxNativeClient::doWaitSeq"
+    ],
+    "ABI_and_license_files_unchanged": true,
+    "read_only_observation": true,
+    "GPU_submissions": 0,
+    "initializers": 0
   }
 }
