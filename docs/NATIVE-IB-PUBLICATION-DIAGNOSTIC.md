@@ -180,3 +180,8 @@ Default retains A1/A2/corrected-A3 at `64f3d99`. Wait promotion and accelerated
 desktop remain on HOLD. No GUI stability, FPS, two-second-cap wait or wait-fix
 acceptance is claimed. Source rollback is a normal revert of this isolated
 diagnostic addition; there is no installed driver change to undo.
+
+The subsequent [upstream solution review](UPSTREAM-SOLUTION-AUDIT-20261116.md)
+found no established fix for this native signature. It ranks a minimal MEC
+doorbell-range initialization candidate separately from BO lifetime, memory
+pressure and application-only IOSurface/cache changes; none is adopted here.

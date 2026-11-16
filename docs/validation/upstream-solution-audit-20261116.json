@@ -1,0 +1,262 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "upstream-source-review-only-no-established-native-fix",
+  "upstream": "luuumi-dev/nullarc",
+  "queried_at": "2026-11-16T20:00:11+08:00",
+  "main_and_PR_heads_rechecked_at": "2026-11-16T20:09:52+08:00",
+  "main_and_all_PR_heads_states_merge_statuses_unchanged_on_recheck": true,
+  "coverage": {
+    "all_state_PR_records": 19,
+    "non_PR_issue_records": 10,
+    "newest_main_commits_inspected": 100,
+    "complete_commit_history_review": false,
+    "all_current_closed_PR_records_fit_one_page": true,
+    "raw_API_responses_public": false
+  },
+  "upstream_main": {
+    "commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+    "committed_at": "2026-11-09T00:59:45Z",
+    "latest_release": "v0.4.0-alpha",
+    "release_published_at": "2026-11-09T00:50:22Z",
+    "no_new_PhxBringup_source_relative_to_default": true,
+    "adaptive_poll_already_present": "4459c4084f47fd3fd8409f046c27d0f7268e0111"
+  },
+  "local_checkpoints": {
+    "downstream_review_base": "6c531d94744f88488fe13da61cdcf8971ad59b95",
+    "default_branch": "upstream34/vram-layout-fix",
+    "default_commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "A1_A2_corrected_A3_present": true,
+    "PR17_global_wired_byte_cap_present_in_either_inspected_kernel": false,
+    "MEC_range_initialization_found_in_either_inspected_src_tools_tree": false,
+    "production_changes": false,
+    "default_branch_changed": false
+  },
+  "source_fingerprints": [
+    {
+      "commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "path": "src/phxbringup/PhxBringup.cpp",
+      "git_blob": "c8631642f1272ec0aec77b2c72422c4f79cc86a2",
+      "sha256": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5"
+    },
+    {
+      "commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "path": "tools/phxctl/mesboot.c",
+      "git_blob": "997eab803379f4b41927d270e5f1be77a876f60b",
+      "sha256": "d0e6e286e3c0c4e75d0ef2ef5c54253c605ad87ab3f4dccff297821e748609f9"
+    },
+    {
+      "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+      "path": "src/phxbringup/PhxBringup.cpp",
+      "git_blob": "c8631642f1272ec0aec77b2c72422c4f79cc86a2",
+      "sha256": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5"
+    },
+    {
+      "commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+      "path": "tools/phxctl/mesboot.c",
+      "git_blob": "fab65f5a95e14f842f3442ff4c7cb5de88c320f4",
+      "sha256": "7a1e4de45589a40b3259bd33a790d9d537498e139fa56719145438801320a21f"
+    },
+    {
+      "commit": "6c531d94744f88488fe13da61cdcf8971ad59b95",
+      "path": "src/phxbringup/PhxBringup.cpp",
+      "git_blob": "7f0116dfabe18f3cb546ee9ef33e62227340c090",
+      "sha256": "2b62e0aa9d8c0a282dd5a4b91782da9dcb13da86ecaa1fc7396a42b05700a1e0"
+    },
+    {
+      "commit": "6c531d94744f88488fe13da61cdcf8971ad59b95",
+      "path": "tools/phxctl/mesboot.c",
+      "git_blob": "0dfd2fea338a8986e9ac2dcf80dd157d91f21383",
+      "sha256": "91095574d5e265fd31173d5046b2876993a1279972a0189acc11a99f406b3650"
+    }
+  ],
+  "candidates": [
+    {
+      "PR": 14,
+      "head": "9f37791bb816092df580f3cb62a9db1e2357fb8f",
+      "state": "open",
+      "merged": false,
+      "priority": 1,
+      "decision": "MEC-doorbell-range-only-source-candidate",
+      "limit": "No matching native reuse/signature evidence; isolate from power policies.",
+      "changed_files": [
+        ".github/workflows/phxbringup-kext.yml",
+        "BUGS.md",
+        "Makefile",
+        "src/amd/phx_smu_pm.h",
+        "src/phxbringup/PhxBringup.cpp",
+        "src/phxbringup/PhxNativeABI.h",
+        "tests/test_phx_smu_pm.cpp",
+        "tools/phxctl/mesboot.c",
+        "tools/phxctl/pmwatch.sh"
+      ]
+    },
+    {
+      "PR": 18,
+      "head": "54e894f6cda42d8e2ee243b966ec4659c8f42d6f",
+      "state": "open",
+      "merged": false,
+      "priority": 2,
+      "decision": "reject-as-is-review-lifetime-safety",
+      "limit": "Default lacks downstream quarantine; preserve positive-retirement and reclaim gates.",
+      "changed_files": [
+        "src/phxbringup/PhxBringup.cpp"
+      ]
+    },
+    {
+      "PR": 17,
+      "head": "460c29ca15e6108f37f5b75192c46a75fa4db218",
+      "state": "open",
+      "merged": false,
+      "priority": 3,
+      "decision": "conditional-memory-pressure-review",
+      "limit": "No local PR17 global cap; separate check/increment does not make an atomic reservation.",
+      "changed_files": [
+        "src/phxbringup/PhxBringup.cpp"
+      ]
+    },
+    {
+      "PR": 16,
+      "head": "0ebda0dc13da7b658dea0c2e9688917ea13d4c25",
+      "state": "open",
+      "merged": false,
+      "priority": 4,
+      "decision": "conditional-app-surface-cache-review",
+      "limit": "Both inspected local branches retain the seven-element array key.",
+      "changed_files": [
+        "src/nmplugin/NVMTLDevice.m"
+      ]
+    },
+    {
+      "PR": 19,
+      "head": "f4623df5aefb5689dbd87fa50ac3b6d971ad8592",
+      "state": "open",
+      "merged": false,
+      "priority": 5,
+      "decision": "conditional-uncovered-shader-cache-review",
+      "limit": "Downstream already has separate bounded persistence for base records; do not overwrite it.",
+      "changed_files": [
+        "src/nmplugin/NVMTLLibraryLoad.m"
+      ]
+    },
+    {
+      "PR": 28,
+      "head": "317092664427f3fe7650f5fa08e8fe1b7ba011df",
+      "state": "open",
+      "merged": false,
+      "priority": 6,
+      "decision": "conditional-app-copy-out-correctness-review",
+      "limit": "Native probe bypasses this path; commit wait can block; exact PR build only compiled.",
+      "changed_files": [
+        "src/nmplugin/NVMTLObjects.m"
+      ]
+    },
+    {
+      "PR": 24,
+      "head": "0a3bd8aa63128ca8b152abf5b10e68ca41bc4ec9",
+      "state": "open",
+      "merged": false,
+      "priority": null,
+      "decision": "hold-unresolved-stability",
+      "limit": "Reporter withdrew initial SDMA causality after resets also occurred with SDMA halted.",
+      "changed_files": [
+        "tools/phxctl/mesboot.c"
+      ]
+    },
+    {
+      "PR": 25,
+      "head": "433423eeaa61f73b9d90be4eb12afba56b4994b7",
+      "state": "closed",
+      "merged": false,
+      "priority": null,
+      "decision": "closed-unmerged-do-not-stack",
+      "limit": "Closed in favor of one power-management mechanism; not an IB fix.",
+      "changed_files": [
+        "docs/SLEEP.md",
+        "src/phxaccel/accel/nvrm-accel.cpp",
+        "src/phxaccel/accel/phxfb.cpp",
+        "src/phxbringup/PhxBringup.cpp",
+        "src/sleeppolicy/Info.plist",
+        "src/sleeppolicy/PhxSleepPolicy.cpp",
+        "src/sleeppolicy/build.sh",
+        "src/sleeppolicy/info.c",
+        "tools/phxctl/mesboot.c",
+        "tools/phxwake/local.phxwake.plist",
+        "tools/phxwake/phxwake.sh",
+        "tools/phxwake/phxwaked.c"
+      ]
+    },
+    {
+      "PR": 20,
+      "head": "d424456ff3e1f2f1b640a620f1b32d1be865d95c",
+      "state": "open",
+      "merged": false,
+      "priority": null,
+      "decision": "out-of-scope",
+      "limit": "Hibernation and boot integration add unrelated variables.",
+      "changed_files": [
+        "docs/SLEEP.md",
+        "src/phxaccel/accel/nvrm-accel.cpp",
+        "src/phxaccel/accel/phxfb.cpp",
+        "src/phxbringup/PhxBringup.cpp",
+        "src/sleeppolicy/Info.plist",
+        "src/sleeppolicy/PhxSleepPolicy.cpp",
+        "src/sleeppolicy/build.sh",
+        "src/sleeppolicy/info.c",
+        "tools/phxwake/local.phxwake.plist",
+        "tools/phxwake/phxresume.py",
+        "tools/phxwake/phxwake.sh",
+        "tools/phxwake/phxwaked.c"
+      ]
+    },
+    {
+      "PR": 21,
+      "head": "77bac943afc8a91bdbd31c68cd8bff281a1d5598",
+      "state": "open",
+      "merged": false,
+      "priority": null,
+      "decision": "out-of-scope",
+      "limit": "CPPC/MSR controls are separate CPU power work."
+    }
+  ],
+  "native_evidence": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "reused_IB_pass_1_mismatch": {
+      "BO_offset": 8208,
+      "actual": 222,
+      "expected": 223,
+      "positive_retirement": true
+    },
+    "immutable_fresh_IB_both_full_BO_comparisons_passed": true,
+    "selective_CPU_IB_publication_did_not_resolve_mismatch": true,
+    "root_cause_established": false,
+    "historical_records_sha256": {
+      "upstream34-native-ib-reuse-control-20261116.json": "c1043c2ac0829fd01bcaf8c43680aa399bb342935ee9980ea0226d626979837e",
+      "upstream34-native-ib-fresh-control-20261116.json": "ce3246019d2ec032a1d68d3cb6a05f368ac0ced58a3d367bf42df9f7526432c9",
+      "native-ib-publication-diagnostic-20261116.json": "77948d30d5a95d64bbc85d1bf968ff1caa026dc4171d7be40378037726bbc1d7",
+      "upstream34-native-ib-publication-control-20261116.json": "06bd0ea496b8cca057fa2f0c6351deb8e30d906e199f80e4e479b8018fbfb34e",
+      "upstream34-native-ib-publication-trial-20261116.json": "2e8e4c16b8655afd3bc36c6c7f3e586d9c734680a2f7cb51814e5571fcb21f36"
+    }
+  },
+  "execution_boundary": {
+    "GPU_calls_during_this_review": 0,
+    "device_probes_run": 0,
+    "GPU_initializations": 0,
+    "driver_installations": 0,
+    "reboots": 0,
+    "startup_jobs_created": 0,
+    "hardware_scope_armed": false,
+    "consumed_scopes_replayed": false,
+    "A1_A2_A3_retested": false,
+    "wait_candidate_promoted": false,
+    "accelerated_desktop_hold": true,
+    "FPS_improvement_claimed": false
+  },
+  "license_scope": {
+    "phxbringup_phxctl": "MIT OR GPL-2.0-only",
+    "nmplugin_phxaccel": "PolyForm-Noncommercial-1.0.0",
+    "implementation_or_binary_imported": false,
+    "license_files_changed": false
+  }
+}
