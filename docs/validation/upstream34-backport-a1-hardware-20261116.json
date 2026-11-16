@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-16",
+  "stage": "a1",
+  "result": "passed-bounded-real-GPU-probe",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "source_checkpoint": "d40d2ecaf232b94b9b91c2360310b70c40fd32b2",
+  "a1_source_checkpoint": "11cb1445b90dc3620afef313f1a811eb3b27e7d7",
+  "target": "Radeon 780M 1002:1900",
+  "probe_source_sha256": "f35d45de1724e34520ed8d8a93b8fdc5e3bfbc6a895141640e4cae973c279ba4",
+  "probe_binary_sha256": "e4431e8f5982c4b6b43770acff2f2625005822ac03342eaa38ca2d417b32b1ca",
+  "installed_plugin_sha256": "a056873d7c3a83b910c0fc6e65cfc4bcc825993cf49d3d821fd69f794a1b9f08",
+  "baseline": {
+    "result": "passed",
+    "probe_exit": 0,
+    "probe": {
+      "target_PCI_verified": true,
+      "loaded_plugin_image_verified": true,
+      "completed_commands": 3,
+      "sampler_slots": [
+        0,
+        15
+      ],
+      "IOSurface_sampled_pixels": 32,
+      "verified_channels": 128
+    },
+    "same_boot": true,
+    "single_WindowServer_unchanged": true,
+    "new_relevant_diagnostic_reports": 0,
+    "present_transaction_delta": 10,
+    "failed_transaction_delta": 0,
+    "copy_skip_delta": 0,
+    "display_gates_unchanged": true
+  },
+  "candidate": {
+    "result": "passed",
+    "probe_exit": 0,
+    "probe": {
+      "target_PCI_verified": true,
+      "loaded_plugin_image_verified": true,
+      "completed_commands": 3,
+      "sampler_slots": [
+        0,
+        15
+      ],
+      "IOSurface_sampled_pixels": 32,
+      "verified_channels": 128
+    },
+    "same_boot": true,
+    "single_WindowServer_unchanged": true,
+    "new_relevant_diagnostic_reports": 0,
+    "present_transaction_delta": 7,
+    "failed_transaction_delta": 0,
+    "copy_skip_delta": 0,
+    "display_gates_unchanged": true
+  },
+  "installation": {
+    "atomic_bundle_exchange": true,
+    "rollback_bundle_verified": true,
+    "kernel_runtime_startup_unchanged": true,
+    "WindowServer_restart_requested": false,
+    "reboot_requested": false
+  },
+  "WindowServer_file_access_checks": 18,
+  "automatic_retry": false,
+  "limitations": [
+    "WindowServer retains its previously loaded plugin until restart; this is new-process plugin acceptance",
+    "Sampler slots 0 and 15 and plane-0 IOSurface render/read are covered; framebuffer-fetch and cross-process surface synchronization are not directly exercised",
+    "No physical scanout, game FPS, long-duration stability or sleep/wake validation",
+    "A2 and A3 are not installed by this stage"
+  ],
+  "private_receipt_sha256": {
+    "baseline-hardware-private.json": "9c5f46663973831b5e55fc6200c56c4b62bc4e7027e795d628adf23581e94a67",
+    "a1-hardware-private.json": "f28db88561951e5edf76e86c22a5bba98888d789800b93fcad8e2147d8b9c772",
+    "a1-installed-private.json": "212851e5a47acabfe6c1d15e7bc34d827b349d5e479edd99feabfba1278cbed1",
+    "baseline-probe.stdout": "3bcc919747f28da82be4619322d4b8f0942b1c0f11691cf53630db3b83737ede",
+    "baseline-probe.stderr": "8f23138e9a1c5b98ed7def07a0ec41796c3d7f5a39cdd0aed9f4bcab9800a2d7",
+    "a1-probe.stdout": "3bcc919747f28da82be4619322d4b8f0942b1c0f11691cf53630db3b83737ede",
+    "a1-probe.stderr": "8f23138e9a1c5b98ed7def07a0ec41796c3d7f5a39cdd0aed9f4bcab9800a2d7"
+  }
+}

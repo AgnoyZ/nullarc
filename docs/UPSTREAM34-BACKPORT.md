@@ -161,3 +161,46 @@ These are source and host/native-build results. They establish no installed
 candidate acceptance, real Metal output, physical panel cadence, FPS increase
 or long-running stability. No deployment, GPU initialization, restart, EFI,
 NVRAM or OS-security change was performed.
+
+## Subsequent explicitly requested installation and hardware testing
+
+The owner requested installation/loading tests on 2026-11-16. The preceding
+source-only results remain historical. Hardware stages also follow A1, A2, A3;
+passing a source gate alone does not advance a hardware stage.
+
+### A1: installed, loaded in a new process, bounded GPU regression passed
+
+The running system remained macOS 26.7.2 / 25G332 in the previously accepted
+original-build34 desktop session. Before changing the plugin, the same new
+`tools/backport_gpu_smoke.m` executable passed against the original installed
+plugin. It verifies PCI 1002:1900 and the actual dyld-loaded plugin image identity,
+renders a 4-by-4 pattern into an IOSurface, then checks all 128 integer output
+channels after sampling a second texture wrapper at sampler slots 0 and 15.
+Each baseline/candidate run completed three real GPU commands. Each command has
+a 15-second completion deadline and the process has a 55-second outer limit;
+a timeout is failure, with no automatic GPU retry.
+
+Only the A1 plugin was installed, through an atomic bundle exchange after a
+complete original-bundle backup, strict signatures, unchanged runtime hashes
+and 18 credential-dropped WindowServer file-access checks. The installed
+candidate is derived from the exact successful A1 build artifact; bundle signing
+changes its signature bytes, while its image identity remains the same. The
+original bundle is also retained at the inactive exchange path for rollback.
+Neither the kernel driver, AuxKC, runtime, firmware nor startup was replaced.
+
+The installed A1 plugin then passed the identical GPU regression in a new
+process, with its actual loaded image verified. Baseline and candidate both
+retained the same WindowServer and display gates, continued panel transaction
+progress, and had zero new failed transactions, copy skips or matching diagnostic
+reports. No WindowServer restart, GPU reinitialization, reboot, EFI, NVRAM or
+security-setting change occurred. Public sanitized evidence is
+`validation/upstream34-backport-a1-hardware-20261116.json`; raw logs and exact
+rollback manifests remain in ignored/private storage, with no binary upload.
+
+This accepts a bounded new-process A1 regression only. WindowServer still uses
+its previously loaded plugin. Framebuffer-fetch, cross-process IOSurface
+synchronization, physical scanout, FPS, sleep/wake and long-duration stability
+are not established by this test. A2 and A3 are not installed by this A1 stage.
+On failure, restore the original bundle using the private verified atomic
+exchange rollback, then recheck its exact manifest and signature; do not retry
+GPU work automatically or advance to A2.
