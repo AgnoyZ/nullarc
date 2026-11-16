@@ -1,5 +1,14 @@
 # Isolated build-34 A1/A2/A3 backports
 
+Latest hardware disposition, **2026-11-16 12:49 +08:00**: A1 and cumulative
+A1+A2 passed their bounded real-GPU gates. A3 **failed** fresh-boot timing
+admission before its Metal probe; it is not accepted for adoption. The exact
+accepted A2 kext and AuxKC have been restored on disk. The current recovery
+session uses the firmware framebuffer with PhxAccel not loaded and GPU-off
+present; restoring disk files is not evidence of A2 being loaded again.
+The consumed A3 witness is retired, with no automatic retry. The chronological
+source/preparation checkpoints below retain their original scope.
+
 Owner request: 2026-11-16. Candidate branch: `backport/upstream34-a1-a3`,
 based on default checkpoint `90bb06f6f9255cb5a16cc5eb87e78032566b2000`.
 The default branch itself is unchanged. Complete A1 tests before changing A2,
@@ -398,3 +407,67 @@ was still A2 at dispatch readback. The 300-second observation and at-most-one
 managed recovery limits remain in force. This dispatch is **not A3 hardware
 acceptance**; next-boot receipts must establish the outcome. Evidence:
 `validation/upstream34-backport-a3-boot-dispatch-20261116.json`.
+
+### A3: timing admission failed; accepted A2 restored on disk
+
+The actual trial boot began at **12:35:46 +08:00 on 2026-11-16**. Original
+startup reported the native panel, expected compute/graphics results, queue
+adoption and accelerator claim. Its line-58 shell diagnostic also exists in
+the accepted A2 startup log; it is retained rather than described as a clean
+startup. The witness completed its exact loaded-A3/original-build34 identity
+and geometry checks, then failed at **12:37:34** because
+`PhxFBRefreshMilliHz` did not equal the accepted 120,000 milliHz baseline.
+No A3 Metal-probe intent, process output or completion receipt exists. Startup
+itself had already executed its original GPU work; this is not a zero-GPU
+trial, nor a completed Metal/desktop regression.
+
+Persisted trial-boot kernel logs report **25 frames in 200,965 microseconds**,
+**124.399 Hz**, totals **2720 by 1694**, and detailed timing marked validated.
+The existing approximately 200 ms, integer-frame refresh estimator and its
+2-percent standard-rate snapping are unchanged by A3. At a nominal 120 Hz,
+one frame in this short window represents roughly 4.2 percent; sampling phase
+quantization is a plausible explanation, not an established hardware cause.
+A3 newly uses the resulting refresh for an estimated detailed-timing pixel
+clock. The evidence establishes inconsistent reported timing, not a physical
+panel-rate change or a proven A3-induced estimator regression. The failed
+contract was not relaxed and its receipts were not rewritten. No complete
+timing-property snapshot survived the pre-snapshot assertion, so a validated
+live callback or verified estimated pixel clock must not be claimed.
+
+GPU-off and display-rearming cleanup were restored before the failure. One
+managed recovery request was consumed; its shutdown output and a different
+actual boot at **12:37:59** verify recovery. Its final dispatch-result receipt
+remains absent; shutdown output and the changed boot carry the recovery
+evidence, without establishing why that receipt was not saved. The recovery
+witness recorded the new boot at 12:38:14 and did not retry. Independent
+readback verified all **2,180** contract pins before rollback and found no new
+matching diagnostic report. The recovery session had no native framebuffer or
+accelerator nodes and retained the firmware framebuffer.
+
+The frozen, one-use disk rollback then restored the exact previously accepted
+A2 bundle and AuxKC. Independent verification at **12:49:11** checked their
+hashes, signatures, cache metadata and all **416** cached extension records
+against A2. All 2,180 witness inputs were checked with only the two exact
+rollback substitutions (accelerator image and AuxKC), before retiring the
+external job. Both stage/backups remain exact. Security settings, Boot/System
+KCs, original startup and runtime inputs are unchanged. Of the installer's 44
+older protected-file hashes, only the boot-generated `fwaddr.log` changed;
+that private output is not treated as an immutable runtime input.
+
+No live-unload command, GPU initializer, additional reboot or GPU retry was
+issued by rollback/readback. A3 was observed loaded early in the recovery
+boot; a later independent check found PhxAccel no longer loaded. The agent did
+not request that unload, and disk restoration alone does not establish its
+cause. The current state is **A2 installed on disk, firmware framebuffer,
+GPU-off, accelerator not loaded**, not an active A2 accelerated desktop.
+The already-unregistered external A3 job was archived and removed after its
+processes exited; the original startup job remains intact.
+
+Adoption recommendation: retain the tested **A1, then A2** changes; **hold A3**.
+A3 needs a separate correction and host regression for short-window refresh
+uncertainty before any newly scoped hardware experiment. Do not hard-code the
+observed panel rate, widen admission after the fact, replay the consumed trial,
+or promote this cumulative A3 source branch as hardware accepted. No FPS,
+physical scanout cadence, sleep/wake or long-duration stability claim follows
+from this attempt. Public sanitized evidence:
+`validation/upstream34-backport-a3-hardware-20261116.json`.
