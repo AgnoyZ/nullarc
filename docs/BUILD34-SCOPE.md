@@ -30,3 +30,12 @@ The subsequent [MEC range diagnostic](BUILD34-MEC-RANGE-DIAGNOSTIC.md) keeps
 one upstream initialization lead available as original34-only offline tooling
 on this branch. It does not change the production helper/kernel, adopt a
 hardware fix or restore either withdrawn candidate.
+
+The owner's subsequent request to test and integrate several PRs authorizes
+the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream
+PR16, PR19 with a tested zero-progress-write correction, PR15 and PR22. Each
+stage passes CPU behavior tests and native compilation before the next is
+applied. This extends only four nmplugin source files from the accepted
+checkpoint; original34 kernel, ABI, production helper and A1/A2/corrected-A3
+behavior remain preserved. It is source integration, not hardware promotion:
+the IB result and existing GPU/desktop HOLDs remain unchanged.

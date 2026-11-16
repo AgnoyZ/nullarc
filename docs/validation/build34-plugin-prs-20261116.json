@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "result": "passed-host-and-compile-only",
+  "branch": "upstream34/vram-layout-fix",
+  "parent": "aef50d8d52c679e4d63f27a204e0a85e66cc4105",
+  "approved_source_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "kernel_build": 34,
+  "build41_build42_withdrawn": true,
+  "environment": {
+    "os_version": "26.7.2",
+    "os_build": "25G332",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+  },
+  "priority_and_test_order": [
+    16,
+    19,
+    15,
+    22
+  ],
+  "stages": [
+    {
+      "pr": 16,
+      "head": "0ebda0dc13da7b658dea0c2e9688917ea13d4c25",
+      "base": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "upstream_files": [
+        {
+          "path": "src/nmplugin/NVMTLDevice.m",
+          "git_blob": "13cf990e5cdab39e4c6380412f20408a7adbfbfb",
+          "sha256": "902e648323ddff22e6f5a53eb943f01c100167f7af0e87df445a2eb650946c92"
+        }
+      ],
+      "host_behavior_test": "passed",
+      "native_plugin_compile": "passed",
+      "next_stage_applied_only_after_pass": true
+    },
+    {
+      "pr": 19,
+      "head": "f4623df5aefb5689dbd87fa50ac3b6d971ad8592",
+      "base": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "upstream_files": [
+        {
+          "path": "src/nmplugin/NVMTLLibraryLoad.m",
+          "git_blob": "8ecbf3d70d90ab734ca11dc7cc57b76817c337bd",
+          "sha256": "5dc67db560a37a6142003a4e98711ee4c7fd673bba654ce3fbda3e706c0080eb"
+        }
+      ],
+      "host_behavior_test": "passed",
+      "native_plugin_compile": "passed",
+      "next_stage_applied_only_after_pass": true,
+      "local_correction": "zero-progress write fails with EIO; original loop failure reproduced by guarded exit90, corrected test passed"
+    },
+    {
+      "pr": 15,
+      "head": "2d198ea005ae2ea8b9828f1cb3e1df99895238b5",
+      "base": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "upstream_files": [
+        {
+          "path": "src/nmplugin/NVMTLDevice.m",
+          "git_blob": "8649f7ed27c6de7d8509c0399c4d61c6d5a41714",
+          "sha256": "9dfac985d5da19ff6133146f36be0f53f0a1f4784c060f4e162ae3e1edb406ac"
+        }
+      ],
+      "host_behavior_test": "passed",
+      "native_plugin_compile": "passed",
+      "next_stage_applied_only_after_pass": true,
+      "adaptation": "context-only placement preserving earlier string-key/promotion changes and A1 code"
+    },
+    {
+      "pr": 22,
+      "head": "4bb4a6d8eaa05222c8b7e3432e1f67c2a37e508a",
+      "base": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "upstream_files": [
+        {
+          "path": "src/nmplugin/NVMTLDevice.m",
+          "git_blob": "575a658222ef200e70433f3688c599d7be2cda7e",
+          "sha256": "004abde46c66622ae2b3d7c837a6f9b0dad3ccdfe113df9560d799432b9b84bd"
+        },
+        {
+          "path": "src/nmplugin/NVMTLObjects.h",
+          "git_blob": "4e5c25d2ef0cac1d856f6560044f2809b3fa10a7",
+          "sha256": "8eae6e811f9ca6bb253d37df11205f87b7dee1983da3814095163eb80b8d4218"
+        },
+        {
+          "path": "src/nmplugin/NVMTLObjects.m",
+          "git_blob": "27a0c8299bc371ab4487da1e2dfc9d695c8669a2",
+          "sha256": "af0c49a832ca8f58bab1357657585e5739dee30582d44380f85184558cc5f938"
+        }
+      ],
+      "host_behavior_test": "passed",
+      "native_plugin_compile": "passed",
+      "next_stage_applied_only_after_pass": true,
+      "adaptation": "context-only placement preserving earlier string-key/promotion changes and A1 code"
+    }
+  ],
+  "combined_checks": {
+    "baseline_unit_suite": "passed",
+    "firmware_fixture_tests": "skipped; no fixtures; synthetic parser tests passed",
+    "build34_layout": "passed",
+    "A1_sampler_keys": "passed; 517 indices and 262144 concurrent lookups",
+    "A1_surface_keys": "passed; 77 boundary keys and 16384 concurrent cycles",
+    "A1_descriptor_masks": "passed; 321 cases in each of three modes",
+    "A2_framebuffer_alias": "passed",
+    "corrected_A3_panel_timing_callbacks": "passed",
+    "plugin_PR_tests": "4 passed under ASan/UBSan; Unknown usage 144 cases; cache store 12 modes; controlled weak-map threshold exercised",
+    "MEC_range_runner": "8 passed",
+    "MEC_range_host_harness": "148 cases; 3 compile policy refusals",
+    "MEC_runtime_host": "7 passed",
+    "native_plugin_build": "passed for each stage and combined",
+    "baseline_warning_comparison": "identical warning multisets; 336 warnings in both baseline and combined builds",
+    "release_build": "passed with macOS15 minimum, NVMTL_RELEASE=1 and unguarded-availability errors enabled",
+    "release_architecture_signature_entry_points": "passed",
+    "git_diff_check": "passed"
+  },
+  "source_sha256": {
+    "src/nmplugin/NVMTLDevice.m": "5cc8292a4f3b335393317ca413c67e723dfd4591c3e9d8d75b77d9a40163b1df",
+    "src/nmplugin/NVMTLLibraryLoad.m": "be168d14f919fe218ac07539846f005f22e01298023cbec166d73f70c5eca82e",
+    "src/nmplugin/NVMTLObjects.h": "8eae6e811f9ca6bb253d37df11205f87b7dee1983da3814095163eb80b8d4218",
+    "src/nmplugin/NVMTLObjects.m": "547575a900f7c04a5c40eb15dad1725cb9273b5dd512121e468362fd0468f226"
+  },
+  "test_runner_sha256": "9a8fa5be29688b33ebb548b5582552025426f7b11614496873f33189972d6708",
+  "local_evidence_sha256": {
+    "16-host.log": "21029c0ec5b9f2b1931ae5049098a6fd36babffebf07c5e814c4a8c130a408bf",
+    "16-build.log": "551a78be8feb751e002e623345f7832dfc640486f11e16c694137ea092db7391",
+    "19-original-host.log": "a193d7dc30c274ca862903f3f2f510173ee05ec33f8ed522de9462684a03d8b3",
+    "19-fixed-host.log": "4bcd46417032dbe8340bcb27f77dffe7a5fe360a7b191f242568454de8fc40f0",
+    "19-build.log": "6780547b840c6b72ff82107e933ea0b63ff2214d3f43958c733115058eaa3f1a",
+    "15-host.log": "9a5d7a2f46a38e1aeb74f59a445c4610636413c2bad2ccca2814730d2e846d7c",
+    "15-build.log": "99f9a68c54e4f5e7639ec53511822b5817b9bea9a88c8f53994099ec8c630c47",
+    "22-host.log": "d92aead4ee85736e8d4f56faf056e3acfc9a6f941d625d2aa2c4533660295f56",
+    "22-build.log": "307e75d2a03a2484fb81e0086829ca62980554a29a4723b5ccb6c471318f4629",
+    "combined-regressions.log": "4b4df19560bdaa86c0c5f6450ee8a2c56374d1eac0b298e3e4ede464e2f448cb",
+    "combined-plugin-host-final.log": "274c3c1a7ecb99ed0b1ea0d07536dc953c98cf2c628c394c84a0d8f8545d406b",
+    "compile-validation-private.json": "f331c68e71ab1450f697d325f05dc96aee8da721b41aea292bcbc260224d5231",
+    "protected-inputs-private.json": "089cd29112b5e6d25907fbab99d31adfc34a527ccd5b81d7b9f1cfd460d7bfbf"
+  },
+  "protected_inputs": {
+    "checked": 176,
+    "kernel_ABI_production_phxctl_phxaccel_licenses_unchanged": true,
+    "A1_surface_writer_key_and_sampler_and_mask_code_unchanged": true,
+    "A1_objects_only_adds_drawable_getter": true
+  },
+  "license": "existing nmplugin PolyForm-Noncommercial-1.0.0; notices preserved; no external library or binary copied",
+  "GPU_executed": false,
+  "plugin_loaded": false,
+  "installed": false,
+  "rebooted": false,
+  "FPS_measured": false,
+  "binaries_uploaded": false,
+  "IB_wrong_value": "unresolved",
+  "wait_promotion": "HOLD",
+  "accelerated_desktop": "HOLD",
+  "PR28": "deferred; blocking-wait latency requires separate review",
+  "rollback": "git revert the source integration commit; preserve A1/A2/corrected-A3 and history; no deployment rollback is needed"
+}
