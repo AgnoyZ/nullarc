@@ -1,6 +1,9 @@
-# Compute IB fetch visibility candidate
+# Historical compute IB fetch visibility experiment
 
-Status on 2026-11-16: **source correction candidate; hardware result pending**.
+Current status on 2026-11-16: **withdrawn by the owner; build41/build42 are not candidates**.
+Active investigation is restricted to [default build34](BUILD34-SCOPE.md).
+The implementation, recipes and validation below are historical records, not
+an active installation, compilation or testing plan.
 The observed native IB wrong value is not yet declared fixed. No driver was
 installed or loaded and no new GPU execution or reboot was performed during
 source preparation. The default branch remains at `64f3d99` with
@@ -13,11 +16,11 @@ development use PhxBringup build34 as the baseline. The approved source
 checkpoint is `upstream34/vram-layout-fix` at
 `64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c`, including A1/A2/corrected-A3.
 Derive each isolated fix from that checkpoint without mixing unrelated
-downstream wait, lifecycle, ABI or initialization changes. The existing
-build41/build42 candidates remain experimental and do not replace build34 as
-the baseline. Candidate identifiers remain distinct from the source baseline;
-this requirement does not rename either candidate or authorize installation,
-loading, GPU execution or reboot.
+downstream wait, lifecycle, ABI or initialization changes. The owner subsequently clarified that
+build41/build42 are withdrawn entirely from candidate consideration. Work must
+focus exclusively on default build34; do not continue either withdrawn path.
+Keep the historical identifiers and original build34 checks intact. This
+clarification does not authorize installation, loading, GPU execution or reboot.
 
 ## Why this change
 
