@@ -1,7 +1,9 @@
 # Default build34 MEC range diagnostic
 
-Status on 2026-11-16: source and offline tests only. This diagnostic does not
-establish a fix for the native reused-IB wrong value, mouse/GUI stalls or FPS.
+Status on 2026-11-16: the separately authorized original34 control reproduced
+the reused-IB wrong value and completed recovery. The MEC-range treatment has
+not run. This diagnostic does not establish a fix for the native reused-IB
+wrong value, mouse/GUI stalls or FPS.
 The default branch remains `upstream34/vram-layout-fix`, with the accepted
 A1/A2/corrected-A3 changes. Build41/build42 remain withdrawn.
 
@@ -116,16 +118,17 @@ mock regressions covered deadline clocks, six concurrent recovery requests
 with one mock dispatch, no recovery-boot GPU retry, control-only selection,
 private `HOME` and stopping before the native probe after observation failure.
 Four original34 user helpers compiled and passed signature/architecture checks;
-none was executed. See the separate
+none was executed during that offline preparation. See the separate
 [preparation record](validation/build34-mec-runtime-preparation-20261116.json).
 These checks do not arm a hardware trial or establish a GPU result.
 
 ### Separate hardware admission
 
-All earlier native policy scopes remain consumed. This change does not create
-a startup job, arm recovery, install/load a driver, initialize the GPU or
-reboot. Do not run the helper as a live register fix or replace ordinary
-`mesboot`: this restricted helper alone is not an ownership/recovery protocol.
+All earlier native policy scopes remain consumed. The tooling additions by
+themselves do not create a startup job, arm recovery, install/load a driver,
+initialize the GPU or reboot. Do not run the helper as a live register fix or
+replace ordinary `mesboot`: this restricted helper alone is not an
+ownership/recovery protocol.
 
 A subsequent hardware comparison requires a new exact-image original34 scope,
 fresh-boot/PCI/OS and inactive-queue admission, an independent bounded recovery
@@ -146,3 +149,53 @@ AMD-derived headers retain their own MIT notices verbatim; the generator
 copies applicable licences/notices from the fixed checkpoint. No firmware,
 plugin, third-party implementation body or binary is imported. The full-stack
 binary publication block remains in place.
+
+## Single-use original34 control result
+
+The owner continued a new bounded original34 control on 2026-11-16 after the
+offline preparation. This scope used default commit
+`a783a166739a8408fdbc3bda4be4d9b58c2f3f48`, the existing exact original34
+driver image and the previously frozen original34 two-dispatch control probe.
+The actual OS was macOS 26.7.2, build `25G332`. No driver was installed or
+loaded by the experiment, and the range-treatment helper was not run.
+
+Original compute, graphics and queue adoption passed. The native probe fully
+verified its first guarded dispatch, then failed the second at allocation
+offset `0x2010` (pass index 1): actual `0xde`, expected `0xdf`. It immediately
+entered HOLD and retained its connection/mappings until recovery. This is the
+same bounded reused-IB signature observed before the new common sampling.
+There was no GPU retry, CPU-load trial, concurrent client, display takeover or
+FPS test.
+
+One range/status observation preceded KIQ/user-queue setup and six followed
+the original compute/graphics/adoption checks. The observed range remained
+unchanged across those samples and did not match the proposed treatment
+range. Post-initialization GRBM status was stable. These are bounded
+observations, not evidence of global CP/GPU idle, a doorbell-range root cause
+or correct native IB execution. In this control, the common observation delay
+did not prevent the mismatch.
+
+Exactly one recovery reboot returned to the same original34 image with
+GPU-off and the firmware framebuffer. The independent result, retirement and
+final readbacks passed: the consumed startup job was removed, no probe or
+shutdown remained, recovery-boot GPU calls were zero, and no additional trial
+started. All 347 EFI files (including 148 Microsoft files), 46 protected files,
+two protected links, OpenCore configuration, security settings and kernel
+collections were unchanged. No new matching WindowServer/kernel/GPU-restart
+diagnostic report appeared. This is not a desktop-stability acceptance.
+
+Two preparation/reporting errors did not change the hardware sequence. An
+incorrect test-receipt path was rejected before root-packet creation and was
+corrected with a CPU-only regression. After independent result assertions and
+the exclusive result write, a local export failed because a loop variable
+shadowed the export-stage name. A separate read-only check verified the
+existing receipt against the frozen inputs and mismatch evidence, completed
+the missing export, and allowed retirement; the GPU trial and result-writing
+stage were not repeated. The original frozen controller/verifier was retained.
+
+See the [sanitized control record](validation/build34-mec-control-20261116.json).
+All raw logs, register samples, firmware, binaries and machine identifiers
+remain private. This control is consumed. Any MEC-range treatment needs a
+different explicit single-use scope with the same common observations and an
+independent recovery path; it cannot be started by this control. IB repair,
+wait promotion and accelerated desktop remain on HOLD.
