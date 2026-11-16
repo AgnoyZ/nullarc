@@ -1,0 +1,112 @@
+{
+  "date": "2026-11-16",
+  "stage": "a3-refresh-correction",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "source_checkpoint": "4279b238bc76e4a78a4f42394a1170f926131431",
+  "result": "passed-bounded-fresh-boot-corrected-A3-hardware-validation",
+  "verified_local": "2026-11-16T13:27:46.471523+08:00",
+  "trial_boot_local": "2026-11-16T13:21:10+08:00",
+  "acceptance_local": "2026-11-16T13:23:10.827649+08:00",
+  "fresh_boot": true,
+  "loaded_corrected_A3_image_exact": true,
+  "original_bringup_build": 34,
+  "original_bringup_identity_and_geometry_exact": true,
+  "contract_pins_verified_before_retirement": 2224,
+  "contract_sha256": "2e8cd7ed69968f3bd9b77b01a45e8087e498a1b375c8eb0044d79750d38667d1",
+  "source_and_protected_hashes_verified": 180,
+  "full_cached_records_verified": 416,
+  "unrelated_cached_records_unchanged": 415,
+  "probe": {
+    "target_PCI_verified": true,
+    "loaded_plugin_image_verified": true,
+    "completed_commands": 3,
+    "sampler_slots": [
+      0,
+      15
+    ],
+    "IOSurface_sampled_pixels": 32,
+    "verified_channels": 128
+  },
+  "probe_exit": 0,
+  "probe_processes": 1,
+  "probe_stderr_only_expected_native_kext_information": true,
+  "panel_timing": {
+    "PhxFBWidth": 2560,
+    "PhxFBHeight": 1600,
+    "PhxFBRefreshMilliHz": 120000,
+    "detailed_timing_valid": true,
+    "horizontal_total": 2720,
+    "vertical_total": 1694,
+    "estimated_pixel_clock": 552921600
+  },
+  "panel_properties_stable_at_independent_readback": true,
+  "estimated_pixel_clock_formula_verified": true,
+  "frames": {
+    "before": 4293,
+    "after": 5025,
+    "delta": 732,
+    "interval_seconds": 11.651128053665161,
+    "VBL_delta": 1375,
+    "failed_transactions": 0,
+    "copy_skips": 0,
+    "single_WindowServer_unchanged": true,
+    "new_matching_diagnostic_reports": 0,
+    "continued_progress_without_new_errors_at_independent_readback": true
+  },
+  "native_node_counts": {
+    "PhxAMDFB": 1,
+    "NMXAccel": 1,
+    "IOAccelerator": 1,
+    "IONDRVFramebuffer": 0
+  },
+  "original_queue_results_and_adoption_passed": true,
+  "original_startup_elapsed_seconds": 97,
+  "original_startup_warning_retained": "upstream34-bringup line 58 status 1; also present in accepted A2 and failed original A3 startup",
+  "candidate_cache_matches_private_build_exactly": true,
+  "original_A2_backups_still_exact": true,
+  "security_and_Boot_System_KCs_unchanged": true,
+  "boot_generated_diagnostic_outputs_changed": 1,
+  "windowserver_file_access_checks": 18,
+  "GPU_off_restored": true,
+  "persistent_display_arming_absent": true,
+  "pending_absent": true,
+  "managed_recovery_requested": false,
+  "external_observer_and_deadline_processes_exited": true,
+  "external_idle_job_archived_and_removed": true,
+  "verification_GPU_calls": 0,
+  "verification_reboot_requests": 0,
+  "A1_A2_retained": true,
+  "automatic_retry": false,
+  "FPS_measured": false,
+  "limitations": [
+    "Transaction and synthetic VBL counters are not physical scanout or game FPS measurements",
+    "The pixel clock is calculated from register totals and measured/snapped refresh, not directly measured",
+    "One bounded fresh-boot regression does not establish long-duration stability or sleep/wake",
+    "The detailed-timing callback was CPU/native tested; no separate direct live callback invocation was performed",
+    "The longer sampling window adds nominal 1.8 seconds; total startup time is not a controlled performance comparison"
+  ],
+  "external_job_already_unregistered_before_retirement": true,
+  "all_contract_pins_verified_after_retirement": 2224,
+  "final_verified_local": "2026-11-16T13:29:34.995817+08:00",
+  "original_startup_preserved": true,
+  "kernel_observations": {
+    "read_only_kernel_log_check": true,
+    "refresh_sample_frames": 240,
+    "refresh_sample_elapsed_microseconds": 2000034,
+    "reported_refresh_milliHz": 120000,
+    "totals": [
+      2720,
+      1694
+    ],
+    "detailed_timing_validated": true,
+    "pool_size_MB": 512,
+    "alias_sample_results": {
+      "matching": 4096,
+      "sampled": 4096,
+      "nonzero": 14
+    },
+    "GPU_calls": 0,
+    "FPS_measured": false
+  }
+}

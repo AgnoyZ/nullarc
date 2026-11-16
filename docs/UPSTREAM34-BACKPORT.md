@@ -1,19 +1,23 @@
 # Isolated build-34 A1/A2/A3 backports
 
-Latest disposition, **2026-11-16 after correction installation**: A1 and
-cumulative A1+A2 passed their bounded real-GPU gates. Original A3 **failed**
-fresh-boot timing admission before its Metal probe and was rolled back. Its
-2-second sampling correction passed the source/native gate and is now
-**installed-awaiting-reboot**, with the accepted A2 bundle/cache backed up.
-The current recovery session uses the firmware framebuffer with PhxAccel not
-loaded and GPU-off present. Corrected A3 loading and hardware acceptance remain
-pending. The consumed original A3 witness is retired; the chronological
-source/preparation checkpoints below retain their original scope.
+Latest disposition, **2026-11-16 at 13:29 +08:00**: A1, then cumulative A1+A2,
+then **corrected A1+A2+A3 passed their bounded real-GPU gates** on macOS
+26.7.2 / 25G332. The corrected A3 image is installed and loaded in the native
+accelerated desktop after the 13:21:10 boot. Timing is 2560 by 1600 at
+120,000 milliHz, with stable validated totals and a consistent estimated clock.
+One three-command Metal/IOSurface probe passed; desktop transactions continued
+with no added failures, copy skips or matching diagnostic reports.
 
-Subsequent correction: a 2-second read-only measurement window passed the
-complete source/native gate, including a pre-fix failing input replay and 511
-callback assertions. This is not hardware acceptance; the failed A3 trial
-remains consumed. Installation/loading of the correction is a separate stage.
+Original A3 failed timing admission and was rolled back; that failure remains
+recorded. Its separate 2-second sampling correction passed all 15 source/native
+checks and this new one-use boot trial. The external trial job is now retired,
+the original startup/watchdog remains unchanged, and exact A2 bundle/cache
+backups remain available. GPU-off is restored and persistent display arming is
+absent for a conservative next boot. The default branch is unchanged. These
+results establish bounded execution, not an FPS gain, physical scanout-rate
+measurement, long-duration stability or sleep/wake validation. The chronological
+checkpoints below retain their original scope. Latest sanitized evidence:
+`validation/upstream34-backport-a3-refresh-hardware-20261116.json`.
 
 Owner request: 2026-11-16. Candidate branch: `backport/upstream34-a1-a3`,
 based on default checkpoint `90bb06f6f9255cb5a16cc5eb87e78032566b2000`.
@@ -639,3 +643,64 @@ had requested none and remains retired. Hardware acceptance and actual loaded
 image/timing/GPU results are **pending fresh-boot receipts**, not implied by
 this dispatch. Evidence:
 `validation/upstream34-backport-a3-refresh-boot-dispatch-20261116.json`.
+
+### A3 correction: fresh-boot GPU/desktop gate passed; trial retired
+
+The corrected image actually loaded after the **13:21:10 +08:00** boot and
+completed its bounded trial at **13:23:10**. Independent readback at **13:27:46**,
+followed by final retirement checks at **13:29:34**, verified the exact loaded
+candidate, original bring-up build 34 and VRAM geometry, retained A1 plugin,
+all **2,224** frozen inputs, and **180** source/protected hashes. The active
+AuxKC still exactly matches its private build; all **416** cached extension
+records match the expected installation, with all 415 unrelated records
+unchanged. Exact accepted A2 bundle/cache backups and their signatures remain
+intact. Security settings and Boot/System KCs are unchanged.
+
+Unlike the original rejected 200 ms sample, the current-boot kernel log reports
+**240 frames in 2,000,034 microseconds**, yielding **120.000 Hz** after the
+existing estimator/snap logic. Registry timing was **2560 by 1600**, totals
+**2720 by 1694**, detailed timing valid, and estimated pixel clock
+**552,921,600 Hz**. The clock equals totals times refresh; it is calculated,
+not directly measured. All timing properties remained identical before/after
+the probe and during independent readback. The unchanged A2 path again reports
+a **512 MB** pool and **4096/4096** matching alias samples, **14 nonzero**.
+These are sanitized observations, not published register/address dumps.
+
+The original startup's compute/gfx patterns, queue adoption and claim passed,
+and its original Metal publication was observed without another initializer.
+Its log spans 13:21:16 through 13:22:53, or **97 seconds**, including the
+existing startup observation period. That is not a controlled startup-latency
+comparison; the longer measurement adds a nominal 1.8 seconds. The existing
+`upstream34-bringup` line-58 status-1 warning is retained, as it was in accepted
+A2; this is not described as a warning-free startup. Probe stderr contains only
+the expected native-kext information line.
+
+Exactly one Metal-probe process completed **three GPU commands**, sampler slots
+**0 and 15**, **32 IOSurface pixels** and **128 channels**, with successful PCI
+and loaded-plugin identity checks and exit status zero. Over **11.651 seconds**,
+successful desktop transactions advanced **4293 to 5025 (+732)** and synthetic
+VBL advanced **+1375**. Failed transactions and copy skips stayed **zero**.
+One WindowServer remained unchanged and no new matching diagnostic report
+appeared, including the later independent readback. PhxAMDFB, NMXAccel and
+IOAccelerator each have one node; the firmware framebuffer has none.
+
+GPU-off was restored after the original startup passed its off gate. M2,
+pending and persistent native-display arming are absent. No recovery reboot,
+GPU retry or additional initialization was needed. The observer and its
+deadline process exited. The already-unregistered external job was archived
+and removed after identity checks; every contract pin was rechecked with only
+the exact job/archive substitution. The original startup and its continuing
+hang watchdog remain intact. Readback/retirement submitted no GPU work and
+requested no reboot; the running accelerated desktop remains active.
+
+Adoption recommendation, in the requested sequence: **A1 plugin keys/masks,
+then A2 pool/alias checks, then corrected A3 read-only timing**. Use source
+correction `4279b23` rather than the original failed A3 image. The default
+`upstream34/vram-layout-fix` remains at `90bb06f`; this acceptance belongs to
+the isolated `backport/upstream34-a1-a3` candidate. No blanket downstream
+kernel/ABI replacement, default-branch promotion or permanent boot rearming
+is implied. The detailed-timing callback has CPU/native coverage, but no
+separate direct live callback invocation was made. No game FPS, physical
+scanout cadence, sleep/wake or long-duration stability result is claimed.
+Sanitized evidence:
+`validation/upstream34-backport-a3-refresh-hardware-20261116.json`.
