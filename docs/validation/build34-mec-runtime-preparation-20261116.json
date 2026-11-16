@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "status": "passed-CPU-only-routing-and-observation-checks",
+  "branch": "upstream34/vram-layout-fix",
+  "source_parent": "a7d39e0f4d6310442e3dad8885330f33bc8a2b21",
+  "approved_source_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "checks": {
+    "CPU_methods": 7,
+    "skipped": 0,
+    "fake_only_controller_regression_passed": true,
+    "concurrent_mock_recovery_requests": 6,
+    "mock_recovery_dispatches": 1,
+    "sampling_failure_stops_before_native_probe": true,
+    "private_HOME_and_control_argument_mock_verified": true,
+    "original34_user_helpers_compile_only": 4,
+    "production_source_and_licenses_unchanged": true
+  },
+  "new_public_source_sha256": {
+    "tools/upstream34_layout/mec_runtime.py": "3badb2374311cf23b376dd594a3ede13937d59acd2225ad8c57a4438cd97b2ea",
+    "tests/test_upstream34_mec_runtime.py": "4d576788dd3446de46080c604ba229f38bbfd4548b3f43ccaaabf0298fc99aeb",
+    "Makefile": "952b5b1205893a2a7ce70afcfe7c62a9980b743a3c62b3155217efa6d768c304",
+    ".github/workflows/upstream34-mec-range.yml": "36eaa2dfb56f91a76a44cd88290ea0252ca5053aa6923457ef65f229e960618d"
+  },
+  "test_log_sha256": "294ae2d18f1853ec702ac94ae1443dee79f1725f8e625516a5df086aa6f49baf",
+  "observation_boundary": {
+    "register_dword_addresses": [
+      "0x305d",
+      "0x305c",
+      "0x2004",
+      "0x2002",
+      "0x2087",
+      "0x219f",
+      "0x21a0"
+    ],
+    "transport_error_missing_reordered_all_ones_or_zero_GRBM_rejected": true,
+    "register_stability_is_not_global_GPU_idle": true,
+    "IB_integrity_not_inferred": true
+  },
+  "execution_boundary": {
+    "driver_modified_or_compiled": false,
+    "driver_installed_or_loaded": false,
+    "GPU_executed": false,
+    "root_packet_created": false,
+    "startup_job_created": false,
+    "reboot_requested": false,
+    "withdrawn_build41_build42_candidates_prepared_or_compiled": false,
+    "raw_diagnostics_or_binaries_published": false
+  },
+  "interpretation": {
+    "IB_wrong_value_fixed": false,
+    "wait_promotion": "HOLD",
+    "accelerated_desktop": "HOLD",
+    "background_GUI_stability_validated": false,
+    "FPS_measured": false
+  },
+  "next_gate": "A separate single-use original34 control scope requires exact-image, boot, frozen-input, independent deadline and recovery admission. It cannot start a treatment scope."
+}

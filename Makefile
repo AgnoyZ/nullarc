@@ -60,6 +60,10 @@ test-upstream34-mec-range:
 	python3 -m unittest discover -s tests -p test_upstream34_mec_range_runner.py -v
 	python3 tools/test_upstream34_mec_range.py --out build/upstream34-mec-range-host-private
 
+.PHONY: test-upstream34-mec-runtime
+test-upstream34-mec-runtime:
+	python3 -m unittest discover -s tests -p test_upstream34_mec_runtime.py -v
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \

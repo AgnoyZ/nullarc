@@ -87,6 +87,41 @@ has not been dispatched and no hardware gate has passed.
 
 ## Hardware gate and rollback
 
+### Common routing and read-only observation support
+
+`tools/upstream34_layout/mec_runtime.py` adds pure routing and observation
+functions for a separately contained control/trial comparison. Importing it
+does not access hardware or launch processes. A rendered router preserves the
+environment and sends only `gart`/`mes` to the original34 helper. It requires a
+successful external `sample-before` gate before invoking the explicitly chosen
+`kiqsched` helper. Other arguments and sampling failures are terminal. The
+router cannot provide ownership, image admission, a deadline or recovery by
+itself, and must never replace the global production helper.
+
+The strict observation parser accepts the exact ordered original34 `regs`
+output for dword addresses `0x305d`, `0x305c`, `0x2004`, `0x2002`, `0x2087`,
+`0x219f` and `0x21a0`. Missing/reordered/error output, all-ones reads and zero
+GRBM status are rejected. The summary records range and status stability only;
+it always declines to establish global GPU idle or IB integrity. No unverified
+CP bit mask is used. The planned common observations are after original
+GART/MES and before KIQ/user queues, then six samples after original
+compute/graphics/adoption and before the native probe. This observation delay
+belongs to both policies and must not be mistaken for a range-only fix.
+
+`make test-upstream34-mec-runtime` passed all seven CPU-only test methods on
+2026-11-16. It executes generated routers only with fake helpers, covering
+policy selection, original stages, preserved environment, path quoting,
+argument rejection and terminal sampling/helper failures. Separate private
+mock regressions covered deadline clocks, six concurrent recovery requests
+with one mock dispatch, no recovery-boot GPU retry, control-only selection,
+private `HOME` and stopping before the native probe after observation failure.
+Four original34 user helpers compiled and passed signature/architecture checks;
+none was executed. See the separate
+[preparation record](validation/build34-mec-runtime-preparation-20261116.json).
+These checks do not arm a hardware trial or establish a GPU result.
+
+### Separate hardware admission
+
 All earlier native policy scopes remain consumed. This change does not create
 a startup job, arm recovery, install/load a driver, initialize the GPU or
 reboot. Do not run the helper as a live register fix or replace ordinary
@@ -95,9 +130,11 @@ reboot. Do not run the helper as a live register fix or replace ordinary
 A subsequent hardware comparison requires a new exact-image original34 scope,
 fresh-boot/PCI/OS and inactive-queue admission, an independent bounded recovery
 path, unchanged EFI/security baseline and one policy per scope. The control
-must establish actual range/CP-idle observations and reproduce the bounded IB
-signature. Only its verified result and recovery can permit a separately
-authorized treatment. The old consumed trial packets cannot be replayed.
+must retain actual range/status observations and reproduce the bounded IB
+signature. Register samples alone cannot establish CP idle. Only its verified
+result and recovery can permit consideration of a separately authorized
+treatment; the control cannot start that treatment. The old consumed trial
+packets cannot be replayed.
 
 Register readbacks or two successful dispatches do not accept the wait change,
 load/concurrency/desktop gates or FPS. Accelerated desktop and wait promotion
