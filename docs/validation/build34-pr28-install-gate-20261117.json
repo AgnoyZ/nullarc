@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "date": "2026-11-17",
+  "result": "installation-loader-pass-native-prerequisite-failed-recovered",
+  "branch": "upstream34/vram-layout-fix",
+  "source_commit": "52d68e68731aead50eda41ce427d4c5112659d4c",
+  "approved_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "kernel_build": 34,
+  "original34_exact_kernel_image": true,
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "plugin_installation": {
+    "atomic_install": "passed",
+    "new_process_loader": "passed",
+    "runtime_access_checks": 18,
+    "PR28_ivar_present": true,
+    "release_clears_inherited_opt_in": true,
+    "GPU_executed_by_loader": false,
+    "restored_exact_preinstall_bundle": true
+  },
+  "native_prerequisite": {
+    "initializations": 1,
+    "original_compute_graphics_and_adoptions": "passed",
+    "policy": "original-control",
+    "MEC_treatment": false,
+    "submitted_dispatches": 2,
+    "fully_verified_dispatches": 1,
+    "failure_pass": 1,
+    "mismatch_offset_bytes": 8208,
+    "mismatch_offset_hex": "0x2010",
+    "actual": "0xde",
+    "expected": "0xdf",
+    "same_mismatch_as_prior_control": true,
+    "waits": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 7324
+      },
+      {
+        "pass": 0,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 22162
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 0,
+        "elapsed_ns": 26250
+      }
+    ],
+    "maximum_observed_wait_ns": 26250,
+    "resources_retained_until_recovery": true,
+    "automatic_retry": false
+  },
+  "recovery": {
+    "requested_once": true,
+    "new_boot_observed": true,
+    "GPU_calls_after_recovery_boot": 0,
+    "original_plugin_restored": true,
+    "GPU_off": true,
+    "firmware_framebuffer_only": true,
+    "no_active_probe_or_shutdown": true,
+    "protected_files_unchanged": 46,
+    "protected_links_unchanged": 2,
+    "EFI_files_unchanged": 347,
+    "Microsoft_files_unchanged": 148,
+    "security_and_kernel_collections_unchanged": true,
+    "new_matching_diagnostic_reports": 0,
+    "consumed_job_removed": true
+  },
+  "acceptance": {
+    "PR28_GPU_wait_path_exercised": false,
+    "PR28_publication_timing_accepted": false,
+    "desktop_acceleration_enabled": false,
+    "desktop_acceleration_accepted": false,
+    "FPS_measured": false,
+    "IB_wrong_value_resolved": false,
+    "default_wait_enabled": false,
+    "accelerated_desktop_HOLD_cleared": false
+  },
+  "scope": {
+    "fresh_packet": true,
+    "old_scope_reused": false,
+    "build41_build42_candidates": false,
+    "EFI_writes": 0,
+    "NVRAM_writes": 0,
+    "binary_uploaded": false,
+    "raw_diagnostics_published": false
+  }
+}

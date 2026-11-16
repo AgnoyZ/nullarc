@@ -100,3 +100,54 @@ Rollback is `git revert` of this isolated source commit after reviewing later
 dependencies. Keep the accepted earlier PR/A1/A2/A3 commits and history. There
 is no deployment to undo. Retain the explicit default-off policy unless a
 separate hardware-scoped decision changes it.
+
+## Subsequent requested installation and desktop prerequisite test
+
+After source integration, the owner requested installation/testing and then a
+desktop-acceleration test. Preparation crossed local midnight; the hardware
+trial and recovery occurred on **2026-11-17**, on macOS 26.7.2 / `25G332`.
+The source was default commit
+`52d68e68731aead50eda41ce427d4c5112659d4c`. The original34 kernel image,
+native ABI, production helper, A1/A2/corrected-A3 and existing admission checks
+were preserved. This was a fresh, single-use scope; no consumed trial packet
+was replayed and neither withdrawn build was a candidate.
+
+The signed x86_64 release plugin was installed by an atomic bundle exchange
+after a complete verified backup. A new process loaded that exact installed
+image, verified the PR28 group ivar and completion method, and performed no
+device creation or GPU work. All 18 runtime file-access checks passed. This
+also confirmed that the release constructor clears inherited `NVMTL_*`
+environment variables. A future process-local opt-in test must set its controls
+after loading the plugin and before first policy use; passing an environment
+variable before load alone would not establish that PR28 was enabled. Global
+configuration was not changed.
+
+Desktop admission then ran the unchanged original34 native integrity probe,
+before any accelerator/display claim or Metal execution. One initialization
+passed the original compute, graphics and queue-adoption checks. The probe
+submitted two guarded dispatches; pass 0 verified, but pass 1 failed at byte
+`0x2010`: actual `0xde`, expected `0xdf`. This is the same mismatch as the
+earlier original34 control. No MEC range treatment was applied in this trial.
+The three native wait calls measured 7,324 ns, 22,162 ns and 26,250 ns; the
+second dispatch reported retirement but failed byte validation. These are
+native wait measurements, **not PR28 publication-wait timing evidence**.
+
+On the failure, the test retained the native client's mappings/resources,
+restored the exact pre-install plugin bundle and requested one recovery reboot.
+Independent readback confirmed original34, GPU-off, the firmware framebuffer,
+zero trial GPU calls on the recovery boot, no active probe/shutdown, and removal
+of the consumed startup job. All 46 protected files, two links and 347 EFI files
+(including 148 Microsoft files) matched their prior manifests; security and
+kernel collections were unchanged, with no new matching diagnostic report.
+No EFI/NVRAM write, kernel replacement or binary upload was performed.
+
+The installation/loader stage passed, but the native prerequisite failed.
+Consequently desktop acceleration was **not enabled**, the PR28 GPU wait path
+was **not exercised**, and no FPS, GUI-stability or camera result is claimed.
+The default wait remains off; the IB wrong value and desktop/wait-promotion
+HOLDs remain unresolved. This prerequisite result does not establish PR28's
+effectiveness or the cause of the native mismatch. Sanitized evidence is
+[`validation/build34-pr28-install-gate-20261117.json`](validation/build34-pr28-install-gate-20261117.json);
+exact manifests, controller checks, binaries and raw logs remain private and
+ignored. The source change remains on default, while the installed plugin is
+back at its pre-test version.

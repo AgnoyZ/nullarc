@@ -46,3 +46,12 @@ It remains explicitly opt-in and always excludes WindowServer. Expiry is
 reported as publication unconfirmed and does not retire pending work or forge
 completion. This does not promote the default wait policy, change the native
 fence timing, authorize deployment/GPU work or resolve the existing HOLDs.
+
+The owner's later installation and desktop-test request was followed by a
+[fresh installation/native prerequisite trial on 2026-11-17](BUILD34-PR28-WAIT-TIMING.md#subsequent-requested-installation-and-desktop-prerequisite-test).
+The candidate plugin installed and loaded in a new process, but the unchanged
+original34 native probe again failed its second guarded dispatch at `0x2010`
+(`0xde` instead of `0xdf`). No desktop accelerator was claimed and no PR28 GPU
+publication wait was exercised. The pre-test plugin was restored, one recovery
+reboot returned to GPU-off/firmware framebuffer, and the consumed job was
+removed. This does not clear any existing HOLD or authorize automatic retries.
