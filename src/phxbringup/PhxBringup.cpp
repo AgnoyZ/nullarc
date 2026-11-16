@@ -37,7 +37,7 @@ static_assert(PHX_PSP_GFX_RESP_OFFSET + PHX_PSP_TOC_SIZE_RESPONSE_REL + 4 <= PHX
 #include "PhxBoPolicy.hpp"
 #include "PhxAllocationDiagnostic.hpp"
 
-#define PHX_KEXT_BUILD 39u
+#define PHX_KEXT_BUILD 40u
 
 // debug.phxbos_flush: how a client's BOs are made coherent around each submission and each completed wait.
 // 2 = clflush every line (the bring-up way), 1 = clflushopt (the same lines, pipelined), 0 = none (the GPU maps system
@@ -3221,16 +3221,21 @@ IOReturn IOAccelPhxNativeClient::doWaitSeq(IOExternalMethodArguments *a) {
         uint64_t timeout = a->scalarInput[1];
         if (timeout > PHXN_WAIT_CAP_NS)
             timeout = PHXN_WAIT_CAP_NS;
+        const uint64_t start = mach_absolute_time();
         uint64_t retired = owner->gpuRetired();
-        for (uint64_t waited = 0; retired < target && waited < timeout; ) {
+        while (retired < target) {
+            // Count actual elapsed time, including lock contention and scheduler overshoot.
+            // A delayed wakeup must not grant another full set of requested sleeps.
+            uint64_t waited;
+            absolutetime_to_nanoseconds(mach_absolute_time() - start, &waited);
+            if (waited >= timeout)
+                break;
             if (waited < 1000000ull) {
                 // Short wait (< 1 ms): fast poll with 50 us delay for low latency
                 IODelay(50);
-                waited += 50000ull;
             } else {
                 // Extended wait (>= 1 ms): yield CPU to scheduler to avoid starving WindowServer & system threads
                 IOSleep(1);
-                waited += 1000000ull;
             }
             retired = owner->gpuRetired();
         }

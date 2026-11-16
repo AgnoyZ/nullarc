@@ -1,0 +1,80 @@
+{
+  "date": "2026-11-16",
+  "status": "offline-candidate-not-installed-hardware-hold",
+  "source_branch": "downstream/780m-tahoe",
+  "base_commit": "81bd11df4ffd775985a4ad40727f7a1f349b7365",
+  "kext_build": 40,
+  "reported_OS": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "watchdog_evidence_commit": "6f593b54457ceba5a378e88f2279eeadac4c9390",
+  "watchdog_evidence_path": "docs/validation/upstream34-backport-post-gate-watchdog-20261116.json",
+  "watchdog_evidence_branch": "backport/upstream34-a1-a3",
+  "regression": {
+    "method": "actual-source-method-extraction-with-ASan-UBSan-and-fake-monotonic-clock",
+    "development_working_tree_extraction": true,
+    "harness_sha256": "2315e98162ebe9e297de56737ffdf5b4309f9f852a6c24546f7bf589264482d7",
+    "before_source_sha256": "fcb2c23dbd12dbc9fb502391898056c949d52467698e84c7bd2ab9d96606e0b6",
+    "after_source_sha256": "2b62e0aa9d8c0a282dd5a4b91782da9dcb13da86ecaa1fc7396a42b05700a1e0",
+    "before_actual_wait_method_sha256": "d88845abb598658632a9c7f31d9d3df61ab6fed60a6515a250181366a234f87c",
+    "after_actual_wait_method_sha256": "688df1b2fecabd61687fcbda288d0fb2f5c3916f77e63860696230d977430a13",
+    "before_cases": 123,
+    "before_passed": 119,
+    "before_failed_cases": [
+      "wait-delay-overshoot",
+      "wait-sleep-overshoot",
+      "wait-cap-overshoot",
+      "wait-poll-preemption"
+    ],
+    "after_cases": 123,
+    "after_passed": 123,
+    "after_failed_cases": [],
+    "compiler_flags": [
+      "-std=c++17",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-g",
+      "-fsanitize=address,undefined",
+      "-fno-sanitize-recover=all"
+    ],
+    "fake_clock_nanoseconds_per_tick": 10,
+    "fake_clock_initial_ticks": 123456789,
+    "initial_fixture_mismatch_fixed_before_production_edit": true
+  },
+  "native_kernel_build": {
+    "exit_code": 0,
+    "MacKernelSDK_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "kext_build": 40,
+    "kernel_loaded": false,
+    "hardware_executed": false,
+    "binary_sha256": "89ccc8be9c4e90063019fd105f0031c4c5b26743a95accf2b682c5fa93336d62",
+    "clock_imports": [
+      "_mach_absolute_time",
+      "_absolutetime_to_nanoseconds"
+    ],
+    "warning_count": 3
+  },
+  "canonical_committed_source_validation": {
+    "status": "pending"
+  },
+  "default_branch_unchanged": {
+    "branch": "upstream34/vram-layout-fix",
+    "commit": "90bb06f6f9255cb5a16cc5eb87e78032566b2000"
+  },
+  "hardware_executed": false,
+  "kernel_loaded": false,
+  "installed": false,
+  "GPU_initialization": false,
+  "reboot_requested": false,
+  "runtime_or_EFI_changes": false,
+  "cumulative_A1_A2_A3_status": "HOLD",
+  "limitations": [
+    "One scheduler delay, blocking lock acquisition or retirement observation can exceed the deadline; the correction stops issuing further delays after observing expiry.",
+    "No proof that this timeout defect triggered the observed GPU fence stall or WindowServer watchdog.",
+    "No measured frame-rate, interactive-latency or hardware-stability improvement.",
+    "The plugin outer timeout and in-flight resource lifetime on terminal failure remain unresolved.",
+    "No deployment of downstream build40 into the distinct build34 baseline trial."
+  ]
+}

@@ -86,7 +86,10 @@ and only after confirmation. They also exercise cached page reuse, partial last
 chunks, both queues, impossible fences, inconsistent ownership, a simulated CAS
 retry, close during wait, repeated close/free, stop retention and stop racing
 allocation. These are deterministic host scenarios, not concurrency stress or
-actual DMA/page-wiring validation.
+actual DMA/page-wiring validation. The elapsed-time correction and deterministic
+delay/sleep/lock-overshoot cases added on 2026-11-16 are described in
+[FENCE-WAIT-DEADLINE.md](FENCE-WAIT-DEADLINE.md); that offline candidate does not
+establish a fix for the later native-desktop watchdog.
 
 The VM submission regression also executes sequence/write-pointer exhaustion
 and stopping refusals; the adoption regression refuses adoption after stop.

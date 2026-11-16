@@ -65,7 +65,10 @@ class ContextRetirementRunnerTests(unittest.TestCase):
     def test_ci_and_lifetime_scenarios(self):
         self.assertEqual(len(CASES), len(set(CASES)))
         for case in ('late-completion', 'ack-retry', 'faulted-peer-recovered', 'host-pins-preserved',
-                     'client-close-then-free', 'close-during-wait', 'stop-repeat', 'alloc-reclaims'):
+                     'client-close-then-free', 'close-during-wait', 'stop-repeat', 'alloc-reclaims',
+                     'wait-zero-timeout', 'wait-short-timeout', 'wait-delay-overshoot', 'wait-sleep-overshoot',
+                     'wait-cap-overshoot', 'wait-poll-preemption', 'wait-complete-at-zero',
+                     'wait-complete-after-oversleep'):
             self.assertIn(case, CASES)
         self.assertIn('python3 tools/test_context_retirement.py', (ROOT / '.github/workflows/build.yml').read_text())
         harness = (ROOT / 'tests/test_context_retirement.cpp').read_text(encoding='utf-8')

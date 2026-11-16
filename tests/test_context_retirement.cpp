@@ -22,6 +22,12 @@ enum { kIOReturnSuccess, kIOReturnNotReady, kIOReturnBadArgument, kIOReturnNotFo
 static std::vector<std::string> events;
 static std::set<void *> allocations;
 static unsigned frees = 0, lineFlushes = 0, delays = 0, sleeps = 0, casCalls = 0, lockFrees = 0;
+// A nonzero epoch and non-nanosecond ticks catch raw-tick/absolute-time mistakes.
+static constexpr uint64_t nsPerTick = 10;
+static uint64_t clockTicks = 123456789, delayExtraNs = 0, sleepExtraNs = 0, pollExtraNs = 0;
+static void advanceTime(uint64_t ns) { assert(ns % nsPerTick == 0); clockTicks += ns / nsPerTick; }
+[[maybe_unused]] static uint64_t mach_absolute_time() { return clockTicks; }
+[[maybe_unused]] static void absolutetime_to_nanoseconds(uint64_t ticks, uint64_t *ns) { *ns = ticks * nsPerTick; }
 static bool failCasOnce = false;
 static void IOFree(void *p, size_t) { assert(allocations.erase(p) == 1); ++frees; events.push_back("free-storage"); std::free(p); }
 static bool OSCompareAndSwapPtr(void *old, void *value, void *volatile *where) {
@@ -36,7 +42,7 @@ static void IOLockUnlock(int *p) { assert(p && *p); *p = 0; }
 static void IOLockFree(int *p) { assert(p && !*p); ++lockFrees; }
 static void IOLog(const char *, ...) {}
 static void IODelay(unsigned);
-static void IOSleep(unsigned ms) { assert(ms == 1); ++sleeps; }
+static void IOSleep(unsigned);
 static void flushLine(void *) { if (!lineFlushes) events.push_back("flush-pages"); ++lineFlushes; }
 static unsigned gSysctlUp = 0;
 static int sysctl__debug_phxbos_flush = 0, sysctl__debug_phxbos_flush_bytes = 0;
@@ -179,11 +185,18 @@ public:
 static PhxBringup *active;
 static bool stopAfterLock = false;
 static void afterLock(int *lock) {
+    if (active && lock == active->gpuLock) advanceTime(pollExtraNs);
     if (stopAfterLock && active && lock == active->gpuLock) { active->stopping = true; stopAfterLock = false; }
+}
+static bool retireOnSleep = false;
+static void IOSleep(unsigned ms) {
+    assert(ms == 1); ++sleeps; advanceTime(1000000ull + sleepExtraNs);
+    if (retireOnSleep) active->aperture.words[0x100 / 8] = 5;
 }
 static IOAccelPhxNativeClient *closeOnDelay = nullptr;
 static void IODelay(unsigned us) {
     ++delays;
+    advanceTime(us * 1000ull + (us == 50 ? delayExtraNs : 0));
     if (us == 1) assert(active->mutex);
     else {
         assert(us == 50);
@@ -341,13 +354,40 @@ int main(int argc, char **argv) {
                 assert(!p.root.releases && !p.child.releases && !system.releases && p.mmio && p.smuLock);
             }
         }
-    } else if (test == "wait-adaptive-timeout" || test == "wait-cap-timeout") {
+    } else if (test.rfind("wait-", 0) == 0 && !clientCase) {
         IOAccelPhxNativeClient c(p, buffers); IOExternalMethodArguments args;
-        args.scalarInput[1] = test == "wait-adaptive-timeout" ? 3000000ull : UINT64_MAX;
+        p.gSeq = 5;
+        uint64_t requested = 3000000ull, expectedElapsed = 3000000ull;
+        unsigned expectedDelays = 20, expectedSleeps = 2;
+        bool completed = false;
+        if (test == "wait-cap-timeout") {
+            requested = UINT64_MAX; expectedElapsed = PHXN_WAIT_CAP_NS;
+            expectedSleeps = (PHXN_WAIT_CAP_NS - 1000000ull) / 1000000ull;
+        } else if (test == "wait-zero-timeout" || test == "wait-complete-at-zero") {
+            requested = expectedElapsed = 0; expectedDelays = expectedSleeps = 0;
+            if (test == "wait-complete-at-zero") { p.aperture.words[0x100 / 8] = 5; completed = true; }
+        } else if (test == "wait-short-timeout") {
+            requested = expectedElapsed = 50000ull; expectedDelays = 1; expectedSleeps = 0;
+        } else if (test == "wait-delay-overshoot") {
+            delayExtraNs = 3450000ull; expectedElapsed = 3500000ull; expectedDelays = 1; expectedSleeps = 0;
+        } else if (test == "wait-sleep-overshoot" || test == "wait-complete-after-oversleep") {
+            sleepExtraNs = 99000000ull; expectedElapsed = 101000000ull; expectedSleeps = 1;
+            if (test == "wait-complete-after-oversleep") { retireOnSleep = true; completed = true; }
+        } else if (test == "wait-cap-overshoot") {
+            requested = UINT64_MAX; sleepExtraNs = 2999000000ull;
+            expectedElapsed = 3001000000ull; expectedSleeps = 1;
+        } else if (test == "wait-poll-preemption") {
+            pollExtraNs = expectedElapsed = 4000000ull; expectedDelays = expectedSleeps = 0;
+        } else assert(test == "wait-adaptive-timeout");
+        args.scalarInput[1] = requested;
+        const uint64_t start = clockTicks;
         assert(c.doWaitSeq(&args) == kIOReturnSuccess);
-        assert(args.scalarOutput[0] == 1 && args.scalarOutput[1] == 4 && args.scalarOutput[2] == 5);
-        assert(delays == 20 && sleeps == (test == "wait-adaptive-timeout" ? 2u : (PHXN_WAIT_CAP_NS - 1000000ull) / 1000000ull));
-        assert(!c.flushCalls && !normal.releases && !host.releases);
+        assert(args.scalarOutput[0] == (completed ? 0u : 1u) && args.scalarOutput[1] == (completed ? 5u : 4u) && args.scalarOutput[2] == 5);
+        assert(delays == expectedDelays && sleeps == expectedSleeps);
+        assert((clockTicks - start) * nsPerTick == expectedElapsed);
+        assert(c.flushCalls == (completed ? 1u : 0u));
+        assert(!normal.releases && !host.releases && !host.completes && !frees);
+        assert(c.bos == buffers->entries && c.bufferStorage == buffers && p.vm[0].busy && !p.vm[0].closing);
     } else if (clientCase) {
         IOAccelPhxNativeClient c(p, buffers);
         if (test == "client-pending-bo-close") { c.bos[1].pendingFree = true; c.bos[2].pendingFree = true; }

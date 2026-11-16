@@ -28,7 +28,9 @@ CASES = (
     'atomic-quarantine-retry', 'client-close-pending', 'client-close-complete', 'client-destructor-pending',
     'client-close-then-free', 'client-repeat-close', 'client-no-vmid', 'client-memory-after-close',
     'wait-after-close', 'close-during-wait', 'stop-active', 'stop-pending', 'stop-faulted', 'stop-orphan',
-    'wait-adaptive-timeout', 'wait-cap-timeout',
+    'wait-adaptive-timeout', 'wait-cap-timeout', 'wait-zero-timeout', 'wait-short-timeout',
+    'wait-delay-overshoot', 'wait-sleep-overshoot', 'wait-cap-overshoot', 'wait-poll-preemption',
+    'wait-complete-at-zero', 'wait-complete-after-oversleep',
     'stop-cold', 'stop-repeat', 'host-pins-preserved', 'mixed-buffer-release', 'empty-buffer-container',
     'shutdown-desktop-initializing', 'shutdown-desktop-sealed', 'shutdown-desktop-abandoned',
     'alloc-stopping-after-lock', 'unbound-peer-invalid-hardware', 'client-pending-bo-close',
@@ -94,7 +96,7 @@ def exercise(out):
     result = {'source_provenance': provenance, 'actual_retirement_method_sha256': hashes,
               'actual_retirement_declarations_sha256': hashlib.sha256((constants + shared + declarations).encode()).hexdigest(),
               'cases': rows, 'hardware_executed': False, 'kernel_loaded': False,
-              'limitation': 'Actual ownership transfer, complete cached-backing validation/clear, reaping, close/free, wait and stop methods with fake IOKit, aligned CPU backing, physical segments, cache flushes, registers and fence storage. No actual DMA, page wiring, concurrency stress, reset or target hardware proof.'}
+              'limitation': 'Actual ownership transfer, complete cached-backing validation/clear, reaping, close/free, wait and stop methods with fake IOKit, aligned CPU backing, physical segments, cache flushes, registers, fence storage and a non-unit monotonic clock with delay/sleep/poll overshoot. No actual DMA, page wiring, concurrency stress, reset or target hardware proof.'}
     (out / 'report.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2), flush=True)
     return result
