@@ -136,6 +136,10 @@ baseline and any minimal candidate's source/image hashes, review ring-size
 compatibility, preserve the original admission checks, and define strict
 candidate-specific containment and recovery. No consumed original-image
 scope, signed diagnostic receipt or CPU PASS may stand in for that work.
+The [inactive source proposal](BUILD34-RING-PADDING-PROPOSAL.md) now pins the
+two-site derived source and defines the fresh control/treatment order. It
+leaves image identities and live admission unprepared; no kernel is built
+and no test scope is armed by that document.
 Do not relabel a downstream kernel as build34, reuse build41/build42, or
 silently admit a changed image as the untouched original34 baseline.
 
