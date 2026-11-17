@@ -296,3 +296,61 @@ plugin stage and FPS stage/cache were removed. Final read-back confirmed
 GPU-off, firmware framebuffer only, EFI unmounted, no remaining test client
 or held process, and no next GPU/reboot task armed. The scope is consumed;
 the verifier performed zero GPU calls.
+
+## Ordinary-user device-open observation: no accelerator open observed
+
+On 2026-11-18, a seventh fresh packet based on
+`87825b7ab2e172c68471a2b6541bce993993e6c3` returned to the fifth packet's
+ordinary GUI-user route. Its probe source/binary, initialization observer,
+selection/FPS parsers, shaders, frame workload, kernel and plugin were
+byte-identical to that packet. The sole new runtime diagnostic was a bounded
+`IOServiceOpen` interposer injected into the final test process. It forwarded
+the original arguments and return value, preserved `errno`, read connection
+outputs only on success, and queried service-class metadata after the real
+open returned. It did not make any additional client-open call or modify
+the production binaries, device admission or wait policy. Injection was
+introduced after the protected launch/priority tools, solely for the probe.
+
+Preparation passed 128 CPU/controller/parser methods and 11 ASan/UBSan
+forwarding cases. Native null-service checks verified actual interposition
+and unchanged returns without opening a valid device. The actual GUI-user
+FPS launch route passed its injected CPU statistics check; both original
+and candidate plugin loader/ABI/observer checks passed with the interposer
+loaded and zero initializer or intercepted client-open calls. These checks
+did not submit GPU work.
+
+Initialization, both full-arena native checks and both PR28 admission probes
+passed again on the trial boot. Before the FPS application, readiness observed
+**127 additional successful present transactions in 10.648462243 seconds**,
+the same WindowServer, unchanged panel timing and mapped plugin/RADV images.
+The application then enumerated **zero devices**, invoked neither observed
+initializer and returned **exit 22 after 1.083880789 seconds**. It did not
+reach window setup or the frame worker. There were zero frame records and
+no accepted ordinary-user FPS result.
+
+Independent parsing found exactly one intercepted `IOServiceOpen`, occurring
+between `before-Metal-device` and `device-observer-restored`: **`IOSurfaceRoot`,
+connection type 0, return code 0, with a nonzero returned connection**. The
+observer's beginning and summary both matched the expected GUI-user identity;
+there were no suppressed, incomplete or output-error events. No accelerator
+open or access-denied return was observed through this interposer.
+
+This does **not** establish a permissions denial or prove that every possible
+internal open path was intercepted. The evidence is limited to the observed
+function calls and interval. The earlier root-only rendering control remains
+separate, and the ordinary-user discovery failure remains unresolved. The next
+diagnosis should inspect device matching/discovery before assuming that a
+kernel access check or the plugin's later allow-list/Vulkan checks rejected
+the application. No permission, identity or FPS requirement was relaxed.
+
+Independent review reparsed the exact failure, stages, call/event ordering,
+device observations, readiness/intent binding, native output and both PR28
+outputs. Exact restoration and retirement passed: original kernel and complete
+plugin restored, all 46 protected files and 347 original EFI files matched,
+protected links/security/kernel collections unchanged, and no new matching
+diagnostic or remaining test client/job. Only the exact nine recovery files,
+job, plugin stage, FPS stage/cache and injected observer stage were removed.
+Final read-back confirmed GPU-off, firmware framebuffer only, EFI unmounted
+and no next GPU/reboot task armed. The scope is consumed and the verifier
+performed zero GPU calls. All earlier failures and the limited root-control
+acceptance remain preserved.
