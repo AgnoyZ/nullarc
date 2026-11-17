@@ -229,3 +229,70 @@ test client/job. Only the exact nine recovery files, job, plugin stage and
 GUI stage/cache were removed. Final read-back confirmed GPU-off, firmware
 framebuffer only, EFI unmounted and no next GPU scope armed. All five failed
 FPS attempts remain preserved and unaccepted.
+
+## Root execution control: bounded frame workload passed
+
+A sixth fresh packet, based on
+`276b10a4c39e6dd5146e4a9f4ce163cacf8015dd`, changed only the FPS application's
+execution credentials to root while retaining the actual console user's
+bootstrap. The probe source and binary, initialization observer, selection
+parser, FPS parser, shaders, frame workload, kernel and plugin matched the
+fifth packet byte for byte. No production source or admission policy changed.
+The application still enumerated devices once, required the unique exact
+target, and made no default-device call, fallback or retry.
+
+Preparation retained the 106 CPU/controller/parser methods, statistics,
+selection and observer checks under both identities, and the GUI-user
+original/candidate plugin loader checks. Additional checks exercised the
+actual root-control launch route: eight CPU statistics cases and both plugin
+loader/ABI/observer checks passed with UID/EUID 0 and zero device initializer
+or GPU calls. This did not execute another GPU workload before the trial.
+
+On the trial boot, initialization, both native full-arena checks and both
+PR28 admission probes passed. Before the FPS launch, readiness observed
+**22 additional successful present transactions in 16.917906416 seconds**,
+the same WindowServer, unchanged panel timing and mapped plugin/RADV images.
+The application ran all eight startup stages with UID/EUID 0, enumerated
+**one device with one exact target match**, and invoked both observed
+initializers once without a nil return. Both original implementations were
+restored before frame work. Target verification and visible-window setup
+passed; the application exited 0 after 32.215373856 seconds.
+
+Independent frame and presentation reparsing confirmed:
+
+- 1280-by-800 visible drawable, display synchronization enabled, two maximum
+  drawables and one command in flight; 227 warmup frames over 2.001434702 seconds.
+- **2332 measured frames over 20.007381711 seconds**, with all commands
+  successfully completed and all 149248 sampled pixel channels verified.
+- **116.556980503 completed-and-verified frames/second**, measured with
+  `CLOCK_UPTIME_RAW`; nearest-rank completion intervals p50 **8.343770 ms**,
+  p95 **9.233229 ms**, p99 **16.777249 ms**, maximum **43.318042 ms**.
+- **2332 positive, strictly increasing presentation timestamps**, spanning
+  19.991754329 seconds and reporting **116.598071467 presentations/second**.
+  These are independently checked callback timestamps, not physical scanout.
+
+The separate desktop tail retained the same WindowServer across three
+samples over 17.118938042 seconds, with no new matching diagnostic report.
+Its present-counter progress was not used to calculate either frame rate.
+PR28 remained default-off, WindowServer remained excluded, and the FPS
+application did not opt in.
+
+**Only this bounded root-context control workload is accepted.** Ordinary
+GUI-user device visibility and FPS remain unaccepted; the fifth packet's
+empty device list and all five earlier failures remain in the evidence.
+The credential-sensitive difference directs the next diagnosis toward the
+ordinary-user discovery/access path. It does not prove a particular
+authorization, session, framework or driver root cause, repair default-device
+creation, or justify running ordinary applications as root. No A/B speedup,
+game FPS, physical scanout, input latency, background-stutter repair,
+unrestricted long-term stability or persistent desktop adoption is claimed.
+
+Independent review reparsed all native, PR28, readiness, startup, observer,
+selection, frame and presentation evidence before checking exact recovery.
+The original kernel and full plugin were restored; all 46 protected files
+and 347 original EFI files matched, with protected links/security/kernel
+collections unchanged. Only the exact nine recovery files, restore-only job,
+plugin stage and FPS stage/cache were removed. Final read-back confirmed
+GPU-off, firmware framebuffer only, EFI unmounted, no remaining test client
+or held process, and no next GPU/reboot task armed. The scope is consumed;
+the verifier performed zero GPU calls.
