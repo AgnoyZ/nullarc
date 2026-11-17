@@ -4,8 +4,10 @@
 > 2026-11-17 在原版与等长 NOP 对照均复现 IB 错值后，外层 ACQUIRE 镜像通过两次受保护提交，
 > 已将逐字节相同的最小计算提交同步修改纳入默认源码；内核 ABI、启动工具及 A1/A2/A3 保留。
 > 实机测试结束已恢复原版 build34、GPU 停用；源码集成不代表本机持续运行修复镜像。
-> **候选在短时实机通过后发生 WindowServer watchdog，原生加速桌面继续 HOLD。**
-> 有界计算测试不代表卡顿已解决、桌面稳定或帧率提高。
+> 2026-11-17 修复镜像配合原已安装运行库通过约 151 秒桌面接管、Metal 输出与帧进展验证，随后独立恢复。
+> **2026-11-16 的 WindowServer watchdog 仍保留；持续使用加速桌面的准入继续 HOLD。**
+> 新增验证不代表长期稳定、卡顿根因已解决、PR28 等待已实测或帧率提高。
+> [桌面接管短测、观察器修正与恢复](docs/BUILD34-DESKTOP-VALIDATION.md) ·
 > [计算提交同步修改、三组对照与恢复记录](docs/BUILD34-SUBMIT-MEMSYNC.md) ·
 > [回移内容、既有验证与回退](docs/UPSTREAM34-BACKPORT.md) ·
 > [原始显存修复基线](docs/UPSTREAM34-LAYOUT-CORRECTION.md)。
@@ -18,8 +20,10 @@
 > Active development and hardware tests use default build34 only. The minimal
 > compute-submit ACQUIRE fix passed two guarded native dispatches after both
 > original and equal-footprint NOP controls failed, and its exact source is
-> integrated. The machine was recovered to the original image with GPU off;
-> graphics, desktop stability and FPS acceptance remain separate.
+> integrated. A subsequent bounded desktop/Metal trial passed with the retained
+> installed runtime, including about 151 seconds of frame observation. The
+> machine was recovered to the original image with GPU off. Persistent desktop
+> adoption, long-run stability, PR28 GPU waits and FPS remain unaccepted.
 > This branch publishes no binaries.
 
 <p align="center">

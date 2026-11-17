@@ -9,6 +9,11 @@ derived from that exact checkpoint. Original and equal-footprint NOP controls
 failed; the exact ACQUIRE image passed both guarded native dispatches and
 independent recovery. Its byte-identical source is integrated on this branch.
 This is bounded compute acceptance, not desktop, stability or FPS acceptance.
+The subsequent [fixed-image desktop trial](BUILD34-DESKTOP-VALIDATION.md)
+passed bounded native/Metal output and about 151 seconds of desktop frame
+observation with the retained installed runtime, then independently recovered.
+It does not accept persistent adoption, the newer default-branch plugin sources,
+PR28 GPU waits, long-run stability or FPS.
 
 Build41 and build42 are withdrawn, not candidates. Do not continue preparing,
 compiling, installing, loading or testing them as candidates. Do not rename a
@@ -24,9 +29,9 @@ of a host-only test or a simulated GPU result. The unmodified original34
 image retains the native single-IB wrong value; the integrated fix has bounded
 native single-IB evidence, while the explicit immutable-tail workaround has
 separate transport and bounded complete-Vulkan evidence below. The recovered
-machine still runs the original image with GPU off. Default waits and
-accelerated desktop remain on HOLD. The following records retain the
-chronology and scope of earlier experiments, including their failures.
+machine still runs the original image with GPU off. Default-wait promotion and
+persistent accelerated-desktop adoption remain on HOLD. The following records
+retain the chronology and scope of earlier experiments, including their failures.
 
 The interrupted build42 user-tool preparation was stopped, and its eight
 uncommitted files were withdrawn. No driver was installed or loaded, no native

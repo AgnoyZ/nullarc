@@ -6,7 +6,11 @@ byte-identical driver source is integrated on the default branch**. The
 fresh original and equal-footprint NOP controls both failed the second
 dispatch at `0x2010` (`0xde` instead of `0xdf`). This is bounded native
 compute evidence for the minimal change, not desktop, full Vulkan, graphics,
-long-run stability or FPS acceptance. Those HOLDs remain.
+long-run stability or FPS acceptance. A later separate
+[desktop trial](BUILD34-DESKTOP-VALIDATION.md) passed bounded graphics/Metal
+output and about 151 seconds of desktop frame observation with the retained
+installed runtime, then recovered. Persistent adoption, newer plugin/PR28
+GPU validation, long-run stability and FPS remain unaccepted.
 
 The approved parent source checkpoint remains
 `64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c` with A1/A2/corrected-A3. The
