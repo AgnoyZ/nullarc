@@ -171,11 +171,17 @@ remain; no next GPU scope is armed.
 The subsequent [outer-ring memory-sync preparation](BUILD34-OUTER-MEMSYNC.md)
 derives equal-footprint NOP and ACQUIRE prefix experiments from original34,
 preserving production source and all existing HOLDs. Three actual-function
-CPU policies and both private native builds passed, but neither changed image
-is installed, loaded or GPU-tested. A new exact-original control and separate
-NOP-prefix result must precede any ACQUIRE attribution; shared EFI observer
-serialization and fresh recovery/admission remain prerequisites. No consumed
-scope is replayed or new hardware task armed by this preparation.
+CPU policies and both private native builds passed; neither changed image had
+been installed, loaded or GPU-tested at the preparation checkpoint. The later
+[fresh original/NOP hardware comparison](BUILD34-OUTER-NOP-HARDWARE.md)
+reproduced the same `0x2010` (`0xde` versus `0xdf`) second-dispatch fault in
+both scopes. Independent recovery, retirement and final original34/GPU-off
+read-back passed, including the exact 347-file EFI baseline and 46 protected
+files. Shared bounded EFI serialization avoided the earlier observer mount
+race. NOP is rejected as a repair; this meets only the prerequisite for a
+separate equal-footprint ACQUIRE comparison. ACQUIRE remains uninstalled and
+GPU-untested at this checkpoint. No consumed scope is replayed, hardware task
+armed or existing HOLD cleared by this record.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

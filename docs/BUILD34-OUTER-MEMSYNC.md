@@ -1,7 +1,12 @@
 # Original34 outer-ring memory-sync experiment
 
-Status on 2026-11-17: **CPU checks and two private native builds passed;
-neither image installed or GPU-tested**. The preceding
+Preparation checkpoint on 2026-11-17: **CPU checks and two private native
+builds passed; neither image was installed or GPU-tested at that checkpoint**.
+The subsequent [fresh original/NOP hardware comparison](BUILD34-OUTER-NOP-HARDWARE.md)
+reproduced the same second-dispatch wrong value in both scopes; independent
+recovery and retirement completed. NOP is rejected as a repair. This meets
+only the reproduction prerequisite for a separate ACQUIRE comparison; the
+ACQUIRE image remains uninstalled and untested on the GPU. The preceding
 [padding candidate failed on hardware](BUILD34-RING-PADDING-HARDWARE.md).
 The original native single-IB wrong value is unresolved. Default build34,
 A1/A2/corrected-A3, kernel/helper/ABI, waits and desktop policy are unchanged.
@@ -92,8 +97,9 @@ and x86_64 checks passed. Independent privileged read-back checked exact
 source/binary pins, original-equal complete plist and identities distinct
 from each other and the loaded original. Both retained only the same three
 field-shadow warnings previously compared with untouched original34; no new
-warning message was introduced. Neither candidate is installed or loaded.
-Original34 remains loaded with GPU-off. See the
+warning message was introduced. At the preparation checkpoint neither
+candidate was installed or loaded, and original34 remained loaded with
+GPU-off. See the
 [aggregate preparation record](validation/build34-outer-memsync-preparation-20261117.json).
 
 ```sh
@@ -133,4 +139,6 @@ dispatch checks and native sequence/fence observations are required for a
 bounded pass. Retain any mismatch/held process until recovery; never kill the
 held GPU client. Restore original34/GPU-off and independently retire each scope.
 No source promotion, desktop, graphics, stability or FPS acceptance follows
-from preparation or a bounded compute pass. No hardware task is armed here.
+from preparation or a bounded compute pass. The subsequent NOP comparison
+completed steps 1 and 2 with the precise original failure; its consumed tasks
+were retired and do not authorize replay. No hardware task is armed here.
