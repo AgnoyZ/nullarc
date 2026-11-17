@@ -65,6 +65,13 @@ The subsequent complete RADV dylib compilation and guarded CPU-only load passed
 with the same three transport source hashes. That private library has not been
 installed or executed on the GPU; full-runtime Vulkan/graphics acceptance
 remains separate from the bounded transport test.
+The subsequent explicit-tail enumeration ownership patch changes only one
+additional MIT Mesa Vulkan source file. It keeps profile/query/logical-device
+use on one shared core when the tail is explicitly enabled, preserving the
+single-client trial boundary and leaving the three hardware-tested transport
+files unchanged. Its actual-function CPU tests do not constitute full Vulkan
+or GPU acceptance. The baseline's orphaned profile sync clone is recorded and
+unchanged; default/desktop/wait HOLDs remain.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

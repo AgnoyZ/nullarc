@@ -48,6 +48,12 @@ baseline after the same 19 reviewed patches, including archived symlinks. It
 checks the full 12,969-file/link inventory against
 `tools/upstream34_layout/radv_ib_tail_runtime_sources.json`, stages the existing
 three-file patch and requires its output to match the hardware-tested sources.
+It then applies `0002-radv-original34-tail-enumeration-owner.patch` to the
+separately pinned MIT `radv_physical_device.c`. Only exact opt-in value `1`
+retains a core owner across physical-device enumeration and subsequent device
+creation. The physical device's existing destructor releases that owner.
+Default/`0` enumeration remains unchanged. This fourth file has separate CPU
+and runtime-build evidence; it is not covered by the earlier transport GPU test.
 It never applies the historical kernel patches or builds a kernel.
 
 Use native x86_64 macOS and Python 3.10 or later. Prepare an isolated Python
@@ -73,7 +79,8 @@ Each attempt needs a fresh output. Meson uses `--wrap-mode=nofallback` and
 Ninja compiles only the RADV dylib target with `-j1`. The recipe verifies
 Mach-O x86_64/dylib identity, system-only runtime dependencies, required
 exports, the actual compiled transport/header dependencies and their presence
-in the dylib link closure. It signs the output and performs an export/service
+in the dylib link closure, including the fourth enumeration source and its
+Darwin DRM header. It signs the output and performs an export/service
 policy load check with physical-device enumeration disabled.
 
 The load check uses a separate IOKit interposer dylib. Before loading its
@@ -89,6 +96,38 @@ using only CPU fixtures and null/invalid IOKit handles:
 python3 tools/test_build34_radv_runtime_smoke.py \
   --out build/radv-tail-runtime-smoke-tests-private
 ```
+
+Test the actual baseline/patched enumeration function, actual DRM wrapper
+functions and real shared core/VA allocator with CPU platform fixtures:
+
+```sh
+python3 -B -I tools/test_build34_radv_enumeration_owner.py \
+  --mesa-source /path/to/complete/verified/mesa \
+  --transport-source /path/to/staged/source/src/amd/common/darwin \
+  --out build/radv-tail-enumeration-owner-cpu-private
+```
+
+The runner verifies all 30 transport dependencies, the wrapper and fourth-file
+hashes, the unchanged hardware-tested transport outputs, and the protected
+original34 source. Its physical-device constructor is a CPU fixture with real
+core acquisition/release, not full Vulkan execution. It explicitly records the
+baseline's existing orphaned profile sync clone; this patch does not fix it.
+
+After a successful complete build, exercise its actual Vulkan enumeration,
+dedicated-compute logical-device creation and destruction with a separate CPU
+IOKit fixture:
+
+```sh
+python3 -B -I tools/test_build34_radv_runtime_enumeration.py \
+  --runtime build/radv-tail-runtime-private \
+  --out build/radv-tail-runtime-enumeration-cpu-private
+```
+
+The fixture audits every runtime IOKit import, tests its dependent-dylib open
+interposition before loading RADV, and implements only fake setup/teardown in
+CPU memory. Its only real IOKit helper constructs a matching dictionary.
+Native submit/wait selectors and all unexpected calls are rejected. This tests
+the full Vulkan CPU lifecycle, not GPU execution or shader correctness.
 
 Results, logs, the source snapshot and the dylib stay in ignored `build/`.
 Successful compilation does not install the library, select it for an

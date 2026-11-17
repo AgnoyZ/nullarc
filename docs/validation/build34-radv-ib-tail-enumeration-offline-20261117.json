@@ -1,0 +1,374 @@
+{
+  "date": "2026-11-17",
+  "scope": "explicit-tail enumeration ownership: actual-function CPU comparison, complete RADV rebuild, guarded CPU load and full Vulkan CPU lifecycle; no GPU test",
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "prior_transport_hardware_evidence": "build34-radv-ib-tail-hardware-20261117.json",
+  "prior_three_file_runtime_evidence": "build34-radv-ib-tail-runtime-offline-20261117.json",
+  "source_pins": {
+    "full_baseline_inventory_sha256": "802ba367ff234b3117f6c384384778f3ea85f74f64d77fb484a7037461a55398",
+    "full_baseline_files_and_links": 12969,
+    "patched_source_sha256": {
+      "src/amd/common/darwin/ac_darwin_drm.c": "dc28898693c313f8db4ffe0fe8d139cb61a4395abd3bcf45c43c6cb3ded66db4",
+      "src/amd/common/darwin/ac_darwin_kext.c": "effeec0095b63119e9494eca6ab73c4cf2bcc4941fccaf0c96c6ea92282878df",
+      "src/amd/common/darwin/ac_darwin_kext.h": "f3d5312d1d3d0248e617cb2d4687c621694b6007e59e789f47a12b821f7ab675"
+    },
+    "enumeration_owner": {
+      "patch": "mesa-patches-build34/0002-radv-original34-tail-enumeration-owner.patch",
+      "source": "src/amd/vulkan/radv_physical_device.c",
+      "base_source_sha256": "967de26f3cb4ce7e01bb5534aba815228acdd92aa2cb21e283e690cbac908b02",
+      "patched_source_sha256": "d0c56ce1fe611744c42d8ea34bfefe28c1ebaa2c3a14cf38ceeaa8a121d1a072",
+      "patch_sha256": "f38bcc1a4e6fb6890ad392e7fd3f775b4903b953ef9957f828c1cf80e240471c",
+      "baseline_wrapper_sha256": "13bf82bc43a42e8ee7857c3c5c427e028d26c06c1952ad0b4253614e57e2c3de",
+      "enabled_only_when_tail_env_is_exact_1": true,
+      "transport_three_sources_changed": false,
+      "GPU_verified": false
+    }
+  },
+  "CPU": {
+    "result": "passed",
+    "ASan_UBSan": true,
+    "actual_enumeration_function_compiled": true,
+    "actual_wrapper_functions_compiled": true,
+    "real_transport_core_and_VA_allocator": true,
+    "physical_device_construction": "CPU fixture with actual core acquire/release, not full Vulkan execution",
+    "legacy_profile_clone_orphan_per_successful_identity_call": 1,
+    "legacy_orphan_changed": false,
+    "CPU": {
+      "baseline": {
+        "cases": 140,
+        "checks": 6498
+      },
+      "patched": {
+        "cases": 140,
+        "checks": 5042
+      }
+    },
+    "GPU_executed": false,
+    "base_source_sha256": "967de26f3cb4ce7e01bb5534aba815228acdd92aa2cb21e283e690cbac908b02",
+    "patched_source_sha256": "d0c56ce1fe611744c42d8ea34bfefe28c1ebaa2c3a14cf38ceeaa8a121d1a072",
+    "patch_sha256": "f38bcc1a4e6fb6890ad392e7fd3f775b4903b953ef9957f828c1cf80e240471c",
+    "baseline_wrapper_sha256": "13bf82bc43a42e8ee7857c3c5c427e028d26c06c1952ad0b4253614e57e2c3de",
+    "baseline_dependency_sha256": {
+      "docs/license.rst": "0d1a0472ecc81830e75c20d59b0ea02841e3db21255e0ebad97ab682c54d6615",
+      "include/c99_compat.h": "92445314d5fb3eff3a12eaf4cc864f9b459862a99594403b36ea79dfe149d267",
+      "include/darwin/amdgpu.h": "83f5e436813f0a886f20943cde8535195c6b79ebc58ba2391bdae27e3d1d35ef",
+      "include/darwin/navi48_native_abi.h": "0d990a6ed3484e39a14e47e1f64ed067b1fc78a70ee3f495efb046777ff4d941",
+      "include/drm-uapi/amdgpu_drm.h": "8b217983283e29059c56bf5194ad101f8ba8eaf32bd7d3101b29612d1825e50f",
+      "include/drm-uapi/drm.h": "1617ef3ed0c0ceb7c1d37f828d529306478313c4363c0d6d597e11503e025f07",
+      "include/drm-uapi/drm_mode.h": "6f1e99012854f40c59e62ba9ab031aa6e0f7354f41f25d0a9d23e6dfc6bd370b",
+      "include/no_extern_c.h": "60883a8d2b2978b861ef686c5a9afb41cf91ffec7c56baca89c626e7fea2d385",
+      "src/amd/common/amd_family.h": "71e54dadceca13790d56b5b71d865580afca693c989ce19e3b738617dd19210d",
+      "src/amd/common/amdgpu_devices.c": "d5297cf39abadb1bf7f5355f14dcfd229b75ca194c016e1329b8582a9eecdc30",
+      "src/amd/common/amdgpu_devices.h": "c12ada2db07a5de7e21f3d74c6b32087e3bc8b43275d0527b3f33ab33b906caa",
+      "src/amd/common/darwin/ac_darwin_budget.h": "f8421741a08095ff9c7bb6d6c9317a644b808a8ad0e894fe6f41869e429d7445",
+      "src/amd/common/darwin/ac_darwin_drm.c": "42d35104174bf3c967a7a3d91f3235fd24514f00367961143c9da8ac0e6561a5",
+      "src/amd/common/darwin/ac_darwin_drm.h": "c4dee26e33a97ef561a26dd593dd230e22ed63e28ecc6e032c5e9a7b474a78b6",
+      "src/amd/common/darwin/ac_darwin_kext.c": "4c35beed2ebdcc2658822e6bebefb5eae1a120947dd7b11c1cb8f7f576a2db50",
+      "src/amd/common/darwin/ac_darwin_kext.h": "9af0b3ef565544b19654ff1b872630d6a810c8e7e4d7cc9f7588c14413026f53",
+      "src/amd/common/darwin/ac_darwin_sync.c": "00a6f2dca9a487373f7cd7f5fa24fd037a3f2837d9cce884d080582f1e8d9548",
+      "src/amd/common/darwin/amdgpu_vamgr.c": "a33bf267cd46f815ada45b9948fa7e7e6ce395aafef09bd2305c444a2d7e05c4",
+      "src/amd/common/darwin/amdgpu_vamgr_internal.h": "bf9033cc8d2a96241e72ccf482c8eb6968b9119d3834c3d9c5ac3f217bb4287b",
+      "src/amd/common/darwin/libdrm_util_double_list.h": "4e70d453bd42e6d6a76cd49805c80e05707853fffdf40e69807de8954cf863ec",
+      "src/amd/common/darwin/phx_hp_760m.h": "eb823ee5807de5f01d9288817ce75e4464773c2f83e60285297a1d91506eecfd",
+      "src/amd/common/darwin/phx_topology.h": "9869fd32bba70df918e23b1414b495a7795a30ef4428e63e58165d610fce776e",
+      "src/amd/common/darwin/test/acd_kext_test.c": "d5fd36784a73c06ffc77a9b2a0a4e74c43d864ae2d317c5395a3ab6b24677fba",
+      "src/util/bitscan.h": "f7ac55be1a19f7a7bad10b64d16861a37b0e239d147a083612875c929a0bc2b5",
+      "src/util/detect_arch.h": "0b4d0d2f98057061e755e7c9af449425a76f5ad7fd76054671b866a3c03e39e5",
+      "src/util/detect_cc.h": "bffcab52c836d510782f872e26055f0ca93562378fccbd5ecdb436a90fdca573",
+      "src/util/macros.h": "f965ee46d99dcd390d49c86aa9df63bc62ad706ab13d8e3e2ae1b4db57afb238",
+      "src/util/u_endian.h": "bf02a7d0e9984cf41e046e559e6c343b972031abaa8ecc253e4c641caa2112ea",
+      "src/util/u_math.h": "c3f8754926a06da39789f9bdcb45e22acc0790d662ebfb6e824a6183c89455ad",
+      "src/util/u_sync_provider.h": "92776c872eb4fc28c16ad5218aa1d3bce1f9c61aaf879b32f497583f4b553ae8"
+    },
+    "hardware_tested_transport_sha256": {
+      "src/amd/common/darwin/ac_darwin_drm.c": "dc28898693c313f8db4ffe0fe8d139cb61a4395abd3bcf45c43c6cb3ded66db4",
+      "src/amd/common/darwin/ac_darwin_kext.c": "effeec0095b63119e9494eca6ab73c4cf2bcc4941fccaf0c96c6ea92282878df",
+      "src/amd/common/darwin/ac_darwin_kext.h": "f3d5312d1d3d0248e617cb2d4687c621694b6007e59e789f47a12b821f7ab675"
+    },
+    "protected_source_sha256": {
+      "LICENSE": "02d7fa970640345480430e246356c99c23436800ef541d57e7217b1337793bf0",
+      "LICENSES/Apache-2.0.txt": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+      "LICENSES/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3",
+      "LICENSES/GPL-3.0.txt": "bc2d6664f6276fa0a72d57633b3ae68dc7dcb677b71018bf08c8e93e509f1357",
+      "LICENSES/LGPL-3.0-or-later.txt": "f56039b5ee783a50114de388f95ffe7173001d63c32ed4c00649045eec0cf506",
+      "LICENSES/LICENSE.amdgpu.txt": "572872598565dc3513470de971a32bf9db301f47afeef3636345eadae33b2eee",
+      "LICENSES/MIT.txt": "381b0b3a8bb7e1aa28502928f75e820339c5878e2bd95d18c25391647bc3c1fd",
+      "LICENSES/PolyForm-Noncommercial-1.0.0.txt": "1b5c7a92697863d38fd2779af76732acfb8f521b758781eab057ad966701b0b7",
+      "THIRD_PARTY_NOTICES.md": "8a89a2766c5b8076afbbfa631c42953230e096477e04399324b075370b9431d4",
+      "src/phxbringup/Info.plist": "05d17cf6d755730497021298d4f57153066d4d64228fdcf28e358b61a82375a5",
+      "src/phxbringup/PhxBringup.cpp": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+      "src/phxbringup/PhxNativeABI.h": "cb37e93dcab4faf8c9e672ad04793f2e363ae1e815c9913251cebcff5cd42c90",
+      "src/phxbringup/build.sh": "70773880841f08640a178d127b162e52dbd59a448c07716ee4716143ab278ba9",
+      "src/phxbringup/kmod_info.c": "b2aba9a49ad7cfccdacb168bb0b08a4f5b4ee1cb45d23ca0dc8d11d8ec4748f0",
+      "tools/phxctl/PhxUpstream34Layout.h": "2f7e3124a99e97469debc9ee5d9bb760092c769ef530f99814257bc314f54de1",
+      "tools/phxctl/alc_le_paths.py": "d4c46fa5fcbecf2fdd88ada0b768186fae540b913397e083e00a9223235a1234",
+      "tools/phxctl/bringup3.sh": "00843d4b3c38c8395d013f11281e3f1178d1afc269ac775dbfdf994e3d86da5c",
+      "tools/phxctl/bringup5.sh": "a0906cceab45f747a1b89d5c75972463e52071b05ae1e6a6c71fac1d207b771d",
+      "tools/phxctl/cetest.sh": "ad1575e70c9a00d6733ee930a57ec242543e028d38215b0b8722b2974abfa5c3",
+      "tools/phxctl/csb_gfx11.h": "f7400527d24ec6a60200ab670a2a78ac0f123d11dda4cc6b745a48e7b1e0d805",
+      "tools/phxctl/deploy_kext.sh": "b5c5b35f86fef0305e42bd6bf781a5bfb9dca735f9467454b79549f53ef46e83",
+      "tools/phxctl/fresh.sh": "4aa3f6c9e0c63bb3ef1c585e2998d22346d3c49ddd9a001741c4d0e7bf80c6c0",
+      "tools/phxctl/full.sh": "36f5c8a01773a3687e6b633c5b0b5e1b3b2031329c5a2065b669b27c45cf0a71",
+      "tools/phxctl/gfx_test.sh": "68b9f9888ff07f2e0b5a273b082e1809b0b34f30eaa2f496f4430fc3db7ede54",
+      "tools/phxctl/hdadump.c": "b80c5174fe03279abad107fcb04d1975d3e0db6cbed9ae9f8c5376c408a29460",
+      "tools/phxctl/inst_accel.sh": "8b7c2b47a9c1f66547b08319a2a64f5c1e3e55eb0743f882bad1bea9ae878ad9",
+      "tools/phxctl/inst_m2.sh": "192949743e2bad7af210a6f0dd43543f8354614b08d2ef3db5ec170ef8bafa71",
+      "tools/phxctl/inst_plugin.sh": "19b9478231f2cba35dd67dcbe63f71f7f2178f6ce9c508e0f49b39462418e787",
+      "tools/phxctl/kinst.sh": "714240464928ff6d37cc516dd4c3ef89012b6bd79fe26bdd02bc5f20c2dab81e",
+      "tools/phxctl/local.phxboot.plist": "80f67b4e715100a879861911c7ff67c4a8e1fabaa496ec854619e695c6a60123",
+      "tools/phxctl/m2arm.sh": "170cac6eeef0b2fead6c0ee47fdaac9718f302b108eddf04313332666d304617",
+      "tools/phxctl/m2check.sh": "567bbc50a894292fa661c1a0ca973d258a28dd15a535e7de3047ba33663631c7",
+      "tools/phxctl/m2seq.sh": "4280294d297d3b4049a0b4bcc6abcd5a7656487de151c648f00aacf1e9ef6836",
+      "tools/phxctl/m2ws.sh": "94e919bda65df0e65a3fa8633eb2174dbe4d6dd4aa983499da295e89871a625a",
+      "tools/phxctl/mes_v11_api_def.h": "7b1b1e895e0faba305f1832bb815c617b51cbbdc6701dea4aa2084b52806b71a",
+      "tools/phxctl/mesboot.c": "7a1e4de45589a40b3259bd33a790d9d537498e139fa56719145438801320a21f",
+      "tools/phxctl/phxaux.c": "c321a3bc10c0a3d9bf9394b8d0cad56aea83559587286aa8323a284fd1838d42",
+      "tools/phxctl/phxbl.c": "3943661f3fafa888921d2d484d646093112d23ffc0fc1228d1f0f3d5da53305e",
+      "tools/phxctl/phxboot.sh": "6a4f7457c4d11d5c230b6620e78ad68b1eb999855b91c4e29b5e81b347ab5201",
+      "tools/phxctl/phxctl.c": "c0a60d07b60b95f3da273bdbedf648980d30f05d337205a6e1bc7dd44a05f279",
+      "tools/phxctl/phxprofile.c": "06d5bf42b5a2e65d62b0c243d657c03ebbad51f871b565a5a66c2e3b240f04a8",
+      "tools/phxctl/phxup.sh": "accd1816d56dc107e4d12a5eb8544f9a540066622bc8a6f4a35892a81a2a5840",
+      "tools/phxctl/plugdeploy.sh": "67402b25f0f5aa4314d242a212f332236a0b4108a661334038ce0654f6ef3a91",
+      "tools/phxctl/rb0.sh": "ecd660822c0d50752104855d8859e26f8a4e87844179785eded25e799c8855d2",
+      "tools/phxctl/relocate_gpubundle.sh": "6e83b282a4522273a16a7f976eb878c50e49a011a9038f3ae91bc39c275f45c7",
+      "tools/phxctl/t48.sh": "7af63224b7beb617d61acaf96fd30347a419724a2533e97eb13db9001057b11b",
+      "tools/phxctl/usbcap.sh": "e388fddc31c6db0ce87e9847901bc0b74a2edf1fccae37ed65fbb5ee516609a7"
+    },
+    "inputs_sha256": {
+      "mesa-patches-build34/0002-radv-original34-tail-enumeration-owner.patch": "f38bcc1a4e6fb6890ad392e7fd3f775b4903b953ef9957f828c1cf80e240471c",
+      "tools/test_build34_radv_enumeration_owner.py": "112b4135f4639d0b8d7820c89b35000d5cf2d83b5a0c3bbd3013079e30e8291b",
+      "tools/upstream34_layout/radv_ib_tail_runtime_sources.json": "fe28e08738cbdd9ff003bd1316a4aae8b90ff5ee95055033cb560a28260e649b",
+      "mesa-patches-build34/0001-radv-original34-immutable-ib-tail.patch": "5044527ed4ac4a93db3e47a49170c970e1b3d07643378bc19649ee25b6141c3d",
+      "tools/upstream34_layout/radv_ib_tail.py": "403a75b1de35606f9b5492cec55e12136929127d28d0c8eba5b40d1ec0f16fc1",
+      "tools/upstream34_layout/radv_ib_tail_sources.json": "8357f3d2c36b52629ce2784a6741b25c0737e92c79b9333e6ddb26f7a0f68699",
+      "tools/upstream34_layout/mec_range.py": "ece685b3e70efb4e9dd13b0c92c09c4189ca97c38e93b46f2b494987df75c941",
+      "tests/test_build34_radv_enumeration_owner.c": "a4349c77f123c841252a22f54d5c7511bdda367327a94ec19ea0bdfb3d35dc85",
+      "tests/test_build34_radv_ib_tail_core.c": "7ff41c64388a0dd28ae8bc4458b1bc861880b1ed73fb278f54e4bc4ded975cd2",
+      "tests/test_build34_radv_ib_tail.c": "0e128e4c14b95660f067bfc5a128ec5b2ccda3b27d1ed1af31601d932597e842"
+    }
+  },
+  "build": {
+    "full_runtime_built": true,
+    "library_sha256": "3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219",
+    "library_bytes": 20869632,
+    "full_source_files_and_links": 12969,
+    "baseline_inventory_sha256": "802ba367ff234b3117f6c384384778f3ea85f74f64d77fb484a7037461a55398",
+    "compiled_inventory_sha256": "9125a95d9a9adc383d103efef36643bb92197860157762ec68da2bcfa67c25e7",
+    "patched_source_sha256": {
+      "src/amd/common/darwin/ac_darwin_kext.c": "effeec0095b63119e9494eca6ab73c4cf2bcc4941fccaf0c96c6ea92282878df",
+      "src/amd/common/darwin/ac_darwin_kext.h": "f3d5312d1d3d0248e617cb2d4687c621694b6007e59e789f47a12b821f7ab675",
+      "src/amd/common/darwin/ac_darwin_drm.c": "dc28898693c313f8db4ffe0fe8d139cb61a4395abd3bcf45c43c6cb3ded66db4"
+    },
+    "compiled_transport": {
+      "ac_darwin_kext.c": {
+        "sha256": "effeec0095b63119e9494eca6ab73c4cf2bcc4941fccaf0c96c6ea92282878df",
+        "reviewed_header_used": true
+      },
+      "ac_darwin_drm.c": {
+        "sha256": "dc28898693c313f8db4ffe0fe8d139cb61a4395abd3bcf45c43c6cb3ded66db4",
+        "reviewed_header_used": true
+      },
+      "ac_darwin_iokit.c": {
+        "sha256": "889a65f216025a230d55ae6a0da3eb8509d12f2a65f8e3bd2ec1930b60c4a3f9",
+        "reviewed_header_used": true
+      }
+    },
+    "enumeration_owner": {
+      "patch": "mesa-patches-build34/0002-radv-original34-tail-enumeration-owner.patch",
+      "source": "src/amd/vulkan/radv_physical_device.c",
+      "base_source_sha256": "967de26f3cb4ce7e01bb5534aba815228acdd92aa2cb21e283e690cbac908b02",
+      "patched_source_sha256": "d0c56ce1fe611744c42d8ea34bfefe28c1ebaa2c3a14cf38ceeaa8a121d1a072",
+      "patch_sha256": "f38bcc1a4e6fb6890ad392e7fd3f775b4903b953ef9957f828c1cf80e240471c",
+      "baseline_wrapper_sha256": "13bf82bc43a42e8ee7857c3c5c427e028d26c06c1952ad0b4253614e57e2c3de",
+      "enabled_only_when_tail_env_is_exact_1": true,
+      "transport_three_sources_changed": false,
+      "GPU_verified": false
+    },
+    "compiled_runtime_extension": {
+      "radv_physical_device.c": {
+        "sha256": "d0c56ce1fe611744c42d8ea34bfefe28c1ebaa2c3a14cf38ceeaa8a121d1a072",
+        "reviewed_header_used": true
+      }
+    },
+    "runtime_dependencies": [
+      "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+      "/usr/lib/libSystem.B.dylib",
+      "/usr/lib/libz.1.dylib",
+      "/usr/lib/libc++.1.dylib"
+    ],
+    "runtime_smoke": {
+      "dylib_loaded": true,
+      "guard_self_test": true,
+      "required_exports": true,
+      "Phoenix_service_policy": true,
+      "IOKit_calls": 0,
+      "physical_device_enumeration": false,
+      "GPU_executed": false
+    },
+    "parallel_jobs": 1,
+    "tool_versions": {
+      "meson": "1.9.1",
+      "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+      "glslangValidator": "Glslang Version: 11:16.5.0\nESSL Version: OpenGL ES GLSL 3.20 glslang Khronos. 16.5.0\nGLSL Version: 4.60 glslang Khronos. 16.5.0\nSPIR-V Version 0x00010600, Revision 1\nGLSL.std.450 Version 100, Revision 1\nKhronos Tool ID 8\nSPIR-V Generator Version 11\nGL_KHR_vulkan_glsl version 100\nARB_GL_gl_spirv version 100"
+    },
+    "tool_executable_sha256": {
+      "meson": "cc78bb674a4c37f188b1140eb3f036f82f6e7365c7560228860575f61214edbf",
+      "ninja": "ad44480e2ba27be95a4850720983fd1b123728bb8a45c6c90670f5aa0d3e0069",
+      "glslangValidator": "21e5f820f04ba1791ca8b8e0f5181b3af87ceaed0273319d564975a3888d08dc",
+      "pkg-config": "2d10dc9267b4598ae72c2fbabba854595b92cc3dbf3a2c991cdebade9562b54d"
+    },
+    "build_python_version": "3.12.16",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "recipe_sha256": {
+      "tools/upstream34_layout/radv_ib_tail_runtime.py": "7617b7849129959742be76dbf075b2a1ae9a855b53ec861e55d968fa3fc2c021",
+      "tools/upstream34_layout/radv_ib_tail_runtime_sources.json": "fe28e08738cbdd9ff003bd1316a4aae8b90ff5ee95055033cb560a28260e649b",
+      "tools/upstream34_layout/radv_ib_tail_dylib_smoke.c": "ed496a0821f070a57b07b83ba691934745309cf2a44b60e25deeb5257dc0952c",
+      "mesa-patches-build34/0002-radv-original34-tail-enumeration-owner.patch": "f38bcc1a4e6fb6890ad392e7fd3f775b4903b953ef9957f828c1cf80e240471c",
+      "mesa-patches-build34/0001-radv-original34-immutable-ib-tail.patch": "5044527ed4ac4a93db3e47a49170c970e1b3d07643378bc19649ee25b6141c3d",
+      "tools/upstream34_layout/radv_ib_tail.py": "403a75b1de35606f9b5492cec55e12136929127d28d0c8eba5b40d1ec0f16fc1",
+      "tools/upstream34_layout/radv_ib_tail_sources.json": "8357f3d2c36b52629ce2784a6741b25c0737e92c79b9333e6ddb26f7a0f68699",
+      "tools/upstream34_layout/mec_range.py": "ece685b3e70efb4e9dd13b0c92c09c4189ca97c38e93b46f2b494987df75c941"
+    },
+    "OS_version": "26.7.2",
+    "OS_build": "25G332"
+  },
+  "full_Vulkan_CPU": {
+    "result": "passed",
+    "library_sha256": "3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219",
+    "policies": {
+      "0": {
+        "CPU_only": true,
+        "real_full_Vulkan_enumeration_and_device_lifecycle": true,
+        "tail_enabled": false,
+        "opens": 3,
+        "closes": 3,
+        "BO_creates": 3,
+        "fake_IOKit_calls": 32,
+        "native_submits": 0,
+        "GPU_executed": false
+      },
+      "1": {
+        "CPU_only": true,
+        "real_full_Vulkan_enumeration_and_device_lifecycle": true,
+        "tail_enabled": true,
+        "opens": 1,
+        "closes": 1,
+        "BO_creates": 4,
+        "fake_IOKit_calls": 30,
+        "native_submits": 0,
+        "GPU_executed": false
+      }
+    },
+    "ASan_UBSan_on_CPU_fixtures": true,
+    "full_runtime_sanitizer_instrumented": false,
+    "all_runtime_IOKit_imports_audited": true,
+    "IOServiceMatching_dictionary_only": true,
+    "native_submits": 0,
+    "GPU_executed": false,
+    "legacy_profile_sync_clone_orphan_fixed": false,
+    "reviewed_header_sha256": {
+      "include/darwin/navi48_native_abi.h": "0d990a6ed3484e39a14e47e1f64ed067b1fc78a70ee3f495efb046777ff4d941",
+      "include/vulkan/vulkan.h": "096f50152d0b298d8df84a561a37d8190c8a60af34dff0e2cc8328b24491a640",
+      "include/vulkan/vk_platform.h": "a2cd9085c66776845d2524c3b0e73ccf4827ba046aa6f676c4b8ddbed47d6552",
+      "include/vulkan/vulkan_core.h": "2f64fd6c7c3f342b0e44f039f1c359b7f0e6cfcb71a7dca1cc5156282faa3b51",
+      "include/vk_video/vulkan_video_codec_h264std.h": "fded484cef9f90fbbd089e0647268f36e5f4292179fbc5428a2c9e8d7709bbe9",
+      "include/vk_video/vulkan_video_codecs_common.h": "d2e7caa396c521d03d491a269572b1d31b925b5127d22fda14199951ebae89f8",
+      "include/vk_video/vulkan_video_codec_h264std_encode.h": "227e092b53c4e7ca1a948ed021704511c1ed16040cd6188ff6703e5ae66db64d",
+      "include/vk_video/vulkan_video_codec_h265std.h": "0b81f8986ada015ef2e127449eff9d9634899bb59a0a9277a4054e9ec4416c12",
+      "include/vk_video/vulkan_video_codec_h265std_encode.h": "abb3e72af22e4e0a3dbe5dff7be1b275949388809fb3987830341e8f495ea1c7",
+      "include/vk_video/vulkan_video_codec_h264std_decode.h": "37b970c3d80536ad1ac074cfe19b58ee03c3075378e02179e1dc5e4351266821",
+      "include/vk_video/vulkan_video_codec_h265std_decode.h": "879a0dd370a1b1ad184638906c52bdfe7d80d639fbc5a5baa8b02d7c5b60b147",
+      "include/vk_video/vulkan_video_codec_av1std.h": "c75c1d324b97d247aef0008024bc7f3adb98c741ab7f66c882ec38fdacc7ee33",
+      "include/vk_video/vulkan_video_codec_av1std_decode.h": "7e3a1ce177c12546d410f3179ce1b81f2da7a8eba4f525b29cd563ab4099c0e5",
+      "include/vk_video/vulkan_video_codec_av1std_encode.h": "8d166b4543260a38347860443b1a59c7a5e86cdb0d0facaf4c704f667de030e3",
+      "include/vk_video/vulkan_video_codec_vp9std.h": "0a47125865376a3fe7014b69ff6db9d04e30ebf8c4d15664f1d894649ad5c09d",
+      "include/vk_video/vulkan_video_codec_vp9std_decode.h": "1ceb1a8d0e3370e508cf688a6e57dc314cd82186b60f3cef420ea4b1b483865d"
+    },
+    "inputs_sha256": {
+      "tools/test_build34_radv_runtime_enumeration.py": "63b01e99666b33102f2af3bc522041f5b688cb126bd3b0129561020b899b7902",
+      "tests/build34_radv_runtime_iokit.c": "b8957719a28c31a25451fb82e9d55ec504354fbf9548a83267de48e5367d616f",
+      "tests/test_build34_radv_runtime_enumeration.c": "870cf1a7c8871f5ccd7e5473af16e00fe5c8fab7a5007bd27c80c73ed7f9a878"
+    }
+  },
+  "stopped_CPU_preparations": {
+    "isolated_Python_import_refused_before_output": true,
+    "initial_fake_BO_page_alignment_assumption_rejected": true,
+    "diagnostic_repeat_of_same_fake_BO_assumption_rejected": true,
+    "fixture_corrected_to_original34_page_rounding": true,
+    "failures_counted_as_passes": false,
+    "real_GPU_calls": 0
+  },
+  "acceptance": {
+    "actual_function_CPU_tests_passed": true,
+    "complete_runtime_compile_and_CPU_load_passed": true,
+    "full_Vulkan_CPU_lifecycle_passed": true,
+    "GPU_executed": false,
+    "installed": false,
+    "new_fourth_source_GPU_verified": false,
+    "three_hardware_tested_transport_files_unchanged": true,
+    "legacy_profile_sync_clone_orphan_fixed": false,
+    "full_lifecycle_leak_free_claim": false,
+    "original34_kernel_helper_ABI_unchanged": true,
+    "A1_A2_corrected_A3_preserved": true,
+    "build41_or_build42_prepared": false,
+    "default_tail_enabled": false,
+    "default_wait_promoted": false,
+    "desktop_enabled": false,
+    "FPS_claim": false,
+    "binary_uploaded": false
+  },
+  "regression": {
+    "original34_layout_methods": 20,
+    "skipped": 0,
+    "passed": true,
+    "CPU_only": true,
+    "test_source_sha256": "64260355291e95301f0be565c4839eee83b32b1a0608f74e706e5d7649775856"
+  },
+  "smoke_guard_CPU": {
+    "result": "passed",
+    "CPU_cases": {
+      "benign": {
+        "passed": true,
+        "returncode": 0
+      },
+      "missing-export": {
+        "passed": true,
+        "returncode": 5
+      },
+      "matching-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "matches-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "open-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "call-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "map-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "unmap-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "close-constructor": {
+        "passed": true,
+        "returncode": 4
+      }
+    },
+    "GPU_executed": false,
+    "real_IOKit_handle_used": false,
+    "input_sha256": {
+      "tools/test_build34_radv_runtime_smoke.py": "7fd69225342414328e88fb0f9132ffd4d1ab4ef7eab7933e2d58588b46786165",
+      "tools/upstream34_layout/radv_ib_tail_dylib_smoke.c": "ed496a0821f070a57b07b83ba691934745309cf2a44b60e25deeb5257dc0952c"
+    }
+  }
+}

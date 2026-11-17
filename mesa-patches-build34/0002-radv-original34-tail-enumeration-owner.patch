@@ -1,0 +1,44 @@
+Subject: [PATCH] radv/darwin: retain explicit-tail core during physical enumeration
+
+SPDX-License-Identifier: MIT
+
+--- a/src/amd/vulkan/radv_physical_device.c
++++ b/src/amd/vulkan/radv_physical_device.c
+@@ -3019,8 +3019,19 @@
+       device_info.revision_id = 0xC0;
+    }
+    struct phx_topology profile = {0};
++   ac_drm_device *native_owner = NULL;
++   const char *tail = getenv("RADV_DARWIN_BUILD34_IB_TAIL");
++   if (tail && !strcmp(tail, "1")) {
++      uint32_t drm_major, drm_minor;
++      if (ac_drm_device_initialize(-1, false, &drm_major, &drm_minor, &native_owner))
++         return VK_SUCCESS;
++   }
+    int profile_result = acd_profile_identity(&profile);
+-   if (profile_result) return VK_SUCCESS; /* backend has logged the reason */
++   if (profile_result) {
++      if (native_owner)
++         ac_drm_device_deinitialize(native_owner);
++      return VK_SUCCESS;
++   }
+    if (profile.version) {
+       device_info.vendor_id = profile.vendor;
+       device_info.device_id = profile.device;
+@@ -3038,8 +3049,16 @@
+
+    VkResult result = radv_physical_device_try_create(instance, &drm_device, &pdev);
+    if (result != VK_SUCCESS) {
++      if (native_owner)
++         ac_drm_device_deinitialize(native_owner);
+       /* The backend already said why on stderr (kext missing, Hello refused, ...): no device. */
+       return result == VK_ERROR_OUT_OF_HOST_MEMORY ? result : VK_SUCCESS;
++   }
++   if (native_owner) {
++      if (!pdev->drm_device)
++         pdev->drm_device = native_owner;
++      else
++         ac_drm_device_deinitialize(native_owner);
+    }
+
+    list_addtail(&pdev->vk.link, &instance->vk.physical_devices.list);

@@ -163,5 +163,16 @@
     "runtime_distributed": false
   },
   "preparation_does_not_enable_policy": true,
-  "public_binary_upload": false
+  "public_binary_upload": false,
+  "enumeration_owner": {
+    "patch": "mesa-patches-build34/0002-radv-original34-tail-enumeration-owner.patch",
+    "source": "src/amd/vulkan/radv_physical_device.c",
+    "base_source_sha256": "967de26f3cb4ce7e01bb5534aba815228acdd92aa2cb21e283e690cbac908b02",
+    "patched_source_sha256": "d0c56ce1fe611744c42d8ea34bfefe28c1ebaa2c3a14cf38ceeaa8a121d1a072",
+    "patch_sha256": "f38bcc1a4e6fb6890ad392e7fd3f775b4903b953ef9957f828c1cf80e240471c",
+    "baseline_wrapper_sha256": "13bf82bc43a42e8ee7857c3c5c427e028d26c06c1952ad0b4253614e57e2c3de",
+    "enabled_only_when_tail_env_is_exact_1": true,
+    "transport_three_sources_changed": false,
+    "GPU_verified": false
+  }
 }

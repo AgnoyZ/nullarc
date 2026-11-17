@@ -251,3 +251,78 @@ the [runtime offline record](validation/build34-radv-ib-tail-runtime-offline-202
 This is full-library build/load evidence, not a Vulkan or GPU execution pass.
 No library was installed or uploaded, and the original34 kernel, production
 helper, ABI, A1/A2/corrected-A3 and desktop/default-wait HOLDs remain unchanged.
+
+## Explicit-tail enumeration ownership
+
+Preparing the complete-runtime trial exposed a connection-lifetime gap before
+GPU execution: profile identity opens and closes a temporary Mesa device,
+physical-device information opens another, and logical-device creation can
+open a third. The baseline's IOKit path also permits open retries and proxy
+fallback. Those behaviors cannot be counted as one executing client or used
+to relax the bounded trial's single-client limit.
+
+The [separate enumeration patch](../mesa-patches-build34/0002-radv-original34-tail-enumeration-owner.patch)
+changes only the MIT `src/amd/vulkan/radv_physical_device.c`. With the exact
+explicit tail setting `1`, it acquires an `ac_drm_device` owner before profile
+identity and physical-device information are queried. It transfers that owner
+to the successful physical device's existing `drm_device` field, whose normal
+destructor releases it. On profile/creation failure it releases the temporary
+owner; if construction already supplied an owner, it releases the extra one.
+The shared core remains open through enumeration and logical-device use.
+No open limit, build identity or admission check is relaxed. Default/`0`
+enumeration and the three hardware-tested transport source bytes are unchanged.
+
+The CPU suite compiles the actual old/new enumeration function and actual
+DRM wrapper initialization/deinitialization functions, linked with the real
+patched transport, shared core and VA allocator under ASan/UBSan. The
+physical-device constructor is a CPU fixture using actual core acquisition
+and release; it is not complete Vulkan or GPU simulation. Baseline and patched
+variants each passed 140 cases (6,498 and 5,042 checks respectively), including
+20 repeated rounds of default/`0`/`1`, pre-existing ownership, profile/creation
+failure, invalid policy strings, build/HUNG/BO/mapping rejection and WindowServer
+exclusion. Exact `1` retains one core opening through successful logical-device
+acquisition; physical-device release closes it last. No native submit occurs.
+
+The same test exposes an existing lifecycle defect: each successful
+`acd_profile_identity` deinitializes its device without finalizing that
+device's sync-provider clone. One orphan remains in both baseline and patched
+cases. The fixture explicitly counts it using a fixed provider pool; no
+sanitizer is disabled and no all-clean lifecycle claim is made. This separate
+defect is unchanged by the enumeration ownership patch.
+
+The runner verifies the 30-file baseline dependency closure, the exact wrapper,
+fourth-source and patch hashes, the three unchanged hardware-tested transport
+outputs, and protected original34 sources before and after execution. The
+complete runtime recipe now stages this second patch in its isolated source
+repository, accepts exactly four changed files, and requires its actual
+translation unit, Darwin DRM header and final link closure. Earlier library
+and transport hardware records remain immutable historical evidence; neither
+automatically covers this fourth-file integration. Full-runtime GPU/Vulkan
+acceptance and desktop/default-wait promotion remain separate.
+
+The subsequent four-file runtime build passed all 774 compilation/link steps,
+the source/header/link closure checks, signature verification and guarded
+CPU-only loading. Its signed private x86_64 dylib is 20,869,632 bytes with
+SHA256 `3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219`.
+The complete baseline inventory is unchanged; the compiled inventory differs
+from it at exactly the three transport files and `radv_physical_device.c`.
+
+A separate dependent-dylib CPU fixture then exercised the complete library's
+actual Vulkan physical-device enumeration, dedicated-compute logical-device
+creation and destruction. It audits every imported IOKit entrypoint and models
+setup/teardown only in CPU memory; submit and wait selectors are rejected.
+The only real IOKit helper used constructs a matching dictionary. With tail
+disabled it observed three opens and three closes. With tail enabled it
+observed one open, no close after logical-device destruction, and one close
+after physical-device destruction. There were zero native submits. The CPU
+fixtures use ASan/UBSan; the complete release library is not sanitizer
+instrumented, and this does not establish leak-free or GPU behavior.
+
+The first fixture run and a diagnostic repeat rejected a BO request because
+the fixture incorrectly required page-aligned requested sizes. Original34
+rounds a nonzero request upward to a page; the fixture was corrected to that
+existing behavior before the final successful run. No kernel or runtime
+admission check was changed, and neither failed run is counted as acceptance.
+See the [separate enumeration integration record](validation/build34-radv-ib-tail-enumeration-offline-20261117.json).
+This library remains uninstalled and untested for Vulkan GPU execution; the
+earlier bounded transport comparison does not cover this extra source file.

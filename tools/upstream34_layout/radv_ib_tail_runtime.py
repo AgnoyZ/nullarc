@@ -89,7 +89,16 @@ def build(mesa, output, tool_directories):
         raise ValueError('Use a fresh, separate ignored build output')
     os.setpriority(os.PRIO_PROCESS, 0, max(15, os.getpriority(os.PRIO_PROCESS, 0)))
     lock = json.loads(LOCK.read_text())
-    snapshots = {str(path.relative_to(ROOT)): path.read_bytes() for path in (Path(__file__).resolve(), LOCK, SMOKE)}
+    owner = lock['enumeration_owner']
+    owner_patch = ROOT / owner['patch']
+    snapshots = {str(path.relative_to(ROOT)): path.read_bytes() for path in
+                 (Path(__file__).resolve(), LOCK, SMOKE, owner_patch, ROOT / radv_ib_tail.PATCH,
+                  Path(radv_ib_tail.__file__).resolve(), radv_ib_tail.MANIFEST,
+                  Path(mec_range.__file__).resolve())}
+    if (digest(owner_patch) != owner['patch_sha256'] or
+            digest(mesa / owner['source']) != owner['base_source_sha256'] or
+            digest(mesa / 'src/amd/common/ac_linux_drm.c') != owner['baseline_wrapper_sha256']):
+        raise ValueError('Enumeration owner patch or baseline differs from the reviewed pins')
     baseline = inventory(mesa)
     if (len(baseline) != lock['full_baseline_files_and_links'] or
             inventory_digest(baseline) != lock['full_baseline_inventory_sha256']):
@@ -104,11 +113,16 @@ def build(mesa, output, tool_directories):
         if digest(transport / name) != expected:
             raise ValueError('Staged patch differs from hardware-tested transport')
         shutil.copyfile(transport / name, source / name)
+    subprocess.run(['git', 'init', '-q', str(source)], check=True, capture_output=True)
+    for check in (True, False):
+        subprocess.run(['git', '-C', str(source), 'apply'] + (['--check'] if check else []) + ['-'],
+                       input=snapshots[owner['patch']], check=True, capture_output=True, timeout=30)
+    if digest(source / owner['source']) != owner['patched_source_sha256']:
+        raise RuntimeError('Enumeration owner patch skipped or produced an unexpected source')
     frozen = inventory(source)
     changed = {name for name in baseline if baseline[name] != frozen.get(name)}
-    if set(baseline) != set(frozen) or changed != set(lock['patched_source_sha256']):
+    if set(baseline) != set(frozen) or changed != set(lock['patched_source_sha256']) | {owner['source']}:
         raise RuntimeError('Unexpected full-source change')
-    subprocess.run(['git', 'init', '-q', str(source)], check=True, capture_output=True)
     for name in ('home', 'tmp', 'pkgconfig-empty'):
         (output / name).mkdir(mode=0o700)
     path = ':'.join([str(Path(p).resolve()) for p in tool_directories] + ['/usr/bin', '/bin', '/usr/sbin', '/sbin'])
@@ -149,23 +163,28 @@ def build(mesa, output, tool_directories):
         raise RuntimeError('Missing runtime exports')
     commands = json.loads((native / 'compile_commands.json').read_text())
     closure = {}
-    for name in ('ac_darwin_kext.c', 'ac_darwin_drm.c', 'ac_darwin_iokit.c'):
+    transport_names = ('ac_darwin_kext.c', 'ac_darwin_drm.c', 'ac_darwin_iokit.c')
+    compilation_inputs = {radv_ib_tail.PREFIX + name: radv_ib_tail.PREFIX + 'ac_darwin_kext.h'
+                          for name in transport_names}
+    compilation_inputs[owner['source']] = radv_ib_tail.PREFIX + 'ac_darwin_drm.h'
+    for relative, header_relative in compilation_inputs.items():
+        name = Path(relative).name
         rows = [row for row in commands if Path(row['file']).name == name]
         if len(rows) != 1:
-            raise RuntimeError('Ambiguous transport compilation')
+            raise RuntimeError('Ambiguous reviewed-source compilation')
         row = rows[0]
         compiled = Path(row['file'])
         if not compiled.is_absolute():
             compiled = Path(row['directory']) / compiled
-        if compiled.resolve() != source / radv_ib_tail.PREFIX / name:
-            raise RuntimeError('Transport compiled from an unexpected source')
+        if compiled.resolve() != source / relative:
+            raise RuntimeError('Reviewed unit compiled from an unexpected source')
         words = shlex.split(row['command'])
         obj = words[words.index('-o') + 1]
         dependencies = subprocess.check_output([tools['ninja'], '-C', native, '-t', 'deps', obj], env=env, text=True)
-        header = source / radv_ib_tail.PREFIX / 'ac_darwin_kext.h'
+        header = source / header_relative
         actual = {(native / item.strip()).resolve() for item in dependencies.splitlines()[1:] if item.strip()}
         if header not in actual:
-            raise RuntimeError('Transport header dependency was not established')
+            raise RuntimeError('Reviewed header dependency was not established')
         closure[name] = {'sha256': digest(compiled), 'reviewed_header_used': True}
     link_commands = subprocess.check_output([tools['ninja'], '-C', native, '-t', 'commands', TARGET], env=env)
     (output / 'link-closure.log').write_bytes(link_commands)
@@ -197,7 +216,10 @@ def build(mesa, output, tool_directories):
     mec_range.verify_current_inputs(mec_range.protected_base_inputs(), ROOT)
     report.update({'full_runtime_built': True, 'library_sha256': digest(library), 'library_bytes': library.stat().st_size,
                    'full_source_files_and_links': len(frozen), 'baseline_inventory_sha256': inventory_digest(baseline),
-                   'compiled_inventory_sha256': inventory_digest(frozen), 'compiled_transport': closure,
+                   'compiled_inventory_sha256': inventory_digest(frozen),
+                   'compiled_transport': {name: closure[name] for name in transport_names},
+                   'enumeration_owner': owner,
+                   'compiled_runtime_extension': {Path(owner['source']).name: closure[Path(owner['source']).name]},
                    'runtime_dependencies': deps[1:], 'runtime_smoke': smoke_result, 'parallel_jobs': 1,
                    'tool_versions': versions, 'tool_executable_sha256': {name: digest(value) for name, value in tools.items()},
                    'build_python_version': platform.python_version(),
