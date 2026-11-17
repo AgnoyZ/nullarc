@@ -106,5 +106,46 @@
     "No timeout, long-stability, FPS or general desktop-runtime acceptance.",
     "No automatic retry; later diagnosis requires a fresh packet.",
     "No binaries, raw diagnostics or personal EFI published."
-  ]
+  ],
+  "diagnostic_followup": {
+    "source_commit": "ef5a41d961b0645838d33f85694388f166999683",
+    "result": "three-natural-GPU-waits-and-pixels-passed-observer-count-refused-and-recovered",
+    "kernel_and_plugin_unchanged": true,
+    "only_observer_diagnostics_changed": true,
+    "natural_group_waits": [
+      {
+        "actual_wait_ns": 158495906,
+        "commit_elapsed_ns": 158544016
+      },
+      {
+        "actual_wait_ns": 454392,
+        "commit_elapsed_ns": 490099
+      },
+      {
+        "actual_wait_ns": 406061,
+        "commit_elapsed_ns": 457397
+      }
+    ],
+    "all_group_wait_results_zero": true,
+    "all_groups_ready": true,
+    "all_command_status_completed": true,
+    "command_errors": 0,
+    "wait_budget_ms": 250,
+    "completed_commands": 3,
+    "IOSurface_sampled_pixels": 32,
+    "verified_channels": 128,
+    "observer_expected_eligible_commands": 1,
+    "observed_eligible_commands": 3,
+    "observer_count_assumption_incorrect": true,
+    "probe_exit_code": 23,
+    "timeout_started": false,
+    "full_packet_accepted": false,
+    "original_prior_failure_subtype_resolved": false,
+    "recovered_and_retired": true,
+    "protected_files_unchanged": 46,
+    "original_EFI_files_unchanged": 347,
+    "new_matching_reports": 0,
+    "GPU_off": true,
+    "followup_GPU_task_armed_at_final_readback": false
+  }
 }

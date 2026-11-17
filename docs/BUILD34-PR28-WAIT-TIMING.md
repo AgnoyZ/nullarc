@@ -200,3 +200,33 @@ EFI unmounted and zero new matching diagnostic reports. No subsequent test
 was armed at that readback. Raw records and binaries remain local and ignored.
 Sanitized evidence is in
 [validation/build34-pr28-fixed-gpu-wait-20261117.json](validation/build34-pr28-fixed-gpu-wait-20261117.json).
+
+
+### Follow-up diagnostics: natural waits passed; observer count refused
+
+A fresh diagnostic packet based on default `ef5a41d961b0645838d33f85694388f166999683`
+kept the same kernel and plugin, changing only process-local observation.
+It preserved the group result, remaining group state, command status and error
+before assertion. Three real-GPU waits returned zero with their groups ready,
+command status Completed and no command error. Their measured durations were
+**158,495,906 ns**, **454,392 ns** and **406,061 ns** with the existing 250 ms
+budget. Both IOSurface sampler passes reached the final summary, establishing
+32 pixels / 128 channels matched after three completed commands.
+
+The probe then exited 23 because its own summary incorrectly required one
+eligible command and two ineligible sampler commands. Production compute
+`setTexture:atIndex:` conservatively marks storage-capable surface textures
+dirty, so those sampler commands can also receive publication groups. This
+is an observer expectation error, not a failed command. It does not determine
+the unresolved failure subtype of the preceding attempt.
+
+The first real natural-wait/pixel evidence is retained, but the complete test
+packet is not accepted and the timeout stage did not start. Independent
+recovery and retirement again verified the original plugin, original loaded
+kernel, all 46 protected files and 347 original EFI files, no held clients,
+GPU-off and zero new matching diagnostic reports. There was no automatic
+retry. The next probe must count the actual three eligible surface commands
+and add a separate buffer-only operation to test the no-surface fast path.
+Its timeout workload must be bounded independently and establish real late
+completion and output; no wait-policy or driver-byte change is required by
+this observer correction. Longer stability and FPS remain untested.
