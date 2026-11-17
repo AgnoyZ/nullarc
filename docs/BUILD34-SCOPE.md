@@ -153,7 +153,20 @@ scope, validate a repair or clear any existing HOLD.
 The subsequent [read-only loading-route audit](BUILD34-RING-PADDING-LOAD-ROUTE.md)
 confirmed that original34 is boot-injected. It established neither a live
 replacement route nor candidate-to-original recovery, and made no deployment,
-GPU attempt or reboot. The candidate remains uninstalled pending that gate.
+GPU attempt or reboot. The candidate remained uninstalled at that checkpoint.
+
+The later owner-authorized [internal-disk ring-padding comparison](BUILD34-RING-PADDING-HARDWARE.md)
+completed a fresh original control followed by the exact derived candidate.
+Both failed the second single-IB dispatch at `0x2010` (`0xde` versus `0xdf`),
+with all 256 output words retaining the previous pattern. This candidate is
+rejected as a repair and not promoted. Independent recovery and retirement
+verified original34 loaded, GPU-off, all 347 original EFI files and 46
+protected files unchanged, no new matching reports and no remaining trial or
+restore jobs. A mounted-EFI refusal by the candidate recovery observer was
+retained and separately resolved through new-boot recovery-only verification;
+no GPU work was replayed. Original kernel/helper/ABI and accepted A1/A2/
+corrected-A3 source remain unchanged. The native defect and existing HOLDs
+remain; no next GPU scope is armed.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

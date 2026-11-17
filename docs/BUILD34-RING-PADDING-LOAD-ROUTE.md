@@ -1,5 +1,12 @@
 # Ring-padding candidate: read-only loading-route audit
 
+This audit and its preparation updates are historical. The subsequent
+owner-authorized [internal-disk hardware comparison](BUILD34-RING-PADDING-HARDWARE.md)
+loaded the candidate, reproduced the same wrong value, then independently
+recovered and retired both scopes. Exact original34/GPU-off and all 347
+original EFI files are restored; no trial/restore job or candidate is active.
+The candidate is not a fix and is not promoted.
+
 Status on 2026-11-17: **candidate uninstalled; image-switch and recovery route
 not established**. The [private candidate](BUILD34-RING-PADDING-CANDIDATE.md)
 remains available, but its compilation is not a live-test admission. No new

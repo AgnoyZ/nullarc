@@ -1,9 +1,16 @@
 # Original34-derived compute-ring padding proposal
 
-Status: **hardware scope inactive**. Subsequent owner continuation produced a
+Status: **comparison completed; candidate failed and was not promoted**.
+Both scopes reproduced `0x2010`, `0xde` instead of `0xdf`; independent recovery
+and retirement restored original34/GPU-off and the original EFI baseline.
+See the [hardware result](BUILD34-RING-PADDING-HARDWARE.md). The proposal and
+its preparation requirements below are retained as history, not a replay plan.
+
+The initial proposal was hardware-inactive. Owner continuation produced a
 [privately built derived candidate](BUILD34-RING-PADDING-CANDIDATE.md), with
 an explicitly reviewed output-bundle target restriction matching the actual
-original-image control. It has not been installed or loaded. The initial
+original-image control. At that preparation checkpoint it was not installed
+or loaded. The initial
 source proposal below remains the boundary for the two function edits.
 The original native single-IB defect remains unresolved. The
 [CPU-only audit](BUILD34-RING-PADDING-AUDIT.md) has passed, including the

@@ -1,5 +1,11 @@
 # Privately built original34-derived ring-padding candidate
 
+Subsequent [hardware comparison](BUILD34-RING-PADDING-HARDWARE.md) on 2026-11-17
+loaded and tested this exact candidate. It reproduced the same second-pass
+wrong value as the fresh original control and is **rejected as a repair**.
+Independent recovery/retirement returned to the exact original34 and GPU-off.
+The build-only checkpoint below predates that trial.
+
 On 2026-11-17 the owner continued the
 [source proposal](BUILD34-RING-PADDING-PROPOSAL.md). An isolated experimental
 kext was compiled and statically verified in ignored private build storage.
@@ -103,7 +109,7 @@ evidence, not GPU acceptance. The actual OS observed during this preparation
 was macOS 26.7.2, build 25G332. No claim about GPU correctness, graphics,
 stability or frame rate follows from compiling on it.
 
-## Remaining live-test gate
+## Historical live-test gate before the completed comparison
 
 A subsequent [read-only loading-route audit](BUILD34-RING-PADDING-LOAD-ROUTE.md)
 confirmed the exact original image in the running boot collection and the

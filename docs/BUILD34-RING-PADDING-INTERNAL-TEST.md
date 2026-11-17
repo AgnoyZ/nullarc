@@ -1,5 +1,12 @@
 # Internal-disk ring-padding comparison preparation
 
+Subsequent execution is complete: the original control and candidate both
+reproduced the wrong value, independently recovered and retired. The exact
+original is loaded, all 347 original EFI files are restored, and trial/recovery
+jobs and the temporary recovery subtree are removed. **The padding candidate
+failed and is not promoted.** See the [hardware result](BUILD34-RING-PADDING-HARDWARE.md).
+The preparation checkpoint below is historical.
+
 On 2026-11-17 the owner requested internal-disk testing and confirmed that the
 existing Windows installation can be started directly from the firmware's
 one-time menu, independently of OpenCore. This replaces the earlier
