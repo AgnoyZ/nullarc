@@ -117,6 +117,11 @@ arena checks and separate region counts require a fresh same-binary failing
 control, independently recovered and retired before a separate treatment.
 Offline preparation is not GPU evidence or permission to replay a consumed
 scope. The unchanged original34 single-IB fault and existing HOLDs remain.
+Its fresh target-control hardware scope subsequently reproduced the precise
+second-pass wrong value, with 256 previous-pattern words in A and B remaining
+poison. Independent recovery and retirement completed. This clears only the
+fresh-control prerequisite for a separate same-binary destination comparison;
+the original GPU failure is retained, not promoted to acceptance.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

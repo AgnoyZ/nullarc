@@ -115,3 +115,31 @@ The kernel, ABI, production helper, A1/A2/corrected-A3 and hardware-tested Mesa
 transport remain unchanged. Default waits, accelerated desktop and FPS stay
 HOLD. Build41/build42 remain withdrawn. No new hardware result is claimed by
 this preparation.
+
+## Fresh hardware control
+
+On 2026-11-17, a new source-`5a5be4f` target-control scope used the exact
+original34 image on macOS 26.7.2 (`25G332`). One initialization and one native
+execution client submitted two single-IB dispatches. The first passed the
+whole 16 KiB, with 256 current words in A and 256 poison words in B. The
+second precisely reproduced `0x2010`, actual `0xde` rather than `0xdf`, after
+a zero-budget WAITSEQ reported retirement. All 256 A words matched the
+previous pattern; all 256 B words remained poison. There were 256 mismatching
+A bytes and no shader, command-page, B or guard mismatch. Neither summary
+observed changes across its two immediate reads.
+
+The original GPU failure and held resources were preserved. Observation
+collection completed, followed by one recovery reboot. Independent
+verification returned to GPU-off/firmware framebuffer with no native clients,
+checked the exact image, 46 protected files, two links, 347 EFI files (148
+Microsoft), unchanged security/kernel collections and no new matching
+diagnostic report, then removed the consumed job. The controller's 20 CPU
+tests covered retained resources, no retries, independent witnesses and
+saving observation before a postcheck failure. No driver/runtime was
+installed or held process killed. See the
+[sanitized control record](validation/build34-ib-target-control-hardware-20261117.json).
+
+This satisfies only the fresh control/recovery prerequisite for considering
+a separate same-binary target-switch scope. It is not successful GPU output
+or a fix. The switched policy has not yet been executed by this record, and
+all native single-IB, desktop/default-wait and FPS HOLDs remain.
