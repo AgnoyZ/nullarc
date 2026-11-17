@@ -13,7 +13,7 @@ import test_upstream34_ib_preamble as runner
 
 class PreambleResultTests(unittest.TestCase):
     def result(self, fault='ok', policy='control'):
-        code, events = runner.expected(fault)
+        code, events = runner.expected(fault, policy)
         stdout = []
         for stage in (1, 2):
             n = events.count(f'wait-{stage}')
@@ -23,10 +23,15 @@ class PreambleResultTests(unittest.TestCase):
                                           'busy': int(index < n - 1), 'elapsed_ns': 4000}))
         if not code:
             stdout.append(runner.CHECK if fault == 'check-ok' else runner.marker(policy))
-        stderr = 'HOLD: synthetic failure\n' if 'hold' in events else ''
+        stderr = ''
         summary = runner.expected_mismatch_summary(fault)
         if summary is not None:
             stderr += 'IB-MISMATCH-SUMMARY ' + json.dumps(summary) + '\n'
+            if policy == 'single-observe-late':
+                stderr += 'IB-LATE-OBSERVATION ' + json.dumps(runner.expected_late_timing(fault)) + '\n'
+                stderr += 'IB-MISMATCH-SUMMARY ' + json.dumps(runner.expected_late_summary(fault)) + '\n'
+        if 'hold' in events:
+            stderr += 'HOLD: synthetic failure\n'
         stderr += 'fake-native-shader-summary ' + json.dumps({'events': events}) + '\n'
         return subprocess.CompletedProcess([], code, '\n'.join(stdout) + '\n', stderr)
 
@@ -91,6 +96,30 @@ class PreambleResultTests(unittest.TestCase):
                         runner.check_result(self.result(policy=actual), 'ok', requested)
         with self.assertRaises(ValueError):
             runner.marker('unknown')
+
+    def test_late_current_result_still_fails_and_holds(self):
+        policy = 'single-observe-late'
+        for fault in ('stale-output-2','late-output-current','late-output-mixed','late-sleep-error','late-clock-backwards'):
+            result = self.result(fault, policy)
+            result.stderr = 'FAIL: mismatch at byte 8208 (pass=1 actual=0xde expected=0xdf)\n' + result.stderr
+            runner.check_result(result, fault, policy)
+            self.assertEqual(result.returncode, 75)
+            self.assertIn('hold', runner.expected(fault,policy)[1])
+            for changed in (result.stderr.replace('IB-LATE-OBSERVATION ', 'REMOVED '),
+                            result.stderr.replace('"elapsed_ns": 100004000', '"elapsed_ns": 0'),
+                            result.stderr.replace('"requested_delay_us": 100000', '"requested_delay_us": true')):
+                if changed == result.stderr:
+                    continue
+                with self.assertRaises((RuntimeError,json.JSONDecodeError)):
+                    runner.check_result(subprocess.CompletedProcess([],75,result.stdout,changed),fault,policy)
+        row = runner.expected_late_summary('late-output-current')
+        self.assertEqual((row['mismatch_bytes'],row['output_current_words']), (0,256))
+
+    def test_late_observation_is_post_failure_only(self):
+        for fault in ('ok','submit-2-status','wait-2-timeout','info-build41','info-build42'):
+            self.assertNotIn('late-observation',runner.expected(fault,'single-observe-late')[1])
+        for policy in runner.POLICIES[:-1]:
+            self.assertNotIn('late-observation',runner.expected('late-output-current',policy)[1])
 
     def test_batch_requires_complete_matching_frames(self):
         frame = 'fake-native-case-end {"index":0,"returncode":75}\n'

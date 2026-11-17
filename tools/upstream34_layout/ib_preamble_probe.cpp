@@ -93,7 +93,7 @@ struct Session {
 
 enum class PreamblePolicy { Single, NopHead, NopTail, MemSync };
 
-static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy) {
+static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy, bool observeLate) {
     const uint64_t helloIn[] = {PHXN_ABI_VERSION, PHXN_HELLO_F_MINOR};
     uint64_t hello[4]{};
     if (!call(s.connection, PHXN_SEL_HELLO, helloIn, 2, nullptr, 0, hello, 4, nullptr, 0)) return 74;
@@ -220,6 +220,19 @@ static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy)
                     "(pass=%u actual=0x%02x expected=0x%02x)\n", i, pass,
                     static_cast<unsigned>(observed), static_cast<unsigned>(expected[i]));
                 phx34ReportIbMismatch(actual, expected, pass, i, observed);
+                if (observeLate) {
+                    // Observation only, after the original failure. Never retry
+                    // GPU work, flush, repair bytes or convert a late match to PASS.
+                    const uint64_t start = mach_absolute_time();
+                    const int sleepStatus = usleep(100000);
+                    const uint64_t end = mach_absolute_time();
+                    const bool clockValid = end >= start && end - start <= UINT64_MAX / tb.numer;
+                    const uint64_t elapsed = clockValid ? (end - start) * tb.numer / tb.denom : 0;
+                    fprintf(stderr, "IB-LATE-OBSERVATION {\"requested_delay_us\":100000,\"sleep_status\":%d,"
+                        "\"clock_valid\":%s,\"elapsed_ns\":%llu}\n", sleepStatus,
+                        clockValid ? "true" : "false", (unsigned long long)elapsed);
+                    phx34ReportIbMismatch(actual, expected, pass, i, observed);
+                }
                 return 75;
             }
         }
@@ -254,12 +267,13 @@ static int finish(Session &s, int result, bool execute) {
 
 int main(int argc, char *argv[]) {
     const bool memsync = argc >= 2 && !strcmp(argv[1], "--run-memsync");
-    const bool single = argc >= 2 && !strcmp(argv[1], "--run-single");
+    const bool observeLate = argc >= 2 && !strcmp(argv[1], "--run-single-observe-late");
+    const bool single = observeLate || (argc >= 2 && !strcmp(argv[1], "--run-single"));
     const bool tail = argc >= 2 && !strcmp(argv[1], "--run-nop-tail");
     const bool execute = memsync || single || tail || (argc >= 2 && !strcmp(argv[1], "--run-control"));
     const bool upper = argc == 3 && !strcmp(argv[2], "--upper");
     if ((argc != 2 && argc != 3) || (!execute && strcmp(argv[1], "--check")) || (argc == 3 && !upper)) {
-        fprintf(stderr, "usage: build34-ib-preamble-probe --check|--run-single|--run-control|--run-nop-tail|--run-memsync [--upper]\n"); return 64;
+        fprintf(stderr, "usage: build34-ib-preamble-probe --check|--run-single|--run-single-observe-late|--run-control|--run-nop-tail|--run-memsync [--upper]\n"); return 64;
     }
     utsname host{};
     if (uname(&host) || strcmp(host.sysname, "Darwin") || strcmp(host.machine, "x86_64") || strncmp(host.release, "25.", 3)) {
@@ -275,10 +289,10 @@ int main(int argc, char *argv[]) {
     if (released != KERN_SUCCESS) return finish(s, 74, false);
     const PreamblePolicy policy = single ? PreamblePolicy::Single : tail ? PreamblePolicy::NopTail :
         memsync ? PreamblePolicy::MemSync : PreamblePolicy::NopHead;
-    result = finish(s, exercise(s, execute, upper, policy), execute);
+    result = finish(s, exercise(s, execute, upper, policy, observeLate), execute);
     if (!result) {
         if (execute) printf("DIAGNOSTIC-PASS: original34 preamble=%s; two guarded dispatches; no driver or display acceptance\n",
-            single ? "single" : tail ? "nop-tail" : memsync ? "memsync" : "control");
+            observeLate ? "single-observe-late" : single ? "single" : tail ? "nop-tail" : memsync ? "memsync" : "control");
         else puts("CHECK: target identity and ABI readiness only; no GPU work submitted");
     }
     return result;

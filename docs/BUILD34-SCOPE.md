@@ -100,6 +100,12 @@ parsed observation is not a successful trial or fix acceptance. Independent
 recovery verification and consumed-job retirement passed. The original
 single-IB fault and all existing HOLDs remain unresolved.
 
+The subsequent [post-failure delayed observer](BUILD34-IB-LATE-OBSERVATION.md)
+adds one explicitly selected 100-ms CPU resample after the original mismatch.
+It changes no commands or native waits and never converts late-correct output
+to success. Its offline verification is not GPU acceptance or permission to
+replay a consumed scope; original34 and desktop/default-wait HOLDs remain.
+
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream
 PR16, PR19 with a tested zero-progress-write correction, PR15 and PR22. Each

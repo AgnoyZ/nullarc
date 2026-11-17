@@ -128,13 +128,15 @@ def baseline_expected(fault):
 EXTRA_CASES = (
     'legacy-run', 'legacy-fresh', 'legacy-reuse', 'legacy-publish',
     'info-build41', 'info-build42', 'stale-output-2', 'poison-output-2', 'mixed-output-2',
+    'late-output-current', 'late-output-mixed', 'late-sleep-error', 'late-clock-backwards',
 ) + tuple(f'wait-{stage}-pending-{kind}' for stage in (1, 2) for kind in ('short', 'cap'))
 EXTRA_CASES += tuple(f'slot-{word}' for word in range(80))
 EXTRA_CASES += tuple(f'preamble-{stage}-{byte}' for stage in (1, 2) for byte in range(32))
 CASES = BASE_CASES + EXTRA_CASES
-POLICIES = ('single', 'control', 'nop-tail', 'memsync')
+POLICIES = ('single', 'control', 'nop-tail', 'memsync', 'single-observe-late')
 EXEC_EQUIVALENCE_CASES = ('ok', 'arg-mode', 'info-build41', 'stale-output-2',
-                          'poison-output-2', 'mixed-output-2', 'submit-2-status',
+                          'poison-output-2', 'mixed-output-2', 'late-output-current',
+                          'late-output-mixed', 'late-sleep-error', 'late-clock-backwards', 'submit-2-status',
                           'byte-2-16383', 'wait-2-pending-cap', 'check-ok')
 
 
@@ -144,7 +146,7 @@ def marker(policy):
     return f'DIAGNOSTIC-PASS: original34 preamble={policy}; two guarded dispatches; no driver or display acceptance'
 
 
-def expected(fault):
+def expected(fault, policy='control'):
     if fault not in CASES:
         raise ValueError('Unknown preamble case')
     if fault.startswith('legacy-'):
@@ -152,7 +154,7 @@ def expected(fault):
     base = fault
     if fault in ('info-build41', 'info-build42'):
         base = 'info-build'
-    elif fault.startswith('slot-') or fault in ('stale-output-2', 'poison-output-2', 'mixed-output-2'):
+    elif fault.startswith(('slot-', 'late-')) or fault in ('stale-output-2', 'poison-output-2', 'mixed-output-2'):
         base = 'output-2-0'
     elif fault.startswith('preamble-'):
         base = f'ib-{fault.split("-")[1]}-0'
@@ -173,11 +175,16 @@ def expected(fault):
         if events[-1] == 'cpu-unmap':
             events.pop()
         events.append('hold')
+    if policy == 'single-observe-late' and expected_mismatch_summary(fault) is not None:
+        assert events[-1] == 'hold'
+        events.insert(-1, 'late-observation')
     return code, events
 
 
 def expected_mismatch_summary(fault):
     """Independent oracle for the fixture's exact injected bytes, not GPU behavior."""
+    if fault.startswith('late-'):
+        fault = 'stale-output-2'
     if fault in ('stale-output-2', 'poison-output-2', 'mixed-output-2'):
         stage, offset = 1, 0x2010
     elif fault in ('wait-1-missing', 'wait-2-missing'):
@@ -216,8 +223,25 @@ def expected_mismatch_summary(fault):
     return row
 
 
+def expected_late_summary(fault):
+    row = expected_mismatch_summary(fault)
+    if row is not None and fault in ('late-output-current', 'late-output-mixed'):
+        count = 256 if fault == 'late-output-current' else 128
+        row.update(first_snapshot_mismatch=16384 if count == 256 else 0x2010 + count * 4,
+                   mismatch_bytes=256-count, output_mismatch_bytes=256-count,
+                   output_current_words=count, output_previous_words=256-count,
+                   original_mismatch_reobserved=False)
+    return row
+
+
+def expected_late_timing(fault):
+    return {'requested_delay_us':100000, 'sleep_status':-1 if fault == 'late-sleep-error' else 0,
+            'clock_valid':fault != 'late-clock-backwards',
+            'elapsed_ns':0 if fault == 'late-clock-backwards' else 100004000}
+
+
 def check_result(result, fault, policy):
-    code, events = expected(fault)
+    code, events = expected(fault, policy)
     prefix = 'fake-native-shader-summary '
     if result.returncode != code or result.stderr.count(prefix) != 1:
         raise RuntimeError(f'Preamble {policy}/{fault}: exit {result.returncode}, wanted {code}: {result.stderr}')
@@ -241,10 +265,25 @@ def check_result(result, fault, policy):
     summaries = [json.loads(line.removeprefix('IB-MISMATCH-SUMMARY '))
                  for line in result.stderr.splitlines() if line.startswith('IB-MISMATCH-SUMMARY ')]
     wanted = expected_mismatch_summary(fault)
-    if summaries != ([] if wanted is None else [wanted]):
+    late = policy == 'single-observe-late' and wanted is not None
+    wanted_summaries = [] if wanted is None else [wanted]
+    if late:
+        wanted_summaries.append(expected_late_summary(fault))
+    if summaries != wanted_summaries:
         raise RuntimeError('Missing, unexpected or inaccurate mismatch classification')
-    if wanted is not None and any(type(summaries[0][key]) is not type(value) for key,value in wanted.items()):
+    if any(type(row[key]) is not type(value) for row, want in zip(summaries,wanted_summaries) for key,value in want.items()):
         raise RuntimeError('Mismatch summary field type changed')
+    timing_lines = [line for line in result.stderr.splitlines() if line.startswith('IB-LATE-OBSERVATION ')]
+    timings = [json.loads(line.split(' ',1)[1]) for line in timing_lines]
+    wanted_timing = [expected_late_timing(fault)] if late else []
+    if timings != wanted_timing or any(type(row[key]) is not type(value)
+            for row,want in zip(timings,wanted_timing) for key,value in want.items()):
+        raise RuntimeError('Missing, unexpected or inaccurate delayed observation timing')
+    if late:
+        framed = [line.split(' ',1)[0] for line in result.stderr.splitlines()
+                  if line.startswith(('IB-MISMATCH-SUMMARY ', 'IB-LATE-OBSERVATION ', 'HOLD:'))]
+        if framed != ['IB-MISMATCH-SUMMARY','IB-LATE-OBSERVATION','IB-MISMATCH-SUMMARY','HOLD:']:
+            raise RuntimeError('Delayed observation/HOLD order changed')
     waits = [json.loads(line) for line in lines if line.startswith('{')]
     transport_waits = tuple(f'wait-{stage}-{kind}' for stage in (1, 2) for kind in ('status', 'short', 'long'))
     unlogged = int(fault in transport_waits)
@@ -259,7 +298,7 @@ def check_result(result, fault, policy):
             raise RuntimeError('Wait order changed')
         if not code and fault != 'check-ok' and (not rows or rows[-1]['busy'] or any(not row['busy'] for row in rows[:-1])):
             raise RuntimeError('Missing positive retirement or continued wait')
-    if fault == 'stale-output-2' and 'mismatch at byte 8208 (pass=1 actual=0xde expected=0xdf)' not in result.stderr:
+    if (fault == 'stale-output-2' or fault.startswith('late-')) and 'mismatch at byte 8208 (pass=1 actual=0xde expected=0xdf)' not in result.stderr:
         raise RuntimeError('Stale pattern was not rejected')
     if fault.startswith('preamble-'):
         _, stage, byte = fault.split('-')
@@ -347,7 +386,7 @@ def exercise(out):
               'source_sha256': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},
               'cases': results, 'sanitizers': 'ASan/UBSan', 'hardware_executed': False,
               'native_IOKit_linked': False, 'shader_executed': False,
-              'case_isolation': 'reset fake fixture per case; synthetic clock stays monotonic; no per-case fork or exec',
+              'case_isolation': 'reset fake fixture per case; synthetic clock regresses only for the explicit clock fault; no per-case fork or exec',
               'separate_process_equivalence_cases': len(EXEC_EQUIVALENCE_CASES) * len(POLICIES) * 2,
               'limitation': 'Fake IOKit/CF, synthetic clock and injected bytes. No GPU ISA, cache/coherency or synchronization emulation; passing memsync is not a hardware result.'}
     (out / 'report.json').write_text(json.dumps(record, indent=2) + '\n')

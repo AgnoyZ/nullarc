@@ -7,7 +7,7 @@
 #include <unistd.h>
 struct TrialHold {};
 static int fake_pause() { throw TrialHold{}; }
-static int fake_usleep(useconds_t delay) { assert(delay == 250000); return 0; }
+static int fake_usleep(useconds_t delay);
 #define pause fake_pause
 #define usleep fake_usleep
 static int fake_uname(struct utsname *);
@@ -19,7 +19,7 @@ static int fake_uname(struct utsname *);
 #undef pause
 #undef usleep
 static bool memsyncPolicy;
-static bool singlePolicy, tailPolicy;
+static bool singlePolicy, tailPolicy, latePolicy;
 static unsigned waitAttempt;
 
 static std::string fault;
@@ -30,6 +30,20 @@ static std::vector<std::string> events;
 alignas(4096) static uint8_t backing[16384];
 static bool is(const std::string &name) { return fault == name; }
 static void event(const std::string &name) { events.push_back(name); }
+static int fake_usleep(useconds_t delay) {
+    if (delay == 250000) return 0;
+    assert(delay == 100000 && latePolicy && opened && mapped && gpuMapped && waited == submitted);
+    event("late-observation");
+    if (is("late-clock-backwards")) phx_fake_ticks -= 200000000ull;
+    else phx_fake_ticks += 100000000ull;
+    if (is("late-output-current") || is("late-output-mixed")) {
+        assert(waited == 2);
+        const uint32_t pattern[] = {0x7800c0dfu, 0x13579be0u, 0x2469ace0u, 0xc001d00cu};
+        const unsigned count = is("late-output-current") ? 256 : 128;
+        for (unsigned i = 0; i < count; ++i) memcpy(backing + 0x2010 + i * 4, &pattern[i & 3], 4);
+    }
+    return is("late-sleep-error") ? -1 : 0;
+}
 static uint64_t virtualBase() { return upper ? 0xffffc02134500000ull : 0x402134500000ull; }
 static int fake_uname(struct utsname *host) {
     event("host");
@@ -298,7 +312,7 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         const uint32_t pattern[] = {0x7800c0deu ^ pass, 0x13579bdfu + pass, 0x2468ace0u ^ (pass << 16), 0xc001d00du - pass};
         for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &pattern[i & 3], 4);
         // Explicitly injected stale-data models, not ISA/cache emulation.
-        if (pass == 1 && is("stale-output-2")) {
+        if (pass == 1 && (is("stale-output-2") || fault.compare(0, 5, "late-") == 0)) {
             const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
             for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &previous[i & 3], 4);
         }
@@ -380,19 +394,20 @@ static void packetInputs() {
 }
 static int runCase(int argc, const char *argv[]) {
     // Only fake process/device storage is reset. No production cleanup runs on
-    // a held case. The synthetic clock remains monotonic across cases.
-    memsyncPolicy = singlePolicy = tailPolicy = false;
+    // a held case. Only the explicit backward-clock fault regresses time.
+    memsyncPolicy = singlePolicy = tailPolicy = latePolicy = false;
     upper = failed = opened = mapped = gpuMapped = false;
     waitAttempt = nextService = propertyLive = allocated = created = submitted = waited = 0;
     mappedAddress = 0; property = {}; events.clear(); fault.clear();
     memset(backing, 0, sizeof(backing));
     assert(argc == 4); memsyncPolicy = !strcmp(argv[3], "memsync");
-    singlePolicy = !strcmp(argv[3], "single"); tailPolicy = !strcmp(argv[3], "nop-tail");
+    latePolicy = !strcmp(argv[3], "single-observe-late");
+    singlePolicy = latePolicy || !strcmp(argv[3], "single"); tailPolicy = !strcmp(argv[3], "nop-tail");
     assert(memsyncPolicy || singlePolicy || tailPolicy || !strcmp(argv[3], "control"));
     upper = !strcmp(argv[1], "upper"); assert(upper || !strcmp(argv[1], "low")); fault = argv[2];
     packetInputs();
     const char *args[] = {"native-shader-probe", "--run", "--upper", "extra"}; int count = upper ? 3 : 2;
-    args[1] = singlePolicy ? "--run-single" : tailPolicy ? "--run-nop-tail" : memsyncPolicy ? "--run-memsync" : "--run-control";
+    args[1] = latePolicy ? "--run-single-observe-late" : singlePolicy ? "--run-single" : tailPolicy ? "--run-nop-tail" : memsyncPolicy ? "--run-memsync" : "--run-control";
     if (is("legacy-fresh")) args[1] = "--run-fresh";
     if (is("legacy-reuse")) args[1] = "--run-reuse";
     if (is("legacy-publish")) args[1] = "--run-ib-publish";

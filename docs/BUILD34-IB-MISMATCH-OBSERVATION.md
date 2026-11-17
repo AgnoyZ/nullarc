@@ -125,3 +125,8 @@ treated as if it had already completed cleanup; any revised observation
 controller needs its own host checks and fresh scope. The unchanged single-IB
 fault remains unresolved, and the separately verified explicit-tail compute
 workaround retains its existing limited scope.
+
+The follow-up [delayed observation](BUILD34-IB-LATE-OBSERVATION.md) adds an
+explicit diagnostic option for one 100-ms CPU resample only after that
+failure. It preserves the failed outcome even if the later bytes match.
+Its CPU/native preparation does not execute or arm another hardware scope.

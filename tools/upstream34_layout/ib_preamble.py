@@ -40,6 +40,7 @@ def prepare(destination, compile_native=False):
               'recipe_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               'source_sha256': {name: hashlib.sha256(data).hexdigest() for name, data in blobs.items()},
               'policies': {'single': 'reused dispatch IB alone; identical staged arena',
+                           'single-observe-late': 'single IB; one 100ms CPU resample only after a mismatch; always fail/HOLD',
                            'control': 'prewritten NOP then reused dispatch IB',
                            'nop-tail': 'reused dispatch IB then prewritten NOP',
                            'memsync': 'prewritten ACQUIRE_MEM then reused dispatch IB'},
