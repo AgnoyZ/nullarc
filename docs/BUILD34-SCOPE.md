@@ -122,6 +122,12 @@ second-pass wrong value, with 256 previous-pattern words in A and B remaining
 poison. Independent recovery and retirement completed. This clears only the
 fresh-control prerequisite for a separate same-binary destination comparison;
 the original GPU failure is retained, not promoted to acceptance.
+The subsequent separate same-binary target-switch scope found all 256
+previous-pattern words at old destination A while new destination B remained
+poison, despite the CPU-visible command page matching expected bytes.
+Independent recovery and retirement completed. This records an old
+destination/parameter combination, not a proved CP/cache root cause or a
+native fix; all existing HOLDs remain.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

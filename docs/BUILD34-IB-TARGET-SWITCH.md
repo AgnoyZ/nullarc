@@ -143,3 +143,40 @@ This satisfies only the fresh control/recovery prerequisite for considering
 a separate same-binary target-switch scope. It is not successful GPU output
 or a fix. The switched policy has not yet been executed by this record, and
 all native single-IB, desktop/default-wait and FPS HOLDs remain.
+
+## Separate hardware target switch
+
+After that control had independently recovered and retired, a new
+source-`ffafd1f` scope used the **same signed binary and result parser** on
+the same exact original34 image and macOS build. No diagnostic source or
+native wait policy changed. One initialization and one execution client
+again submitted two single-IB dispatches. The first passed the whole arena.
+
+The second command targeted B, with both regions first poisoned. Native
+WAITSEQ initially reported busy with zero budget, then retirement with the
+50,000-ns budget. The whole-arena check failed first at A's `0x2010`: actual
+`0xde`, expected poison byte `0x20`. A contained **256 previous-pattern
+words**; B contained **256 poison words**, with no current or unexpected
+words in either region. All 1,024 bytes in each region differed from its
+expected state, totaling 2,048 mismatch bytes. Shader, command-page and guard
+counts were zero, as was the change count across immediate reads.
+
+Thus this bounded comparison observed the **old destination and old pattern
+combination**, rather than a previous pattern at the new destination. Since
+both regions were re-poisoned before submission, A's previous-pattern words
+were not the expected untouched CPU contents. This narrows the investigation
+toward command/state reuse or stale GPU-visible work; it still does not prove
+what CP fetched, identify a cache, or exclude a visibility fault. In
+particular, a CPU-visible command page matching its expected bytes does not
+establish GPU-visible command freshness. The original native fault is not
+repaired.
+
+The original failure/HOLD was retained. Observation collection, one recovery
+reboot and independent retirement completed. Verification again required
+GPU-off/firmware framebuffer with no native clients, the exact original
+image, 46 protected files, two links, 347 EFI files (148 Microsoft), unchanged
+security/kernel collections and no new matching diagnostic report. No
+driver/runtime was installed, held native process killed or extra GPU mode
+run. See the [sanitized treatment record](validation/build34-ib-target-switch-hardware-20261117.json).
+Neither consumed scope may be replayed. All original single-IB,
+desktop/default-wait and FPS HOLDs remain.
