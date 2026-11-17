@@ -16,8 +16,10 @@ Continue IB wrong-value investigation only against default build34. A further
 authorized fix must be a minimal isolated change, preserve the accepted A1/A2/
 corrected-A3 changes and keep unrelated downstream wait, lifecycle, ABI and
 initialization changes out. A subsequent item must not be promoted on the basis
-of a host-only test or a simulated GPU result. The observed IB wrong value
-remains unresolved; wait promotion and accelerated desktop remain on HOLD.
+of a host-only test or a simulated GPU result. The unmodified native single-IB
+path's wrong value remains unresolved; the explicit immutable-tail compute
+workaround now has separate transport and bounded complete-Vulkan hardware
+evidence below. Default waits and accelerated desktop remain on HOLD.
 
 The interrupted build42 user-tool preparation was stopped, and its eight
 uncommitted files were withdrawn. No driver was installed or loaded, no native
@@ -74,9 +76,16 @@ or GPU acceptance. The baseline's orphaned profile sync clone is recorded and
 unchanged; default/desktop/wait HOLDs remain.
 The subsequent [complete-runtime probe preparation](BUILD34-RADV-RUNTIME-PROBE.md)
 adds a separate IOKit guard and two-pass Vulkan program. Its 15 complete-program
-and 25 guard CPU cases use fake platform ops; the signed native program has only
-run a no-client guard self-test. This is not a new GPU trial, installation,
-desktop promotion or authorization to replay a consumed scope.
+and 25 guard CPU cases use fake platform ops; preparation ran only a no-client
+native guard self-test. A subsequent fresh complete-Vulkan hardware scope
+passed both guarded dispatches with actual same-address IB bytes changed,
+native sequences 1/2 retired and the explicit immutable tail last. Recovery
+returned to GPU-off and the scope was independently retired. A prior launcher
+path error was separately recovered/retired before the original initializer
+or Vulkan could start; it is not counted as acceptance. These records verify
+bounded opt-in compute only. They do not install the runtime, repair the
+unmodified native single-IB path, change default policy, clear desktop/wait
+HOLDs or permit replay of any consumed scope.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

@@ -166,3 +166,10 @@ The [scope and evidence limits](../docs/BUILD34-RADV-RUNTIME-PROBE.md) remain
 mandatory. CPU binaries are explicitly identified and cannot admit a hardware
 scope. Real execution needs a fresh independent recovery/deadline packet; no
 launcher, installation or automatic GPU retry is part of these commands.
+
+The subsequent [bounded complete-runtime hardware result](../docs/BUILD34-RADV-RUNTIME-PROBE.md#complete-runtime-hardware-result)
+passed two whole-arena compute dispatches with actual changed bytes at the
+same IB address, then independently recovered and retired. This verifies the
+explicit opt-in compute workaround only; it does not enable the default policy,
+install a runtime, fix the unchanged kernel's single-IB path or accept graphics,
+desktop or FPS behavior.

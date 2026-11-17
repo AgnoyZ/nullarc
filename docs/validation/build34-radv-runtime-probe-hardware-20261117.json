@@ -1,0 +1,119 @@
+{
+  "result": "complete-Vulkan-tail-passed-and-recovered",
+  "policy": "runtime-tail",
+  "source_commit": "c73d5cd38bba8003ac5f7d71dc2a0c6cca80aa6f",
+  "binaries_sha256": {
+    "libbuild34_runtime_guard.dylib": "7d4ef842cd884fd02cc3e4be798b501d495ea51a2d76e570cedfabfa95291b81",
+    "build34-radv-runtime-probe": "0646023b2a964d946ddf8d967f0148ae5284a48f4fc33ba68bc844dd1b9b2fa8",
+    "libvulkan_radeon.dylib": "3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219"
+  },
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "original34_exact_image": true,
+  "initialization_attempts": 1,
+  "maximum_native_submissions": 2,
+  "native": {
+    "CPU_platform": false,
+    "opens": 1,
+    "closes": 1,
+    "completed_guarded_dispatches": 2,
+    "whole_arena_bytes": 16384,
+    "all_bytes_guarded_and_verified": true,
+    "tail_last": true,
+    "reused_changed_IB": true,
+    "first_IB_bytes": 256,
+    "second_IB_bytes": 256,
+    "positive_retirement": [
+      {
+        "arena_pass": 0,
+        "whole_bytes": 16384,
+        "offset_0x2010": "0x7800c0de",
+        "fence_complete": true,
+        "last_sequence": 1,
+        "retired_sequence": 1
+      },
+      {
+        "arena_pass": 1,
+        "whole_bytes": 16384,
+        "offset_0x2010": "0x7800c0df",
+        "fence_complete": true,
+        "last_sequence": 2,
+        "retired_sequence": 2
+      }
+    ]
+  },
+  "mismatch": null,
+  "GPU_off": true,
+  "firmware_framebuffer_only": true,
+  "recovery_boots": 1,
+  "GPU_calls_after_recovery": 0,
+  "consumed_job_removed": true,
+  "protected_files_unchanged": 46,
+  "protected_links_unchanged": 2,
+  "EFI_files_unchanged": 347,
+  "Microsoft_files_unchanged": 148,
+  "security_and_KC_unchanged": true,
+  "new_matching_reports": 0,
+  "driver_deployed": false,
+  "runtime_installed": false,
+  "desktop_enabled": false,
+  "default_wait_promoted": false,
+  "FPS_claim": false,
+  "automatic_retry": false,
+  "date": "2026-11-17",
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "scope": "full actual RADV Vulkan compute, explicit immutable tail, two passes; no graphics/desktop/FPS acceptance",
+  "scope_fresh": true,
+  "CPU_platform": false,
+  "controlled_new_scope_after_launcher_correction": true,
+  "recovery_controller_CPU": {
+    "result": "passed",
+    "tests": 12,
+    "GPU_calls": 0,
+    "reboots": 0,
+    "includes_actual_low_priority_command_preflight": true
+  },
+  "launcher_tools_pinned": true,
+  "native_and_runtime_binaries_root_frozen": true,
+  "earlier_launcher_incident": {
+    "result": "launcher-command-not-found-before-initialization",
+    "actual_original_initializer_started": false,
+    "Vulkan_started": false,
+    "runtime_native_submissions": 0,
+    "GPU_initialization_executed": false,
+    "recovery_boots": 1,
+    "GPU_off_and_firmware_framebuffer_verified": true,
+    "protected_files_and_EFI_verified": true,
+    "scope_retired": true,
+    "scope_replayed": false,
+    "failure_counted_as_pass": false
+  },
+  "acceptance": {
+    "whole_runtime_compute_reused_IB_workaround_GPU_verified": true,
+    "explicit_tail_only": true,
+    "known_bad_single_IB_control_previously_reproduced": true,
+    "kernel_helper_ABI_changed": false,
+    "A1_A2_corrected_A3_preserved": true,
+    "default_tail_enabled": false,
+    "runtime_installed": false,
+    "graphics_GPU_accepted": false,
+    "desktop_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_claim": false,
+    "legacy_profile_sync_clone_orphan_fixed": false,
+    "binary_uploaded": false,
+    "build41_or_build42_prepared": false,
+    "unmodified_native_single_IB_repaired": false,
+    "cache_or_root_cause_proven": false
+  },
+  "source_pins": {
+    "native_probe_sources_sha256": {
+      "tools/upstream34_layout/radv_ib_tail_runtime_guard.h": "afc40d34bdf4718b22a7bbdd67c868befa8d5ae527bb2e77d07dcd4b044af689",
+      "tools/upstream34_layout/radv_ib_tail_runtime_guard.cpp": "f515734049c9153d2fd38b805e9a996900010c271ebcf59a13226f9214e0618f",
+      "tools/upstream34_layout/radv_ib_tail_runtime_probe.c": "9d272503801a1db5367b3eaa15b4ab13dfc7c365b480a8c64c035492883113be",
+      "tools/upstream34_layout/radv_ib_tail_runtime_probe.comp": "e40d02b7ebe5714103545d17e2db90731b3eb6d3bd4835fb41768a221578a5ba",
+      "tools/upstream34_layout/radv_ib_tail_runtime_probe.py": "b9bd208fd636fca4c6d608189e26fe49c82474886699164c9a357d092beb0090"
+    },
+    "offline_preparation_record_sha256": "ab6608a978e758a2f432b95c3679d9c6cb38fc0a0f30c49e58777e2b3aa7f6b6"
+  }
+}

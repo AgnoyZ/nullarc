@@ -324,10 +324,16 @@ rounds a nonzero request upward to a page; the fixture was corrected to that
 existing behavior before the final successful run. No kernel or runtime
 admission check was changed, and neither failed run is counted as acceptance.
 See the [separate enumeration integration record](validation/build34-radv-ib-tail-enumeration-offline-20261117.json).
-This library remains uninstalled and untested for Vulkan GPU execution; the
-earlier bounded transport comparison does not cover this extra source file.
+At that enumeration-preparation checkpoint the library remained uninstalled
+and untested for Vulkan GPU execution; the earlier bounded transport comparison
+did not cover this extra source file.
 
 The separate [complete-runtime probe](BUILD34-RADV-RUNTIME-PROBE.md) now has
 signed native preparation plus actual-Vulkan CPU and guard fault tests. It
 checks same-address IB byte changes and whole-arena output, but its CPU oracle
-is not GPU evidence. A fresh complete-runtime hardware scope remains required.
+is not GPU evidence. A subsequent independently recovered and retired hardware
+scope passed both whole-arena dispatches through the actual complete Vulkan
+compute path with the same private four-file library. This verifies only the
+explicit-tail bounded compute workaround; default policy, the unmodified
+native single-IB path, graphics, desktop and FPS remain outside acceptance.
+See the [complete-runtime hardware result](BUILD34-RADV-RUNTIME-PROBE.md#complete-runtime-hardware-result).

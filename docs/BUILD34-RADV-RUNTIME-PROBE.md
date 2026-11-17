@@ -1,10 +1,13 @@
 # Original34 bounded complete-runtime probe
 
-Status on 2026-11-17: preparation and CPU checks passed. No complete-runtime
-GPU trial has been armed or executed by this addition. The original34 kernel,
-ABI, production helper, A1/A2/corrected-A3, default waits and desktop HOLDs are
-unchanged. The earlier [bounded transport comparison](BUILD34-RADV-IB-TAIL.md)
-does not substitute for executing this complete Vulkan path on hardware.
+Status on 2026-11-17: preparation, CPU checks and a separate bounded
+complete-runtime Vulkan compute GPU trial passed. Both whole-arena checks
+passed after same-address IB bytes changed. Independent recovery and scope
+retirement also passed. The explicit immutable-tail workaround remains
+opt-in; the unmodified native single-IB path is not repaired by changing the
+kernel. Original34 kernel, ABI, production helper, A1/A2/corrected-A3,
+default waits and desktop HOLDs are unchanged. See the exact
+[hardware scope and limits](#complete-runtime-hardware-result).
 
 ## Program and boundary
 
@@ -101,7 +104,52 @@ confirms actual same-address byte changes. Earlier preparations are not counted
 as passes or eligible native candidates.
 
 The final native probe/guard were separately compiled without CPU platform
-symbols, signed and verified as x86_64. Only their no-client guard self-test
-was executed. See the [sanitized preparation record](validation/build34-radv-runtime-probe-offline-20261117.json).
-There is no complete-runtime GPU, graphics, desktop, performance or FPS
-acceptance. These commands publish no binary or extend artifact exceptions.
+symbols, signed and verified as x86_64. The preparation commands executed only
+their no-client guard self-test, as recorded in the immutable
+[sanitized preparation record](validation/build34-radv-runtime-probe-offline-20261117.json).
+That historical CPU/preparation record is separate from the subsequent GPU
+trial below. These commands publish no binary or extend artifact exceptions.
+
+## Complete-runtime hardware result
+
+A fresh scope on macOS 26.7.2, build 25G332, tested source commit
+`c73d5cd38bba8003ac5f7d71dc2a0c6cca80aa6f` against the exact original34
+image. The complete private RADV library had SHA256
+`3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219`.
+The actual Vulkan enumeration, logical-device creation, ACO compilation,
+command recording/reset, compute queue submission, fence waits and destruction
+ran on the native platform. The result explicitly reported `CPU_platform=0`.
+
+The observer verified one executing client open and close, two native
+submissions, an immutable last tail and changed payload bytes at the same
+IB address. Both IB payloads were 256 bytes. The first whole 16-KiB arena
+matched `0x7800c0de` at `0x2010`, and the second matched `0x7800c0df`.
+Vulkan completion and native sequence 1/retired 1, then sequence 2/retired 2,
+were positive before comparison. There was no output or guard-byte mismatch.
+
+One independent recovery reboot returned to GPU-off/firmware framebuffer;
+there were zero GPU calls after recovery. Independent read-back verified 46
+protected files, two links, all 347 EFI files (including 148 Microsoft files),
+security and kernel collections unchanged, with no new matching diagnostic
+report. The consumed launch job was removed. No driver or runtime was installed,
+and no binary was uploaded.
+
+An earlier fresh launcher scope failed before the original initializer could
+start: its absolute path to the low-priority scheduling tool was wrong. It
+executed no GPU initialization or Vulkan program. That scope recovered once,
+was independently verified and retired, and was never replayed. The corrected
+launcher uses the actual system tool path, pins both scheduling tools and
+executes a harmless command as a CPU-only preflight. Its 12 controller tests
+passed before preparing the new scope. The launcher failure is not a GPU
+failure or a passing test, and the corrective scope retained the exact same
+three native binary hashes.
+
+See the [sanitized hardware record](validation/build34-radv-runtime-probe-hardware-20261117.json).
+Together with the earlier same-binary failing single-IB/positive-tail
+[transport comparison](validation/build34-radv-ib-tail-hardware-20261117.json),
+this verifies the explicit-tail workaround through the bounded complete Vulkan
+compute path. It does not prove the cache/root cause or repair the unmodified
+kernel's single-IB behavior. Default policy remains unchanged. Graphics,
+stress/concurrency, desktop, default waits and FPS have not been accepted;
+the known profile sync-clone orphan is also unchanged. Those limits must not
+be inferred away from two passing dispatches.
