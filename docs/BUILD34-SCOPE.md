@@ -150,6 +150,10 @@ PCI-match restriction makes bundle metadata identical to the original-image
 control. Native compilation/signature/static identity checks do not install
 or load it, change the production source or original admission, arm a hardware
 scope, validate a repair or clear any existing HOLD.
+The subsequent [read-only loading-route audit](BUILD34-RING-PADDING-LOAD-ROUTE.md)
+confirmed that original34 is boot-injected. It established neither a live
+replacement route nor candidate-to-original recovery, and made no deployment,
+GPU attempt or reboot. The candidate remains uninstalled pending that gate.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

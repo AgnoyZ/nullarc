@@ -1,0 +1,107 @@
+{
+  "date": "2026-11-17",
+  "status": "live-image-switch-and-recovery-route-not-established",
+  "source_commit_before_audit": "cfe31e04d3e14a765c7b57a5102efc8a2ea777d8",
+  "OS": {
+    "version": "26.7.2",
+    "build": "25G332"
+  },
+  "live_readback": {
+    "loaded_original_image": true,
+    "loaded_candidate_image": false,
+    "original_executable_sha256": "4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412",
+    "candidate_executable_sha256": "58f7dab14e3e1768d0fca2333eedea7e15e51e3257c966c0430e46dfe304e8b3",
+    "original_bundle_unchanged": true,
+    "phx_build": 34,
+    "native_clients": 0,
+    "matching_held_or_initializer_processes": 0,
+    "matching_consumed_jobs": 0,
+    "GPU_off_marker_present": true,
+    "firmware_framebuffers": 1,
+    "accelerated_framebuffers": 0,
+    "accelerator_services": 0,
+    "pending_or_display_arm_markers": false,
+    "protected_files": 46,
+    "protected_files_unchanged": true,
+    "protected_links_unchanged": true,
+    "security_and_KCs_unchanged": true,
+    "previous_scope_recovered_and_retired": true
+  },
+  "loading_route": {
+    "kmutil_showloaded_boot_contains_original": true,
+    "kmutil_showloaded_system_contains_original": false,
+    "kmutil_showloaded_auxiliary_contains_original": false,
+    "on_disk_KC_inspection_lists_injected_original": false,
+    "read_only_boot_EFI_manifest_unchanged": true,
+    "active_boot_EFI_bundle_matches_original_executable": true,
+    "deployed_info_contains_OSBundleAllowUserLoad": false,
+    "deployed_info_contains_OSMutableSegmentCopy": false,
+    "runtime_unloadability_proved": false,
+    "runtime_replacement_route_admitted": false,
+    "exact_original_recovery_from_candidate_proved": false
+  },
+  "acceptance": {
+    "new_hardware_scope_prepared": false,
+    "new_hardware_scope_armed": false,
+    "control_GPU_executed": false,
+    "candidate_installed": false,
+    "candidate_loaded": false,
+    "candidate_GPU_executed": false,
+    "unload_or_terminate_requested": false,
+    "EFI_written": false,
+    "KC_written": false,
+    "NVRAM_written": false,
+    "security_changed": false,
+    "reboot_requested": false,
+    "native_single_IB_repaired": false,
+    "desktop_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_validated": false,
+    "build41_or_build42_prepared": false,
+    "binary_uploaded": false
+  },
+  "public_source_comparison": {
+    "repository": "apple-oss-distributions/xnu",
+    "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+    "sha256": "2fd549f450800e32e9e32c61f4fb6dfbffebe5e4f5f3406d4248bae9df4a68a3",
+    "source_path": "libkern/c++/OSKext.cpp",
+    "not_claimed_identical_to_running_kernel": true,
+    "primary_collection_branch_lines": [
+      2264,
+      2293
+    ],
+    "removeKext_rejection_lines": [
+      4605,
+      4625
+    ],
+    "internal_live_unloadUnsupported_flag_observed": false,
+    "no_claim_runtime_unload_was_tested": true
+  },
+  "CPU": {
+    "passed": true,
+    "rerun_methods": 22,
+    "suites": [
+      {
+        "suite": "test_upstream34_ring_padding_candidate.py",
+        "methods": 16,
+        "passed": true,
+        "log_sha256": "63faba8d169d4e923f04866deb4663c662d617bac99c15c48e1b9440f52f1465"
+      },
+      {
+        "suite": "test_upstream34_ring_padding_recipe.py",
+        "methods": 6,
+        "passed": true,
+        "log_sha256": "af57000ecfb3e36d0bf7d57e7c8ddcf30acc11a58ea94fb87057935c3d3a9cf7"
+      }
+    ],
+    "actual_function_72222_scenarios_rerun": false,
+    "native_or_GPU_probe_run": false
+  },
+  "production": {
+    "approved_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "kernel_helper_ABI_and_licenses_unchanged": true,
+    "A1_A2_corrected_A3_preserved": true,
+    "candidate_rebuilt": false
+  },
+  "next_gate": "Separately reviewed boot-image switch and exact-original recovery route before any fresh control/treatment scope; existing working-EFI, KC and security boundaries remain. No live unloadability or hardware correctness is asserted."
+}

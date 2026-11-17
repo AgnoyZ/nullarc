@@ -105,6 +105,12 @@ stability or frame rate follows from compiling on it.
 
 ## Remaining live-test gate
 
+A subsequent [read-only loading-route audit](BUILD34-RING-PADDING-LOAD-ROUTE.md)
+confirmed the exact original image in the running boot collection and the
+candidate still uninstalled. It did not establish a runtime replacement or
+exact-original recovery route; those must be resolved before consuming a new
+control. No live unload, EFI write, GPU work or reboot was attempted.
+
 No new hardware scope or loaded-image admission has been prepared or armed.
 The proposal's separate fresh original-image reproduction control,
 candidate-specific admission, exact-image rollback, independent witnesses,
