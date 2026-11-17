@@ -129,6 +129,14 @@ Independent recovery and retirement completed. This records an old
 destination/parameter combination, not a proved CP/cache root cause or a
 native fix; all existing HOLDs remain.
 
+The subsequent [outer-ring padding audit](BUILD34-RING-PADDING-AUDIT.md)
+finds a pinned upstream GFX11 publication-framing difference and tests a
+two-site compute-only padding idea in the actual extracted original34 submit
+function with CPU fakes. It changes no production kernel/helper/ABI and
+builds no kernel candidate. Source arithmetic and fake-platform checks are
+not GPU acceptance; ring-size compatibility and a separately pinned strict
+hardware proposal remain necessary. All existing HOLDs remain.
+
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream
 PR16, PR19 with a tested zero-progress-write correction, PR15 and PR22. Each
