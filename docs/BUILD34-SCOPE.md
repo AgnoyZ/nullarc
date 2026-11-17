@@ -61,6 +61,10 @@ then passed both guarded compute dispatches with the immutable tail enabled.
 Both scopes independently recovered and retired. This verifies only the bounded
 real transport reproducer, not full RADV/Vulkan, graphics, desktop or FPS use.
 Original34 kernel/helper/ABI and all desktop/default-wait HOLDs remain.
+The subsequent complete RADV dylib compilation and guarded CPU-only load passed
+with the same three transport source hashes. That private library has not been
+installed or executed on the GPU; full-runtime Vulkan/graphics acceptance
+remains separate from the bounded transport test.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

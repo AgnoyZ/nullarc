@@ -7,6 +7,8 @@ the separately recovered tail scope passed both whole-arena checks. This is
 bounded transport evidence, not full RADV/Vulkan runtime acceptance. The
 production policy remains opt-in; default waits, accelerated desktop and FPS
 claims remain on HOLD.
+The subsequent complete RADV build and guarded CPU load also passed; that
+library remains private, uninstalled and untested for GPU/Vulkan execution.
 
 ## Evidence motivating this change
 
@@ -206,3 +208,46 @@ runtime build/integration check and separately scoped execution evidence remain
 necessary before broader promotion. Original34 still lacks close-time
 quarantine; forced exit of a held GPU process remains unsafe. All earlier
 hardware packets remain consumed.
+
+## Full runtime integration checks
+
+The [separate compile-only runtime recipe](../mesa-patches-build34/README.md#full-runtime-compilation-and-cpu-load-check)
+pins the complete Mesa baseline inventory and compiles the unchanged,
+hardware-tested three-file transport into the full RADV dylib. It checks the
+compiled source/header and dylib link closure, system-only dependencies,
+exports, signature and a guarded CPU-only load/unload. Neither compilation nor
+that load check performs physical-device enumeration or opens an executing GPU
+client. The resulting library remains private and uninstalled; full-runtime
+GPU acceptance is separate from the bounded transport evidence above.
+
+The load guard's first executable-local interpose attempt did not intercept
+the CPU fixture's constructor query and was rejected before any real RADV
+library was loaded. The corrected guard is a separate dependent dylib with an
+open-blocker self-test before target loading. All nine fixture cases then
+passed: benign loading, missing exports and constructor calls to each of the
+seven reviewed IOKit entrypoints. An unavailable guard or any target IOKit
+activity is a failure, not an empty-device pass.
+
+The first private full-runtime configuration attempt stopped because the
+system Python 3.9 did not meet Mesa's Python 3.10 minimum. A second preparation
+refused the older probe-only source copy because it lacked 13 archived links;
+no candidate source was produced by that refusal. The complete baseline was
+rebuilt from the pinned archive and 19 verified patches. These stopped
+preparations are not compilation or hardware acceptance evidence.
+
+The subsequent complete-source run passed all 774 compilation/link steps on
+macOS 26.7.2 (`25G332`) with Apple Clang 21.0.0 and isolated Python 3.12.16,
+using one low-priority Ninja job. The actual three transport translation units
+used the reviewed header, and their objects were present in the full RADV
+link closure. The signed x86_64 dylib is 20,869,632 bytes with SHA256
+`c03a9590bc0533aadea5768f36683d6f26f1e2757e89ac86527a4b7dcfd4b990`.
+Its runtime dependencies are system libraries/frameworks only.
+
+The guarded load, required exports, Phoenix-only service setter and unload
+passed with zero target IOKit calls and no physical-device enumeration. The
+final nine CPU guard cases passed against the same smoke source hash; full
+source inventories and recipe inputs were unchanged after compilation. See
+the [runtime offline record](validation/build34-radv-ib-tail-runtime-offline-20261117.json).
+This is full-library build/load evidence, not a Vulkan or GPU execution pass.
+No library was installed or uploaded, and the original34 kernel, production
+helper, ABI, A1/A2/corrected-A3 and desktop/default-wait HOLDs remain unchanged.

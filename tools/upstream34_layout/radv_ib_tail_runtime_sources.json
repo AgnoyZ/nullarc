@@ -1,0 +1,167 @@
+{
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "full_baseline_inventory_sha256": "802ba367ff234b3117f6c384384778f3ea85f74f64d77fb484a7037461a55398",
+  "full_baseline_files_and_links": 12969,
+  "archive_sha256": {
+    "mesa-base.tar.gz": "b66b7e4b8a5a6a9049e0266209f6f719895777932f2cbcd5eeb7bcbbfd47767d",
+    "cobalt-radv.tar.gz": "96779ff15b1a8660f1521ee6ac1a2ce39c40dd51ed7f878a4873345ea9999684",
+    "phoenix-radv.tar.gz": "09871aecb7291ec5393f2afd67b4dc9f379f2b0b17bbd13cb7d9e6a8ce854b19",
+    "nullarc-radv.tar.gz": "65a284c778ea84f01186d93ea4062cffc6196f9a91867ea34395f30a19b3ab13"
+  },
+  "patch_series": [
+    {
+      "order": 1,
+      "path": "patches/01-Cobalt64-0001-radv-Darwin-macOS-backend-with-canned-gfx1201-device.patch",
+      "component": "Cobalt64",
+      "original_name": "0001-radv-Darwin-macOS-backend-with-canned-gfx1201-device.patch",
+      "sha256": "c70e5b13179edf09c105524d7b36351f5aa9db35f6fffdb91723744ff019679d"
+    },
+    {
+      "order": 2,
+      "path": "patches/02-Cobalt64-0002-radv-Darwin-native-backend-Mesa-half-of-the-Navi48-k.patch",
+      "component": "Cobalt64",
+      "original_name": "0002-radv-Darwin-native-backend-Mesa-half-of-the-Navi48-k.patch",
+      "sha256": "8dfc56cec7369c8337e930cc7a0000099425fd891a0c88fd810b7062de9cb480"
+    },
+    {
+      "order": 3,
+      "path": "patches/03-Cobalt64-0003-radv-Darwin-scanout-API-on-the-N48N-connection-ABI-1.patch",
+      "component": "Cobalt64",
+      "original_name": "0003-radv-Darwin-scanout-API-on-the-N48N-connection-ABI-1.patch",
+      "sha256": "9cf1c92d436255b3fbb3493f1f602e99e888c0f515fb7fea5631b5da37f6f73d"
+    },
+    {
+      "order": 4,
+      "path": "patches/04-Cobalt64-0004-darwin-host-pointer-import-userptr-via-N48N-BoImport.patch",
+      "component": "Cobalt64",
+      "original_name": "0004-darwin-host-pointer-import-userptr-via-N48N-BoImport.patch",
+      "sha256": "e03062531ba33986507f52635f6b9c1f2c09301108bf06b82223aca2d4ab7807"
+    },
+    {
+      "order": 5,
+      "path": "patches/05-Cobalt64-0005-radv-amdgpu-cs_grow-failure-paths-return-instead-of-.patch",
+      "component": "Cobalt64",
+      "original_name": "0005-radv-amdgpu-cs_grow-failure-paths-return-instead-of-.patch",
+      "sha256": "f01262151341e94c2c61c4164e661203dfe9a42d87567bb836441ae0095d8fa7"
+    },
+    {
+      "order": 6,
+      "path": "patches/06-Cobalt64-0006-radv-darwin-report-the-kext-s-per-session-VRAM-budge.patch",
+      "component": "Cobalt64",
+      "original_name": "0006-radv-darwin-report-the-kext-s-per-session-VRAM-budge.patch",
+      "sha256": "5b9933b1e88bbd310ae5b59cf4f01da000917385154b738bd3b9d53e7c205dcf"
+    },
+    {
+      "order": 7,
+      "path": "patches/07-Cobalt64-0007-radv-darwin-take-GB_ADDR_CONFIG-from-QueryInfo-ReadR.patch",
+      "component": "Cobalt64",
+      "original_name": "0007-radv-darwin-take-GB_ADDR_CONFIG-from-QueryInfo-ReadR.patch",
+      "sha256": "8383181e4b3ab9bdbbefc28a4f424e4805d7c17d19366c342abaccf1a8a751f3"
+    },
+    {
+      "order": 8,
+      "path": "patches/08-Cobalt64-0008-radv-darwin-radv_darwin_set_service_class-Navi48Brin.patch",
+      "component": "Cobalt64",
+      "original_name": "0008-radv-darwin-radv_darwin_set_service_class-Navi48Brin.patch",
+      "sha256": "550e5a8fb45e2efe7514c4076d9bfcbad01b29e9e59334eb0c2263327572cfc6"
+    },
+    {
+      "order": 9,
+      "path": "patches/09-Cobalt64-0009-radv-darwin-radv_darwin_n48n_call-selectors-22.26-on.patch",
+      "component": "Cobalt64",
+      "original_name": "0009-radv-darwin-radv_darwin_n48n_call-selectors-22.26-on.patch",
+      "sha256": "07e6fd710ea0d06f3fa44dd108d77315c2f22825253021e79d054790d7f74701"
+    },
+    {
+      "order": 10,
+      "path": "patches/10-radv-phoenix-0001-radv-darwin-selectable-canned-device-default-phoenix.patch",
+      "component": "radv-phoenix",
+      "original_name": "0001-radv-darwin-selectable-canned-device-default-phoenix.patch",
+      "sha256": "b066c2b60bb58d075c8dfc647dc510e7a02449bb370c8dbf1a9a9f96f77a5532"
+    },
+    {
+      "order": 11,
+      "path": "patches/11-radv-phoenix-0002-radv-darwin-report-Radeon-780M-identity-for-the-phoe.patch",
+      "component": "radv-phoenix",
+      "original_name": "0002-radv-darwin-report-Radeon-780M-identity-for-the-phoe.patch",
+      "sha256": "5a6874b77c876296ea6cdca1f6cdc01c7654d93fd8651b02e807688e720369e6"
+    },
+    {
+      "order": 12,
+      "path": "patches/12-radv-phoenix-0003-radv-darwin-open-the-PhxBringup-service-by-default.patch",
+      "component": "radv-phoenix",
+      "original_name": "0003-radv-darwin-open-the-PhxBringup-service-by-default.patch",
+      "sha256": "ef19977422a94a2a633ddec32cb236f9e60f6f1536691f7d0f82c5f3c3640aa1"
+    },
+    {
+      "order": 13,
+      "path": "patches/13-radv-phoenix-0004-radv-darwin-AMDGPU_INFO_TIMESTAMP-from-SMUIO-GOLDEN_TSC.patch",
+      "component": "radv-phoenix",
+      "original_name": "0004-radv-darwin-AMDGPU_INFO_TIMESTAMP-from-SMUIO-GOLDEN_TSC.patch",
+      "sha256": "7838c16102c49c3b2e7f1cef143cb316166e08a4cc95d88ab0bbfaae72986a2b"
+    },
+    {
+      "order": 14,
+      "path": "patches/14-radv-phoenix-0005-radv-darwin-reach-PhxBringup-through-the-accelerator.patch",
+      "component": "radv-phoenix",
+      "original_name": "0005-radv-darwin-reach-PhxBringup-through-the-accelerator.patch",
+      "sha256": "058a0a3bc9ec8679bd3ad940aa64d5a7e4024dd0732aa1afcc758a134dfc137a"
+    },
+    {
+      "order": 15,
+      "path": "patches/15-radv-phoenix-0006-radv-unroll-nested-loops-without-a-full-optimization.patch",
+      "component": "radv-phoenix",
+      "original_name": "0006-radv-unroll-nested-loops-without-a-full-optimization.patch",
+      "sha256": "1d0105993888b0ce9283cbf6ae6eeee3612a47deb7bc7482f896a58edac7e4c0"
+    },
+    {
+      "order": 16,
+      "path": "patches/16-radv-phoenix-0007-radv-darwin-captured-phoenix-topology.patch",
+      "component": "radv-phoenix",
+      "original_name": "0007-radv-darwin-captured-phoenix-topology.patch",
+      "sha256": "e0b28b318cca10f5f6d9e7eb86b5aa9dfdc12f4b19862f4867bb0b9a551d19d3"
+    },
+    {
+      "order": 17,
+      "path": "patches/17-downstream-0001-native-phoenix-only.patch",
+      "component": "downstream",
+      "original_name": "0001-native-phoenix-only.patch",
+      "sha256": "0e91433a8c44dfd2aaf0ca3db1b994427f946daafee053ef75d12241381dedff"
+    },
+    {
+      "order": 18,
+      "path": "patches/18-downstream-0002-initialize-command-buffer-cleanup-before-stream.patch",
+      "component": "downstream",
+      "original_name": "0002-initialize-command-buffer-cleanup-before-stream.patch",
+      "sha256": "eec0d1b61a3bc189f808f737a97c8912d46ed67f46f2f60b7f262c785b53b109"
+    },
+    {
+      "order": 19,
+      "path": "patches/19-downstream-0003-bounded-native-allocation-diagnostics.patch",
+      "component": "downstream",
+      "original_name": "0003-bounded-native-allocation-diagnostics.patch",
+      "sha256": "80dfb96263225c54a83ac59680af652159bdfa51ac6f54c1457e86cd0149847e"
+    }
+  ],
+  "patched_source_sha256": {
+    "src/amd/common/darwin/ac_darwin_drm.c": "dc28898693c313f8db4ffe0fe8d139cb61a4395abd3bcf45c43c6cb3ded66db4",
+    "src/amd/common/darwin/ac_darwin_kext.c": "effeec0095b63119e9494eca6ab73c4cf2bcc4941fccaf0c96c6ea92282878df",
+    "src/amd/common/darwin/ac_darwin_kext.h": "f3d5312d1d3d0248e617cb2d4687c621694b6007e59e789f47a12b821f7ab675"
+  },
+  "build_tools": {
+    "meson": "1.9.1",
+    "ninja": "1.13.0",
+    "glslang": "16.5.0"
+  },
+  "glslang_build_only_source": {
+    "repository": "KhronosGroup/glslang",
+    "tag": "16.5.0",
+    "commit": "a8d28bd082bff18ffbe80996e922b012f915cf07",
+    "archive_sha256": "64760f912da8daf34422dfe27a7577238212c48a4b8483b6810a58624b87a943",
+    "bytes": 4593851,
+    "build_only": true,
+    "runtime_distributed": false
+  },
+  "preparation_does_not_enable_policy": true,
+  "public_binary_upload": false
+}

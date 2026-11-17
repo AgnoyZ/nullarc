@@ -1,0 +1,133 @@
+{
+  "date": "2026-11-17",
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "transport_hardware_evidence": "build34-radv-ib-tail-hardware-20261117.json",
+  "tested_transport_source_commit": "7cd4b6c605d96d7af1128eab98428542bea560a0",
+  "scope": "full RADV compilation and guarded CPU-only library load; no runtime hardware promotion",
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "build_python_version": "3.12.16",
+  "build": {
+    "full_runtime_built": true,
+    "library_sha256": "c03a9590bc0533aadea5768f36683d6f26f1e2757e89ac86527a4b7dcfd4b990",
+    "library_bytes": 20869632,
+    "full_source_files_and_links": 12969,
+    "baseline_inventory_sha256": "802ba367ff234b3117f6c384384778f3ea85f74f64d77fb484a7037461a55398",
+    "compiled_inventory_sha256": "55f8c99516fcecc5e379702067a715e6243e25d5a2b705856e095ad508172b7d",
+    "patched_source_sha256": {
+      "src/amd/common/darwin/ac_darwin_kext.c": "effeec0095b63119e9494eca6ab73c4cf2bcc4941fccaf0c96c6ea92282878df",
+      "src/amd/common/darwin/ac_darwin_kext.h": "f3d5312d1d3d0248e617cb2d4687c621694b6007e59e789f47a12b821f7ab675",
+      "src/amd/common/darwin/ac_darwin_drm.c": "dc28898693c313f8db4ffe0fe8d139cb61a4395abd3bcf45c43c6cb3ded66db4"
+    },
+    "compiled_transport": {
+      "ac_darwin_kext.c": {
+        "sha256": "effeec0095b63119e9494eca6ab73c4cf2bcc4941fccaf0c96c6ea92282878df",
+        "reviewed_header_used": true
+      },
+      "ac_darwin_drm.c": {
+        "sha256": "dc28898693c313f8db4ffe0fe8d139cb61a4395abd3bcf45c43c6cb3ded66db4",
+        "reviewed_header_used": true
+      },
+      "ac_darwin_iokit.c": {
+        "sha256": "889a65f216025a230d55ae6a0da3eb8509d12f2a65f8e3bd2ec1930b60c4a3f9",
+        "reviewed_header_used": true
+      }
+    },
+    "runtime_dependencies": [
+      "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+      "/usr/lib/libSystem.B.dylib",
+      "/usr/lib/libz.1.dylib",
+      "/usr/lib/libc++.1.dylib"
+    ],
+    "parallel_jobs": 1,
+    "tool_versions": {
+      "meson": "1.9.1",
+      "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+      "glslangValidator": "Glslang Version: 11:16.5.0\nESSL Version: OpenGL ES GLSL 3.20 glslang Khronos. 16.5.0\nGLSL Version: 4.60 glslang Khronos. 16.5.0\nSPIR-V Version 0x00010600, Revision 1\nGLSL.std.450 Version 100, Revision 1\nKhronos Tool ID 8\nSPIR-V Generator Version 11\nGL_KHR_vulkan_glsl version 100\nARB_GL_gl_spirv version 100"
+    },
+    "recipe_sha256": {
+      "tools/upstream34_layout/radv_ib_tail_runtime.py": "71e607fe25bc90314f984654cbd67e7091cb6c50a5a0d6d27f6f50dae2c051c0",
+      "tools/upstream34_layout/radv_ib_tail_runtime_sources.json": "f8cc1f675f9d783ae495f198bbca6350ca8f6114805d59142952dbf1b0d362dc",
+      "tools/upstream34_layout/radv_ib_tail_dylib_smoke.c": "ed496a0821f070a57b07b83ba691934745309cf2a44b60e25deeb5257dc0952c"
+    }
+  },
+  "smoke": {
+    "dylib_loaded": true,
+    "guard_self_test": true,
+    "required_exports": true,
+    "Phoenix_service_policy": true,
+    "IOKit_calls": 0,
+    "physical_device_enumeration": false,
+    "GPU_executed": false
+  },
+  "guard_CPU_tests": {
+    "result": "passed",
+    "CPU_cases": {
+      "benign": {
+        "passed": true,
+        "returncode": 0
+      },
+      "missing-export": {
+        "passed": true,
+        "returncode": 5
+      },
+      "matching-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "matches-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "open-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "call-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "map-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "unmap-constructor": {
+        "passed": true,
+        "returncode": 4
+      },
+      "close-constructor": {
+        "passed": true,
+        "returncode": 4
+      }
+    },
+    "GPU_executed": false,
+    "real_IOKit_handle_used": false,
+    "input_sha256": {
+      "tools/test_build34_radv_runtime_smoke.py": "7fd69225342414328e88fb0f9132ffd4d1ab4ef7eab7933e2d58588b46786165",
+      "tools/upstream34_layout/radv_ib_tail_dylib_smoke.c": "ed496a0821f070a57b07b83ba691934745309cf2a44b60e25deeb5257dc0952c"
+    }
+  },
+  "stopped_preparations": {
+    "system_Python39_rejected_before_runtime_compilation": true,
+    "probe_source_without_13_archive_links_rejected_before_candidate_output": true,
+    "executable_local_interpose_attempt_rejected_by_negative_CPU_fixture": true,
+    "stopped_attempts_counted_as_passes": false
+  },
+  "acceptance": {
+    "bounded_transport_reproducer_workaround_verified": true,
+    "full_runtime_compilation_and_CPU_load_verified": true,
+    "full_runtime_GPU_executed": false,
+    "physical_device_enumeration_performed": false,
+    "driver_or_runtime_installed": false,
+    "default_policy_enabled": false,
+    "default_wait_promoted": false,
+    "desktop_enabled": false,
+    "Vulkan_execution_or_graphics_acceptance": false,
+    "FPS_claim": false,
+    "original34_kernel_helper_ABI_unchanged": true,
+    "A1_A2_corrected_A3_preserved": true,
+    "build41_or_build42_prepared": false,
+    "binary_uploaded": false
+  }
+}
