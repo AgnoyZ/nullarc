@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-17",
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "source_parent": "a13e1a71ed89742f89e1099018bab9c756858862",
+  "scope": "explicit compute-only real Mesa submission workaround; no runtime promotion",
+  "CPU": {
+    "actual_marshaller_compiled_and_executed": true,
+    "asan_ubsan": true,
+    "transport_checks": 5752346,
+    "split_fence_cases": 1028,
+    "independent_CPU_hold_cases": 11,
+    "upstream_checks_unchanged": 126,
+    "historical_upstream_service_assertion_failures_unchanged": 8,
+    "core_translation_unit_compiled": true,
+    "core_lifecycle_executed": true,
+    "core_lifecycle_checks": 210,
+    "concurrent_submit_threads": 2,
+    "CPU_allocator_container_of": "compiler offsetof; no sanitizer disabled",
+    "actual_probe_CPU_cases": 68,
+    "patch_sha256": "b3d99520bbce99eb3720d08e299604568f9aada59dad1efc551017636a88f5d8",
+    "installed": false,
+    "GPU_executed": false,
+    "native_binary_executed": false
+  },
+  "native_preparation": {
+    "compiled": true,
+    "binary_sha256": "9e73ce02a2e7502249bed4e191b455638d42c75086bdb514dd815b2f8b7e1fd2",
+    "signature_and_x86_64_verified": true,
+    "native_binary_executed": false,
+    "patch_sha256": "b3d99520bbce99eb3720d08e299604568f9aada59dad1efc551017636a88f5d8",
+    "dependency_manifest_sha256": "8357f3d2c36b52629ce2784a6741b25c0737e92c79b9333e6ddb26f7a0f68699",
+    "patched_source_sha256": {
+      "src/amd/common/darwin/ac_darwin_kext.c": "effeec0095b63119e9494eca6ab73c4cf2bcc4941fccaf0c96c6ea92282878df",
+      "src/amd/common/darwin/ac_darwin_kext.h": "f3d5312d1d3d0248e617cb2d4687c621694b6007e59e789f47a12b821f7ab675",
+      "src/amd/common/darwin/ac_darwin_drm.c": "dc28898693c313f8db4ffe0fe8d139cb61a4395abd3bcf45c43c6cb3ded66db4"
+    },
+    "dispatch_limit": 2,
+    "initialization_performed": false
+  },
+  "protected_original34_source_and_licences_unchanged": true,
+  "acceptance": {
+    "production_IB_fix_hardware_verified": false,
+    "new_transport_GPU_executed": false,
+    "driver_deployed": false,
+    "default_enabled": false,
+    "desktop_acceleration_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_claim": false,
+    "build41_or_build42_prepared": false,
+    "binary_uploaded": false
+  },
+  "limitations": [
+    "CPU oracle is not GPU execution or an ISA/coherency simulation",
+    "Eight historical upstream service assertions fail identically on baseline and patched transport; only 126 unchanged passing checks counted",
+    "CPU allocator uses supported compiler-offset macro override; sanitizers remain enabled",
+    "Fresh same-binary single failure and separately recovered tail scope still required"
+  ],
+  "original34_layout_regression": {
+    "passed": 20,
+    "skipped": 0
+  }
+}

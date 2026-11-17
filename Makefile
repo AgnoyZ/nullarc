@@ -69,6 +69,12 @@ test-upstream34-ib-preamble:
 	python3 -m unittest discover -s tests -p test_upstream34_ib_preamble_runner.py -v
 	python3 tools/test_upstream34_ib_preamble.py --out build/upstream34-ib-preamble-host-private
 
+# Actual pinned Mesa source is required; this never links a GPU/IOKit backend.
+.PHONY: test-upstream34-radv-ib-tail
+test-upstream34-radv-ib-tail:
+	@test -n "$(MESA_SOURCE)" || (echo "Set MESA_SOURCE to the verified matching Mesa source"; exit 2)
+	python3 tools/test_build34_radv_ib_tail.py --mesa-source "$(MESA_SOURCE)" --out build/upstream34-radv-ib-tail-host-private
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \

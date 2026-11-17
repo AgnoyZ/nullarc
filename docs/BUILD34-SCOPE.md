@@ -49,6 +49,16 @@ This clears only that comparison's reproduction prerequisite. A lifetime-safe
 change in the real RADV submission path and its own bounded native verification
 are still required before claiming a production fix.
 
+The subsequent [real RADV IB-tail source experiment](BUILD34-RADV-IB-TAIL.md)
+adapts three pinned MIT Mesa transport/core files with a separately owned,
+connection-lifetime immutable NOP BO. It is explicitly opt-in, compute-only and
+excluded from WindowServer. Its CPU tests execute the actual marshaller,
+shared core/VA allocator and native-probe control flow with fake platform ops;
+native compilation does not execute the signed probe. This is an unpromoted
+source workaround, not an installed runtime or hardware acceptance. A new
+same-binary single-control/tail comparison with independent recovery remains
+required. Original34 kernel/helper/ABI and all desktop/default-wait HOLDs remain.
+
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream
 PR16, PR19 with a tested zero-progress-write correction, PR15 and PR22. Each

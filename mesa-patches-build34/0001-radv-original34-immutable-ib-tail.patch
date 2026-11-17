@@ -1,0 +1,319 @@
+From: nullarc build34 maintainers
+Subject: [PATCH] radv/darwin: opt-in original34 immutable compute IB tail
+
+SPDX-License-Identifier: MIT
+
+Experimental compute submission only; desktop/default wait remain HOLD.
+Applies only to the three pinned transport blobs in the accompanying recipe.
+
+diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_darwin_kext.c
+--- a/src/amd/common/darwin/ac_darwin_kext.c
++++ b/src/amd/common/darwin/ac_darwin_kext.c
+@@ -12,6 +12,8 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <time.h>
++#include <pthread.h>
++#include <unistd.h>
+ 
+ /* ---- the mirrored structs must be layout-identical to their drm twins (D2) ---- */
+ _Static_assert(sizeof(struct n48n_gem_create_in) == 32, "gem_create_in size");
+@@ -72,6 +74,10 @@
+ struct acd_kext {
+    struct acd_kext_ops ops;
+    void *ctx;
++   pthread_mutex_t tail_lock;
++   bool submission_started;
++   bool tail_attempted, tail_enabled, tail_uncertain;
++   uint64_t tail_va, tail_last_seq;
+ };
+ 
+ /* G6: the service class of the N48N open. A pointer to one of the two string literals below (never to the caller's buffer). */
+@@ -103,6 +109,12 @@
+    }
+    k->ops = *ops;
+    k->ctx = ctx;
++   if (pthread_mutex_init(&k->tail_lock, NULL)) {
++      if (ops->close)
++         ops->close(ctx);
++      free(k);
++      return NULL;
++   }
+    return k;
+ }
+ 
+@@ -111,8 +123,25 @@
+ {
+    if (!k)
+       return;
++   /* Original34 has no close-time quarantine. Never release the tail (or the
++    * connection's other BOs) after an uncertain submit or without retirement.
++    * This affects ONLY the explicit workaround. One bounded wait, no retries. */
++   if (k->tail_enabled && (k->tail_last_seq || k->tail_uncertain)) {
++      struct acd_wait_status st = {0};
++      bool busy = true;
++      int r = k->tail_uncertain ? -EIO :
++         acd_kext_wait_seq(k, k->tail_last_seq, N48N_WAIT_CAP_NS, &busy, &st);
++      if (r || busy || st.retired < k->tail_last_seq || st.retired == N48N_SEQ_LAST ||
++          st.emitted < st.retired || st.emitted == N48N_SEQ_LAST) {
++         fprintf(stderr, "HOLD: original34 IB-tail teardown lacks positive retirement; recovery required\n");
++         fflush(stderr);
++         for (;;)
++            pause();
++      }
++   }
+    if (k->ops.close)
+       k->ops.close(k->ctx);
++   pthread_mutex_destroy(&k->tail_lock);
+    free(k);
+ }
+ 
+@@ -515,25 +544,108 @@
+ }
+ 
+ int
+-acd_kext_submit(struct acd_kext *k, const struct acd_cs_plan *plan, uint64_t *last_seqno)
++acd_kext_enable_build34_ib_tail(struct acd_kext *k, uint64_t va)
++{
++   if (!k || k->tail_attempted || __atomic_load_n(&k->submission_started, __ATOMIC_ACQUIRE))
++      return -EINVAL;
++   k->tail_attempted = true;
++   if (!va || (va & 4095) || !acd_canon_bits_ok(va) || va > UINT64_MAX - 4095)
++      return -EINVAL;
++
++   struct acd_hello h = {0};
++   struct n48n_info info = {0};
++   int r = acd_kext_hello(k, &h);
++   if (!r)
++      r = acd_kext_query_info(k, &info);
++   if (r)
++      return r;
++   if (h.abi != N48N_ABI_VERSION || h.minor != 12 || h.build != 34 ||
++       h.max_ibs != N48N_MAX_IBS || h.vmid != 8 || info.abi_version != h.abi ||
++       info.reserved[2] != h.minor || info.kext_build != h.build || info.vmid != h.vmid ||
++       info.gc_version != ((11u << 16) | 1u) || info.max_ibs != h.max_ibs ||
++       (info.flags & (N48N_INFO_HUNG | N48N_INFO_NATIVE_BOOT | N48N_INFO_S1B_POSITIVE)) !=
++          (N48N_INFO_NATIVE_BOOT | N48N_INFO_S1B_POSITIVE))
++      return -ENODEV;
++   /* Restrict this reservation to the low canonical range used by the core's
++    * allocator. Never choose a hard-coded address behind the allocator. */
++   if (info.va_low_first < 0x10000 || info.va_low_first > info.va_low_last ||
++       info.va_low_last > 0x7fffffffffffull || va < info.va_low_first ||
++       va > info.va_low_last || info.va_low_last - va < 4095)
++      return -EINVAL;
++
++   const struct n48n_gem_create_in create = {
++      .bo_size = 4096, .alignment = 4096, .domains = N48N_GEM_DOMAIN_GTT,
++      .domain_flags = N48N_GEM_CPU_ACCESS_REQUIRED,
++   };
++   struct acd_bo_created bo = {0};
++   r = acd_kext_bo_create(k, &create, &bo);
++   if (r)
++      return r;
++   if (bo.size != 4096 || bo.domain != N48N_GEM_DOMAIN_GTT ||
++       !(bo.bits & N48N_PLACED_ZEROED) ||
++       (bo.bits & ~(N48N_PLACED_ZEROED | N48N_PLACED_CPU_MAPPABLE)))
++      return -EIO;
++   void *cpu = NULL;
++   size_t size = 0;
++   r = acd_kext_bo_map(k, bo.handle, &cpu, &size);
++   if (r)
++      return r;
++   if (!cpu || ((uintptr_t)cpu & 4095) || size != 4096)
++      return -EIO;
++   /* Same eight-dword NOP as the guarded descriptor-order experiment. The
++    * CPU mapping is removed before publication, and never recreated. */
++   memset(cpu, 0, 4096);
++   const uint32_t nop[8] = {0xc0061000u, 0, 0, 0, 0, 0, 0, 0};
++   memcpy(cpu, nop, sizeof(nop));
++   acd_sfence();
++   r = acd_kext_bo_unmap(k, bo.handle, cpu);
++   if (r)
++      return r;
++   const struct drm_amdgpu_gem_va map = {
++      .handle = bo.handle, .operation = AMDGPU_VA_OP_MAP,
++      .flags = AMDGPU_VM_PAGE_READABLE | AMDGPU_VM_PAGE_EXECUTABLE,
++      .va_address = va, .map_size = 4096,
++   };
++   r = acd_kext_gem_va(k, &map);
++   if (r)
++      return r;
++   k->tail_va = va;
++   k->tail_enabled = true;
++   return 0;
++}
++
++static int
++acd_kext_submit_locked(struct acd_kext *k, const struct acd_cs_plan *plan, uint64_t *last_seqno)
+ {
+    uint8_t buf[sizeof(struct n48n_cs_in) + N48N_MAX_IBS * sizeof(struct n48n_cs_ib)];
+    uint64_t seq = 0;
+ 
+-   if (plan->n_ibs == 0)
+-      return -EINVAL;
+-
+-   for (uint32_t off = 0; off < plan->n_ibs; off += N48N_MAX_IBS) {
++   if (!plan || !last_seqno || plan->n_ibs == 0 || !plan->ibs)
++      return -EINVAL;
++   if ((k->tail_attempted && !k->tail_enabled) || k->tail_uncertain)
++      return -EIO;
++   const uint32_t capacity = N48N_MAX_IBS - (k->tail_enabled ? 1 : 0);
++   /* Validate every payload before emitting the first chunk. This opt-in scope
++    * covers compute only; do not silently route a foreign engine to its tail. */
++   if (k->tail_enabled) {
++      for (uint32_t i = 0; i < plan->n_ibs; ++i) {
++         if (plan->ibs[i].ip_type != AMDGPU_HW_IP_COMPUTE ||
++             plan->ibs[i].ip_instance || plan->ibs[i].ring)
++            return -EINVAL;
++      }
++   }
++
++   for (uint32_t off = 0; off < plan->n_ibs;) {
+       uint32_t n = plan->n_ibs - off;
+-      if (n > N48N_MAX_IBS)
+-         n = N48N_MAX_IBS;
++      if (n > capacity)
++         n = capacity;
+       const bool last = off + n == plan->n_ibs;
+ 
+       struct n48n_cs_in hdr;
+       memset(&hdr, 0, sizeof(hdr));
+       hdr.abi = N48N_ABI_VERSION;
+       hdr.ctx_id = plan->ctx_id;
+-      hdr.num_ibs = n;
++      hdr.num_ibs = n + (k->tail_enabled ? 1 : 0);
+       if (last && plan->has_fence) {
+          hdr.flags = N48N_CS_HAS_FENCE;
+          hdr.fence_handle = plan->fence_handle;
+@@ -541,20 +653,51 @@
+       }
+       memcpy(buf, &hdr, sizeof(hdr));
+       memcpy(buf + sizeof(hdr), plan->ibs + off, n * sizeof(struct n48n_cs_ib));
++      if (k->tail_enabled) {
++         const struct n48n_cs_ib tail = {
++            .va_start = k->tail_va, .ib_bytes = 32, .ip_type = AMDGPU_HW_IP_COMPUTE,
++         };
++         memcpy(buf + sizeof(hdr) + n * sizeof(tail), &tail, sizeof(tail));
++      }
+ 
+       uint64_t sout[1] = {0};
+       uint32_t nout = 1;
++      if (k->tail_enabled)
++         k->tail_uncertain = true; /* even a failed reply can follow emitted work */
+       acd_sfence();
+-      int r = kcall(k, ACD_SEL_SUBMIT, NULL, 0, buf, sizeof(hdr) + n * sizeof(struct n48n_cs_ib), sout, &nout,
++      int r = kcall(k, ACD_SEL_SUBMIT, NULL, 0, buf, sizeof(hdr) + hdr.num_ibs * sizeof(struct n48n_cs_ib), sout, &nout,
+                     NULL, NULL);
+       if (r)
+          return r;
+       if (nout != 1)
+          return -EIO;
+       seq = sout[0];
++      if (k->tail_enabled) {
++         if (!seq || seq == N48N_SEQ_LAST || seq <= k->tail_last_seq)
++            return -EIO;
++         k->tail_last_seq = seq;
++         k->tail_uncertain = false;
++      }
++      off += n;
+    }
+    *last_seqno = seq;
+    return 0;
++}
++
++int
++acd_kext_submit(struct acd_kext *k, const struct acd_cs_plan *plan, uint64_t *last_seqno)
++{
++   if (!k)
++      return -EINVAL;
++   __atomic_store_n(&k->submission_started, true, __ATOMIC_RELEASE);
++   /* Enabled once before the core is published; serialize split transactions
++    * and sticky-error/sequence bookkeeping only for the explicit workaround. */
++   if (k->tail_enabled)
++      pthread_mutex_lock(&k->tail_lock);
++   int r = acd_kext_submit_locked(k, plan, last_seqno);
++   if (k->tail_enabled)
++      pthread_mutex_unlock(&k->tail_lock);
++   return r;
+ }
+ 
+ int
+diff --git a/src/amd/common/darwin/ac_darwin_kext.h b/src/amd/common/darwin/ac_darwin_kext.h
+--- a/src/amd/common/darwin/ac_darwin_kext.h
++++ b/src/amd/common/darwin/ac_darwin_kext.h
+@@ -99,6 +99,14 @@
+ struct acd_kext *acd_kext_create(const struct acd_kext_ops *ops, void *ctx);
+ void acd_kext_destroy(struct acd_kext *k);
+ 
++/* Experimental, explicit original34-only IB transition workaround. Call once,
++ * before publishing the connection or submitting anything. The caller reserves
++ * [va, va + 4096) in its OWN VA manager until connection destruction. A private
++ * immutable NOP BO lives for that connection; there is deliberately no disable
++ * or early-free API. Failure poisons submission; destroy the unsubmitted client.
++ * Does not initialize the GPU or relax the kernel's admission requirements. */
++int acd_kext_enable_build34_ib_tail(struct acd_kext *k, uint64_t va);
++
+ /* Backend selection: RADV_DARWIN_MOCK=1 gives the in-process mock, otherwise the
+  * IOKit transport (IOServiceOpen of Navi48Bringup, type 'N48N'). Logs one clear
+  * stderr line and returns -errno on failure. */
+diff --git a/src/amd/common/darwin/ac_darwin_drm.c b/src/amd/common/darwin/ac_darwin_drm.c
+--- a/src/amd/common/darwin/ac_darwin_drm.c
++++ b/src/amd/common/darwin/ac_darwin_drm.c
+@@ -65,6 +65,7 @@
+    bool shared; /* the process-wide core (false: the private HOST_BO stand-in core) */
+    struct acd_kext *kext; /* NULL in the HOST_BO stand-in */
+    struct amdgpu_va_manager *va_mgr;
++   amdgpu_va_handle ib_tail_reservation; /* private, connection-lifetime page */
+    struct util_sync_provider *sync; /* master; every device holds a clone */
+    pthread_mutex_t bo_lock;
+    struct amdgpu_bo *bos[N48N_MAX_BOS]; /* by kext handle */
+@@ -283,6 +284,28 @@
+    /* gfx12: RADV needs half of the VA range reserved for PRT, as on Linux. */
+    amdgpu_va_manager_init2(c->va_mgr, di->virtual_address_offset, di->virtual_address_max, di->high_va_offset,
+                            di->high_va_max, di->virtual_address_alignment, AMDGPU_VA_MGR_RESERVE_HALF_VA_FOR_PRT);
++   const char *tail = getenv("RADV_DARWIN_BUILD34_IB_TAIL");
++   if (tail && strcmp(tail, "0")) {
++      uint64_t va = 0;
++      const char *program = getprogname();
++      int r = strcmp(tail, "1") || !c->kext || (program && !strcmp(program, "WindowServer")) ? -EINVAL :
++         amdgpu_va_range_alloc2(c->va_mgr, amdgpu_gpu_va_range_general, 4096, 4096, 0,
++                                &va, &c->ib_tail_reservation, 0);
++      if (!r)
++         r = acd_kext_enable_build34_ib_tail(c->kext, va);
++      if (r) {
++         /* No submit has occurred. Close before releasing the reservation. */
++         acd_kext_destroy(c->kext);
++         if (c->ib_tail_reservation)
++            amdgpu_va_range_free(c->ib_tail_reservation);
++         amdgpu_va_manager_deinit(c->va_mgr);
++         free(c->va_mgr);
++         c->sync->finalize(c->sync);
++         pthread_mutex_destroy(&c->bo_lock);
++         free(c);
++         return r;
++      }
++   }
+    *out = c;
+    return 0;
+ }
+@@ -290,12 +313,19 @@
+ static void
+ acd_core_destroy(struct acd_core *c)
+ {
++   /* Tail-enabled destruction requires positive retirement before IOServiceClose
++    * frees its BO. A failure holds the connection for independent recovery. */
++   if (c->ib_tail_reservation) {
++      acd_kext_destroy(c->kext);
++      c->kext = NULL;
++      amdgpu_va_range_free(c->ib_tail_reservation);
++   }
+    amdgpu_va_manager_deinit(c->va_mgr);
+    free(c->va_mgr);
+    /* BOs RADV leaked: the kext frees them at close; only the Mesa side is released here. */
+    for (uint32_t i = 0; i < N48N_MAX_BOS; i++)
+       free(c->bos[i]);
+-   acd_kext_destroy(c->kext); /* IOServiceClose */
++   acd_kext_destroy(c->kext); /* original order when the workaround is disabled */
+    c->sync->finalize(c->sync); /* clones keep the syncobj state alive as long as they need it */
+    pthread_mutex_destroy(&c->bo_lock);
+    free(c);
