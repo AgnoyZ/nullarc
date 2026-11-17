@@ -149,3 +149,61 @@ adoption, longer interactive/background-load stability, sleep/wake, FPS and
 PR28's real GPU wait remain separate, unaccepted items. The earlier watchdog
 and first observer refusal remain in the record. Sanitized evidence is in
 [`validation/build34-desktop-hardware-20261117.json`](validation/build34-desktop-hardware-20261117.json).
+
+## Subsequent 30-minute low-load observation
+
+After the complete bounded PR28 real-GPU wait packet passed and was independently
+recovered, a fresh single-use scope based on default
+`654e62fac841db5bd3ab3b93d0c5f281847151e8` extended desktop observation to
+1800 seconds. It retained the exact compute-sync build34 kernel and release
+PR28 plugin from that accepted packet. The wait policy stayed default-off,
+WindowServer remained excluded, and only the admission probe opted in inside
+its own process. Build41/build42 were not candidates.
+
+The new packet passed **73 CPU/controller methods**, both CPU observer
+self-checks and all **18 runtime-access checks**. Its single initialization
+passed compute, graphics and both queue adoptions. Both native dispatches
+verified their full 16-KiB arenas. The same bounded Metal admission workloads
+passed: three successful publication waits, a genuine buffer-only fast path,
+and a controlled 1 ms timeout followed by real completion and verified pixels.
+No production driver, plugin, runtime or display parameter was changed for
+the longer observation. Recovery instructions were corrected to name this
+new scope's exact dedicated subtree; the Windows fallback was not executed.
+
+The independent guardian retained the 105-second pre-release bound and used
+a **2100-second overall bound**. Observation sampled at nominal five-second
+intervals and refused any interval over 30 seconds. No synthetic stress or
+FPS workload was injected. The measured sample span was
+**1802.062185442 seconds**, with **336 samples / 335 validated intervals** and
+a maximum interval of **5.726472353 seconds**. The controller's elapsed
+observation including its final checks was 1809.486080748 seconds.
+
+| Observation | Start | End |
+| --- | ---: | ---: |
+| Successful present transactions | 840 | 72,718 |
+| Failed transactions | 0 | 0 |
+| Copy-skipped transactions | 0 | 0 |
+| Synthetic VBL ticks | 5,863 | 141,346 |
+
+Every adjacent pair had increasing present and synthetic-VBL counters, the
+same single WindowServer and unchanged armed/hold state. Panel timing stayed
+at 2560 by 1600 / 120,000 milliHz, and no new matching diagnostic report
+appeared. These counters establish progress; they are not FPS or measured
+input latency.
+
+Automatic recovery completed without restoration errors. Independent review
+reparsed the native and Metal output, WindowServer mappings, every sample
+and every incremental sample receipt. It confirmed the exact original loaded
+kernel and complete original plugin, all 46 protected files and 347 original
+EFI files, unchanged links/security/kernel collections, GPU-off and only the
+firmware framebuffer. The nine exact recovery files, restore-only job and
+candidate plugin stage were removed; no test client, held process, recovery
+scheduler or follow-up GPU task remained, and EFI was unmounted.
+
+**The bounded 30-minute low-load desktop observation passed.** This is not
+unrestricted long-term stability, background-load or interactive-stutter
+acceptance, sleep/wake validation, a camera result, permanent desktop adoption
+or FPS acceptance. The earlier watchdog and unresolved first PR28 failure
+remain historical evidence. FPS is the next separate stage and had not
+started at the final readback. Sanitized results are in
+[`validation/build34-desktop-stability-20261117.json`](validation/build34-desktop-stability-20261117.json).
