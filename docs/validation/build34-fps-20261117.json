@@ -280,5 +280,96 @@
       "verifier_GPU_calls": 0,
       "no_replay": true
     }
+  },
+  "explicit_enumeration_followup": {
+    "result": "visible-Metal-FPS-explicit-enumeration-empty-with-no-observed-device-init-invocations-independently-recovered",
+    "source_commit": "14d1474ae0827b92e953143a59b4ca8960a502a7",
+    "same_production_kernel_plugin_frame_workload_and_FPS_parser": true,
+    "upstream_test_selection_review": {
+      "commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "path": "tools/mtlprobe/mtlprobe.m",
+      "matched_local_source": true,
+      "other_upstream_candidate_prepared_or_used": false
+    },
+    "CPU_controller_parser_methods": 106,
+    "statistics_cases": 8,
+    "root_native_selection_cases": 10,
+    "GUI_user_native_selection_cases": 10,
+    "root_native_observer_cases": 10,
+    "GUI_user_native_observer_cases": 10,
+    "both_GUI_user_CPU_loader_ABI_install_restore_checks_passed": true,
+    "CPU_checks_GPU_calls": 0,
+    "native_full_arena_checks": 2,
+    "both_PR28_admission_outputs_independently_reparsed": true,
+    "before_FPS_readiness": {
+      "elapsed_seconds": 9.569722125999998,
+      "successful_present_transaction_delta": 7,
+      "same_WindowServer": true,
+      "panel_timing_unchanged": true,
+      "plugin_and_RADV_mapped": true,
+      "receipt_hash_bound_to_application_intent": true,
+      "not_an_FPS_measurement": true
+    },
+    "FPS_application_launches": 1,
+    "FPS_startup_stages": [
+      "main-entered",
+      "plugin-loaded",
+      "device-observer-installed",
+      "before-Metal-device",
+      "device-observer-restored"
+    ],
+    "expected_GUI_user_verified": true,
+    "device_selection": {
+      "enumeration_calls": 1,
+      "default_device_calls": 0,
+      "enumerated_devices": 0,
+      "matching_target_devices": 0,
+      "array_within_bound": true,
+      "selected_unique_target": false,
+      "independently_reparsed": true
+    },
+    "process_local_device_init_observation": {
+      "plugin_init_calls": 0,
+      "superclass_init_calls": 0,
+      "plugin_nil_returns": 0,
+      "superclass_nil_returns": 0,
+      "original_IMPs_restored": true,
+      "events_and_counts_independently_reparsed": true
+    },
+    "application_exit_code": 22,
+    "application_elapsed_seconds": 1.7567663279999977,
+    "device_visibility_root_cause_unresolved": true,
+    "default_device_creation_fixed": false,
+    "internal_GPU_calls_established": false,
+    "visible_window_setup_reached": false,
+    "frame_worker_reached": false,
+    "explicit_frame_commands_submitted": 0,
+    "frame_records": 0,
+    "FPS_result_present": false,
+    "FPS_workload_accepted": false,
+    "automatic_retry": false,
+    "default_wait_policy_promoted": false,
+    "independent_recovery_and_retirement": {
+      "automatic_restoration_errors": [],
+      "exact_original_loaded": true,
+      "candidate_not_loaded": true,
+      "plugin_original_full_manifest": true,
+      "protected_files_unchanged": 46,
+      "original_EFI_file_count": 347,
+      "original_EFI_baseline_exact": true,
+      "protected_links_security_and_kernel_collections_unchanged": true,
+      "temporary_recovery_files_removed": 9,
+      "restore_only_job_removed": true,
+      "exact_plugin_stage_removed": true,
+      "exact_FPS_GUI_stage_and_cache_removed": true,
+      "no_remaining_test_jobs_clients_or_held_processes": true,
+      "GPU_off": true,
+      "firmware_framebuffer_only": true,
+      "EFI_unmounted": true,
+      "new_matching_reports": 0,
+      "followup_GPU_task_armed": false,
+      "verifier_GPU_calls": 0,
+      "no_replay": true
+    }
   }
 }

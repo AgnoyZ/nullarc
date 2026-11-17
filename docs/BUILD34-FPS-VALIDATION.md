@@ -178,3 +178,54 @@ test process/job. The exact nine-file recovery tree, plugin stage and GUI
 stage/cache were removed. Final read-back confirmed GPU-off, firmware
 framebuffer only, EFI unmounted and no next GPU scope armed. No retry was
 made. All four failed FPS attempts remain in the evidence and unaccepted.
+
+## Explicit device enumeration: empty device list
+
+A fifth fresh packet, based on
+`14d1474ae0827b92e953143a59b4ca8960a502a7`, changed only the test's device
+selection and the diagnostics/checks needed to distinguish that path. The
+production kernel/plugin, frame workload and FPS parser were unchanged.
+It called `MTLCopyAllDevices()` once, required a unique device passing the
+existing exact PCI and plugin-image checks, and made no default-device call
+or fallback. This was a separate diagnostic path, not a repair of default
+device creation. Upstream's `tools/mtlprobe/mtlprobe.m` at fixed commit
+`8aba872560a3c9b7dc7a0ddebfad001c6dddf315` was reviewed through the GitHub
+API and matched the local copy; it also starts with device enumeration. No
+other upstream driver source or candidate build was prepared or used.
+
+Preparation passed 106 CPU/controller/parser methods and eight statistics
+cases. Ten native selection cases and ten native initialization-observer
+cases passed under each of the root and actual GUI-user routes. Selection
+checks rejected empty, ambiguous, wrong-identity, wrong-image and oversized
+input arrays without calling Metal. Both GUI-user plugin-loader ABI and
+observer install/restore checks passed again. Independent prearm review also
+checked the one enumeration import, absence of a default-device import and
+byte-identical frame workload/parser. These preparation checks made no GPU
+calls.
+
+The trial again passed initialization, both native full-arena checks and both
+PR28 admission probes. Before the application, readiness observed **seven
+additional successful present transactions in 9.569722126 seconds**, the
+same WindowServer, unchanged panel timing and mapped plugin/RADV images.
+The actual GUI-user application enumerated **zero Metal devices**, selected
+none and returned **exit 22 after 1.756766328 seconds**. Neither observed
+initializer was invoked; both original implementations were restored. The
+application never reached window setup or the frame worker. There are zero
+frame records and no FPS result. No default-device call, fallback or retry
+was made.
+
+Explicit enumeration alone therefore did not resolve the application's
+device visibility problem. The cause remains unproved: these observations
+do not distinguish user/session/launch conditions, framework loading or an
+earlier device-discovery rejection. They do not justify changing the plugin's
+later initialization checks or weakening device identity and FPS admission.
+
+Independent review reparsed the enumeration summary, initialization events,
+startup stages, exit, readiness/intent binding, native output and both PR28
+outputs. Exact restoration and retirement passed again: original kernel and
+full plugin restored; all 46 protected files and 347 original EFI files
+matched; protected state unchanged; no new matching diagnostic or remaining
+test client/job. Only the exact nine recovery files, job, plugin stage and
+GUI stage/cache were removed. Final read-back confirmed GPU-off, firmware
+framebuffer only, EFI unmounted and no next GPU scope armed. All five failed
+FPS attempts remain preserved and unaccepted.
