@@ -96,3 +96,35 @@ application launch. This is a test-order correction to evaluate, **not a proven
 cause or driver fix**. The driver, device identity, frame/pixel checks and
 presentation requirements must remain unchanged. Both failed attempts remain
 in the evidence, and neither accepts FPS or persistent desktop adoption.
+
+## Readiness-order follow-up: insufficient to resolve the refusal
+
+A third fresh packet, based on
+`2988a8eb585daf37bbeb9cee73787811bce9f15a`, moved the existing desktop-progress
+and compositor-image checks before its single FPS application launch. It
+passed 94 CPU/controller/parser methods, including refusal and call-order
+checks. The frame probe source/binary, frame workload, parser, kernel and
+plugin were byte-identical to the second packet. Both GUI-user CPU loader
+checks passed again. No device or output check was weakened.
+
+The trial passed initialization, both native dispatches and both PR28
+admission probes. Before launching the application, the new gate observed
+**10 additional successful present transactions in 9.704926724 seconds**, the
+same WindowServer, unchanged panel timing and mapped plugin/RADV images.
+The readiness receipt was bound by hash to the subsequent application intent.
+The application nevertheless reached the same three startup stages and
+returned **exit 22 after 1.767093161 seconds** because the default Metal
+device was nil. Window setup and the frame worker were not reached; there
+were no frame records and no FPS result. Desktop readiness alone is therefore
+insufficient to resolve this refusal. The underlying device-creation cause
+remains unproved.
+
+Independent review reparsed the readiness samples and compositor mappings,
+the bound intent, exit/stages, native checks and both Metal admission outputs.
+Recovery and exact retirement passed again: original kernel/plugin restored,
+46 protected files and 347 original EFI files matched, protected state
+unchanged, no new matching diagnostic, no remaining test client/job, exact
+recovery/plugin/GUI stages removed, GPU-off and EFI unmounted. No next GPU
+scope was armed at final read-back. Further diagnosis must inspect the device
+creation path rather than treating another delay as a repair. All three
+failed FPS attempts remain unaccepted.
