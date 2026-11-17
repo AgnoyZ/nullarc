@@ -42,6 +42,12 @@ control did not reproduce the wrong value. A follow-up single/head/tail
 descriptor-order fixture keeps the arena identical and requires a new failing
 single-IB control before any further comparison; the production IB fault and
 all desktop/default-wait HOLDs remain unresolved.
+The subsequent same-binary single-IB scope reproduced the exact fault and a
+separate NOP-tail scope passed both whole-arena dispatch checks. Both recovered
+and retired independently; see the linked diagnostic's hardware comparison.
+This clears only that comparison's reproduction prerequisite. A lifetime-safe
+change in the real RADV submission path and its own bounded native verification
+are still required before claiming a production fix.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

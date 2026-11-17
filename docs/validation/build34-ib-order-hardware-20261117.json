@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "date": "2026-11-17",
+  "result": "same-fixture-single-failed-NOP-tail-passed-both-recovered",
+  "branch": "upstream34/vram-layout-fix",
+  "source_commit": "2974a49b42693574022c4b252e04ed02ff9c4aa0",
+  "approved_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "probe_sha256": "1b44fb5fd63bc8d759aab6c0e789789ccc8f58eace46fd42e57ef6a249faf9ee",
+  "kernel_build": 34,
+  "comparison": {
+    "same_source_and_binary": true,
+    "same_staged_arena": true,
+    "same_shader_dispatch_rewrite_and_waits": true,
+    "only_policy_difference": "one dispatch descriptor versus dispatch then immutable eight-dword NOP descriptor",
+    "single_control_before_tail": true,
+    "separate_fresh_one_use_scopes": true,
+    "separate_GPU_off_boots": true,
+    "independent_recovery_and_retirement_verified_for_each": true
+  },
+  "trials": [
+    {
+      "original34_exact_kernel_image": true,
+      "os_version": "26.7.2",
+      "os_build": "25G332",
+      "initializations": 1,
+      "clients": 1,
+      "submitted_dispatches": 2,
+      "arena_bytes_checked_after_retirement": 16384,
+      "recovery_boots": 1,
+      "GPU_calls_after_recovery": 0,
+      "GPU_off": true,
+      "firmware_framebuffer_only": true,
+      "consumed_job_removed": true,
+      "protected_files_unchanged": 46,
+      "protected_links_unchanged": 2,
+      "EFI_files_unchanged": 347,
+      "Microsoft_files_unchanged": 148,
+      "security_and_kernel_collections_unchanged": true,
+      "new_matching_reports": 0,
+      "driver_deployed": false,
+      "desktop_enabled": false,
+      "default_wait_promoted": false,
+      "automatic_retry": false,
+      "policy": "single",
+      "result": "single-IB-control-reproduced-and-recovered",
+      "fully_verified_dispatches": 1,
+      "mismatch": {
+        "offset_bytes": 8208,
+        "offset_hex": "0x2010",
+        "pass": 1,
+        "actual": "0xde",
+        "expected": "0xdf"
+      },
+      "resources_held_until_recovery": true,
+      "waits": [
+        {
+          "pass": 0,
+          "budget_ns": 0,
+          "busy": 1,
+          "elapsed_ns": 3135
+        },
+        {
+          "pass": 0,
+          "budget_ns": 50000,
+          "busy": 0,
+          "elapsed_ns": 15850
+        },
+        {
+          "pass": 1,
+          "budget_ns": 0,
+          "busy": 1,
+          "elapsed_ns": 7484
+        },
+        {
+          "pass": 1,
+          "budget_ns": 50000,
+          "busy": 0,
+          "elapsed_ns": 12865
+        }
+      ]
+    },
+    {
+      "original34_exact_kernel_image": true,
+      "os_version": "26.7.2",
+      "os_build": "25G332",
+      "initializations": 1,
+      "clients": 1,
+      "submitted_dispatches": 2,
+      "arena_bytes_checked_after_retirement": 16384,
+      "recovery_boots": 1,
+      "GPU_calls_after_recovery": 0,
+      "GPU_off": true,
+      "firmware_framebuffer_only": true,
+      "consumed_job_removed": true,
+      "protected_files_unchanged": 46,
+      "protected_links_unchanged": 2,
+      "EFI_files_unchanged": 347,
+      "Microsoft_files_unchanged": 148,
+      "security_and_kernel_collections_unchanged": true,
+      "new_matching_reports": 0,
+      "driver_deployed": false,
+      "desktop_enabled": false,
+      "default_wait_promoted": false,
+      "automatic_retry": false,
+      "policy": "nop-tail",
+      "result": "descriptor-order-policy-passed-and-recovered",
+      "fully_verified_dispatches": 2,
+      "mismatch": null,
+      "resources_held_until_recovery": false,
+      "waits": [
+        {
+          "pass": 0,
+          "budget_ns": 0,
+          "busy": 1,
+          "elapsed_ns": 6853
+        },
+        {
+          "pass": 0,
+          "budget_ns": 50000,
+          "busy": 0,
+          "elapsed_ns": 30698
+        },
+        {
+          "pass": 1,
+          "budget_ns": 0,
+          "busy": 1,
+          "elapsed_ns": 8196
+        },
+        {
+          "pass": 1,
+          "budget_ns": 50000,
+          "busy": 0,
+          "elapsed_ns": 22562
+        }
+      ]
+    }
+  ],
+  "interpretation": {
+    "NOP_before_dispatch_required_for_this_trigger": false,
+    "ACQUIRE_MEM_treatment_run": false,
+    "specific_CP_cache_mechanism_proven": false,
+    "next_step": "minimal lifetime-safe NOP-tail adaptation in the real RADV submit path, then bounded native verification",
+    "production_RADV_submit_path_exercised": false
+  },
+  "acceptance": {
+    "diagnostic_tail_passed": true,
+    "IB_wrong_value_resolved": false,
+    "production_fix_integrated": false,
+    "desktop_acceleration_accepted": false,
+    "default_wait_promoted": false,
+    "FPS_measured": false,
+    "HOLD_cleared": false
+  },
+  "scope": {
+    "kernel_or_production_helper_changed": false,
+    "build41_build42_candidates": false,
+    "EFI_writes": 0,
+    "NVRAM_writes": 0,
+    "binary_uploaded": false,
+    "raw_diagnostics_published": false
+  }
+}

@@ -1,9 +1,10 @@
 # Original build34 IB preamble diagnostic
 
-Status on 2026-11-17: the bounded original34 NOP-head trial passed both guarded
-dispatches and independently verified recovery. This is a diagnostic result,
-not a proven IB fix. Earlier one-IB trials have an unresolved first mismatch at
-BO byte `0x2010`: actual `0xde`, expected `0xdf`, including
+Status on 2026-11-17: the new same-binary single-IB control reproduced the wrong
+value; the separate NOP-tail trial then passed both guarded dispatches. Both
+completed independent recovery. The earlier NOP-head trial also passed. These
+are diagnostic results, not an integrated production IB fix. One-IB trials
+have a first mismatch at BO byte `0x2010`: actual `0xde`, expected `0xdf`, including
 [the PR28 gate](validation/build34-pr28-install-gate-20261117.json).
 Desktop acceleration and default wait promotion remain on HOLD. No FPS claim
 follows from these tools.
@@ -79,6 +80,33 @@ scope needs its own source/binary pins, fresh GPU-off boot, independent
 deadline and one-use recovery. A passing single-IB result instead stops that
 comparison and requires reassessing reproducibility; it is not permission to
 keep trying policies until one fails.
+
+### Same-binary single versus NOP-tail hardware result
+
+That reproduction prerequisite is now satisfied. With source `2974a49` and the
+same signed diagnostic binary, the single-IB scope reproduced the exact second
+dispatch mismatch at `0x2010` (`0xde`, expected `0xdf`). After its independently
+verified recovery and job retirement, a fresh GPU-off scope submitted dispatch
+then NOP. Both of its dispatches passed the entire 16 KiB arena check.
+
+| Policy | Fully verified dispatches | Second dispatch |
+| --- | --- | --- |
+| Single reused IB | 1 of 2 | Exact original mismatch |
+| Reused IB followed by immutable NOP IB | 2 of 2 | Entire arena passed |
+
+Both scopes used original build34 on macOS 26.7.2 (`25G332`), one initialization,
+one client and two dispatches each. Each returned through one recovery reboot
+to GPU-off/firmware framebuffer, verified protected files, EFI and security,
+reported no new matching crash report and removed its consumed job. No full-cap
+wait was needed. See [the same-binary hardware comparison](validation/build34-ib-order-hardware-20261117.json).
+
+For this bounded trigger, the additional NOP IB need not precede the dispatch.
+This supports investigating an IB-transition workaround rather than attributing
+success to the untested ACQUIRE_MEM preamble. It does not distinguish command
+fetch/cache effects from the extra descriptor's ring footprint or timing.
+The real RADV submission path was not exercised, so the next change must adapt
+that path with correct BO lifetime and submit limits, pass host checks and
+undergo a separate bounded native test. Desktop/default-wait HOLDs remain.
 
 ## Source review and licensing
 
