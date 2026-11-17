@@ -4,11 +4,13 @@ Status on 2026-11-17: the explicit compute-only source workaround passed a
 bounded real-hardware comparison through the real Mesa submission path. The
 same binary's single-IB control reproduced the exact second-dispatch fault;
 the separately recovered tail scope passed both whole-arena checks. This is
-bounded transport evidence, not full RADV/Vulkan runtime acceptance. The
-production policy remains opt-in; default waits, accelerated desktop and FPS
-claims remain on HOLD.
-The subsequent complete RADV build and guarded CPU load also passed; that
-library remains private, uninstalled and untested for GPU/Vulkan execution.
+bounded transport evidence. A subsequent separate
+[complete-runtime Vulkan compute trial](BUILD34-RADV-RUNTIME-PROBE.md#complete-runtime-hardware-result)
+also passed both whole-arena checks with the actual same-address IB bytes
+changed, then independently recovered and retired. Acceptance is limited to
+that bounded compute workaround. The production policy remains opt-in; the
+unchanged native single-IB path, default waits, graphics, accelerated desktop
+and FPS are not accepted. The complete library remains private and uninstalled.
 
 ## Evidence motivating this change
 
