@@ -59,3 +59,40 @@ a number. FPS, game performance, physical scanout, input latency, background
 stutter and persistent accelerated-desktop adoption are not accepted by this
 failed attempt. Sanitized evidence is in
 [`validation/build34-fps-20261117.json`](validation/build34-fps-20261117.json).
+
+## Diagnostic follow-up: default Metal device absent
+
+A separate packet based on `947d3479817ca289776183cb2403020b057e6d71`
+kept the same kernel, plugin, frame workload and admission requirements. It
+added explicit startup stages, distinct early-refusal messages and an exit
+receipt. Its 87 CPU/controller/parser methods, eight statistics cases,
+three early-refusal diagnostic cases and both wait-observer self-checks
+passed. The actual GUI-user route also loaded both the original plugin and
+an exact copy of the signed candidate without requesting a Metal device or
+submitting GPU commands. The temporary loader input was removed by exact hash.
+
+The fresh trial again passed initialization, both queue adoptions, both
+full-arena native checks and both PR28 admission probes. Its one frame
+application reached `main-entered`, `plugin-loaded` and `before-Metal-device`
+as the expected GUI user. `MTLCreateSystemDefaultDevice()` returned nil; the
+application recorded **exit 22 after 1.02195072 seconds**. It never reached
+target-device verification, window setup or the frame worker. There are still
+zero frame records and no FPS result. This establishes the observed refusal,
+not the underlying reason or the first attempt's undocumented exit subtype.
+No retry or alternate device-enumeration call was made.
+
+Independent review reparsed the exact exit/stages, both CPU loader receipts,
+native output and both PR28 outputs before verifying restoration and retiring
+the second scope. The original kernel and plugin, all 46 protected files,
+347 original EFI files and other protected state matched; no new matching
+diagnostic report or test client remained. The exact nine-file recovery tree,
+job, plugin stage and GUI stage/cache were removed. Final state was GPU-off,
+firmware framebuffer only, EFI unmounted and no follow-up task armed.
+
+Controller review found a readiness gap: the new FPS call had been inserted
+before the existing compositor-image and first-present readiness checks. A
+further isolated packet should require those existing checks before its one
+application launch. This is a test-order correction to evaluate, **not a proven
+cause or driver fix**. The driver, device identity, frame/pixel checks and
+presentation requirements must remain unchanged. Both failed attempts remain
+in the evidence, and neither accepts FPS or persistent desktop adoption.
