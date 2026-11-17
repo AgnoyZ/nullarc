@@ -91,3 +91,54 @@ Production kernel/helper/ABI, A1/A2/corrected-A3, licenses and existing candidat
 bytes are unchanged. No new kernel was built, installed or loaded, no GPU work
 or reboot was requested, and no consumed scope was replayed. Graphics, desktop,
 default-wait and FPS HOLDs remain.
+
+## Subsequent independent-boot preparation
+
+The owner's continuation authorized preparation of an independent test boot
+environment, preserving the working EFI, NVRAM and live security settings.
+Fresh disk inventory found **no external physical disk**. The only physical
+disk is internal and contains Windows and the working EFI; it was not selected
+as a deployment target. No partitioning, formatting or device write occurred.
+
+Two inactive overlays were prepared in root-owned ignored storage. Each
+contains one `PhxBringup.kext` and the same proposed test `config.plist`; neither
+contains OpenCore, a fallback bootloader, other EFI binaries or a complete boot
+environment. The control preserves the exact original bundle. The candidate
+preserves the exact previously built derived bundle. Independent read-back
+found only two differing members: the executable and the candidate's additional
+`Contents/_CodeSignature/CodeResources` file. No executable was rebuilt or
+re-signed.
+
+The first materialization attempt stopped before making its destination:
+strict signature verification reported that the exact original image is
+unsigned. Independent inspection confirmed this existing state and its exact
+two-file manifest. A fresh second attempt preserved that unsigned control,
+verified the candidate's strict signature, and passed independent overlay
+comparison. The original-image admission was not weakened or replaced with a
+version-only check; the exact protected bundle and executable pins remain.
+
+The common private test-configuration **proposal** changes only
+`NVRAM.WriteFlash`, `NVRAM.LegacyOverwrite` and
+`Misc.Security.AllowSetDefault` from true to false. `LauncherOption` remains
+disabled. Recursive semantic comparison found exactly these three changes;
+both overlay configurations are byte-identical and pass `plutil -lint`.
+The working configuration was not changed. These checks do not establish that
+a future boot makes no NVRAM writes or that the proposed configuration is
+hardware-accepted. A future control and treatment must use the same reviewed
+test environment; old control receipts cannot validate this proposal.
+
+The recovery design to examine next is to use a separate removable boot medium,
+then detach it after loaded-image verification and **before GPU initialization**.
+That would remove the candidate medium from a later recovery boot's choices
+without editing the working EFI or NVRAM. This is still an untested design:
+the removal gate, original boot selection, complete boot environment and
+independent trial controller/witness are not prepared or accepted. No recovery
+guarantee follows from having inactive overlays.
+
+Independent final read-back retained original34 loaded, GPU-off/firmware
+framebuffer, zero native clients/test jobs, unchanged protected files/security
+and an unchanged, unmounted working EFI. No hardware scope, initializer,
+submission or reboot was started. A separate usable removable test medium is
+now a concrete prerequisite; the internal Windows disk must not be repurposed.
+See the [sanitized preparation record](validation/build34-ring-padding-independent-boot-preparation-20261117.json).
+The native IB defect and all existing HOLDs remain unresolved.

@@ -1,0 +1,119 @@
+{
+  "date": "2026-11-17",
+  "source_commit_before_preparation": "4433ba48c73630b184413730e07af51afdf70b6c",
+  "status": "inactive-overlays-independently-verified-no-removable-test-medium",
+  "owner_continuation_scope": "Prepare an independent test boot environment and run bounded comparison only after image admission and exact-original recovery are established; preserve working EFI, NVRAM and security settings.",
+  "media": {
+    "external_physical_disks": 0,
+    "internal_physical_disks": 1,
+    "internal_disk_contains_Windows": true,
+    "physical_test_medium_selected": false,
+    "partitioned_or_formatted": false
+  },
+  "private_preparation": {
+    "recipe_sha256": "b0cb25d0288b5bf773a02f0b0ae23cb089148dbc23519b69cd428570129fbae6",
+    "inactive_control_overlay_created": true,
+    "inactive_candidate_overlay_created": true,
+    "control_candidate_differing_members": [
+      "OC/Kexts/PhxBringup.kext/Contents/MacOS/PhxBringup",
+      "OC/Kexts/PhxBringup.kext/Contents/_CodeSignature/CodeResources"
+    ],
+    "original_binary_sha256": "4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412",
+    "candidate_binary_sha256": "58f7dab14e3e1768d0fca2333eedea7e15e51e3257c966c0430e46dfe304e8b3",
+    "original_unsigned_state_preserved": true,
+    "candidate_strict_signature_valid": true,
+    "shared_test_configuration_identical": true,
+    "shared_configuration_proposal_changes": [
+      {
+        "path": [
+          "NVRAM",
+          "WriteFlash"
+        ],
+        "old": true,
+        "new": false
+      },
+      {
+        "path": [
+          "NVRAM",
+          "LegacyOverwrite"
+        ],
+        "old": true,
+        "new": false
+      },
+      {
+        "path": [
+          "Misc",
+          "Security",
+          "AllowSetDefault"
+        ],
+        "old": true,
+        "new": false
+      }
+    ],
+    "configuration_semantic_diff_and_lint_passed": true,
+    "complete_bootable_EFI": false,
+    "bootloader_or_other_EFI_binaries_copied": false,
+    "raw_configurations_or_binaries_published": false,
+    "prior_scope_replayed": false
+  },
+  "attempt_history": [
+    {
+      "attempt": 1,
+      "result": "strict signature check stopped before materialization because exact original image is unsigned; no EFI mount, driver write or GPU call"
+    },
+    {
+      "attempt": 2,
+      "result": "preserved exact unsigned control and strict-signed candidate; inactive overlays independently verified"
+    }
+  ],
+  "independent_readback": {
+    "result": "inactive-overlays-independently-verified-no-removable-test-medium",
+    "original_overlay_exact": true,
+    "candidate_overlay_exact": true,
+    "original_unsigned_state_preserved": true,
+    "candidate_strict_signature_valid": true,
+    "shared_configuration_identical": true,
+    "configuration_semantic_changes": 3,
+    "configuration_lint_passed": true,
+    "overlay_file_counts": {
+      "control": 3,
+      "candidate": 4
+    },
+    "external_physical_media": 0,
+    "only_physical_disk_internal_with_Windows": true,
+    "working_EFI_manifest_unchanged_and_unmounted": true,
+    "protected_files_and_security_unchanged": true,
+    "original34_loaded": true,
+    "candidate_loaded": false,
+    "GPU_off_firmware_framebuffer": true,
+    "native_clients": 0,
+    "test_jobs": 0,
+    "GPU_executed": false,
+    "reboot_requested": false,
+    "device_writes": false,
+    "complete_bootable_EFI": false,
+    "boot_recovery_demonstrated": false
+  },
+  "recovery_design": {
+    "proposal": "Use a separate removable test boot medium, detach it after loaded-image verification and before any GPU initialization, then recover to the unchanged internal original-image boot. Verify boot selection, NVRAM policy and independent witness/deadline before arming.",
+    "removal_gate_implemented": false,
+    "normal_original_boot_selection_proved_for_proposed_environment": false,
+    "no_NVRAM_mutation_on_future_boot_proved": false,
+    "candidate_to_original_recovery_demonstrated": false
+  },
+  "acceptance": {
+    "candidate_installed": false,
+    "candidate_loaded": false,
+    "hardware_scope_prepared": false,
+    "GPU_executed": false,
+    "reboot_requested": false,
+    "native_single_IB_repaired": false,
+    "desktop_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_validated": false,
+    "build41_or_build42_prepared": false,
+    "binary_uploaded": false,
+    "live_EFI_or_KC_written": false,
+    "live_NVRAM_or_security_changed": false
+  }
+}
