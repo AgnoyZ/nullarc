@@ -15,7 +15,7 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_d
  #include <time.h>
 +#include <pthread.h>
 +#include <unistd.h>
- 
+
  /* ---- the mirrored structs must be layout-identical to their drm twins (D2) ---- */
  _Static_assert(sizeof(struct n48n_gem_create_in) == 32, "gem_create_in size");
 @@ -72,6 +74,10 @@
@@ -27,7 +27,7 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_d
 +   bool tail_attempted, tail_enabled, tail_uncertain;
 +   uint64_t tail_va, tail_last_seq;
  };
- 
+
  /* G6: the service class of the N48N open. A pointer to one of the two string literals below (never to the caller's buffer). */
 @@ -103,6 +109,12 @@
     }
@@ -41,7 +41,7 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_d
 +   }
     return k;
  }
- 
+
 @@ -111,8 +123,25 @@
  {
     if (!k)
@@ -67,10 +67,10 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_d
 +   pthread_mutex_destroy(&k->tail_lock);
     free(k);
  }
- 
+
 @@ -515,25 +544,108 @@
  }
- 
+
  int
 -acd_kext_submit(struct acd_kext *k, const struct acd_cs_plan *plan, uint64_t *last_seqno)
 +acd_kext_enable_build34_ib_tail(struct acd_kext *k, uint64_t va)
@@ -148,7 +148,7 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_d
  {
     uint8_t buf[sizeof(struct n48n_cs_in) + N48N_MAX_IBS * sizeof(struct n48n_cs_ib)];
     uint64_t seq = 0;
- 
+
 -   if (plan->n_ibs == 0)
 -      return -EINVAL;
 -
@@ -175,7 +175,7 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_d
 +      if (n > capacity)
 +         n = capacity;
        const bool last = off + n == plan->n_ibs;
- 
+
        struct n48n_cs_in hdr;
        memset(&hdr, 0, sizeof(hdr));
        hdr.abi = N48N_ABI_VERSION;
@@ -195,7 +195,7 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_d
 +         };
 +         memcpy(buf + sizeof(hdr) + n * sizeof(tail), &tail, sizeof(tail));
 +      }
- 
+
        uint64_t sout[1] = {0};
        uint32_t nout = 1;
 +      if (k->tail_enabled)
@@ -236,7 +236,7 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_d
 +      pthread_mutex_unlock(&k->tail_lock);
 +   return r;
  }
- 
+
  int
 diff --git a/src/amd/common/darwin/ac_darwin_kext.h b/src/amd/common/darwin/ac_darwin_kext.h
 --- a/src/amd/common/darwin/ac_darwin_kext.h
@@ -244,7 +244,7 @@ diff --git a/src/amd/common/darwin/ac_darwin_kext.h b/src/amd/common/darwin/ac_d
 @@ -99,6 +99,14 @@
  struct acd_kext *acd_kext_create(const struct acd_kext_ops *ops, void *ctx);
  void acd_kext_destroy(struct acd_kext *k);
- 
+
 +/* Experimental, explicit original34-only IB transition workaround. Call once,
 + * before publishing the connection or submitting anything. The caller reserves
 + * [va, va + 4096) in its OWN VA manager until connection destruction. A private

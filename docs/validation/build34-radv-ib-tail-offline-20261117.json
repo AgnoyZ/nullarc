@@ -58,5 +58,11 @@
   "original34_layout_regression": {
     "passed": 20,
     "skipped": 0
+  },
+  "patch_encoding": {
+    "canonical_patch_sha256": "5044527ed4ac4a93db3e47a49170c970e1b3d07643378bc19649ee25b6141c3d",
+    "CPU_tested_patch_sha256": "b3d99520bbce99eb3720d08e299604568f9aada59dad1efc551017636a88f5d8",
+    "applied_three_sources_byte_identical_to_CPU_and_native_frozen_sources": true,
+    "change": "Blank unified-diff context uses empty lines; no applied-source change"
   }
 }
