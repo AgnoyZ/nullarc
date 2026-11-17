@@ -140,6 +140,11 @@ The [inactive source proposal](BUILD34-RING-PADDING-PROPOSAL.md) now pins the
 two-site derived source and defines the fresh control/treatment order. It
 leaves image identities and live admission unprepared; no kernel is built
 and no test scope is armed by that document.
+Subsequent owner continuation produced a separate
+[private derived candidate](BUILD34-RING-PADDING-CANDIDATE.md), with native
+compilation, signature and static identity verification only. The CPU audit
+itself still emits no kernel; no image has been installed, loaded or tested
+on the GPU by that preparation.
 Do not relabel a downstream kernel as build34, reuse build41/build42, or
 silently admit a changed image as the untouched original34 baseline.
 

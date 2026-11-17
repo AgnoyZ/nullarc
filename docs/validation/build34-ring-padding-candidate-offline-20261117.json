@@ -1,0 +1,201 @@
+{
+  "date": "2026-11-17",
+  "result": "privately-built-and-statically-verified; no-hardware-acceptance",
+  "identity_class": "original34-derived-ringpad-experimental",
+  "base_commit": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "source_proposal_commit": "688a06e9a96022f80fd13554aed12e3afbef4cae",
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "CPU": {
+    "candidate_recipe_unit_tests": 16,
+    "passed": true,
+    "prior_actual_function_scenarios": 72222,
+    "prior_evidence": "build34-ring-padding-before-fence-offline-20261117.json",
+    "prior_function_test_sources_unchanged": true,
+    "prior_function_scenarios_rerun_this_build": false,
+    "recipe_sha256": {
+      "tools/upstream34_layout/ring_padding_candidate.py": "177e9146cfaf7508653181b42611740dbc2b74971826cfb1931b11690e2d07f5",
+      "tools/upstream34_layout/ring_padding.py": "712c1476ab9db532005b00cc3f46a14795c35f6c9c1efe6a575a1ed8aa0e0509",
+      "tools/upstream34_layout/mec_range.py": "ece685b3e70efb4e9dd13b0c92c09c4189ca97c38e93b46f2b494987df75c941",
+      "tests/test_upstream34_ring_padding_candidate.py": "eb7b3b9a3816231f82c523d2b13faeda164f4ef5506804fd2dd89d57066ee9b4"
+    },
+    "limitation": "CPU parser/archive/identity data and mocked Git results are not GPU evidence. The separate native compiler creates a kext without executing it."
+  },
+  "source": {
+    "original_driver_sha256": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+    "candidate_driver_sha256": "b34f262fe5cd05b6aa8b18d9500a23121e838dea0c3ffb86cf63f74fbdfc06c0",
+    "gpuSubmit_reversible_edit_sites": 2,
+    "source_sha256": {
+      "src/phxbringup/PhxBringup.cpp": "b34f262fe5cd05b6aa8b18d9500a23121e838dea0c3ffb86cf63f74fbdfc06c0",
+      "src/phxbringup/PhxNativeABI.h": "cb37e93dcab4faf8c9e672ad04793f2e363ae1e815c9913251cebcff5cd42c90",
+      "src/phxbringup/kmod_info.c": "b2aba9a49ad7cfccdacb168bb0b08a4f5b4ee1cb45d23ca0dc8d11d8ec4748f0",
+      "src/phxbringup/Info.plist": "05d17cf6d755730497021298d4f57153066d4d64228fdcf28e358b61a82375a5",
+      "src/phxbringup/build.sh": "70773880841f08640a178d127b162e52dbd59a448c07716ee4716143ab278ba9",
+      "src/amd/phx_topology.h": "28445bee8fc0f13a08aa52f114e4570ab6d6b8c068421dd10cf16023c06014d5",
+      "LICENSE": "02d7fa970640345480430e246356c99c23436800ef541d57e7217b1337793bf0",
+      "THIRD_PARTY_NOTICES.md": "8a89a2766c5b8076afbbfa631c42953230e096477e04399324b075370b9431d4",
+      "LICENSES/MIT.txt": "381b0b3a8bb7e1aa28502928f75e820339c5878e2bd95d18c25391647bc3c1fd",
+      "LICENSES/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3"
+    },
+    "production_protected_sha256": {
+      "LICENSE": "02d7fa970640345480430e246356c99c23436800ef541d57e7217b1337793bf0",
+      "LICENSES/Apache-2.0.txt": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+      "LICENSES/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3",
+      "LICENSES/GPL-3.0.txt": "bc2d6664f6276fa0a72d57633b3ae68dc7dcb677b71018bf08c8e93e509f1357",
+      "LICENSES/LGPL-3.0-or-later.txt": "f56039b5ee783a50114de388f95ffe7173001d63c32ed4c00649045eec0cf506",
+      "LICENSES/LICENSE.amdgpu.txt": "572872598565dc3513470de971a32bf9db301f47afeef3636345eadae33b2eee",
+      "LICENSES/MIT.txt": "381b0b3a8bb7e1aa28502928f75e820339c5878e2bd95d18c25391647bc3c1fd",
+      "LICENSES/PolyForm-Noncommercial-1.0.0.txt": "1b5c7a92697863d38fd2779af76732acfb8f521b758781eab057ad966701b0b7",
+      "THIRD_PARTY_NOTICES.md": "8a89a2766c5b8076afbbfa631c42953230e096477e04399324b075370b9431d4",
+      "src/phxbringup/Info.plist": "05d17cf6d755730497021298d4f57153066d4d64228fdcf28e358b61a82375a5",
+      "src/phxbringup/PhxBringup.cpp": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+      "src/phxbringup/PhxNativeABI.h": "cb37e93dcab4faf8c9e672ad04793f2e363ae1e815c9913251cebcff5cd42c90",
+      "src/phxbringup/build.sh": "70773880841f08640a178d127b162e52dbd59a448c07716ee4716143ab278ba9",
+      "src/phxbringup/kmod_info.c": "b2aba9a49ad7cfccdacb168bb0b08a4f5b4ee1cb45d23ca0dc8d11d8ec4748f0",
+      "tools/phxctl/PhxUpstream34Layout.h": "2f7e3124a99e97469debc9ee5d9bb760092c769ef530f99814257bc314f54de1",
+      "tools/phxctl/alc_le_paths.py": "d4c46fa5fcbecf2fdd88ada0b768186fae540b913397e083e00a9223235a1234",
+      "tools/phxctl/bringup3.sh": "00843d4b3c38c8395d013f11281e3f1178d1afc269ac775dbfdf994e3d86da5c",
+      "tools/phxctl/bringup5.sh": "a0906cceab45f747a1b89d5c75972463e52071b05ae1e6a6c71fac1d207b771d",
+      "tools/phxctl/cetest.sh": "ad1575e70c9a00d6733ee930a57ec242543e028d38215b0b8722b2974abfa5c3",
+      "tools/phxctl/csb_gfx11.h": "f7400527d24ec6a60200ab670a2a78ac0f123d11dda4cc6b745a48e7b1e0d805",
+      "tools/phxctl/deploy_kext.sh": "b5c5b35f86fef0305e42bd6bf781a5bfb9dca735f9467454b79549f53ef46e83",
+      "tools/phxctl/fresh.sh": "4aa3f6c9e0c63bb3ef1c585e2998d22346d3c49ddd9a001741c4d0e7bf80c6c0",
+      "tools/phxctl/full.sh": "36f5c8a01773a3687e6b633c5b0b5e1b3b2031329c5a2065b669b27c45cf0a71",
+      "tools/phxctl/gfx_test.sh": "68b9f9888ff07f2e0b5a273b082e1809b0b34f30eaa2f496f4430fc3db7ede54",
+      "tools/phxctl/hdadump.c": "b80c5174fe03279abad107fcb04d1975d3e0db6cbed9ae9f8c5376c408a29460",
+      "tools/phxctl/inst_accel.sh": "8b7c2b47a9c1f66547b08319a2a64f5c1e3e55eb0743f882bad1bea9ae878ad9",
+      "tools/phxctl/inst_m2.sh": "192949743e2bad7af210a6f0dd43543f8354614b08d2ef3db5ec170ef8bafa71",
+      "tools/phxctl/inst_plugin.sh": "19b9478231f2cba35dd67dcbe63f71f7f2178f6ce9c508e0f49b39462418e787",
+      "tools/phxctl/kinst.sh": "714240464928ff6d37cc516dd4c3ef89012b6bd79fe26bdd02bc5f20c2dab81e",
+      "tools/phxctl/local.phxboot.plist": "80f67b4e715100a879861911c7ff67c4a8e1fabaa496ec854619e695c6a60123",
+      "tools/phxctl/m2arm.sh": "170cac6eeef0b2fead6c0ee47fdaac9718f302b108eddf04313332666d304617",
+      "tools/phxctl/m2check.sh": "567bbc50a894292fa661c1a0ca973d258a28dd15a535e7de3047ba33663631c7",
+      "tools/phxctl/m2seq.sh": "4280294d297d3b4049a0b4bcc6abcd5a7656487de151c648f00aacf1e9ef6836",
+      "tools/phxctl/m2ws.sh": "94e919bda65df0e65a3fa8633eb2174dbe4d6dd4aa983499da295e89871a625a",
+      "tools/phxctl/mes_v11_api_def.h": "7b1b1e895e0faba305f1832bb815c617b51cbbdc6701dea4aa2084b52806b71a",
+      "tools/phxctl/mesboot.c": "7a1e4de45589a40b3259bd33a790d9d537498e139fa56719145438801320a21f",
+      "tools/phxctl/phxaux.c": "c321a3bc10c0a3d9bf9394b8d0cad56aea83559587286aa8323a284fd1838d42",
+      "tools/phxctl/phxbl.c": "3943661f3fafa888921d2d484d646093112d23ffc0fc1228d1f0f3d5da53305e",
+      "tools/phxctl/phxboot.sh": "6a4f7457c4d11d5c230b6620e78ad68b1eb999855b91c4e29b5e81b347ab5201",
+      "tools/phxctl/phxctl.c": "c0a60d07b60b95f3da273bdbedf648980d30f05d337205a6e1bc7dd44a05f279",
+      "tools/phxctl/phxprofile.c": "06d5bf42b5a2e65d62b0c243d657c03ebbad51f871b565a5a66c2e3b240f04a8",
+      "tools/phxctl/phxup.sh": "accd1816d56dc107e4d12a5eb8544f9a540066622bc8a6f4a35892a81a2a5840",
+      "tools/phxctl/plugdeploy.sh": "67402b25f0f5aa4314d242a212f332236a0b4108a661334038ce0654f6ef3a91",
+      "tools/phxctl/rb0.sh": "ecd660822c0d50752104855d8859e26f8a4e87844179785eded25e799c8855d2",
+      "tools/phxctl/relocate_gpubundle.sh": "6e83b282a4522273a16a7f976eb878c50e49a011a9038f3ae91bc39c275f45c7",
+      "tools/phxctl/t48.sh": "7af63224b7beb617d61acaf96fd30347a419724a2533e97eb13db9001057b11b",
+      "tools/phxctl/usbcap.sh": "e388fddc31c6db0ce87e9847901bc0b74a2edf1fccae37ed65fbb5ee516609a7"
+    },
+    "production_source_modified": false,
+    "ABI_or_production_helper_modified": false,
+    "build_marker_unchanged": true,
+    "untouched_original_admission_changed": false
+  },
+  "packaging_review": {
+    "source_plist_sha256": "05d17cf6d755730497021298d4f57153066d4d64228fdcf28e358b61a82375a5",
+    "control_matching_plist_sha256": "aaeef27a947e0a2a70b358628ff21216a5edaf0a5d65f32651f8654cef654af7",
+    "only_change": "IOPCIMatch restricted to 0x19001002, byte-identical to the original deployed control bundle",
+    "production_plist_modified": false
+  },
+  "build": {
+    "SDK_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "SDK_archived_files": 1216,
+    "SDK_files_fingerprint_sha256": "ef2f5e99b1ccef15f3057a85cb8f70f18de56421b16b6ab196ddd55534c9949d",
+    "toolchain_fingerprint_sha256": "0ddab69863de16b265286c3bcff408aad9a67141782ffc554a2f22cf6e79ce7b",
+    "compiler_version": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "kernel_built": true,
+    "signed": true,
+    "signature_strict_verified": true,
+    "architecture": "x86_64",
+    "filetype": "MH_KEXT_BUNDLE",
+    "binary_sha256": "58f7dab14e3e1768d0fca2333eedea7e15e51e3257c966c0430e46dfe304e8b3",
+    "bundle_files_sha256": {
+      "Contents/Info.plist": "aaeef27a947e0a2a70b358628ff21216a5edaf0a5d65f32651f8654cef654af7",
+      "Contents/MacOS/PhxBringup": "58f7dab14e3e1768d0fca2333eedea7e15e51e3257c966c0430e46dfe304e8b3",
+      "Contents/_CodeSignature/CodeResources": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b"
+    },
+    "checks": [
+      {
+        "name": "compile",
+        "exit_code": 0,
+        "log_sha256": "e517ff3d804943d4c808264a1d82425a677c66177a5afac7b8cf9eb342725199"
+      },
+      {
+        "name": "sign",
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "signature",
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "architecture",
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "warning_comparison": {
+      "result": "original-and-candidate-warning-messages-match",
+      "original_syntax_only_exit_code": 0,
+      "original_warning_count": 3,
+      "candidate_warning_count": 3,
+      "warning_class": "unchanged field shadowing",
+      "original_log_sha256": "e3032d6a25dc2b9dcf464b91cd8c3c81919307cf6078d71732657b0a37ac093b",
+      "candidate_log_sha256": "e517ff3d804943d4c808264a1d82425a677c66177a5afac7b8cf9eb342725199",
+      "GPU_executed": false
+    },
+    "private_image_identity_recorded": true,
+    "raw_image_identity_published": false,
+    "independent_original_comparison": {
+      "result": "original-and-candidate-static-identities-distinct-and-metadata-identical",
+      "original_binary_sha256": "4a88035fd2ead990b8c44b638c9283d579b14d6ba4f0b48d78d6435a3a44a412",
+      "candidate_binary_sha256": "58f7dab14e3e1768d0fca2333eedea7e15e51e3257c966c0430e46dfe304e8b3",
+      "binary_hashes_different": true,
+      "MachO_image_identities_different": true,
+      "bundle_metadata_byte_identical": true,
+      "control_matching_plist_sha256": "aaeef27a947e0a2a70b358628ff21216a5edaf0a5d65f32651f8654cef654af7",
+      "root_independent_readback": true,
+      "installation_or_load_performed": false,
+      "GPU_executed": false,
+      "hardware_scope_armed": false
+    }
+  },
+  "attempt_history": [
+    {
+      "attempt": 1,
+      "result": "preflight stopped before materialization/compile because recipe misattributed Clang cc_kext runtime to MacKernelSDK; corrected input attribution",
+      "kernel_built": false,
+      "GPU_executed": false
+    },
+    {
+      "attempt": 2,
+      "result": "native build passed; initial independent metadata-equality assertion failed, then read-back identified only IOPCIMatch difference; superseded before installation",
+      "kernel_built": true,
+      "GPU_executed": false
+    },
+    {
+      "attempt": 3,
+      "result": "fresh native build and independent original-image comparison passed with explicit original-matching PCI restriction",
+      "kernel_built": true,
+      "GPU_executed": false
+    }
+  ],
+  "acceptance": {
+    "installed": false,
+    "loaded": false,
+    "GPU_executed": false,
+    "hardware_scope_armed": false,
+    "unmodified_native_single_IB_repaired": false,
+    "A1_A2_corrected_A3_preserved": true,
+    "desktop_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_claim": false,
+    "build41_or_build42_prepared": false,
+    "binary_uploaded": false
+  },
+  "remaining_gate": "Separate fresh original-image reproducer, candidate-specific loaded-image admission, independently reviewed rollback/witness/deadline and one-use control/treatment scopes. No consumed scope or original-image receipt admits this image."
+}

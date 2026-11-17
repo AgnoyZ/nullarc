@@ -1,7 +1,11 @@
 # Original34-derived compute-ring padding proposal
 
-Status: **inactive source proposal, not a built kernel or armed hardware
-scope**. The original native single-IB defect remains unresolved. The
+Status: **hardware scope inactive**. Subsequent owner continuation produced a
+[privately built derived candidate](BUILD34-RING-PADDING-CANDIDATE.md), with
+an explicitly reviewed output-bundle target restriction matching the actual
+original-image control. It has not been installed or loaded. The initial
+source proposal below remains the boundary for the two function edits.
+The original native single-IB defect remains unresolved. The
 [CPU-only audit](BUILD34-RING-PADDING-AUDIT.md) has passed, including the
 revised order that keeps RELEASE_MEM last. This proposal defines the next
 comparison without treating a changed kernel as the untouched original34.
@@ -33,11 +37,14 @@ Its `gpuSubmit` SHA-256 is
 `c0d916882adaec32e928f17979cb05f671ad540122642a6b600aa88c02146a02`.
 The complete reversible diff SHA-256 and protected original inputs are in the
 [source proposal record](validation/build34-ring-padding-source-proposal-20261117.json).
-No driver source file was materialized or changed to obtain those hashes.
+No driver source file was materialized or changed to obtain those initial
+proposal hashes. Subsequent private build materialization is recorded in the
+linked candidate preparation; repository production source remains unchanged.
 
 The existing recipe can regenerate this exact function for inspection; it
-does not build a kext. A future candidate would be an **original34-derived
-experimental image**, not the already accepted original image. Any source or
+does not build a kext. The separate candidate builder produces an
+**original34-derived experimental image**, not the already accepted original
+image. Any source or
 metadata difference beyond this proposal needs its own review and fresh
 hashes; it cannot silently inherit this CPU evidence.
 
@@ -47,8 +54,9 @@ hashes; it cannot silently inherit this CPU evidence.
   the original source, ABI and production helper remain available unchanged.
   Build41/build42 are excluded.
 - Pin the actual candidate binary, bundle, signature and loaded-image
-  identity separately from the untouched original34. These values do not
-  exist yet. A version string or matching bundle identifier is insufficient.
+  identity separately from the untouched original34. The private build now
+  records these values and independent static comparison; live candidate
+  admission is still unprepared. A version string or matching bundle identifier is insufficient.
   Preserve the original image's admission checks; use a separate
   candidate-specific gate that rejects the original or any other image.
 - Review the scope against actual ring geometry. The CPU accounting fits
