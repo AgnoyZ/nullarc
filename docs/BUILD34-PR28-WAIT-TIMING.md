@@ -151,3 +151,52 @@ effectiveness or the cause of the native mismatch. Sanitized evidence is
 exact manifests, controller checks, binaries and raw logs remain private and
 ignored. The source change remains on default, while the installed plugin is
 back at its pre-test version.
+
+
+## Fixed-kernel real-GPU wait trial, 2026-11-17
+
+After the bounded desktop result recorded in
+[BUILD34-DESKTOP-VALIDATION.md](BUILD34-DESKTOP-VALIDATION.md), the owner
+requested continued PR28 real-GPU waiting, longer stability and FPS acceptance,
+in that order. This trial used default source
+`857434ee3282281edd53f36706494baf1a8cb4ae`, the same already tested build34
+compute-sync kernel and the previously built release PR28 plugin. The plugin
+source inputs still matched default byte for byte. Only the installed plugin
+changed relative to the accepted kernel/runtime trial; its original complete
+bundle was backed up and restored. Withdrawn builds were not candidates.
+
+An initial preparation refused an unsigned loader-only probe. That packet
+was retired before installation, EFI writes, a startup job or GPU calls. A
+new signed packet passed 70 CPU/controller methods, a dynamic-library
+wait-observer self-check and 18 credential-dropped runtime access checks.
+The observer passively intercepted the production publication-group wait in
+the test process, without modifying the production plugin. Controls were set
+inside that process after loading. Default-off policy and WindowServer's
+exclusion were retained. Planned subsequent timeout instrumentation would
+gate completion signalling in the test process only; it was never reached.
+
+The fixed kernel loaded, with the original restored to disk before GPU
+initialization. Original compute/graphics and both queue-adoption checks
+passed. Both native dispatches verified their full 16-KiB arenas without a
+mismatch. The PR28 IOSurface writer then reached its observed publication
+wait, but failed the probe's check that natural `commit` return had established
+successful completion. The probe held its resources until managed recovery.
+The normal-success record and pixel checks were not completed.
+
+**This is an unaccepted PR28 result.** The observer reached a combined failure
+condition covering a nonzero wait result, a still-pending group or command
+status other than Completed; it did not preserve those three values separately.
+No actual elapsed duration or specific completion-error subtype can be claimed
+from that attempt. It does not establish a GPU hang, a PR28 timing defect or
+an observer defect. Further diagnosis must preserve those values before
+asserting. The induced-timeout trial, longer stability and FPS were not run.
+
+Recovery restored the exact plugin, startup job, allowlist and original
+build34 disk image and rebooted once. Independent readback re-parsed the
+native evidence, verified all 46 protected files and 347 EFI files, removed
+the exact nine-file recovery subtree and consumed restore job, and confirmed
+GPU-off, the firmware framebuffer, no test clients or shutdown scheduler,
+EFI unmounted and zero new matching diagnostic reports. No subsequent test
+was armed at that readback. Raw records and binaries remain local and ignored.
+Sanitized evidence is in
+[validation/build34-pr28-fixed-gpu-wait-20261117.json](validation/build34-pr28-fixed-gpu-wait-20261117.json).

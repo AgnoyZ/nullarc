@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "date": "2026-11-17",
+  "result": "PR28-natural-writer-completion-not-accepted-and-recovered",
+  "branch": "upstream34/vram-layout-fix",
+  "source_commit": "857434ee3282281edd53f36706494baf1a8cb4ae",
+  "approved_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "kernel_build": 34,
+  "kernel_source_commit": "62d695424072522b5c05779fe500baec5a73aad5",
+  "kernel_executable_sha256": "7c2f8d4d68b63f32fba120f60fec0877e1e58607e70253c94d7394883f7cf8e1",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "preparation": {
+    "first_packet_refused_unsigned_loader": true,
+    "first_packet_GPU_calls": 0,
+    "first_packet_EFI_writes": 0,
+    "first_packet_retired_no_replay": true,
+    "new_packet_CPU_methods": 70,
+    "dynamic_observer_CPU_self_check": "passed",
+    "runtime_access_checks": 18
+  },
+  "plugin": {
+    "source_inputs_match_default": true,
+    "release_input_sha256": "4da353b5f02dfffac8c509514fad86e70fd30e7a6d6660eb51e3bd99cf8d6f80",
+    "resigned_installed_executable_sha256": "c9dc00ce66ece5b4fba642b989a6f6bce7bfe91c81e297a9f98e688fafb1b170",
+    "original_executable_sha256": "a056873d7c3a83b910c0fc6e65cfc4bcc825993cf49d3d821fd69f794a1b9f08",
+    "atomic_install_and_loader": "passed",
+    "process_local_opt_in_after_load": true,
+    "default_off_preserved": true,
+    "WindowServer_exclusion_preserved": true,
+    "production_plugin_instrumented": false,
+    "observer_dynamic_library_in_test_process_only": true
+  },
+  "native": {
+    "compute_graphics_and_adoption": "passed",
+    "fully_verified_dispatches": 2,
+    "whole_arena_bytes_per_dispatch": 16384,
+    "whole_arena_checks_passed": 2,
+    "mismatch": null,
+    "waits": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 3136
+      },
+      {
+        "pass": 0,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 17362
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 4849
+      },
+      {
+        "pass": 1,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 20238
+      }
+    ]
+  },
+  "PR28": {
+    "normal_writer_group_wait_call_observed": true,
+    "matching_group_wait_calls": 1,
+    "normal_writer_acceptance": false,
+    "separate_wait_result_group_state_and_status_preserved": false,
+    "actual_wait_elapsed_ns": null,
+    "completion_failure_subtype": "unresolved",
+    "pixel_validation_completed": false,
+    "test_client_retained_until_recovery": true,
+    "induced_timeout_started": false,
+    "timeout_acceptance": false
+  },
+  "acceptance": {
+    "PR28_real_GPU_wait": false,
+    "long_stability_started": false,
+    "long_stability": false,
+    "FPS_started": false,
+    "FPS": false,
+    "persistent_adoption": false
+  },
+  "independent_final_readback": {
+    "exact_original_loaded": true,
+    "fixed_image_not_loaded": true,
+    "original_plugin_full_manifest": true,
+    "protected_files_unchanged": 46,
+    "original_EFI_files_unchanged": 347,
+    "temporary_recovery_files_removed": 9,
+    "startup_allowlist_links_security_and_kernel_collections_unchanged": true,
+    "GPU_off": true,
+    "firmware_framebuffer_only": true,
+    "restore_only_job_removed": true,
+    "test_clients_and_shutdown_absent": true,
+    "EFI_unmounted": true,
+    "new_matching_reports": 0,
+    "followup_GPU_task_armed": false
+  },
+  "limits": [
+    "Failure subcondition and elapsed duration were not preserved; do not infer a specific timing or GPU defect.",
+    "Native waits are not PR28 publication-wait measurements.",
+    "No timeout, long-stability, FPS or general desktop-runtime acceptance.",
+    "No automatic retry; later diagnosis requires a fresh packet.",
+    "No binaries, raw diagnostics or personal EFI published."
+  ]
+}
