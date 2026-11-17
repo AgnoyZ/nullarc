@@ -302,6 +302,15 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
             const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
             for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &previous[i & 3], 4);
         }
+        if (pass == 1 && (is("poison-output-2") || is("mixed-output-2"))) {
+            const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
+            for (unsigned i = 0; i < 256; ++i) {
+                const uint32_t value = is("poison-output-2") ? ~pattern[i & 3] :
+                    i < 64 ? previous[i & 3] : i < 128 ? ~pattern[i & 3] :
+                    i < 192 ? pattern[i & 3] : pattern[i & 3] ^ 0x01010101u;
+                memcpy(backing + 0x2010 + i * 4, &value, 4);
+            }
+        }
         if (fault.compare(0, 5, "slot-") == 0 && pass == 1) {
             const unsigned index = static_cast<unsigned>(std::stoul(fault.substr(5)));
             assert(index < 80); backing[0x1200 + index * 4] ^= 1;

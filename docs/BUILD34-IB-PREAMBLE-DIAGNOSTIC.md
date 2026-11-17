@@ -9,6 +9,11 @@ have a first mismatch at BO byte `0x2010`: actual `0xde`, expected `0xdf`, inclu
 Desktop acceleration and default wait promotion remain on HOLD. No FPS claim
 follows from these tools.
 
+The subsequent [post-failure mismatch observation](BUILD34-IB-MISMATCH-OBSERVATION.md)
+adds aggregate read-only reporting after a retired dispatch has already failed.
+It preserves the submitted commands and cannot turn an old first-byte report
+into evidence about the entire output. Its own fresh scope is required.
+
 ## Hypothesis and one-variable comparison
 
 Earlier independent original34 trials distinguished rewriting/reusing one IB

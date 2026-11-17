@@ -15,6 +15,7 @@ else:
 ROOT = Path(__file__).resolve().parents[2]
 INPUTS = ('tools/upstream34_layout/ib_preamble_probe.cpp',
           'tools/upstream34_layout/ib_preamble_packets.h',
+          'tools/upstream34_layout/ib_mismatch_summary.h',
           'src/phxbringup/PhxNativeABI.h', 'src/amd/phx_topology.h',
           'LICENSE', 'LICENSES/MIT.txt', 'LICENSES/GPL-2.0-only.txt',
           'THIRD_PARTY_NOTICES.md')

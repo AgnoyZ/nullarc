@@ -11,6 +11,7 @@
 #include <string.h>
 #include "PhxNativeABI.h"
 #include "ib_preamble_packets.h"
+#include "ib_mismatch_summary.h"
 
 static constexpr size_t bytes = 16384;
 static constexpr uint64_t vaMask = (1ull << 48) - 1;
@@ -218,6 +219,7 @@ static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy)
                 fprintf(stderr, "FAIL: native shader output/code/IB/guard mismatch at byte %zu "
                     "(pass=%u actual=0x%02x expected=0x%02x)\n", i, pass,
                     static_cast<unsigned>(observed), static_cast<unsigned>(expected[i]));
+                phx34ReportIbMismatch(actual, expected, pass, i, observed);
                 return 75;
             }
         }

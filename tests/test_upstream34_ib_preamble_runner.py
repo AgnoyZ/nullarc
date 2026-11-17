@@ -24,6 +24,9 @@ class PreambleResultTests(unittest.TestCase):
         if not code:
             stdout.append(runner.CHECK if fault == 'check-ok' else runner.marker(policy))
         stderr = 'HOLD: synthetic failure\n' if 'hold' in events else ''
+        summary = runner.expected_mismatch_summary(fault)
+        if summary is not None:
+            stderr += 'IB-MISMATCH-SUMMARY ' + json.dumps(summary) + '\n'
         stderr += 'fake-native-shader-summary ' + json.dumps({'events': events}) + '\n'
         return subprocess.CompletedProcess([], code, '\n'.join(stdout) + '\n', stderr)
 
@@ -65,6 +68,18 @@ class PreambleResultTests(unittest.TestCase):
             result = self.result('stale-output-2', policy)
             result.stderr = ('FAIL: mismatch at byte 8208 (pass=1 actual=0xde expected=0xdf)\n' + result.stderr)
             runner.check_result(result, 'stale-output-2', policy)
+
+    def test_mismatch_summary_is_required_and_checked(self):
+        for fault in ('stale-output-2', 'poison-output-2', 'mixed-output-2', 'byte-2-16383'):
+            result = self.result(fault)
+            if fault == 'stale-output-2':
+                result.stderr = 'FAIL: mismatch at byte 8208 (pass=1 actual=0xde expected=0xdf)\n' + result.stderr
+            runner.check_result(result, fault, 'control')
+            for changed in (result.stderr.replace('IB-MISMATCH-SUMMARY ', 'REMOVED '),
+                            result.stderr.replace('"mismatch_bytes": ', '"mismatch_bytes": 999'),
+                            result.stderr.replace('"original_mismatch_reobserved": true', '"original_mismatch_reobserved": false')):
+                with self.assertRaises((RuntimeError, json.JSONDecodeError)):
+                    runner.check_result(subprocess.CompletedProcess([],result.returncode,result.stdout,changed),fault,'control')
 
     def test_policy_markers_cannot_be_interchanged(self):
         for actual in runner.POLICIES:

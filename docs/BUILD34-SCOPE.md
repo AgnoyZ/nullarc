@@ -87,6 +87,13 @@ bounded opt-in compute only. They do not install the runtime, repair the
 unmodified native single-IB path, change default policy, clear desktop/wait
 HOLDs or permit replay of any consumed scope.
 
+The subsequent [mismatch observation](BUILD34-IB-MISMATCH-OBSERVATION.md) adds
+only post-failure volatile reads and aggregate statistics to the original
+single/head/tail diagnostic. Commands, descriptors, waits, original34 kernel
+and the hardware-tested Mesa transport are unchanged. CPU-injected patterns
+test classification, not GPU coherency. It cannot clear any existing HOLD
+and requires its own fresh recovered/retired hardware scope.
+
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream
 PR16, PR19 with a tested zero-progress-write correction, PR15 and PR22. Each

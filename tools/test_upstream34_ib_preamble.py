@@ -127,14 +127,15 @@ def baseline_expected(fault):
 
 EXTRA_CASES = (
     'legacy-run', 'legacy-fresh', 'legacy-reuse', 'legacy-publish',
-    'info-build41', 'info-build42', 'stale-output-2',
+    'info-build41', 'info-build42', 'stale-output-2', 'poison-output-2', 'mixed-output-2',
 ) + tuple(f'wait-{stage}-pending-{kind}' for stage in (1, 2) for kind in ('short', 'cap'))
 EXTRA_CASES += tuple(f'slot-{word}' for word in range(80))
 EXTRA_CASES += tuple(f'preamble-{stage}-{byte}' for stage in (1, 2) for byte in range(32))
 CASES = BASE_CASES + EXTRA_CASES
 POLICIES = ('single', 'control', 'nop-tail', 'memsync')
 EXEC_EQUIVALENCE_CASES = ('ok', 'arg-mode', 'info-build41', 'stale-output-2',
-                          'submit-2-status', 'byte-2-16383', 'wait-2-pending-cap', 'check-ok')
+                          'poison-output-2', 'mixed-output-2', 'submit-2-status',
+                          'byte-2-16383', 'wait-2-pending-cap', 'check-ok')
 
 
 def marker(policy):
@@ -151,7 +152,7 @@ def expected(fault):
     base = fault
     if fault in ('info-build41', 'info-build42'):
         base = 'info-build'
-    elif fault.startswith('slot-') or fault == 'stale-output-2':
+    elif fault.startswith('slot-') or fault in ('stale-output-2', 'poison-output-2', 'mixed-output-2'):
         base = 'output-2-0'
     elif fault.startswith('preamble-'):
         base = f'ib-{fault.split("-")[1]}-0'
@@ -173,6 +174,46 @@ def expected(fault):
             events.pop()
         events.append('hold')
     return code, events
+
+
+def expected_mismatch_summary(fault):
+    """Independent oracle for the fixture's exact injected bytes, not GPU behavior."""
+    if fault in ('stale-output-2', 'poison-output-2', 'mixed-output-2'):
+        stage, offset = 1, 0x2010
+    elif fault in ('wait-1-missing', 'wait-2-missing'):
+        stage, offset = int(fault.split('-')[1]) - 1, 0x2010
+    elif re.fullmatch(r'(?:code|ib|output|byte|preamble)-[12]-\d+', fault):
+        kind, stage, index = fault.split('-'); stage = int(stage) - 1; index = int(index)
+        offset = {'code':0, 'ib':4096, 'output':0x2010, 'byte':0, 'preamble':0x1400}[kind]
+        offset += index * (4 if kind in ('code', 'ib', 'output') else 1)
+    elif fault.startswith('slot-'):
+        stage, offset = 1, 0x1200 + int(fault[5:]) * 4
+    else:
+        return None
+    row = {'classification_valid':True, 'pass':stage, 'arena_bytes':16384,
+           'first_snapshot_mismatch':offset, 'mismatch_bytes':1,
+           'shader_page_mismatch_bytes':int(offset < 4096),
+           'command_page_mismatch_bytes':int(4096 <= offset < 8192),
+           'output_mismatch_bytes':int(0x2010 <= offset < 0x2410),
+           'guard_mismatch_bytes':int(8192 <= offset < 0x2010 or offset >= 0x2410),
+           'output_current_words':256, 'output_previous_words':0,
+           'output_poison_words':0, 'output_other_words':0,
+           'original_mismatch_reobserved':True, 'changed_during_observation_bytes':0}
+    if fault in ('stale-output-2', 'poison-output-2', 'mixed-output-2', 'wait-1-missing', 'wait-2-missing'):
+        counts = {'stale-output-2':(256,0,256,0,0), 'poison-output-2':(1024,0,0,256,0),
+                  'mixed-output-2':(576,64,64,64,64),
+                  'wait-1-missing':(1024,0,0,256,0), 'wait-2-missing':(1024,0,0,256,0)}[fault]
+        row.update(zip(('mismatch_bytes','output_current_words','output_previous_words',
+                        'output_poison_words','output_other_words'),counts))
+        row['output_mismatch_bytes'] = row['mismatch_bytes']
+    elif 0x2010 <= offset < 0x2410:
+        row['output_current_words'] = 255
+        # The fixture XORs one byte. Only three pass-1 lane/byte pairs
+        # equal their previous value (the second lane changes df -> e0).
+        lane, byte = ((offset - 0x2010) // 4) % 4, (offset - 0x2010) % 4
+        previous = int(stage == 1 and (lane,byte) in ((0,0),(2,2),(3,0)))
+        row['output_previous_words'], row['output_other_words'] = previous, 1 - previous
+    return row
 
 
 def check_result(result, fault, policy):
@@ -197,6 +238,13 @@ def check_result(result, fault, policy):
         raise RuntimeError('Missing or spurious HOLD')
     if 'hold' in events and any(e in events for e in ('cpu-unmap', 'gpu-unmap', 'free', 'ctx-free', 'close')):
         raise RuntimeError('Exercise failure continued into cleanup')
+    summaries = [json.loads(line.removeprefix('IB-MISMATCH-SUMMARY '))
+                 for line in result.stderr.splitlines() if line.startswith('IB-MISMATCH-SUMMARY ')]
+    wanted = expected_mismatch_summary(fault)
+    if summaries != ([] if wanted is None else [wanted]):
+        raise RuntimeError('Missing, unexpected or inaccurate mismatch classification')
+    if wanted is not None and any(type(summaries[0][key]) is not type(value) for key,value in wanted.items()):
+        raise RuntimeError('Mismatch summary field type changed')
     waits = [json.loads(line) for line in lines if line.startswith('{')]
     transport_waits = tuple(f'wait-{stage}-{kind}' for stage in (1, 2) for kind in ('status', 'short', 'long'))
     unlogged = int(fault in transport_waits)
@@ -256,6 +304,12 @@ def exercise(out):
     out = Path(out).resolve()
     if out.exists():
         raise ValueError('Choose a fresh output directory')
+    paths = [ROOT / name for name in ('tools/upstream34_layout/ib_preamble_probe.cpp',
+             'tools/upstream34_layout/ib_preamble_packets.h', 'tools/upstream34_layout/ib_mismatch_summary.h',
+             'tools/upstream34_layout/ib_preamble.py', 'tools/test_upstream34_ib_preamble.py',
+             'tests/test_build34_ib_preamble.cpp', 'tests/test_upstream34_ib_preamble_runner.py')]
+    paths += sorted((ROOT / 'tests/fake_build34_ib_preamble').rglob('*.h'))
+    snapshots = {p:p.read_bytes() for p in paths}
     protected = mec_range.verify_current_inputs(mec_range.protected_base_inputs(), ROOT)
     out.mkdir(parents=True, mode=0o700)
     binary = out / 'preamble-simulation'
@@ -286,10 +340,9 @@ def exercise(out):
                     raise RuntimeError(f'Preamble {variant}/{policy}/{fault}: {error}') from error
                 results.append({'variant': variant, 'policy': policy, 'case': fault, **checked})
             print(json.dumps({'completed': variant + '/' + policy, 'cases': len(CASES), 'hardware_executed': False}), flush=True)
-    paths = [ROOT / name for name in ('tools/upstream34_layout/ib_preamble_probe.cpp',
-             'tools/upstream34_layout/ib_preamble_packets.h', 'tools/test_upstream34_ib_preamble.py',
-             'tests/test_build34_ib_preamble.cpp')]
-    paths += sorted((ROOT / 'tests/fake_build34_ib_preamble').rglob('*.h'))
+    if any(p.read_bytes() != data for p,data in snapshots.items()):
+        raise RuntimeError('Diagnostic source changed during CPU tests')
+    mec_range.verify_current_inputs(mec_range.protected_base_inputs(), ROOT)
     record = {'base_commit': mec_range.BASE, 'original34_protected_sha256': protected,
               'source_sha256': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},
               'cases': results, 'sanitizers': 'ASan/UBSan', 'hardware_executed': False,
