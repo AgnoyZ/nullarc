@@ -1,10 +1,12 @@
 # Original34 real RADV IB-tail experiment
 
-Status on 2026-11-17: an explicit compute-only source workaround and a probe of
-the real Mesa submission path are prepared. CPU verification and native
-compilation are separate from hardware acceptance. This new transport has not
-yet passed a native hardware comparison. The IB production fault remains
-unresolved; default waits, accelerated desktop and FPS claims remain on HOLD.
+Status on 2026-11-17: the explicit compute-only source workaround passed a
+bounded real-hardware comparison through the real Mesa submission path. The
+same binary's single-IB control reproduced the exact second-dispatch fault;
+the separately recovered tail scope passed both whole-arena checks. This is
+bounded transport evidence, not full RADV/Vulkan runtime acceptance. The
+production policy remains opt-in; default waits, accelerated desktop and FPS
+claims remain on HOLD.
 
 ## Evidence motivating this change
 
@@ -158,3 +160,49 @@ takeover are part of this source addition. Rollback is the independent recovery
 to GPU-off/firmware framebuffer; no persistent runtime file is changed by the
 probe. A native transport pass would still not be a Vulkan/graphics/desktop or
 FPS validation.
+
+## Real transport hardware comparison on 2026-11-17
+
+Both fresh scopes used source
+`7cd4b6c605d96d7af1128eab98428542bea560a0` and the identical signed probe
+SHA256 `9e73ce02a2e7502249bed4e191b455638d42c75086bdb514dd815b2f8b7e1fd2`
+on macOS 26.7.2 (`25G332`), with the exact original34 kernel image. The
+previous offline record remains a preparation-time snapshot; the
+[separate hardware record](validation/build34-radv-ib-tail-hardware-20261117.json)
+records subsequent execution and recovery.
+
+| Policy | Dispatch 1 | Dispatch 2 after same-address IB rewrite | Independent recovery |
+| --- | --- | --- | --- |
+| Single IB, workaround disabled | Full 16 KiB passed | `0x2010`: `0xde`, expected `0xdf` | Passed; held client retained until reboot |
+| Separate immutable NOP tail enabled | Full 16 KiB passed | Full 16 KiB passed | Passed; test job removed |
+
+Each scope separately performed one original initialization, then opened one
+executing native client for at most two dispatches. There was no additional
+`--check` client, retry, proxy fallback or second initialization. The second
+scope was admitted only after the first precisely reproduced the fault and
+its recovery and retirement were independently verified. Tail ownership,
+submission and retirement used the actual patched Mesa core, VA manager,
+CS parser, marshaller and sync code; only platform open/map/call were supplied
+by the probe's strict direct IOKit adapter.
+
+Both dispatches in each scope reached positive retirement before arena
+comparison. Neither required the two-second capped wait. The longest observed
+wait syscall wall time was 19,717 ns for single and 35,036 ns for tail; these
+are timing observations, not GPU execution times or frame-rate measurements.
+The control detected the mismatch despite positive retirement, so faster fence
+completion alone is not the acceptance criterion.
+
+Each scope recovered once to GPU-off and firmware framebuffer, with zero GPU
+calls on its recovery boot. Independent read-back verified 46 protected files,
+two protected links, 347 EFI files including 148 Microsoft files, unchanged
+security/KC pins and no new matching crash/watchdog reports. Both consumed
+launch jobs were removed. No driver or runtime was installed by this comparison.
+
+The evidence verifies the bounded compute transport workaround for the exact
+reproducer. It does not establish the cache/root cause or validate repeated
+workloads, concurrent GPU clients, complete Vulkan, graphics or desktop use.
+Adding a descriptor still changes submission footprint and timing. A full
+runtime build/integration check and separately scoped execution evidence remain
+necessary before broader promotion. Original34 still lacks close-time
+quarantine; forced exit of a held GPU process remains unsafe. All earlier
+hardware packets remain consumed.

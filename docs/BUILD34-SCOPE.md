@@ -55,9 +55,12 @@ connection-lifetime immutable NOP BO. It is explicitly opt-in, compute-only and
 excluded from WindowServer. Its CPU tests execute the actual marshaller,
 shared core/VA allocator and native-probe control flow with fake platform ops;
 native compilation does not execute the signed probe. This is an unpromoted
-source workaround, not an installed runtime or hardware acceptance. A new
-same-binary single-control/tail comparison with independent recovery remains
-required. Original34 kernel/helper/ABI and all desktop/default-wait HOLDs remain.
+source workaround, not an installed runtime. Its subsequent fresh same-binary
+hardware comparison reproduced the exact fault with the workaround disabled,
+then passed both guarded compute dispatches with the immutable tail enabled.
+Both scopes independently recovered and retired. This verifies only the bounded
+real transport reproducer, not full RADV/Vulkan, graphics, desktop or FPS use.
+Original34 kernel/helper/ABI and all desktop/default-wait HOLDs remain.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

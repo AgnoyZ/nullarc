@@ -1,0 +1,143 @@
+{
+  "date": "2026-11-17",
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "source_commit": "7cd4b6c605d96d7af1128eab98428542bea560a0",
+  "probe_sha256": "9e73ce02a2e7502249bed4e191b455638d42c75086bdb514dd815b2f8b7e1fd2",
+  "comparison": "same binary and guarded payload arena; one DRM payload IB per pass; real Mesa shared core, CS parser, marshaller and sync; explicit separately owned immutable tail versus disabled policy",
+  "platform_boundary": "strict direct IOKit adapter; one PCI-verified client; no proxy fallback or open retry",
+  "scopes": [
+    {
+      "result": "real-transport-single-reproduced-and-recovered",
+      "policy": "single",
+      "source_commit": "7cd4b6c605d96d7af1128eab98428542bea560a0",
+      "probe_sha256": "9e73ce02a2e7502249bed4e191b455638d42c75086bdb514dd815b2f8b7e1fd2",
+      "original34_exact_image": true,
+      "OS_version": "26.7.2",
+      "OS_build": "25G332",
+      "initializations": 1,
+      "submitted_dispatches": 2,
+      "fully_verified_dispatches": 1,
+      "mismatch": {
+        "offset": 8208,
+        "pass": 1,
+        "actual": "0xde",
+        "expected": "0xdf"
+      },
+      "waits": [
+        {
+          "pass": 0,
+          "budget_ns": 0,
+          "busy": 1,
+          "elapsed_ns": 5320
+        },
+        {
+          "pass": 0,
+          "budget_ns": 50000,
+          "busy": 0,
+          "elapsed_ns": 19717
+        },
+        {
+          "pass": 1,
+          "budget_ns": 0,
+          "busy": 0,
+          "elapsed_ns": 10319
+        }
+      ],
+      "resources_held_until_recovery": true,
+      "GPU_off": true,
+      "firmware_framebuffer_only": true,
+      "recovery_boots": 1,
+      "GPU_calls_after_recovery": 0,
+      "consumed_job_removed": true,
+      "protected_files_unchanged": 46,
+      "protected_links_unchanged": 2,
+      "EFI_files_unchanged": 347,
+      "Microsoft_files_unchanged": 148,
+      "security_and_KC_unchanged": true,
+      "new_matching_reports": 0,
+      "driver_deployed": false,
+      "desktop_enabled": false,
+      "default_wait_promoted": false,
+      "automatic_retry": false,
+      "controller_CPU_tests": 11,
+      "complete_arena_bytes_per_dispatch": 16384,
+      "wait_clock": "mach_absolute_time; elapsed_ns is syscall wall time, not GPU duration",
+      "dispatch_pass_indices": "zero-based"
+    },
+    {
+      "result": "real-transport-tail-passed-and-recovered",
+      "policy": "tail",
+      "source_commit": "7cd4b6c605d96d7af1128eab98428542bea560a0",
+      "probe_sha256": "9e73ce02a2e7502249bed4e191b455638d42c75086bdb514dd815b2f8b7e1fd2",
+      "original34_exact_image": true,
+      "OS_version": "26.7.2",
+      "OS_build": "25G332",
+      "initializations": 1,
+      "submitted_dispatches": 2,
+      "fully_verified_dispatches": 2,
+      "mismatch": null,
+      "waits": [
+        {
+          "pass": 0,
+          "budget_ns": 0,
+          "busy": 1,
+          "elapsed_ns": 24767
+        },
+        {
+          "pass": 0,
+          "budget_ns": 50000,
+          "busy": 0,
+          "elapsed_ns": 35036
+        },
+        {
+          "pass": 1,
+          "budget_ns": 0,
+          "busy": 0,
+          "elapsed_ns": 30758
+        }
+      ],
+      "resources_held_until_recovery": false,
+      "GPU_off": true,
+      "firmware_framebuffer_only": true,
+      "recovery_boots": 1,
+      "GPU_calls_after_recovery": 0,
+      "consumed_job_removed": true,
+      "protected_files_unchanged": 46,
+      "protected_links_unchanged": 2,
+      "EFI_files_unchanged": 347,
+      "Microsoft_files_unchanged": 148,
+      "security_and_KC_unchanged": true,
+      "new_matching_reports": 0,
+      "driver_deployed": false,
+      "desktop_enabled": false,
+      "default_wait_promoted": false,
+      "automatic_retry": false,
+      "controller_CPU_tests": 11,
+      "complete_arena_bytes_per_dispatch": 16384,
+      "wait_clock": "mach_absolute_time; elapsed_ns is syscall wall time, not GPU duration",
+      "dispatch_pass_indices": "zero-based"
+    }
+  ],
+  "conclusion": {
+    "single_reproduced_exact_0x2010_de_instead_of_df": true,
+    "tail_two_dispatches_and_whole_arenas_passed": true,
+    "same_source_and_binary": true,
+    "independent_recovery_and_retirement_per_scope": true,
+    "real_Mesa_transport_bounded_workaround_verified": true,
+    "root_cause_proven": false,
+    "full_RADV_dylib_built_or_installed_by_comparison": false,
+    "Vulkan_or_graphics_acceptance": false,
+    "desktop_acceleration_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_claim": false,
+    "build41_or_build42_prepared": false,
+    "automatic_retry": false
+  },
+  "limitations": [
+    "Two guarded compute dispatches per independent scope; not a stress or concurrency GPU test",
+    "Probe links real Mesa transport/core/CS/sync/allocator but uses a strict direct platform adapter rather than a complete Vulkan runtime",
+    "A tail descriptor changes submission footprint and timing; the exact cache/root cause remains unproven",
+    "Production policy remains opt-in, compute-only, and excluded from WindowServer",
+    "Original34 kernel has no close-time quarantine; forced exit of held GPU clients remains unsafe"
+  ]
+}
