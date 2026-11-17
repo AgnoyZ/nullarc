@@ -1,0 +1,143 @@
+{
+  "result": "native-single-IB-late-observation-completed-and-recovered",
+  "policy": "single-late-observation",
+  "source_commit": "d1b1ab2de7ed58ef0cba28f7783e0eaac6b2e109",
+  "probe_sha256": "9eb35e366f949d483210d5ed5e81e575b42d50c8cdae8bf52d216abd82ab9999",
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "original34_exact_image": true,
+  "initialization_attempts": 1,
+  "maximum_native_submissions": 2,
+  "native": {
+    "outcome": "original-trigger-observed",
+    "trigger_reproduced": true,
+    "native_submissions": 2,
+    "fully_verified_dispatches": 1,
+    "resources_held_until_recovery": true,
+    "mismatch": {
+      "offset": 8208,
+      "pass": 1,
+      "actual": "0xde",
+      "expected": "0xdf"
+    },
+    "summary": {
+      "classification_valid": true,
+      "pass": 1,
+      "arena_bytes": 16384,
+      "first_snapshot_mismatch": 8208,
+      "mismatch_bytes": 256,
+      "shader_page_mismatch_bytes": 0,
+      "command_page_mismatch_bytes": 0,
+      "output_mismatch_bytes": 256,
+      "guard_mismatch_bytes": 0,
+      "output_current_words": 0,
+      "output_previous_words": 256,
+      "output_poison_words": 0,
+      "output_other_words": 0,
+      "original_mismatch_reobserved": true,
+      "changed_during_observation_bytes": 0
+    },
+    "waits": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 6632
+      },
+      {
+        "pass": 0,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 44023
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 0,
+        "elapsed_ns": 8907
+      }
+    ],
+    "late_summary": {
+      "classification_valid": true,
+      "pass": 1,
+      "arena_bytes": 16384,
+      "first_snapshot_mismatch": 8208,
+      "mismatch_bytes": 256,
+      "shader_page_mismatch_bytes": 0,
+      "command_page_mismatch_bytes": 0,
+      "output_mismatch_bytes": 256,
+      "guard_mismatch_bytes": 0,
+      "output_current_words": 0,
+      "output_previous_words": 256,
+      "output_poison_words": 0,
+      "output_other_words": 0,
+      "original_mismatch_reobserved": true,
+      "changed_during_observation_bytes": 0
+    },
+    "late_timing": {
+      "requested_delay_us": 100000,
+      "sleep_status": 0,
+      "clock_valid": true,
+      "elapsed_ns": 101636975
+    },
+    "original_failure_retained": true,
+    "late_interpretation": "aggregate-counts-unchanged-after-delay"
+  },
+  "GPU_off": true,
+  "firmware_framebuffer_only": true,
+  "recovery_boots": 1,
+  "GPU_calls_after_recovery": 0,
+  "consumed_job_removed": true,
+  "protected_files_unchanged": 46,
+  "protected_links_unchanged": 2,
+  "EFI_files_unchanged": 347,
+  "Microsoft_files_unchanged": 148,
+  "security_and_KC_unchanged": true,
+  "new_matching_reports": 0,
+  "driver_deployed": false,
+  "runtime_installed": false,
+  "desktop_enabled": false,
+  "default_wait_promoted": false,
+  "FPS_claim": false,
+  "automatic_retry": false,
+  "date": "2026-11-17",
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "scope_fresh": true,
+  "controller": {
+    "trial_observation_completed": true,
+    "failure_record_written": false,
+    "CPU_tests": 20,
+    "native_observation_saved_before_postcheck": true,
+    "held_postcheck_recovery_only": true,
+    "pre_GPU_admission_unchanged": true,
+    "post_recovery_no_clients_required": true
+  },
+  "interpretation": {
+    "all_256_output_words_previous_at_both_samples": true,
+    "two_immediate_reads_stable_at_each_sample": true,
+    "shader_command_and_guard_mismatch_bytes": 0,
+    "late_result_became_current": false,
+    "CP_old_IB_fetch_proven": false,
+    "root_cause_proven": false,
+    "GPU_fault_counted_as_pass": false
+  },
+  "acceptance": {
+    "unmodified_native_single_IB_repaired": false,
+    "kernel_helper_ABI_changed": false,
+    "A1_A2_corrected_A3_preserved": true,
+    "default_tail_enabled": false,
+    "graphics_GPU_accepted": false,
+    "desktop_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_claim": false,
+    "binary_uploaded": false,
+    "build41_or_build42_prepared": false,
+    "scope_replayed": false,
+    "native_reexecuted_during_verification": false
+  },
+  "privacy": {
+    "raw_logs_exported": false,
+    "raw_IORegistry_exported": false,
+    "addresses_or_UUIDs_exported": false
+  }
+}

@@ -105,6 +105,10 @@ adds one explicitly selected 100-ms CPU resample after the original mismatch.
 It changes no commands or native waits and never converts late-correct output
 to success. Its offline verification is not GPU acceptance or permission to
 replay a consumed scope; original34 and desktop/default-wait HOLDs remain.
+Its subsequent fresh hardware scope still observed all 256 previous-pattern
+words after a measured 101.637 ms. Observation collection, independent
+recovery and retirement completed, while the original GPU mismatch remained
+a failure. No wait-based repair, native single-IB fix or root cause is claimed.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

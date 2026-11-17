@@ -73,3 +73,41 @@ no native clients, exact build34, GPU-off/firmware framebuffer, unchanged
 protected files/EFI/security/kernel collections and no new matching report.
 Then remove the consumed job. No scope may be replayed. Rollback is the
 existing independent GPU-off recovery; no runtime or driver is installed.
+
+## Hardware observation
+
+On 2026-11-17 a new source-`d1b1ab2` scope used the exact original34 image on
+macOS 26.7.2 (`25G332`). One initialization and one client submitted two
+single-IB dispatches. The first passed all 16 KiB. The second again failed at
+`0x2010`, actual `0xde` rather than `0xdf`, after a zero-budget native wait
+reported retirement. The initial summary had 256 previous-pattern output
+words, zero current/poison/other words, and 256 mismatching output bytes.
+
+The single requested 100-ms delay succeeded; its measured interval was
+**101,636,975 ns**. The subsequent summary was identical: all 256 output
+words still matched the previous pattern, with no shader, command-page or
+guard mismatch and no byte change across either summary's immediate read
+pair. Thus this trial did not observe a late correction within that interval.
+It does not establish a CP-fetch/cache root cause or rule out every possible
+completion/visibility fault. Increasing a wait or hiding the original
+failure is not an accepted fix.
+
+The original failure and HOLD were retained. The controller first saved the
+parsed observation, then performed recovery-only identity/protection checks
+while the client was still held. It did not admit further GPU work. Both
+the observation controller and the independent post-recovery verifier
+completed; this means the **observation** completed, not that the failing
+GPU result passed. Twenty CPU controller tests had checked that distinction,
+incomplete/timing-error transcripts, live witness requirements, no retries,
+one recovery dispatch and retained resources.
+
+One recovery reboot returned to GPU-off/firmware framebuffer. Independent
+verification required no native clients and checked the exact original image,
+46 protected files, two links, 347 EFI files (148 Microsoft), unchanged
+security/kernel collections and no new matching diagnostic report, then
+removed the consumed job. No driver/runtime was installed and no held native
+process was killed. See the [sanitized hardware record](validation/build34-ib-late-observation-hardware-20261117.json).
+
+The unchanged native single-IB fault remains unresolved. The separately
+verified explicit-tail compute workaround retains its limited scope;
+graphics, desktop, default waits and FPS remain HOLD.

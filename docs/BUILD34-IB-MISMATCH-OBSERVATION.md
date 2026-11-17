@@ -130,3 +130,6 @@ The follow-up [delayed observation](BUILD34-IB-LATE-OBSERVATION.md) adds an
 explicit diagnostic option for one 100-ms CPU resample only after that
 failure. It preserves the failed outcome even if the later bytes match.
 Its CPU/native preparation does not execute or arm another hardware scope.
+Its subsequent independent hardware scope measured 101.637 ms between
+samples and still observed all 256 previous-pattern words. That observation
+and its recovery/retirement completed; the underlying GPU fault did not pass.
