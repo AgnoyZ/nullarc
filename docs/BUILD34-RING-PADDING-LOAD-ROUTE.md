@@ -142,3 +142,17 @@ submission or reboot was started. A separate usable removable test medium is
 now a concrete prerequisite; the internal Windows disk must not be repurposed.
 See the [sanitized preparation record](validation/build34-ring-padding-independent-boot-preparation-20261117.json).
 The native IB defect and all existing HOLDs remain unresolved.
+
+## Subsequent owner-authorized internal-disk route
+
+The owner subsequently requested internal-disk testing and confirmed an
+independent firmware-menu Windows boot. This supersedes the removable-only
+medium proposal above. The [internal route preparation](BUILD34-RING-PADDING-INTERNAL-TEST.md)
+adds exact-original recovery material under a new dedicated EFI directory,
+tests image replacement only in an inactive FAT directory, and installs a
+restore-only startup job. All preexisting EFI files, including the working
+configuration and Windows/fallback paths, remain unchanged. A fresh original
+control is prepared but not armed. The candidate is still inactive; no new
+GPU work or reboot was requested during that preparation. Startup restoration
+does not cover pre-OS boot failure; the owner-confirmed Windows route remains
+the manual fallback, and its generated rollback script is not Windows-tested.

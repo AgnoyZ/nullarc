@@ -1,0 +1,64 @@
+{
+  "date": "2026-11-17",
+  "source_commit_before_preparation": "fc4f8d90052cf91047336afca8871579a63b51d4",
+  "status": "internal-recovery-material-prepared-control-scope-not-armed",
+  "owner_internal_disk_test_requested": true,
+  "owner_independent_Windows_boot_confirmed": true,
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "CPU": {
+    "bundle_transition_test_methods": 16,
+    "startup_restore_test_methods": 12,
+    "comparison_controller_test_methods": 24,
+    "all_passed": true,
+    "GPU_calls": 0
+  },
+  "disk_preparation": {
+    "recovery_material_added_only_under": "EFI/OC/Nullarc34Rollback",
+    "original_backup_exact": true,
+    "inactive_FAT_roundtrip_passed": true,
+    "inactive_FAT_interrupted_stage_recovery_passed": true,
+    "active_original_unchanged": true,
+    "preexisting_EFI_files_unchanged": 347,
+    "recovery_files_added": 9,
+    "Windows_and_fallback_boot_paths_unchanged": true,
+    "working_config_unchanged": true,
+    "EFI_unmounted": true,
+    "restore_only_startup_job_installed_idle": true,
+    "Windows_script_runtime_tested": false,
+    "pre_OS_automatic_recovery_proved": false
+  },
+  "control_preparation": {
+    "fresh_scope_prepared": true,
+    "independent_observer_handshake_passed": true,
+    "one_use_control_job_installed": false,
+    "armed": false,
+    "initialization_limit": 1,
+    "execution_client_limit": 1,
+    "native_submit_limit": 2,
+    "recovery_boot_limit": 1,
+    "probe_argument": "--run-single",
+    "probe_sha256": "f89035937656ecc16cf6329a24801e29b8cd40d3c646e66d03628b358a9703a5"
+  },
+  "preparation_refusal": {
+    "retained_runtime_log_excluded_using_original_frozen_input_allowlist": true,
+    "stopped_before_scope_creation_and_GPU_work": true,
+    "regression_test_added": true
+  },
+  "acceptance": {
+    "original_loaded": true,
+    "GPU_off_firmware_framebuffer": true,
+    "protected_files_unchanged": 46,
+    "security_and_KCs_unchanged": true,
+    "candidate_activated": false,
+    "candidate_loaded": false,
+    "GPU_executed": false,
+    "reboot_requested": false,
+    "native_IB_repaired": false,
+    "desktop_enabled": false,
+    "FPS_validated": false,
+    "build41_or_build42_used": false,
+    "binary_uploaded": false,
+    "automatic_retry": false
+  }
+}
