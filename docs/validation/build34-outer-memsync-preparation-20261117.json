@@ -1,0 +1,166 @@
+{
+  "date": "2026-11-17",
+  "status": "three-policy-CPU-and-two-private-native-builds-passed-not-installed",
+  "source_commit_before_preparation": "5544f11cde13000e89f8306dc6fe63c7f5685877",
+  "approved_source_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "source_reference": {
+    "repository": "torvalds/linux",
+    "commit": "adc218676eef25575469234709c2d87185ca223a",
+    "files": {
+      "amdgpu_ib.c": {
+        "sha256": "3ad28f135d332cb49aed6035539fc7bfda760e3b585ea1028426c89fb7b6d267",
+        "git_blob": "8b512dc28df8384861be0385e8cbdb292406421e"
+      },
+      "soc15d.h": {
+        "sha256": "45426641c204f06f54951174ac02a58c9bd49f7b0a7c822eaf984668ba3b8457",
+        "git_blob": "b9cbeb389edc1e3216a49d97940767e36b1cd789"
+      },
+      "sid.h": {
+        "sha256": "befc39ea9c835a2f09a6a6b6fb3b1845c22e161c26b215f4b2fe0457dfb84a33",
+        "git_blob": "9a39cbfe6db9f277adc5576caa4dcd0d2ddff4fe"
+      },
+      "gfx_v11_0.c": {
+        "git_blob": "d3e8be82a1727a7839040bb82291a742de4409e8",
+        "sha256": "74dc38ba2d48b1e43db0bec0706a53385fb2f083b273a8f8f4ee2da5d3e06317"
+      },
+      "nvd.h": {
+        "git_blob": "631dafb9229900474845cd50a3a3144a8f748299",
+        "sha256": "f65a105dfceff3bc03b3e02ac52ed18586586a5866135170a3239ec77fbe29c8"
+      }
+    },
+    "licence": "MIT notices retained",
+    "copied_into_production": false
+  },
+  "function_sha256": {
+    "original": "f4cce20334d98ebdb58ef3ddf7cd13673ba35d6b1e5109483321b5acf4c7a845",
+    "nop-prefix": "be852355544586676895791fa19c47929aeec355103d835acd43c15f481b0408",
+    "acquire-prefix": "12fcaa4cb7ab0a19df9ac16491e7654362547625e4fbe879840cbfb9d351e722"
+  },
+  "complete_source_sha256": {
+    "original": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+    "nop-prefix": "5c010ac379266cd7ac47292d5037e586baef50479a92286a5c6357b836de04d1",
+    "acquire-prefix": "fffd2bdfea25ca87312679e194949f2538807b43610d157f06c9dde0d33a70d0"
+  },
+  "CPU": {
+    "new_Python_test_methods_passed": 16,
+    "shared_builder_test_methods_passed": 16,
+    "actual_function_scenarios_total": 108333,
+    "policies": {
+      "original": {
+        "passed": true,
+        "policy": "original",
+        "scenarios": 36111,
+        "prefixed_submissions": 0,
+        "refused_submissions": 292,
+        "adopted_queue_CPU_submissions": 140,
+        "GPU_executed": false
+      },
+      "nop-prefix": {
+        "passed": true,
+        "policy": "nop-prefix",
+        "scenarios": 36111,
+        "prefixed_submissions": 17972,
+        "refused_submissions": 298,
+        "adopted_queue_CPU_submissions": 140,
+        "GPU_executed": false
+      },
+      "acquire-prefix": {
+        "passed": true,
+        "policy": "acquire-prefix",
+        "scenarios": 36111,
+        "prefixed_submissions": 17972,
+        "refused_submissions": 298,
+        "adopted_queue_CPU_submissions": 140,
+        "GPU_executed": false
+      }
+    },
+    "sanitizers": "ASan/UBSan",
+    "real_IOKit_linked": false,
+    "GPU_executed": false
+  },
+  "candidates": {
+    "nop-prefix": {
+      "result": "built-and-statically-verified-not-installed",
+      "complete_source_sha256": "5c010ac379266cd7ac47292d5037e586baef50479a92286a5c6357b836de04d1",
+      "executable_sha256": "3124e6378ef7d3c7c04ec84aa69a724e67f70c2e5ab8c3cc00ed45b50b81d543",
+      "source_plist_sha256": "05d17cf6d755730497021298d4f57153066d4d64228fdcf28e358b61a82375a5",
+      "complete_control_matching_plist_sha256": "aaeef27a947e0a2a70b358628ff21216a5edaf0a5d65f32651f8654cef654af7",
+      "SDK_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "SDK_file_count": 1216,
+      "strict_signature_and_x86_64_checks_passed": true,
+      "independent_privileged_static_readback_passed": true,
+      "independent_SDK_toolchain_recipe_and_CPU_report_hashes_verified": true,
+      "distinct_image_identities_retained_privately": true,
+      "same_three_original_field_shadow_warnings": true,
+      "CPU_report_sha256": "36b2816bb3aba2ffc2474637b1be8b6c81a075fc29f605e21dcc60e4b0f61408",
+      "recipe_sha256": {
+        "tools/upstream34_layout/outer_memsync_candidate.py": "790802547587b3e402eac7a6be200fb273b91f493278c6528b6ac7e146382c73",
+        "tools/upstream34_layout/outer_memsync.py": "5383ab4d52bb802284988a92dfaa1b206e9a21db0c0c415c24fab4e575e8c379",
+        "tools/upstream34_layout/ring_padding_candidate.py": "177e9146cfaf7508653181b42611740dbc2b74971826cfb1931b11690e2d07f5",
+        "tools/upstream34_layout/ring_padding.py": "712c1476ab9db532005b00cc3f46a14795c35f6c9c1efe6a575a1ed8aa0e0509",
+        "tools/upstream34_layout/mec_range.py": "ece685b3e70efb4e9dd13b0c92c09c4189ca97c38e93b46f2b494987df75c941",
+        "tests/test_build34_outer_memsync.cpp": "27c391c188287d62b72dbc2189e6abe782a6f9a06d1e26205291ca2274ad351c",
+        "tests/test_upstream34_outer_memsync.py": "c541eb3efe6c2e48aae91b91a1f009a08001d9156b209d622d5b9ea4f185ad26",
+        "tests/test_upstream34_outer_memsync_candidate.py": "ae2be55b2b80d96db8a55a277c50dbaa342f68db9207e134e5fbd33dcbabe177"
+      },
+      "installed": false,
+      "loaded": false,
+      "GPU_executed": false
+    },
+    "acquire-prefix": {
+      "result": "built-and-statically-verified-not-installed",
+      "complete_source_sha256": "fffd2bdfea25ca87312679e194949f2538807b43610d157f06c9dde0d33a70d0",
+      "executable_sha256": "7c2f8d4d68b63f32fba120f60fec0877e1e58607e70253c94d7394883f7cf8e1",
+      "source_plist_sha256": "05d17cf6d755730497021298d4f57153066d4d64228fdcf28e358b61a82375a5",
+      "complete_control_matching_plist_sha256": "aaeef27a947e0a2a70b358628ff21216a5edaf0a5d65f32651f8654cef654af7",
+      "SDK_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+      "SDK_file_count": 1216,
+      "strict_signature_and_x86_64_checks_passed": true,
+      "independent_privileged_static_readback_passed": true,
+      "independent_SDK_toolchain_recipe_and_CPU_report_hashes_verified": true,
+      "distinct_image_identities_retained_privately": true,
+      "same_three_original_field_shadow_warnings": true,
+      "CPU_report_sha256": "36b2816bb3aba2ffc2474637b1be8b6c81a075fc29f605e21dcc60e4b0f61408",
+      "recipe_sha256": {
+        "tools/upstream34_layout/outer_memsync_candidate.py": "790802547587b3e402eac7a6be200fb273b91f493278c6528b6ac7e146382c73",
+        "tools/upstream34_layout/outer_memsync.py": "5383ab4d52bb802284988a92dfaa1b206e9a21db0c0c415c24fab4e575e8c379",
+        "tools/upstream34_layout/ring_padding_candidate.py": "177e9146cfaf7508653181b42611740dbc2b74971826cfb1931b11690e2d07f5",
+        "tools/upstream34_layout/ring_padding.py": "712c1476ab9db532005b00cc3f46a14795c35f6c9c1efe6a575a1ed8aa0e0509",
+        "tools/upstream34_layout/mec_range.py": "ece685b3e70efb4e9dd13b0c92c09c4189ca97c38e93b46f2b494987df75c941",
+        "tests/test_build34_outer_memsync.cpp": "27c391c188287d62b72dbc2189e6abe782a6f9a06d1e26205291ca2274ad351c",
+        "tests/test_upstream34_outer_memsync.py": "c541eb3efe6c2e48aae91b91a1f009a08001d9156b209d622d5b9ea4f185ad26",
+        "tests/test_upstream34_outer_memsync_candidate.py": "ae2be55b2b80d96db8a55a277c50dbaa342f68db9207e134e5fbd33dcbabe177"
+      },
+      "installed": false,
+      "loaded": false,
+      "GPU_executed": false
+    }
+  },
+  "comparison_boundary": {
+    "prefix_dwords": 8,
+    "position": "outer compute ring before all user IB descriptors",
+    "NOP_and_ACQUIRE_equal_footprint": true,
+    "original_kernel_admission_unchanged": true,
+    "fresh_original_control_required": true,
+    "NOP_result_precedes_ACQUIRE_attribution": true,
+    "shared_EFI_observer_serialization_required_before_hardware": true,
+    "old_consumed_packets_not_replayed": true
+  },
+  "acceptance": {
+    "original_still_loaded": true,
+    "GPU_off": true,
+    "kernel_candidates_built": 2,
+    "installed": false,
+    "loaded": false,
+    "GPU_executed": false,
+    "hardware_scope_armed": false,
+    "native_IB_repaired": false,
+    "production_source_helper_and_ABI_unchanged": true,
+    "A1_A2_corrected_A3_preserved": true,
+    "build41_or_build42_used": false,
+    "desktop_default_wait_or_FPS_promoted": false,
+    "binary_uploaded": false
+  }
+}

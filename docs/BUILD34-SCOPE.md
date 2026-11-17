@@ -168,6 +168,15 @@ no GPU work was replayed. Original kernel/helper/ABI and accepted A1/A2/
 corrected-A3 source remain unchanged. The native defect and existing HOLDs
 remain; no next GPU scope is armed.
 
+The subsequent [outer-ring memory-sync preparation](BUILD34-OUTER-MEMSYNC.md)
+derives equal-footprint NOP and ACQUIRE prefix experiments from original34,
+preserving production source and all existing HOLDs. Three actual-function
+CPU policies and both private native builds passed, but neither changed image
+is installed, loaded or GPU-tested. A new exact-original control and separate
+NOP-prefix result must precede any ACQUIRE attribution; shared EFI observer
+serialization and fresh recovery/admission remain prerequisites. No consumed
+scope is replayed or new hardware task armed by this preparation.
+
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream
 PR16, PR19 with a tested zero-progress-write correction, PR15 and PR22. Each
