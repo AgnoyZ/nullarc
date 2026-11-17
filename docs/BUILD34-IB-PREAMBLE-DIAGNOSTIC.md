@@ -12,7 +12,11 @@ follows from these tools.
 The subsequent [post-failure mismatch observation](BUILD34-IB-MISMATCH-OBSERVATION.md)
 adds aggregate read-only reporting after a retired dispatch has already failed.
 It preserves the submitted commands and cannot turn an old first-byte report
-into evidence about the entire output. Its own fresh scope is required.
+into evidence about the entire output. Its subsequent fresh scope observed
+256 previous-pattern output words, with zero shader/command/guard mismatches
+and no change across two immediate reads. The controller's post-probe
+admission assertion then failed; independent recovery and retirement passed.
+The parsed observation is reported separately from that failed trial outcome.
 
 ## Hypothesis and one-variable comparison
 
@@ -22,7 +26,9 @@ address (failed) from submitting two already-written distinct IB addresses
 the separate MEC doorbell-range treatment both failed to remove the same wrong
 value. These observations motivate a command-fetch/publication investigation;
 they do not establish its root cause. Only the first mismatching byte was
-reported, so the entire output must not be described as the old pattern.
+reported, so those earlier trials do not establish the entire output pattern.
+The later post-failure observer supplies that additional CPU-visible fact for
+its own fresh scope, without establishing a CP-fetch or cache mechanism.
 
 `tools/upstream34_layout/ib_preamble_probe.cpp` uses the existing multiple-IB
 native ABI with the exact original34 kernel. The original control/memsync pair

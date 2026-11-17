@@ -1,0 +1,117 @@
+{
+  "source_commit": "0afcd11afc09154bd70607055f941ae8c8ad7359",
+  "probe_sha256": "3ad13b9106c4257042244b4448d3b8ac61377d246be99e28328689e0672a6711",
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "original34_exact_image": true,
+  "initialization_attempts": 1,
+  "maximum_native_submissions": 2,
+  "GPU_off": true,
+  "firmware_framebuffer_only": true,
+  "recovery_boots": 1,
+  "GPU_calls_after_recovery": 0,
+  "consumed_job_removed": true,
+  "protected_files_unchanged": 46,
+  "protected_links_unchanged": 2,
+  "EFI_files_unchanged": 347,
+  "Microsoft_files_unchanged": 148,
+  "security_and_KC_unchanged": true,
+  "new_matching_reports": 0,
+  "driver_deployed": false,
+  "runtime_installed": false,
+  "desktop_enabled": false,
+  "default_wait_promoted": false,
+  "FPS_claim": false,
+  "automatic_retry": false,
+  "result": "single-IB-mismatch-observed-controller-postcheck-failed-recovery-verified",
+  "date": "2026-11-17",
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "scope_fresh": true,
+  "policy": "single-observation",
+  "native": {
+    "outcome": "original-trigger-observed",
+    "trigger_reproduced": true,
+    "native_submissions": 2,
+    "fully_verified_dispatches": 1,
+    "resources_held_until_recovery": true,
+    "mismatch": {
+      "offset": 8208,
+      "pass": 1,
+      "actual": "0xde",
+      "expected": "0xdf"
+    },
+    "summary": {
+      "classification_valid": true,
+      "pass": 1,
+      "arena_bytes": 16384,
+      "first_snapshot_mismatch": 8208,
+      "mismatch_bytes": 256,
+      "shader_page_mismatch_bytes": 0,
+      "command_page_mismatch_bytes": 0,
+      "output_mismatch_bytes": 256,
+      "guard_mismatch_bytes": 0,
+      "output_current_words": 0,
+      "output_previous_words": 256,
+      "output_poison_words": 0,
+      "output_other_words": 0,
+      "original_mismatch_reobserved": true,
+      "changed_during_observation_bytes": 0
+    },
+    "waits": [
+      {
+        "pass": 0,
+        "budget_ns": 0,
+        "busy": 1,
+        "elapsed_ns": 3306
+      },
+      {
+        "pass": 0,
+        "budget_ns": 50000,
+        "busy": 0,
+        "elapsed_ns": 17753
+      },
+      {
+        "pass": 1,
+        "budget_ns": 0,
+        "busy": 0,
+        "elapsed_ns": 11261
+      }
+    ]
+  },
+  "controller": {
+    "trial_completed": false,
+    "hardware_result_receipt_written": false,
+    "failure_type": "AssertionError",
+    "failure_stage": "post-probe admission assertion combining service count, build34 identity and no children",
+    "failed_operand_identified": false,
+    "native_log_independently_parsed_after_recovery": true,
+    "no_failure_counted_as_fix_pass": true
+  },
+  "interpretation": {
+    "CPU_visible_output_all_previous_pattern": true,
+    "stable_across_two_immediate_reads": true,
+    "all_16KiB_guarded": true,
+    "full_16KiB_second_dispatch_passed": false,
+    "CP_old_IB_fetch_proven": false,
+    "root_cause_proven": false
+  },
+  "acceptance": {
+    "unmodified_native_single_IB_repaired": false,
+    "kernel_helper_ABI_changed": false,
+    "A1_A2_corrected_A3_preserved": true,
+    "default_tail_enabled": false,
+    "graphics_GPU_accepted": false,
+    "desktop_enabled": false,
+    "default_wait_promoted": false,
+    "FPS_claim": false,
+    "binary_uploaded": false,
+    "build41_or_build42_prepared": false,
+    "scope_replayed": false,
+    "native_reexecuted_during_verification": false
+  },
+  "privacy": {
+    "raw_logs_exported": false,
+    "raw_IORegistry_exported": false,
+    "addresses_or_UUIDs_exported": false
+  }
+}

@@ -92,7 +92,13 @@ only post-failure volatile reads and aggregate statistics to the original
 single/head/tail diagnostic. Commands, descriptors, waits, original34 kernel
 and the hardware-tested Mesa transport are unchanged. CPU-injected patterns
 test classification, not GPU coherency. It cannot clear any existing HOLD
-and requires its own fresh recovered/retired hardware scope.
+and requires its own fresh recovered/retired hardware scope. That subsequent
+scope observed all 256 output words matching the previous pattern, with no
+shader/command/guard mismatch or change across two immediate reads. The
+controller's post-probe admission assertion failed, so the independently
+parsed observation is not a successful trial or fix acceptance. Independent
+recovery verification and consumed-job retirement passed. The original
+single-IB fault and all existing HOLDs remain unresolved.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

@@ -83,3 +83,45 @@ After recovery, independently verify GPU-off/firmware framebuffer, protected
 files/links, EFI/security/kernel collections and matching diagnostic reports,
 then retire the consumed job. Keep raw logs private and publish only the
 sanitized observation. Graphics, desktop, default waits and FPS remain HOLD.
+
+## Hardware observation and controller failure
+
+On 2026-11-17, a fresh scope ran the signed source-`0afcd11` observer against
+the exact original34 image on macOS 26.7.2 (`25G332`). The first dispatch
+passed all 16 KiB. The second again reported `0x2010`, actual `0xde` instead
+of `0xdf`, after its zero-budget wait reported native retirement.
+
+The complete post-failure summary classified **all 256 output words as the
+previous pattern**: zero current, poison or other words. There were 256
+mismatching bytes, all within the 1-KiB output; each changed pattern word
+differs by one byte. Shader, command-page and guard mismatch counts were
+zero. The first mismatch was reobserved, and no bytes changed between the
+snapshot and the second immediate read. These counts establish a stable
+CPU-visible previous result at observation time. They do not establish that
+CP fetched an old IB, distinguish stale command/state/data visibility, or
+exclude a later update. No delayed sample or extra GPU call was performed.
+
+The native process retained its connection and mappings in HOLD. The
+controller subsequently failed its post-probe admission assertion combining
+service count, build34 identity and absence of children. The available
+failure record does not identify which operand failed. Consequently the
+controller wrote a failure receipt, **not** a completed hardware-result
+receipt; this scope is not counted as a successful trial or fix acceptance.
+After recovery, an independent parser checked the complete native wait,
+mismatch, summary and HOLD records. This supplemental log observation does
+not replace the controller's failed outcome.
+
+One recovery reboot returned to GPU-off with the firmware framebuffer. An
+independent verifier checked the original image, 46 protected files, two
+links, 347 EFI files (including 148 Microsoft files), unchanged security and
+kernel collections, and no new matching diagnostic report. It then removed
+the consumed job. No held process was killed, no scope was replayed, and no
+driver or runtime was deployed. See the
+[sanitized hardware record](validation/build34-ib-mismatch-observation-hardware-20261117.json).
+
+The next experiment must preserve the separate failed-controller and parsed
+observation outcomes. In particular, an intentionally held client cannot be
+treated as if it had already completed cleanup; any revised observation
+controller needs its own host checks and fresh scope. The unchanged single-IB
+fault remains unresolved, and the separately verified explicit-tail compute
+workaround retains its existing limited scope.
