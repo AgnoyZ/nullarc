@@ -6,10 +6,14 @@ The subsequent [fresh original/NOP hardware comparison](BUILD34-OUTER-NOP-HARDWA
 reproduced the same second-dispatch wrong value in both scopes; independent
 recovery and retirement completed. NOP is rejected as a repair. This meets
 only the reproduction prerequisite for a separate ACQUIRE comparison; the
-ACQUIRE image remains uninstalled and untested on the GPU. The preceding
+ACQUIRE image remained uninstalled and untested at that checkpoint. The later
+[separate ACQUIRE trial and source integration](BUILD34-SUBMIT-MEMSYNC.md)
+passed both guarded native dispatches and independent recovery. Its exact
+source is now integrated on default build34; desktop/wait/FPS HOLDs remain.
+The preceding
 [padding candidate failed on hardware](BUILD34-RING-PADDING-HARDWARE.md).
-The original native single-IB wrong value is unresolved. Default build34,
-A1/A2/corrected-A3, kernel/helper/ABI, waits and desktop policy are unchanged.
+The unmodified original image retains the fault. A1/A2/corrected-A3,
+helper/ABI, waits and desktop policy remain unchanged by the integrated fix.
 
 ## Source lead and its limits
 
@@ -138,7 +142,10 @@ then pass independent loaded-identity/disk/GPU-off checks. Both whole-arena
 dispatch checks and native sequence/fence observations are required for a
 bounded pass. Retain any mismatch/held process until recovery; never kill the
 held GPU client. Restore original34/GPU-off and independently retire each scope.
-No source promotion, desktop, graphics, stability or FPS acceptance follows
-from preparation or a bounded compute pass. The subsequent NOP comparison
+Preparation does not adopt source or establish hardware acceptance. A bounded
+compute pass alone does not establish desktop, graphics, stability or FPS
+acceptance. The later exact-source integration has separate identity checks,
+host regressions and the scoped hardware record linked above; it leaves those
+HOLDs intact. The subsequent NOP comparison
 completed steps 1 and 2 with the precise original failure; its consumed tasks
 were retired and do not authorize replay. No hardware task is armed here.

@@ -36,14 +36,15 @@ def image(commands=None, cpu=0x1000007, kind=11):
 
 class CandidateTests(unittest.TestCase):
     def test_exact_full_driver_and_source_proposal(self):
-        original = (ROOT / p.DRIVER).read_bytes()
+        production = (ROOT / p.DRIVER).read_bytes()
+        original = p.mec_range.read_base(p.DRIVER)
         candidate = p.candidate_source(original)
         self.assertEqual(p.sha(candidate), p.CANDIDATE_SHA)
-        self.assertEqual((ROOT / p.DRIVER).read_bytes(), original)
+        self.assertEqual((ROOT / p.DRIVER).read_bytes(), production)
         self.assertIn(b'#define PHX_KEXT_BUILD 34u', candidate)
 
     def test_source_drift_and_reapplication_refused(self):
-        original = (ROOT / p.DRIVER).read_bytes()
+        original = p.mec_range.read_base(p.DRIVER)
         for data in (original + b'\n', original.replace(b'34u', b'42u', 1), p.candidate_source(original)):
             with self.assertRaises(ValueError): p.candidate_source(data)
 

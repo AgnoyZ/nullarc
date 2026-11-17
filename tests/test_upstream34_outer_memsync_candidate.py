@@ -30,7 +30,7 @@ class Tests(unittest.TestCase):
         self.cpu.write_text(json.dumps(self.record if row is None else row))
 
     def test_pinned_complete_source_for_both_policies(self):
-        source = (m.ROOT / m.DRIVER).read_bytes()
+        source = m.mec_range.read_base(m.DRIVER)
         for policy, digest in m.SOURCE_SHA.items():
             result = m.reviewed_source(source, policy)
             self.assertEqual(m.sha(result), digest)

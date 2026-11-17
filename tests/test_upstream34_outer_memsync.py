@@ -11,7 +11,7 @@ from tools.upstream34_layout import outer_memsync as m
 class Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.original = (m.ROOT / 'src/phxbringup/PhxBringup.cpp').read_bytes()
+        cls.original = m.mec_range.read_base('src/phxbringup/PhxBringup.cpp')
         cls.function = m.ring_padding.extract(cls.original.decode())
 
     def test_original_identity(self):

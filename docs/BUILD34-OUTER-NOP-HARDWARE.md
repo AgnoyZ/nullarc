@@ -73,7 +73,9 @@ setting was changed. No binary or raw diagnostic was published.
 
 The [aggregate hardware record](validation/build34-outer-nop-hardware-20261117.json)
 contains only public hashes and bounded observations. At this checkpoint the
-ACQUIRE image remains privately built and statically checked, **not installed,
-loaded or GPU-tested**. A later ACQUIRE comparison requires a new frozen route,
-independent recovery checks and a fresh one-use scope; none is armed by this
-record. Original34 admission and all existing HOLDs remain.
+ACQUIRE image remained privately built and statically checked, **not installed,
+loaded or GPU-tested**. The later [separate ACQUIRE scope](BUILD34-SUBMIT-MEMSYNC.md)
+passed both guarded dispatches, independently recovered and retired, and its
+exact driver source is now integrated. This does not change the failed NOP
+result or authorize replay. Original34 admission and all desktop/wait/FPS
+HOLDs remain; no task is armed by this record.

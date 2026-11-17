@@ -3,8 +3,12 @@
 The owner clarified the development scope on 2026-11-16: focus exclusively on
 PhxBringup build34 on the default branch `upstream34/vram-layout-fix`. Its
 approved source checkpoint is `64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c`,
-including the already validated A1, A2 and corrected A3 changes. Documentation
-commits may advance the branch without changing this driver-source baseline.
+including the already validated A1, A2 and corrected A3 changes. The later
+[minimal compute-submit synchronization fix](BUILD34-SUBMIT-MEMSYNC.md) is
+derived from that exact checkpoint. Original and equal-footprint NOP controls
+failed; the exact ACQUIRE image passed both guarded native dispatches and
+independent recovery. Its byte-identical source is integrated on this branch.
+This is bounded compute acceptance, not desktop, stability or FPS acceptance.
 
 Build41 and build42 are withdrawn, not candidates. Do not continue preparing,
 compiling, installing, loading or testing them as candidates. Do not rename a
@@ -16,10 +20,13 @@ Continue IB wrong-value investigation only against default build34. A further
 authorized fix must be a minimal isolated change, preserve the accepted A1/A2/
 corrected-A3 changes and keep unrelated downstream wait, lifecycle, ABI and
 initialization changes out. A subsequent item must not be promoted on the basis
-of a host-only test or a simulated GPU result. The unmodified native single-IB
-path's wrong value remains unresolved; the explicit immutable-tail compute
-workaround now has separate transport and bounded complete-Vulkan hardware
-evidence below. Default waits and accelerated desktop remain on HOLD.
+of a host-only test or a simulated GPU result. The unmodified original34
+image retains the native single-IB wrong value; the integrated fix has bounded
+native single-IB evidence, while the explicit immutable-tail workaround has
+separate transport and bounded complete-Vulkan evidence below. The recovered
+machine still runs the original image with GPU off. Default waits and
+accelerated desktop remain on HOLD. The following records retain the
+chronology and scope of earlier experiments, including their failures.
 
 The interrupted build42 user-tool preparation was stopped, and its eight
 uncommitted files were withdrawn. No driver was installed or loaded, no native
@@ -179,9 +186,12 @@ both scopes. Independent recovery, retirement and final original34/GPU-off
 read-back passed, including the exact 347-file EFI baseline and 46 protected
 files. Shared bounded EFI serialization avoided the earlier observer mount
 race. NOP is rejected as a repair; this meets only the prerequisite for a
-separate equal-footprint ACQUIRE comparison. ACQUIRE remains uninstalled and
-GPU-untested at this checkpoint. No consumed scope is replayed, hardware task
-armed or existing HOLD cleared by this record.
+separate equal-footprint ACQUIRE comparison. ACQUIRE remained uninstalled and
+GPU-untested at that checkpoint. Its subsequent
+[independent ACQUIRE scope](BUILD34-SUBMIT-MEMSYNC.md) passed both guarded
+native single-IB dispatches, recovered and retired; the exact two-site source
+change is now integrated, with the original admission unchanged. No consumed
+scope is replayed, hardware task armed or desktop/wait/FPS HOLD cleared.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

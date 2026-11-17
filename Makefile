@@ -55,6 +55,12 @@ clean:
 test-upstream34-layout:
 	python3 tests/test_upstream34_layout.py -v
 
+# Actual integrated compute submit, with CPU fakes and no device frameworks.
+.PHONY: test-upstream34-submit-memsync
+test-upstream34-submit-memsync:
+	python3 -B -m unittest discover -s tests -p test_upstream34_submit_memsync.py -v
+	python3 -B tools/upstream34_layout/submit_memsync.py --out build/upstream34-submit-memsync-CPU-private
+
 .PHONY: test-upstream34-mec-range
 test-upstream34-mec-range:
 	python3 -m unittest discover -s tests -p test_upstream34_mec_range_runner.py -v

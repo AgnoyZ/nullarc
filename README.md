@@ -1,9 +1,12 @@
 > **默认分支 `upstream34/vram-layout-fix`：build 34 基线＋显存地址修复＋A1/A2/修正版 A3。**
 > 2026-11-16 已将 `backport/upstream34-a1-a3` 的既有提交与实机验证记录迁入，
 > 包含 A3 的 2 秒采样修正；按所有者要求，迁入操作不再重复测试。
-> PhxBringup、内核 ABI 和启动工具保持基线不变；插件与加速器源码已包含指定回移。
+> 2026-11-17 在原版与等长 NOP 对照均复现 IB 错值后，外层 ACQUIRE 镜像通过两次受保护提交，
+> 已将逐字节相同的最小计算提交同步修改纳入默认源码；内核 ABI、启动工具及 A1/A2/A3 保留。
+> 实机测试结束已恢复原版 build34、GPU 停用；源码集成不代表本机持续运行修复镜像。
 > **候选在短时实机通过后发生 WindowServer watchdog，原生加速桌面继续 HOLD。**
-> 迁入不代表卡顿已解决或帧率提高；本次不安装、加载或重启。
+> 有界计算测试不代表卡顿已解决、桌面稳定或帧率提高。
+> [计算提交同步修改、三组对照与恢复记录](docs/BUILD34-SUBMIT-MEMSYNC.md) ·
 > [回移内容、既有验证与回退](docs/UPSTREAM34-BACKPORT.md) ·
 > [原始显存修复基线](docs/UPSTREAM34-LAYOUT-CORRECTION.md)。
 > 以下上游参考机器的表现不代表本机长期稳定性或本次迁入的帧率结果。
@@ -12,7 +15,11 @@
 > The existing candidate commits and hardware records are preserved. No repeat
 > testing is required for this source transfer. Native accelerated desktop
 > adoption remains on HOLD after the post-gate WindowServer watchdog.
-> General downstream development remains on `downstream/780m-tahoe`.
+> Active development and hardware tests use default build34 only. The minimal
+> compute-submit ACQUIRE fix passed two guarded native dispatches after both
+> original and equal-footprint NOP controls failed, and its exact source is
+> integrated. The machine was recovered to the original image with GPU off;
+> graphics, desktop stability and FPS acceptance remain separate.
 > This branch publishes no binaries.
 
 <p align="center">

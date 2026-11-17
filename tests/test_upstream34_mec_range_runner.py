@@ -39,7 +39,19 @@ class MecRangeTests(unittest.TestCase):
         self.base_source()
         with tempfile.TemporaryDirectory() as temp:
             destination = Path(temp) / "new"
-            source, record = mec_range.materialize(destination)
+            pinned = Path(temp) / "pinned-original"
+            expected = mec_range.protected_base_inputs()
+            for name, data in expected.items():
+                path = pinned / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            def read_pinned(name):
+                return subprocess.check_output(["git", "show", mec_range.BASE + ":" + name], cwd=ROOT, timeout=20)
+            # Historical diagnostics must keep refusing the modified default tree.
+            with mock.patch.object(mec_range, "ROOT", pinned), \
+                    mock.patch.object(mec_range, "protected_base_inputs", return_value=expected), \
+                    mock.patch.object(mec_range, "read_base", side_effect=read_pinned):
+                source, record = mec_range.materialize(destination)
             for name, digest in mec_range.INPUTS.items():
                 if name != "mesboot.c":
                     self.assertEqual(digest, mec_range.sha((source / name).read_bytes()))

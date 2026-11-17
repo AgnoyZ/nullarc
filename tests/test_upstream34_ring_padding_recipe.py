@@ -11,7 +11,8 @@ from upstream34_layout import ring_padding as p
 
 class RecipeTests(unittest.TestCase):
     def setUp(self):
-        self.source = (ROOT / 'src/phxbringup/PhxBringup.cpp').read_text()
+        self.production = (ROOT / 'src/phxbringup/PhxBringup.cpp').read_text()
+        self.source = p.mec_range.read_base('src/phxbringup/PhxBringup.cpp').decode()
         self.function = p.extract(self.source)
 
     def test_exact_original_function(self):
@@ -23,7 +24,7 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(candidate.replace(p.NEW_RESERVATION,p.OLD_RESERVATION).replace(p.NEW_FENCE,p.OLD_FENCE),self.function)
         self.assertEqual(candidate.count(p.NEW_RESERVATION),1)
         self.assertEqual(candidate.count(p.NEW_FENCE),1)
-        self.assertEqual((ROOT / 'src/phxbringup/PhxBringup.cpp').read_text(),self.source)
+        self.assertEqual((ROOT / 'src/phxbringup/PhxBringup.cpp').read_text(),self.production)
 
     def test_padding_precedes_final_completion_fence(self):
         candidate = p.transform(self.function)
