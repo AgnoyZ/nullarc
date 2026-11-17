@@ -230,3 +230,45 @@ and add a separate buffer-only operation to test the no-surface fast path.
 Its timeout workload must be bounded independently and establish real late
 completion and output; no wait-policy or driver-byte change is required by
 this observer correction. Longer stability and FPS remain untested.
+
+### Complete bounded wait acceptance after observer correction
+
+A fresh packet based on default
+`85e8872d96643489e5fa0ff7be651b46e14806a0` corrected only the probe's
+eligibility expectation and added a genuine buffer-only control. The same
+compute-sync build34 kernel and exact release plugin were retained. The
+packet passed 70 CPU/controller methods, both CPU observer self-checks and
+18 runtime-access checks before its single activation. Both native dispatches
+again verified their complete 16-KiB arenas with no mismatch.
+
+The real publication waits for three eligible commands returned successfully
+in **38,432,698 ns**, **232,346 ns** and **300,062 ns**, with a 250 ms budget.
+Each group was ready, each command was Completed and no command error was
+present. Two sampler passes verified 32 IOSurface pixels / 128 channels.
+The fourth, buffer-only command had no publication group, called no group
+wait and verified all 256 output bytes.
+
+A separate real render used the 1 ms budget. A bounded gate in the test
+process delayed that command's completion signalling; production plugin bytes
+were unchanged. The observed wait returned unsuccessfully after
+**1,096,975 ns** (whole `commit`: **1,200,369 ns**), with its group still pending,
+command status Scheduled and `_completionReady` still false. Releasing the
+gate allowed genuine completion; subsequent IOSurface locking verified
+16 pixels / 64 channels. No completion was forged, and this controlled case
+does not establish recovery from arbitrary GPU hangs.
+
+**This complete, bounded PR28 real-GPU wait packet passed.** Independent
+readback re-parsed native and Metal output and matched the controller
+receipts. It then verified exact restoration of the original loaded build34,
+original complete plugin, 46 protected files and 347 original EFI files;
+removed the exact nine recovery files, restore-only job and candidate plugin
+stage; and confirmed GPU-off, EFI unmounted, no test clients and zero new
+matching diagnostic reports. No later test was armed at that readback.
+
+The short desktop tail contained three samples and two validated intervals;
+it is not longer stability or FPS acceptance. The successful packet does not
+explain the earlier unresolved combined failure. Default-off policy and
+WindowServer exclusion remain intact; no permanent adoption, camera repair,
+UI-stutter repair or general performance result is claimed. Longer stability
+must pass before the separate FPS stage. The sanitized evidence file retains
+the earlier failed packets and appends this successful follow-up.

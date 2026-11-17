@@ -147,5 +147,144 @@
     "new_matching_reports": 0,
     "GPU_off": true,
     "followup_GPU_task_armed_at_final_readback": false
+  },
+  "complete_bounded_followup": {
+    "source_commit": "85e8872d96643489e5fa0ff7be651b46e14806a0",
+    "result": "PR28-natural-wait-buffer-control-timeout-late-publication-passed-independently-reparsed-and-recovered",
+    "kernel_and_plugin_unchanged": true,
+    "production_plugin_instrumented": false,
+    "probe_eligibility_corrected_and_buffer_control_added": true,
+    "CPU_controller_methods": 70,
+    "CPU_observer_self_checks": 2,
+    "runtime_access_checks": 18,
+    "native": {
+      "fully_verified_dispatches": 2,
+      "whole_arena_bytes_per_dispatch": 16384,
+      "whole_arena_checks_passed": 2,
+      "mismatch": null,
+      "waits": [
+        {
+          "pass": 0,
+          "budget_ns": 0,
+          "busy": 1,
+          "elapsed_ns": 3236
+        },
+        {
+          "pass": 0,
+          "budget_ns": 50000,
+          "busy": 0,
+          "elapsed_ns": 20067
+        },
+        {
+          "pass": 1,
+          "budget_ns": 0,
+          "busy": 1,
+          "elapsed_ns": 7604
+        },
+        {
+          "pass": 1,
+          "budget_ns": 50000,
+          "busy": 0,
+          "elapsed_ns": 13686
+        }
+      ]
+    },
+    "ready": {
+      "wait_budget_ms": 250,
+      "natural_group_waits": [
+        {
+          "actual_wait_ns": 38432698,
+          "commit_elapsed_ns": 39016772
+        },
+        {
+          "actual_wait_ns": 232346,
+          "commit_elapsed_ns": 264636
+        },
+        {
+          "actual_wait_ns": 300062,
+          "commit_elapsed_ns": 326622
+        }
+      ],
+      "all_group_wait_results_zero": true,
+      "all_groups_ready": true,
+      "all_commands_completed": true,
+      "command_errors": 0,
+      "completed_commands": 4,
+      "eligible_commands": 3,
+      "sampler_slots": [
+        0,
+        15
+      ],
+      "IOSurface_sampled_pixels": 32,
+      "verified_channels": 128,
+      "buffer_only_control": {
+        "commands": 1,
+        "publication_group_absent": true,
+        "group_wait_calls": 0,
+        "verified_bytes": 256
+      }
+    },
+    "timeout": {
+      "budget_ms": 1,
+      "actual_wait_ns": 1096975,
+      "commit_elapsed_ns": 1200369,
+      "wait_result_nonzero": true,
+      "group_pending_at_return": true,
+      "command_status_at_return": "Scheduled",
+      "completion_ready_false_at_return": true,
+      "command_error_present": false,
+      "completion_gate_test_process_only": true,
+      "late_real_completion_verified": true,
+      "completed_commands": 1,
+      "IOSurface_sampled_pixels": 16,
+      "verified_channels": 64,
+      "arbitrary_GPU_hang_recovery_tested": false
+    },
+    "desktop_tail": {
+      "frame_samples": 3,
+      "validated_intervals": 2,
+      "controller_observation_seconds": 16.168137954,
+      "present_delta": 877,
+      "synthetic_VBL_delta": 1245,
+      "WindowServer_stable": true,
+      "physical_panel_or_FPS_measured": false
+    },
+    "acceptance": {
+      "bounded_PR28_real_GPU_wait": true,
+      "default_wait_policy_promoted": false,
+      "WindowServer_exclusion_preserved": true,
+      "long_stability_started": false,
+      "long_stability": false,
+      "FPS_started": false,
+      "FPS": false,
+      "persistent_adoption": false,
+      "original_prior_failure_subtype_resolved": false
+    },
+    "independent_final_readback": {
+      "exact_original_loaded": true,
+      "fixed_image_not_loaded": true,
+      "original_plugin_full_manifest": true,
+      "protected_files_unchanged": 46,
+      "original_EFI_files_unchanged": 347,
+      "temporary_recovery_files_removed": 9,
+      "exact_candidate_plugin_stage_removed": true,
+      "startup_allowlist_links_security_and_kernel_collections_unchanged": true,
+      "GPU_off": true,
+      "firmware_framebuffer_only": true,
+      "restore_only_job_removed": true,
+      "test_clients_and_shutdown_absent": true,
+      "EFI_unmounted": true,
+      "new_matching_reports": 0,
+      "followup_GPU_task_armed": false,
+      "no_replay": true
+    },
+    "limits": [
+      "Controlled timeout delayed completion signalling in the probe process; no arbitrary GPU hang was injected.",
+      "Native waits are separate from PR28 publication waits.",
+      "The short desktop tail is neither longer stability nor FPS acceptance.",
+      "Prior unresolved failure remains unresolved; successful follow-up does not reinterpret it.",
+      "Default-off policy and WindowServer exclusion retained.",
+      "No binaries, raw diagnostics or personal EFI published."
+    ]
   }
 }
