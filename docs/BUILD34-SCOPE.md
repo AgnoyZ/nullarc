@@ -136,6 +136,12 @@ function with CPU fakes. It changes no production kernel/helper/ABI and
 builds no kernel candidate. Source arithmetic and fake-platform checks are
 not GPU acceptance; ring-size compatibility and a separately pinned strict
 hardware proposal remain necessary. All existing HOLDs remain.
+The subsequent CPU-only revision withdraws the initial after-fence padding
+order and places padding before the final RELEASE_MEM, matching original34's
+fence-based end-of-frame accounting. The revised actual-function tests also
+cover the initializer's 1024-dword compute ring and successive history-slot
+reuse. This detects a source-level ownership risk in the earlier experiment;
+neither version has become a kernel candidate or GPU-validated repair.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

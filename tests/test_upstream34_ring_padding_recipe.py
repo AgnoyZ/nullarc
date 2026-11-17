@@ -20,10 +20,26 @@ class RecipeTests(unittest.TestCase):
     def test_only_two_insertions_are_reversible(self):
         candidate = p.transform(self.function)
         self.assertNotEqual(candidate, self.function)
-        self.assertEqual(candidate.replace(p.NEW_RESERVATION,p.OLD_RESERVATION).replace(p.NEW_COMMIT,p.OLD_COMMIT),self.function)
+        self.assertEqual(candidate.replace(p.NEW_RESERVATION,p.OLD_RESERVATION).replace(p.NEW_FENCE,p.OLD_FENCE),self.function)
         self.assertEqual(candidate.count(p.NEW_RESERVATION),1)
-        self.assertEqual(candidate.count(p.NEW_COMMIT),1)
+        self.assertEqual(candidate.count(p.NEW_FENCE),1)
         self.assertEqual((ROOT / 'src/phxbringup/PhxBringup.cpp').read_text(),self.source)
+
+    def test_padding_precedes_final_completion_fence(self):
+        candidate = p.transform(self.function)
+        padding = candidate.index('while ((q.wptr + k + 8) & 0xffu)')
+        sequence = candidate.index(p.OLD_FENCE)
+        release = candidate.index('ringPut(q, k++, 0xC0064900)')
+        publication = candidate.index('    q.wptr += k;\n')
+        self.assertLess(candidate.index('ibDw[i] |'),padding)
+        self.assertLess(padding,sequence)
+        self.assertLess(sequence,release)
+        self.assertLess(release,publication)
+
+    def test_fence_and_publication_suffix_unchanged(self):
+        candidate = p.transform(self.function)
+        self.assertEqual(candidate[candidate.index(p.OLD_FENCE):],
+                         self.function[self.function.index(p.OLD_FENCE):])
 
     def test_source_and_function_drift_rejected(self):
         for before,after in (('n * 4 + 8','n * 4 + 9'),('q.wptr += k','q.wptr += k + 1'),('return kIOReturnSuccess','return kIOReturnBusy')):

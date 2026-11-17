@@ -57,8 +57,22 @@ function unchanged. The other changes only two reversible sites:
 1. Lock before calculating space; reserve the exact padded end based on the
    locked compute WPTR, while retaining the 16-dword ring guard. Unlock on a
    geometry refusal. Graphics keeps its original unpadded reservation.
-2. Append compute-only single-word NOP padding before write-pointer/history
-   publication. The IB descriptors and RELEASE_MEM payload remain unchanged.
+2. Insert compute-only single-word NOP padding **between the IB descriptors
+   and RELEASE_MEM**, reserving the latter's eight dwords when aligning the
+   final end. RELEASE_MEM stays the last packet. Its payload and all code from
+   sequence allocation through write-pointer/history publication are unchanged.
+
+The first published CPU-only prototype (`9e0f04c`) placed padding after
+RELEASE_MEM. That ordering is withdrawn. Original34 advances `q.doneEnd` to
+the submission's recorded `q.fend` when its completion fence retires. Padding
+after that fence would leave a suffix beyond the completion packet while the
+bookkeeping describes the entire padded frame as reclaimable. This is a
+source-level ownership risk, not an observed hardware failure or proof of the
+IB defect's cause. The revised ordering keeps the entire frame at or before
+the fence. The withdrawn prototype never became a kernel candidate and was
+never installed, loaded or executed on the GPU; its published history and
+[original CPU evidence](validation/build34-ring-padding-offline-20261117.json)
+remain available.
 
 This is independently written test-only transformation logic. It neither
 modifies `src/phxbringup` nor emits a kernel build, installer or hardware job.
@@ -70,23 +84,41 @@ The fixture stubs locks, ring writes, VM binding, queue fences, HDP flushes and
 MMIO with ordinary process storage. It checks all 64 admitted descriptor
 counts, every alignment residue, representative ring/counter boundaries,
 compute and graphics selection/fallback, canonical address emission,
-descriptor and RELEASE_MEM words, padding counts, full-ring/history refusal,
+descriptor and RELEASE_MEM words, fence placement at the very end, padding
+counts, full-ring/history refusal,
 one delayed retirement, bounded exhaustion, sequence/history bookkeeping,
 both write-pointer halves and the CPU-backed doorbell. The arithmetic oracle
 uses division rather than the transform's bit mask. It models **no CP, GPU
 cache, DMA, real MMIO, concurrency or GPU completion**.
 
-On 2026-11-17 four recipe regression methods and **71,942 actual-function CPU
-scenarios** passed: 35,971 each for original and padded source. The padded
-fixture added NOPs in 17,583 scenarios; 468 scenarios refused submission,
+The source-defined compute adoption in `tools/phxctl/mesboot.c` uses a
+**1024-dword ring starting at WPTR 8**. The native query's hardcoded 4096 is
+not used as the actual adopted queue geometry here. For all 256 starting
+alignment residues and 64 descriptor counts, the largest compute frame is
+519 dwords; with the existing guard it needs 535, fitting an otherwise empty
+1024-dword ring. Occupied-ring and history checks still apply. The fixture
+also runs 70 successive submissions each for one and 64 descriptors, starting
+from the initializer's geometry, with explicitly CPU-injected retirement.
+These cases cross ring and 64-entry history-slot boundaries; they do not
+model hardware completion.
+
+On 2026-11-17 six recipe regression methods and **72,222 actual-function CPU
+scenarios** passed: 36,111 each for original and revised padded source,
+including 140 successive adopted-queue CPU submissions per policy. The padded
+fixture added NOPs in 17,723 scenarios; 468 scenarios refused submission,
 compared with 292 for the original fixture. The difference includes small
 ring geometries for which a padded submission plus the original guard does
 not fit. Those refusals are explicit compatibility work to review, not a
 silent acceptance or evidence that all original configurations are preserved.
-The first compile attempt found a missing `ringOff` field in the CPU stub;
-the corrected fixture passed in a fresh output directory. No native driver
-was involved in that compile error or its correction. See the
-[sanitized offline evidence](validation/build34-ring-padding-offline-20261117.json).
+The earlier withdrawn prototype's first compile attempt found a missing
+`ringOff` field in the CPU stub; its corrected fixture passed in a fresh
+output directory. The revised ordering passed its first CPU run, then a
+second fresh run after adding the successive adopted-queue cases. A separate
+negative control compiled the exact withdrawn transformed function against
+the revised fixture and stopped at the expected padding-placement assertion,
+confirming the new check detects the old ordering. Its expected CPU assertion
+is not a GPU test or sanitizer fault. See the
+[revised sanitized evidence](validation/build34-ring-padding-before-fence-offline-20261117.json).
 
 ```sh
 nice -n 15 /usr/sbin/taskpolicy -b python3 -B -m unittest discover \

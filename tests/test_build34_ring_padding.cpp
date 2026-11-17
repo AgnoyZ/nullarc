@@ -100,8 +100,9 @@ static void run(uint32_t ring, uint64_t start, unsigned n, bool gfx, unsigned hi
     const uint64_t fence = d.fbMcBase + q.fenceOff;
     const uint32_t release[] = {0xc0064900u, 0x06603514u, 0x40000000u,
         uint32_t(fence), uint32_t(fence >> 32), 100, 0, 0};
-    for (unsigned i = 0; i < 8; ++i) assert(d.writes[n * 4 + i] == release[i]);
-    for (unsigned i = raw; i < count; ++i) assert(d.writes[i] == 0xffff1000u);
+    // The fence retires fend == q.wptr: no ring words may follow it.
+    for (unsigned i = n * 4; i < count - 8; ++i) assert(d.writes[i] == 0xffff1000u);
+    for (unsigned i = 0; i < 8; ++i) assert(d.writes[count - 8 + i] == release[i]);
     const auto *wb = reinterpret_cast<const uint32_t *>(d.aperture.bytes + 16);
     assert(wb[0] == uint32_t(q.wptr) && wb[1] == uint32_t(q.wptr >> 32));
     assert(*reinterpret_cast<const uint64_t *>(d.doorbells.bytes) == q.wptr);
@@ -117,6 +118,51 @@ static void admission() {
         uint64_t address = 0x10000, seq = 0xabcdef; uint32_t length = 80;
         assert(d.gpuSubmit(7, false, &address, &length, 1, &seq) == (fault == 2 ? kIOReturnBusy : kIOReturnNotReady));
         assert(!held && d.writes.empty() && !d.flushes && seq == 0xabcdef && d.gSeq == 99); ++scenarios;
+    }
+}
+static void adoptedComputeQueue() {
+    // mesboot's compute adoption starts at dword 8 in a 1024-dword ring.
+    // CPU-injected retirement only; 70 calls also wrap the history slots.
+    for (const unsigned n : {1u, PHXN_MAX_IBS}) {
+        PhxBringup d;
+        auto &q = d.gq[0];
+        q.ready = true; q.ringDw = 1024; q.wptr = q.doneEnd = 8; q.fenceOff = 0x100;
+        uint64_t addresses[PHXN_MAX_IBS]; uint32_t lengths[PHXN_MAX_IBS];
+        for (unsigned i = 0; i < n; ++i) {
+            addresses[i] = 0x12340000ull + i * 0x1000; lengths[i] = 80;
+        }
+        for (unsigned pass = 0; pass < 70; ++pass) {
+            d.writes.clear(); d.flushes = delays = 0; d.mockFence = d.gSeq;
+            const uint64_t start = q.wptr, expectedSeq = d.gSeq + 1;
+            const unsigned raw = n * 4 + 8;
+            const unsigned count = PHX34_CPU_PADDING ?
+                static_cast<unsigned>(((start + raw + 255) / 256) * 256 - start) : raw;
+            const auto slot = q.tail & 63, priorTail = q.tail;
+            uint64_t seq = 0;
+            assert(d.gpuSubmit(7, false, addresses, lengths, n, &seq) == kIOReturnSuccess);
+            ++scenarios;
+            assert(!held && !delays && d.flushes == 2 && seq == expectedSeq && d.gSeq == seq);
+            assert(count + 16 <= q.ringDw && q.wptr == start + count && d.writes.size() == count);
+            assert(q.doneEnd == start && q.head == priorTail && q.tail == priorTail + 1);
+            assert(q.fseq[slot] == seq && q.fend[slot] == q.wptr && q.fvmid[slot] == 8);
+            assert(d.hwv[0].lastSeq == seq);
+            for (unsigned i = 0; i < n; ++i) {
+                assert(d.writes[i * 4] == 0xc0023f00u);
+                assert(d.writes[i * 4 + 1] == uint32_t(addresses[i]));
+                assert(d.writes[i * 4 + 2] == 0);
+                assert(d.writes[i * 4 + 3] == (80u | (1u << 23) | (8u << 24)));
+            }
+            for (unsigned i = n * 4; i < count - 8; ++i) assert(d.writes[i] == 0xffff1000u);
+            const uint64_t fence = d.fbMcBase + q.fenceOff;
+            const uint32_t release[] = {0xc0064900u, 0x06603514u, 0x40000000u,
+                uint32_t(fence), uint32_t(fence >> 32), uint32_t(seq), uint32_t(seq >> 32), 0};
+            for (unsigned i = 0; i < 8; ++i) assert(d.writes[count - 8 + i] == release[i]);
+            const auto *wb = reinterpret_cast<const uint32_t *>(d.aperture.bytes + 16);
+            assert(wb[0] == uint32_t(q.wptr) && wb[1] == uint32_t(q.wptr >> 32));
+            assert(*reinterpret_cast<const uint64_t *>(d.doorbells.bytes) == q.wptr);
+            if (PHX34_CPU_PADDING) assert((q.wptr & 255) == 0);
+            if (count != raw) ++padded;
+        }
     }
 }
 int main() {
@@ -137,7 +183,8 @@ int main() {
         for (unsigned n = 1; n <= PHXN_MAX_IBS; ++n)
             for (const bool gfx : {false,true}) run(4096, start, n, gfx, 0, true);
     admission();
-    printf("{\"passed\":true,\"policy\":\"%s\",\"scenarios\":%llu,\"padded_submissions\":%llu,\"refused_submissions\":%llu,\"GPU_executed\":false}\n",
+    adoptedComputeQueue();
+    printf("{\"passed\":true,\"policy\":\"%s\",\"scenarios\":%llu,\"padded_submissions\":%llu,\"refused_submissions\":%llu,\"adopted_queue_CPU_submissions\":140,\"GPU_executed\":false}\n",
         PHX34_CPU_PADDING ? "compute-padding" : "original", (unsigned long long)scenarios,
         (unsigned long long)padded, (unsigned long long)refused);
 }

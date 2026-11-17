@@ -28,12 +28,12 @@ NEW_RESERVATION = '''    IOLockLock(gpuLock);
         return kIOReturnBadArgument;
     }
 '''
-OLD_COMMIT = '    q.wptr += k;\n'
-NEW_COMMIT = '''    // CPU-only source experiment: align the compute ring end before publication.
+OLD_FENCE = '    const uint64_t seq = ++gSeq;\n'
+NEW_FENCE = '''    // CPU-only experiment: keep RELEASE_MEM last in the padded frame.
     if (!q.gfx)
-        while ((q.wptr + k) & 0xffu)
+        while ((q.wptr + k + 8) & 0xffu)
             ringPut(q, k++, 0xffff1000u);
-    q.wptr += k;
+    const uint64_t seq = ++gSeq;
 '''
 
 
@@ -52,10 +52,10 @@ def extract(source):
 def transform(function):
     if hashlib.sha256(function.encode()).hexdigest() != FUNCTION_SHA:
         raise ValueError('Unreviewed submit function')
-    if function.count(OLD_RESERVATION) != 1 or function.count(OLD_COMMIT) != 1:
+    if function.count(OLD_RESERVATION) != 1 or function.count(OLD_FENCE) != 1:
         raise ValueError('Ambiguous padding insertion sites')
-    candidate = function.replace(OLD_RESERVATION, NEW_RESERVATION).replace(OLD_COMMIT, NEW_COMMIT)
-    if candidate.replace(NEW_RESERVATION, OLD_RESERVATION).replace(NEW_COMMIT, OLD_COMMIT) != function:
+    candidate = function.replace(OLD_RESERVATION, NEW_RESERVATION).replace(OLD_FENCE, NEW_FENCE)
+    if candidate.replace(NEW_RESERVATION, OLD_RESERVATION).replace(NEW_FENCE, OLD_FENCE) != function:
         raise ValueError('Change outside the two reviewed sites')
     return candidate
 
@@ -108,6 +108,8 @@ def exercise(destination):
         raise RuntimeError('CPU recipe/fixture changed during verification')
     report = {'result':'passed', 'base_commit':mec_range.BASE,
               'original_gpuSubmit_sha256':FUNCTION_SHA,
+              'experiment_gpuSubmit_sha256':hashlib.sha256(transform(function).encode()).hexdigest(),
+              'padding_position':'between IB descriptors and final RELEASE_MEM',
               'original34_protected_sha256':protected,
               'source_sha256':{str(p.relative_to(ROOT)):hashlib.sha256(b).hexdigest() for p,b in snapshots.items()},
               'policies':results, 'sanitizers':'ASan/UBSan', 'real_IOKit_linked':False,
