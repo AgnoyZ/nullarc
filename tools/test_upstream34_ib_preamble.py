@@ -134,25 +134,44 @@ EXTRA_CASES += tuple(f'slot-{word}' for word in range(80))
 EXTRA_CASES += tuple(f'preamble-{stage}-{byte}' for stage in (1, 2) for byte in range(32))
 CASES = BASE_CASES + EXTRA_CASES
 POLICIES = ('single', 'control', 'nop-tail', 'memsync', 'single-observe-late')
+TARGET_POLICIES = ('target-control', 'target-switch')
+ALL_POLICIES = POLICIES + TARGET_POLICIES
+TARGET_MODELS = ('model-old-command', 'model-new-address-old-pattern', 'model-no-write',
+                 'model-old-address-current-pattern', 'model-both-current')
+TARGET_CASES = TARGET_MODELS + tuple(f'target-{r}-{s}-{i}' for r in ('a','b')
+                                    for s in (1,2) for i in range(1024))
+TARGET_CASES += tuple(f'byte-{s}-{i}' for s in (1,2)
+                     for i in (0x240f,0x2410,0x280f,0x2810,0x2c0f,0x2c10)
+                     if f'byte-{s}-{i}' not in CASES)
 EXEC_EQUIVALENCE_CASES = ('ok', 'arg-mode', 'info-build41', 'stale-output-2',
                           'poison-output-2', 'mixed-output-2', 'late-output-current',
                           'late-output-mixed', 'late-sleep-error', 'late-clock-backwards', 'submit-2-status',
                           'byte-2-16383', 'wait-2-pending-cap', 'check-ok')
 
 
+def policy_cases(policy):
+    if policy not in ALL_POLICIES:
+        raise ValueError('Unknown preamble policy')
+    return CASES + TARGET_CASES if policy in TARGET_POLICIES else CASES
+
+
 def marker(policy):
-    if policy not in POLICIES:
+    if policy not in ALL_POLICIES:
         raise ValueError('Unknown preamble policy')
     return f'DIAGNOSTIC-PASS: original34 preamble={policy}; two guarded dispatches; no driver or display acceptance'
 
 
 def expected(fault, policy='control'):
-    if fault not in CASES:
+    if fault not in policy_cases(policy):
         raise ValueError('Unknown preamble case')
     if fault.startswith('legacy-'):
         return 64, []
     base = fault
-    if fault in ('info-build41', 'info-build42'):
+    if fault in TARGET_MODELS:
+        base = 'ok' if policy == 'target-control' and fault == 'model-old-address-current-pattern' else 'output-2-0'
+    elif fault in TARGET_CASES:
+        base = f'output-{fault.split("-")[1 if fault.startswith("byte-") else 2]}-0'
+    elif fault in ('info-build41', 'info-build42'):
         base = 'info-build'
     elif fault.startswith(('slot-', 'late-')) or fault in ('stale-output-2', 'poison-output-2', 'mixed-output-2'):
         base = 'output-2-0'
@@ -240,6 +259,88 @@ def expected_late_timing(fault):
             'elapsed_ns':0 if fault == 'late-clock-backwards' else 100004000}
 
 
+def expected_target_summaries(fault, policy):
+    """Independent byte oracle: output values and injected corruption, no ISA."""
+    if policy not in TARGET_POLICIES:
+        return []
+    _, events = expected(fault, policy)
+    rows = []
+    for stage in (1,2):
+        if f'wait-{stage}' not in events:
+            break
+        if fault.startswith(f'wait-{stage}-') and fault.split('-',2)[2] not in ('missing','pending-short','pending-cap'):
+            break
+        pass_index = stage - 1
+        selected = 0x2810 if policy == 'target-switch' and pass_index else 0x2010
+        previous = (0x7800c0de,0x13579bdf,0x2468ace0,0xc001d00d)
+        current = (previous[0]^pass_index, previous[1]+pass_index,
+                   previous[2]^(pass_index<<16), previous[3]-pass_index)
+        want = bytearray(16384)
+
+        def put(arena, offset, values):
+            for i in range(256):
+                arena[offset+i*4:offset+i*4+4] = values[i%len(values)].to_bytes(4,'little')
+
+        poison = tuple(v ^ 0xffffffff for v in current)
+        for offset in (0x2010,0x2810):
+            put(want,offset,poison)
+        actual = bytearray(want)
+        put(want,selected,current)
+        if fault != f'wait-{stage}-missing':
+            put(actual,selected,current)
+        if pass_index and (fault == 'stale-output-2' or fault.startswith('late-')):
+            put(actual,selected,previous)
+        if pass_index and fault == 'poison-output-2':
+            put(actual,selected,poison)
+        if pass_index and fault == 'mixed-output-2':
+            for i in range(256):
+                value = (previous if i < 64 else poison if i < 128 else current)[i&3]
+                if i >= 192: value ^= 0x01010101
+                actual[selected+i*4:selected+i*4+4] = value.to_bytes(4,'little')
+        if pass_index and fault in TARGET_MODELS:
+            for offset in (0x2010,0x2810): put(actual,offset,poison)
+            if fault == 'model-old-command': put(actual,0x2010,previous)
+            elif fault == 'model-new-address-old-pattern': put(actual,selected,previous)
+            elif fault == 'model-old-address-current-pattern': put(actual,0x2010,current)
+            elif fault == 'model-both-current':
+                for offset in (0x2010,0x2810): put(actual,offset,current)
+        mutation = None
+        if re.fullmatch(r'(?:code|ib|output|byte|preamble)-[12]-\d+',fault):
+            kind, s, index = fault.split('-'); index = int(index)
+            if int(s) == stage:
+                mutation = {'code':0,'ib':4096,'output':selected,'byte':0,'preamble':0x1400}[kind]
+                mutation += index * (4 if kind in ('code','ib','output') else 1)
+        elif fault.startswith('slot-') and pass_index:
+            mutation = 0x1200 + int(fault[5:])*4
+        elif re.fullmatch(r'target-[ab]-[12]-\d+',fault):
+            _,region,s,index = fault.split('-')
+            if int(s) == stage: mutation = (0x2010 if region == 'a' else 0x2810)+int(index)
+        if mutation is not None: actual[mutation] ^= 1
+        mismatch = [i for i,(a,b) in enumerate(zip(actual,want)) if a != b]
+        first = mismatch[0] if mismatch else 16384
+        row = {'classification_valid':True,'pass':pass_index,'policy':policy,'arena_bytes':16384,
+               'selected_region':'B' if selected == 0x2810 else 'A','first_scan_mismatch':first,
+               'first_snapshot_mismatch':first,'mismatch_bytes':len(mismatch),
+               'shader_page_mismatch_bytes':sum(i < 4096 for i in mismatch),
+               'command_page_mismatch_bytes':sum(4096 <= i < 8192 for i in mismatch),
+               'a_mismatch_bytes':sum(0x2010 <= i < 0x2410 for i in mismatch),
+               'b_mismatch_bytes':sum(0x2810 <= i < 0x2c10 for i in mismatch),
+               'guard_mismatch_bytes':sum(i >= 8192 and not (0x2010 <= i < 0x2410 or 0x2810 <= i < 0x2c10) for i in mismatch)}
+        for region,offset in (('a',0x2010),('b',0x2810)):
+            counts = dict.fromkeys(('expected','current','previous','poison','other'),0)
+            for i in range(256):
+                a = int.from_bytes(actual[offset+i*4:offset+i*4+4],'little')
+                b = int.from_bytes(want[offset+i*4:offset+i*4+4],'little')
+                counts['expected'] += a == b
+                kind = 'current' if a == current[i&3] else 'previous' if pass_index and a == previous[i&3] else 'poison' if a == poison[i&3] else 'other'
+                counts[kind] += 1
+            row.update({f'{region}_{k}_words':v for k,v in counts.items()})
+        row.update(changed_during_observation_bytes=0,validation_passed=not mismatch)
+        rows.append(row)
+        if mismatch: break
+    return rows
+
+
 def check_result(result, fault, policy):
     code, events = expected(fault, policy)
     prefix = 'fake-native-shader-summary '
@@ -264,7 +365,8 @@ def check_result(result, fault, policy):
         raise RuntimeError('Exercise failure continued into cleanup')
     summaries = [json.loads(line.removeprefix('IB-MISMATCH-SUMMARY '))
                  for line in result.stderr.splitlines() if line.startswith('IB-MISMATCH-SUMMARY ')]
-    wanted = expected_mismatch_summary(fault)
+    targets = policy in TARGET_POLICIES
+    wanted = None if targets else expected_mismatch_summary(fault)
     late = policy == 'single-observe-late' and wanted is not None
     wanted_summaries = [] if wanted is None else [wanted]
     if late:
@@ -273,6 +375,17 @@ def check_result(result, fault, policy):
         raise RuntimeError('Missing, unexpected or inaccurate mismatch classification')
     if any(type(row[key]) is not type(value) for row, want in zip(summaries,wanted_summaries) for key,value in want.items()):
         raise RuntimeError('Mismatch summary field type changed')
+    target_rows = [json.loads(line.split(' ',1)[1]) for line in result.stderr.splitlines()
+                   if line.startswith('IB-TARGET-SUMMARY ')]
+    wanted_targets = expected_target_summaries(fault,policy)
+    if target_rows != wanted_targets or any(type(row[k]) is not type(v)
+            for row,want in zip(target_rows,wanted_targets) for k,v in want.items()):
+        raise RuntimeError('Missing, unexpected or inaccurate target classification')
+    if targets:
+        framed = [line.split(' ',1)[0] for line in result.stderr.splitlines()
+                  if line.startswith(('IB-TARGET-SUMMARY ', 'HOLD:'))]
+        if framed != ['IB-TARGET-SUMMARY']*len(wanted_targets)+(['HOLD:'] if 'hold' in events else []):
+            raise RuntimeError('Target observation/HOLD order changed')
     timing_lines = [line for line in result.stderr.splitlines() if line.startswith('IB-LATE-OBSERVATION ')]
     timings = [json.loads(line.split(' ',1)[1]) for line in timing_lines]
     wanted_timing = [expected_late_timing(fault)] if late else []
@@ -298,7 +411,8 @@ def check_result(result, fault, policy):
             raise RuntimeError('Wait order changed')
         if not code and fault != 'check-ok' and (not rows or rows[-1]['busy'] or any(not row['busy'] for row in rows[:-1])):
             raise RuntimeError('Missing positive retirement or continued wait')
-    if (fault == 'stale-output-2' or fault.startswith('late-')) and 'mismatch at byte 8208 (pass=1 actual=0xde expected=0xdf)' not in result.stderr:
+    stale_offset = 10256 if policy == 'target-switch' else 8208
+    if (fault == 'stale-output-2' or fault.startswith('late-')) and f'mismatch at byte {stale_offset} (pass=1 actual=0xde expected=0xdf)' not in result.stderr:
         raise RuntimeError('Stale pattern was not rejected')
     if fault.startswith('preamble-'):
         _, stage, byte = fault.split('-')
@@ -345,6 +459,7 @@ def exercise(out):
         raise ValueError('Choose a fresh output directory')
     paths = [ROOT / name for name in ('tools/upstream34_layout/ib_preamble_probe.cpp',
              'tools/upstream34_layout/ib_preamble_packets.h', 'tools/upstream34_layout/ib_mismatch_summary.h',
+             'tools/upstream34_layout/ib_target_summary.h',
              'tools/upstream34_layout/ib_preamble.py', 'tools/test_upstream34_ib_preamble.py',
              'tests/test_build34_ib_preamble.cpp', 'tests/test_upstream34_ib_preamble_runner.py')]
     paths += sorted((ROOT / 'tests/fake_build34_ib_preamble').rglob('*.h'))
@@ -364,11 +479,12 @@ def exercise(out):
             raise RuntimeError('Mock binary linked a real device framework')
     results = []
     for variant in ('low', 'upper'):
-        for policy in POLICIES:
-            batch = subprocess.run([str(binary), '--batch', variant, policy, *CASES], capture_output=True,
+        for policy in ALL_POLICIES:
+            selected_cases = policy_cases(policy)
+            batch = subprocess.run([str(binary), '--batch', variant, policy, *selected_cases], capture_output=True,
                                    text=True, timeout=180, stdin=subprocess.DEVNULL)
-            for fault, result in zip(CASES, batch_results(batch, len(CASES))):
-                if fault in EXEC_EQUIVALENCE_CASES:
+            for fault, result in zip(selected_cases, batch_results(batch, len(selected_cases))):
+                if fault in EXEC_EQUIVALENCE_CASES + TARGET_MODELS:
                     separate = subprocess.run([str(binary), variant, fault, policy], capture_output=True,
                                               text=True, timeout=10, stdin=subprocess.DEVNULL)
                     if (separate.returncode, separate.stdout, separate.stderr) != (result.returncode, result.stdout, result.stderr):
@@ -378,7 +494,7 @@ def exercise(out):
                 except Exception as error:
                     raise RuntimeError(f'Preamble {variant}/{policy}/{fault}: {error}') from error
                 results.append({'variant': variant, 'policy': policy, 'case': fault, **checked})
-            print(json.dumps({'completed': variant + '/' + policy, 'cases': len(CASES), 'hardware_executed': False}), flush=True)
+            print(json.dumps({'completed': variant + '/' + policy, 'cases': len(selected_cases), 'hardware_executed': False}), flush=True)
     if any(p.read_bytes() != data for p,data in snapshots.items()):
         raise RuntimeError('Diagnostic source changed during CPU tests')
     mec_range.verify_current_inputs(mec_range.protected_base_inputs(), ROOT)
@@ -387,7 +503,7 @@ def exercise(out):
               'cases': results, 'sanitizers': 'ASan/UBSan', 'hardware_executed': False,
               'native_IOKit_linked': False, 'shader_executed': False,
               'case_isolation': 'reset fake fixture per case; synthetic clock regresses only for the explicit clock fault; no per-case fork or exec',
-              'separate_process_equivalence_cases': len(EXEC_EQUIVALENCE_CASES) * len(POLICIES) * 2,
+              'separate_process_equivalence_cases': len(EXEC_EQUIVALENCE_CASES) * len(ALL_POLICIES) * 2 + len(TARGET_MODELS) * len(TARGET_POLICIES) * 2,
               'limitation': 'Fake IOKit/CF, synthetic clock and injected bytes. No GPU ISA, cache/coherency or synchronization emulation; passing memsync is not a hardware result.'}
     (out / 'report.json').write_text(json.dumps(record, indent=2) + '\n')
     print(json.dumps({'result': 'passed', 'scenarios': len(results), 'hardware_executed': False}), flush=True)

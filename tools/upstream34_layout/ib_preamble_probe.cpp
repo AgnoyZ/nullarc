@@ -12,6 +12,7 @@
 #include "PhxNativeABI.h"
 #include "ib_preamble_packets.h"
 #include "ib_mismatch_summary.h"
+#include "ib_target_summary.h"
 
 static constexpr size_t bytes = 16384;
 static constexpr uint64_t vaMask = (1ull << 48) - 1;
@@ -92,8 +93,9 @@ struct Session {
 };
 
 enum class PreamblePolicy { Single, NopHead, NopTail, MemSync };
+enum class TargetPolicy { Off, Control, Switch };
 
-static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy, bool observeLate) {
+static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy, bool observeLate, TargetPolicy targetPolicy) {
     const uint64_t helloIn[] = {PHXN_ABI_VERSION, PHXN_HELLO_F_MINOR};
     uint64_t hello[4]{};
     if (!call(s.connection, PHXN_SEL_HELLO, helloIn, 2, nullptr, 0, hello, 4, nullptr, 0)) return 74;
@@ -161,6 +163,16 @@ static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy,
         memcpy(expected + ibOffset[slot], packets[slot], sizeof(packets[slot]));
     memcpy(expected + preambleOffset, preamble, sizeof(noOperation));
     memcpy(reinterpret_cast<void *>(s.cpu), expected, bytes);
+    // The unused slot remains the canonical pass-1-to-A packet in both modes.
+    // Only the future pass-1 rewrite of slot 0 changes its destination to B.
+    const bool targets = targetPolicy != TargetPolicy::Off;
+    const bool switchTarget = targetPolicy == TargetPolicy::Switch;
+    if (switchTarget) {
+        const uint32_t pattern[4] = {0x7800c0dfu, 0x13579be0u, 0x2469ace0u, 0xc001d00cu};
+        if (phxGfx11DispatchCommands(packets[1], 80, base, base + 0x2810, pattern) != PHX_SHADER_DISPATCH_DWORDS)
+            return reject("switched dispatch packet construction invalid");
+        packets[1][78] = packets[1][79] = 0xffff1000u;
+    }
     uint64_t previous = 0;
     for (unsigned pass = 0; pass < 2; ++pass) {
         const uint32_t pattern[4] = {0x7800c0deu ^ pass, 0x13579bdfu + pass, 0x2468ace0u ^ (pass << 16), 0xc001d00du - pass};
@@ -172,9 +184,15 @@ static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy,
         for (unsigned i = 0; i < 256; ++i) {
             const uint32_t poison = ~pattern[i & 3];
             memcpy(reinterpret_cast<void *>(s.cpu + 0x2010 + i * 4), &poison, 4);
+            if (targets) {
+                memcpy(expected + 0x2010 + i * 4, &poison, 4);
+                memcpy(expected + 0x2810 + i * 4, &poison, 4);
+                memcpy(reinterpret_cast<void *>(s.cpu + 0x2810 + i * 4), &poison, 4);
+            }
         }
         __sync_synchronize();
-        for (unsigned i = 0; i < 256; ++i) memcpy(expected + 0x2010 + i * 4, &pattern[i & 3], 4);
+        const size_t outputOffset = switchTarget && pass ? 0x2810 : 0x2010;
+        for (unsigned i = 0; i < 256; ++i) memcpy(expected + outputOffset + i * 4, &pattern[i & 3], 4);
         struct Request { phxn_cs_in header; phxn_cs_ib ib[2]; } request{};
         static_assert(sizeof(Request) == 96, "two native IB request");
         const bool single = policy == PreamblePolicy::Single;
@@ -219,7 +237,8 @@ static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy,
                 fprintf(stderr, "FAIL: native shader output/code/IB/guard mismatch at byte %zu "
                     "(pass=%u actual=0x%02x expected=0x%02x)\n", i, pass,
                     static_cast<unsigned>(observed), static_cast<unsigned>(expected[i]));
-                phx34ReportIbMismatch(actual, expected, pass, i, observed);
+                if (targets) phx34ReportIbTargets(actual, expected, pass, switchTarget, i);
+                else phx34ReportIbMismatch(actual, expected, pass, i, observed);
                 if (observeLate) {
                     // Observation only, after the original failure. Never retry
                     // GPU work, flush, repair bytes or convert a late match to PASS.
@@ -236,6 +255,8 @@ static int exercise(Session &s, bool execute, bool upper, PreamblePolicy policy,
                 return 75;
             }
         }
+        if (targets && !phx34ReportIbTargets(actual, expected, pass, switchTarget, bytes))
+            return reject("target summary changed after the arena scan");
         previous = sequence;
         usleep(250000);
     }
@@ -266,14 +287,16 @@ static int finish(Session &s, int result, bool execute) {
 }
 
 int main(int argc, char *argv[]) {
+    const bool targetControl = argc >= 2 && !strcmp(argv[1], "--run-target-control");
+    const bool targetSwitch = argc >= 2 && !strcmp(argv[1], "--run-target-switch");
     const bool memsync = argc >= 2 && !strcmp(argv[1], "--run-memsync");
     const bool observeLate = argc >= 2 && !strcmp(argv[1], "--run-single-observe-late");
-    const bool single = observeLate || (argc >= 2 && !strcmp(argv[1], "--run-single"));
+    const bool single = targetControl || targetSwitch || observeLate || (argc >= 2 && !strcmp(argv[1], "--run-single"));
     const bool tail = argc >= 2 && !strcmp(argv[1], "--run-nop-tail");
     const bool execute = memsync || single || tail || (argc >= 2 && !strcmp(argv[1], "--run-control"));
     const bool upper = argc == 3 && !strcmp(argv[2], "--upper");
     if ((argc != 2 && argc != 3) || (!execute && strcmp(argv[1], "--check")) || (argc == 3 && !upper)) {
-        fprintf(stderr, "usage: build34-ib-preamble-probe --check|--run-single|--run-single-observe-late|--run-control|--run-nop-tail|--run-memsync [--upper]\n"); return 64;
+        fprintf(stderr, "usage: build34-ib-preamble-probe --check|--run-single|--run-single-observe-late|--run-control|--run-nop-tail|--run-memsync|--run-target-control|--run-target-switch [--upper]\n"); return 64;
     }
     utsname host{};
     if (uname(&host) || strcmp(host.sysname, "Darwin") || strcmp(host.machine, "x86_64") || strncmp(host.release, "25.", 3)) {
@@ -289,10 +312,11 @@ int main(int argc, char *argv[]) {
     if (released != KERN_SUCCESS) return finish(s, 74, false);
     const PreamblePolicy policy = single ? PreamblePolicy::Single : tail ? PreamblePolicy::NopTail :
         memsync ? PreamblePolicy::MemSync : PreamblePolicy::NopHead;
-    result = finish(s, exercise(s, execute, upper, policy, observeLate), execute);
+    const TargetPolicy targetPolicy = targetSwitch ? TargetPolicy::Switch : targetControl ? TargetPolicy::Control : TargetPolicy::Off;
+    result = finish(s, exercise(s, execute, upper, policy, observeLate, targetPolicy), execute);
     if (!result) {
         if (execute) printf("DIAGNOSTIC-PASS: original34 preamble=%s; two guarded dispatches; no driver or display acceptance\n",
-            observeLate ? "single-observe-late" : single ? "single" : tail ? "nop-tail" : memsync ? "memsync" : "control");
+            targetSwitch ? "target-switch" : targetControl ? "target-control" : observeLate ? "single-observe-late" : single ? "single" : tail ? "nop-tail" : memsync ? "memsync" : "control");
         else puts("CHECK: target identity and ABI readiness only; no GPU work submitted");
     }
     return result;

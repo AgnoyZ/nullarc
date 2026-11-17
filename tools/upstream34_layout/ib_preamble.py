@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INPUTS = ('tools/upstream34_layout/ib_preamble_probe.cpp',
           'tools/upstream34_layout/ib_preamble_packets.h',
           'tools/upstream34_layout/ib_mismatch_summary.h',
+          'tools/upstream34_layout/ib_target_summary.h',
           'src/phxbringup/PhxNativeABI.h', 'src/amd/phx_topology.h',
           'LICENSE', 'LICENSES/MIT.txt', 'LICENSES/GPL-2.0-only.txt',
           'THIRD_PARTY_NOTICES.md')
@@ -40,6 +41,8 @@ def prepare(destination, compile_native=False):
               'recipe_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               'source_sha256': {name: hashlib.sha256(data).hexdigest() for name, data in blobs.items()},
               'policies': {'single': 'reused dispatch IB alone; identical staged arena',
+                           'target-control': 'single IB; both output regions poisoned; both passes target A',
+                           'target-switch': 'same dual-region fixture; only pass-1 command destination changes from A to B',
                            'single-observe-late': 'single IB; one 100ms CPU resample only after a mismatch; always fail/HOLD',
                            'control': 'prewritten NOP then reused dispatch IB',
                            'nop-tail': 'reused dispatch IB then prewritten NOP',

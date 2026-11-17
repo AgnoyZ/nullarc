@@ -24,7 +24,9 @@ class PreambleResultTests(unittest.TestCase):
         if not code:
             stdout.append(runner.CHECK if fault == 'check-ok' else runner.marker(policy))
         stderr = ''
-        summary = runner.expected_mismatch_summary(fault)
+        summary = None if policy in runner.TARGET_POLICIES else runner.expected_mismatch_summary(fault)
+        for row in runner.expected_target_summaries(fault,policy):
+            stderr += 'IB-TARGET-SUMMARY ' + json.dumps(row) + '\n'
         if summary is not None:
             stderr += 'IB-MISMATCH-SUMMARY ' + json.dumps(summary) + '\n'
             if policy == 'single-observe-late':
@@ -138,6 +140,45 @@ class PreambleResultTests(unittest.TestCase):
                 runner.batch_results(changed, 1)
         with self.assertRaises(RuntimeError):
             runner.batch_results(result, 2)
+
+    def test_target_rows_required_on_success_and_failure(self):
+        for policy in runner.TARGET_POLICIES:
+            for fault in ('ok','model-old-command','model-no-write','model-new-address-old-pattern'):
+                result = self.result(fault,policy)
+                runner.check_result(result,fault,policy)
+                for changed in (result.stderr.replace('IB-TARGET-SUMMARY ','REMOVED ',1),
+                                result.stderr.replace('"b_poison_words": ', '"b_poison_words": 999',1),
+                                result.stderr.replace('"classification_valid": true','"classification_valid": 1',1)):
+                    with self.assertRaises((RuntimeError,json.JSONDecodeError)):
+                        runner.check_result(subprocess.CompletedProcess([],result.returncode,result.stdout,changed),fault,policy)
+
+    def test_target_address_and_pattern_models_are_distinct(self):
+        policy = 'target-switch'
+        rows = {fault:runner.expected_target_summaries(fault,policy)[-1] for fault in runner.TARGET_MODELS}
+        self.assertEqual((rows['model-old-command']['a_previous_words'],rows['model-old-command']['b_poison_words']),(256,256))
+        self.assertEqual((rows['model-new-address-old-pattern']['a_poison_words'],rows['model-new-address-old-pattern']['b_previous_words']),(256,256))
+        self.assertEqual((rows['model-no-write']['a_poison_words'],rows['model-no-write']['b_poison_words']),(256,256))
+        self.assertEqual((rows['model-old-address-current-pattern']['a_current_words'],rows['model-old-address-current-pattern']['b_poison_words']),(256,256))
+        for fault in runner.TARGET_MODELS:
+            self.assertIn('hold',runner.expected(fault,policy)[1])
+            self.assertFalse(rows[fault]['validation_passed'])
+
+    def test_target_nonselected_region_corruption_is_failure(self):
+        for policy in runner.TARGET_POLICIES:
+            for fault in ('target-a-2-0','target-b-1-1023','target-b-2-1023','byte-2-10255','byte-2-11280'):
+                result = self.result(fault,policy)
+                runner.check_result(result,fault,policy)
+                self.assertEqual(result.returncode,75)
+                self.assertIn('hold',runner.expected(fault,policy)[1])
+
+    def test_target_policy_cannot_be_mislabelled_or_late_observed(self):
+        for policy in runner.TARGET_POLICIES:
+            result = self.result(policy=policy)
+            other = 'target-switch' if policy == 'target-control' else 'target-control'
+            with self.assertRaises(RuntimeError): runner.check_result(result,'ok',other)
+            result.stderr = result.stderr.replace('"pass": 0','"pass": 1',1)
+            with self.assertRaises(RuntimeError): runner.check_result(result,'ok',policy)
+            self.assertNotIn('late-observation',runner.expected('late-output-current',policy)[1])
 
 
 if __name__ == '__main__':

@@ -20,6 +20,7 @@ static int fake_uname(struct utsname *);
 #undef usleep
 static bool memsyncPolicy;
 static bool singlePolicy, tailPolicy, latePolicy;
+static bool targetPolicy, switchPolicy;
 static unsigned waitAttempt;
 
 static std::string fault;
@@ -137,9 +138,10 @@ static kern_return_t respond(const std::string &name, uint32_t *count, size_t *s
     }
     return 0;
 }
-static void independentPacket(uint8_t *destination, unsigned pass) {
+static size_t selectedOutput(unsigned pass) { return switchPolicy && pass ? 0x2810 : 0x2010; }
+static void independentPacket(uint8_t *destination, unsigned pass, size_t output = 0x2010) {
     const uint32_t pattern[] = {0x7800c0deu ^ pass, 0x13579bdfu + pass, 0x2468ace0u ^ (pass << 16), 0xc001d00du - pass};
-    const uint64_t code = virtualBase() & ((1ull << 48) - 1), target = code + 0x2010;
+    const uint64_t code = virtualBase() & ((1ull << 48) - 1), target = code + output;
     const uint32_t packet[] = {
         0xc0065800u, 0, 0xffffffffu, 0xff, 0, 0, 10, 0xc381,
         0xc0037602u, 0x204, 0, 0, 0, 0xc0017602u, 0x218, 0, 0xc0017602u, 0x222, 0,
@@ -160,13 +162,14 @@ static void checkStaged(unsigned pass) {
     const uint32_t pattern[] = {0x7800c0deu ^ pass, 0x13579bdfu + pass, 0x2468ace0u ^ (pass << 16), 0xc001d00du - pass};
     uint8_t image[16384]; memset(image, 0xa5, sizeof(image)); memset(image, 0, 8192);
     memcpy(image, phxGfx11ClearShader, sizeof(phxGfx11ClearShader));
-    independentPacket(image + 0x1000, pass);
+    independentPacket(image + 0x1000, pass, selectedOutput(pass));
     independentPacket(image + 0x1200, 1);
     const uint32_t nop[] = {0xc0061000, 0, 0, 0, 0, 0, 0, 0};
     const uint32_t sync[] = {0xc0065800, 0, 0xffffffff, 0xffffff, 0, 0, 10, 0xc3b1};
     memcpy(image + 0x1400, memsyncPolicy ? sync : nop, sizeof(nop));
     for (unsigned i = 0; i < 256; ++i) {
         const uint32_t value = ~pattern[i & 3]; memcpy(image + 0x2010 + i * 4, &value, 4);
+        if (targetPolicy) memcpy(image + 0x2810 + i * 4, &value, 4);
     }
     assert(!memcmp(image, backing, sizeof(image)));
 }
@@ -310,11 +313,12 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
         if (is(name + "-missing")) break;
         const unsigned pass = waited - 1;
         const uint32_t pattern[] = {0x7800c0deu ^ pass, 0x13579bdfu + pass, 0x2468ace0u ^ (pass << 16), 0xc001d00du - pass};
-        for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &pattern[i & 3], 4);
+        const size_t output = selectedOutput(pass);
+        for (unsigned i = 0; i < 256; ++i) memcpy(backing + output + i * 4, &pattern[i & 3], 4);
         // Explicitly injected stale-data models, not ISA/cache emulation.
         if (pass == 1 && (is("stale-output-2") || fault.compare(0, 5, "late-") == 0)) {
             const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
-            for (unsigned i = 0; i < 256; ++i) memcpy(backing + 0x2010 + i * 4, &previous[i & 3], 4);
+            for (unsigned i = 0; i < 256; ++i) memcpy(backing + output + i * 4, &previous[i & 3], 4);
         }
         if (pass == 1 && (is("poison-output-2") || is("mixed-output-2"))) {
             const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
@@ -322,7 +326,31 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
                 const uint32_t value = is("poison-output-2") ? ~pattern[i & 3] :
                     i < 64 ? previous[i & 3] : i < 128 ? ~pattern[i & 3] :
                     i < 192 ? pattern[i & 3] : pattern[i & 3] ^ 0x01010101u;
-                memcpy(backing + 0x2010 + i * 4, &value, 4);
+                memcpy(backing + output + i * 4, &value, 4);
+            }
+        }
+        if (pass == 1 && fault.compare(0, 6, "model-") == 0) {
+            assert(targetPolicy);
+            const uint32_t previous[] = {0x7800c0deu, 0x13579bdfu, 0x2468ace0u, 0xc001d00du};
+            for (unsigned i = 0; i < 256; ++i) {
+                const uint32_t poison = ~pattern[i & 3];
+                memcpy(backing + 0x2010 + i * 4, &poison, 4);
+                memcpy(backing + 0x2810 + i * 4, &poison, 4);
+                if (is("model-old-command")) memcpy(backing + 0x2010 + i * 4, &previous[i & 3], 4);
+                else if (is("model-new-address-old-pattern")) memcpy(backing + output + i * 4, &previous[i & 3], 4);
+                else if (is("model-old-address-current-pattern")) memcpy(backing + 0x2010 + i * 4, &pattern[i & 3], 4);
+                else if (is("model-both-current")) {
+                    memcpy(backing + 0x2010 + i * 4, &pattern[i & 3], 4);
+                    memcpy(backing + 0x2810 + i * 4, &pattern[i & 3], 4);
+                } else assert(is("model-no-write"));
+            }
+        }
+        for (const char *region : {"a", "b"}) {
+            const std::string start = std::string("target-") + region + "-" + std::to_string(waited) + "-";
+            if (fault.compare(0, start.size(), start) == 0) {
+                assert(targetPolicy);
+                const unsigned index = static_cast<unsigned>(std::stoul(fault.substr(start.size())));
+                assert(index < 1024); backing[(!strcmp(region, "a") ? 0x2010 : 0x2810) + index] ^= 1;
             }
         }
         if (fault.compare(0, 5, "slot-") == 0 && pass == 1) {
@@ -339,7 +367,7 @@ kern_return_t IOConnectCallMethod(io_connect_t connection, uint32_t selector, co
             if (fault.compare(0, start.size(), start) == 0) {
                 const unsigned index = static_cast<unsigned>(std::stoul(fault.substr(start.size())));
                 const unsigned offset = prefix == "code" ? index * 4 : prefix == "ib" ? 4096 + index * 4 :
-                    prefix == "output" ? 0x2010 + index * 4 : index;
+                    prefix == "output" ? static_cast<unsigned>(output) + index * 4 : index;
                 assert(offset < sizeof(backing)); backing[offset] ^= 1;
             }
         }
@@ -396,18 +424,21 @@ static int runCase(int argc, const char *argv[]) {
     // Only fake process/device storage is reset. No production cleanup runs on
     // a held case. Only the explicit backward-clock fault regresses time.
     memsyncPolicy = singlePolicy = tailPolicy = latePolicy = false;
+    targetPolicy = switchPolicy = false;
     upper = failed = opened = mapped = gpuMapped = false;
     waitAttempt = nextService = propertyLive = allocated = created = submitted = waited = 0;
     mappedAddress = 0; property = {}; events.clear(); fault.clear();
     memset(backing, 0, sizeof(backing));
     assert(argc == 4); memsyncPolicy = !strcmp(argv[3], "memsync");
     latePolicy = !strcmp(argv[3], "single-observe-late");
-    singlePolicy = latePolicy || !strcmp(argv[3], "single"); tailPolicy = !strcmp(argv[3], "nop-tail");
+    switchPolicy = !strcmp(argv[3], "target-switch");
+    targetPolicy = switchPolicy || !strcmp(argv[3], "target-control");
+    singlePolicy = targetPolicy || latePolicy || !strcmp(argv[3], "single"); tailPolicy = !strcmp(argv[3], "nop-tail");
     assert(memsyncPolicy || singlePolicy || tailPolicy || !strcmp(argv[3], "control"));
     upper = !strcmp(argv[1], "upper"); assert(upper || !strcmp(argv[1], "low")); fault = argv[2];
     packetInputs();
     const char *args[] = {"native-shader-probe", "--run", "--upper", "extra"}; int count = upper ? 3 : 2;
-    args[1] = latePolicy ? "--run-single-observe-late" : singlePolicy ? "--run-single" : tailPolicy ? "--run-nop-tail" : memsyncPolicy ? "--run-memsync" : "--run-control";
+    args[1] = switchPolicy ? "--run-target-switch" : targetPolicy ? "--run-target-control" : latePolicy ? "--run-single-observe-late" : singlePolicy ? "--run-single" : tailPolicy ? "--run-nop-tail" : memsyncPolicy ? "--run-memsync" : "--run-control";
     if (is("legacy-fresh")) args[1] = "--run-fresh";
     if (is("legacy-reuse")) args[1] = "--run-reuse";
     if (is("legacy-publish")) args[1] = "--run-ib-publish";

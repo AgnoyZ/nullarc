@@ -110,6 +110,14 @@ words after a measured 101.637 ms. Observation collection, independent
 recovery and retirement completed, while the original GPU mismatch remained
 a failure. No wait-based repair, native single-IB fix or root cause is claimed.
 
+The subsequent [output-target comparison](BUILD34-IB-TARGET-SWITCH.md) adds
+two explicitly selected single-IB modes with identical dual-region poisoning.
+Only the second rewritten command's destination changes from A to B. Full
+arena checks and separate region counts require a fresh same-binary failing
+control, independently recovered and retired before a separate treatment.
+Offline preparation is not GPU evidence or permission to replay a consumed
+scope. The unchanged original34 single-IB fault and existing HOLDs remain.
+
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream
 PR16, PR19 with a tested zero-progress-write correction, PR15 and PR22. Each
