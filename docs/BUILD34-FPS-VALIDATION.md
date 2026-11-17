@@ -128,3 +128,53 @@ recovery/plugin/GUI stages removed, GPU-off and EFI unmounted. No next GPU
 scope was armed at final read-back. Further diagnosis must inspect the device
 creation path rather than treating another delay as a repair. All three
 failed FPS attempts remain unaccepted.
+
+## Device-initialization observation: no invocation observed
+
+A fourth single-use packet, based on
+`39c7330b0e1e8ca2bb322b84397c9c3068b2b66a`, retained the same production
+kernel, plugin, frame workload and FPS parser. Its only new runtime diagnostic
+was a process-local observer around the application's single
+`MTLCreateSystemDefaultDevice()` call. It checked the actual method ABIs and
+temporarily wrapped `NVMTLDevice` and its direct superclass
+`MTLIOAccelDevice` at `initWithAcceleratorPort:`. The wrappers forwarded to
+the original methods with unchanged return values and ownership; both
+original implementations had to be restored before any frame work.
+
+Preparation passed 100 CPU/controller/parser methods, eight statistics cases,
+ten native observer cases under each of the root and actual GUI-user routes,
+and both wait-observer self-checks. The native cases included nil returns,
+ABI/class rejection, exclusive installation, restoration and balanced object
+lifetimes. Both original and candidate plugins also passed the GUI-user
+loader-only ABI/install/restore check, with no device initialization or GPU
+calls during those CPU checks.
+
+On the trial boot, initialization, both full-arena native checks and both PR28
+admission probes passed again. Before the FPS application, readiness observed
+**28 additional successful present transactions in 16.248535576 seconds**,
+the same WindowServer, unchanged panel timing and mapped plugin/RADV images.
+The application reached the observer-installed and observer-restored stages,
+but returned **exit 22 after 0.592238663 seconds** with the default Metal
+device still nil. Independent parsing found **zero invocations of either
+observed initializer**, zero nil returns from those uninvoked methods and
+successful restoration of both original implementations. Target-device
+verification, window setup and the frame worker were not reached. There were
+zero frame records and no FPS result.
+
+This narrows the evidence: the observed call did not invoke those two
+initializer implementations during the observation interval. It does not
+establish why Metal returned nil, prove a specific discovery/cache/admission
+failure, or establish how many other GPU/device calls occurred internally.
+It provides no basis to bypass device admission or attribute the refusal to
+the plugin's later initialization checks. Further diagnosis should examine
+device discovery and selection before changing those checks.
+
+Independent review reparsed the observer events/summary, exact startup
+stages and exit, readiness and its intent binding, native output and both
+PR28 outputs. Recovery and exact retirement passed: original kernel and
+complete plugin restored; all 46 protected files and 347 original EFI files
+matched; protected state unchanged; no new matching diagnostic or remaining
+test process/job. The exact nine-file recovery tree, plugin stage and GUI
+stage/cache were removed. Final read-back confirmed GPU-off, firmware
+framebuffer only, EFI unmounted and no next GPU scope armed. No retry was
+made. All four failed FPS attempts remain in the evidence and unaccepted.
