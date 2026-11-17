@@ -1,0 +1,408 @@
+{
+  "date": "2026-11-17",
+  "baseline": "original PhxBringup build34",
+  "approved_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "library_sha256": "3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219",
+  "full_Vulkan_CPU": {
+    "result": "passed",
+    "CPU_cases": {
+      "ok": {
+        "passed": true,
+        "CPU_hold": false,
+        "fake_native_submissions": 2,
+        "whole_arena_passes": 2
+      },
+      "missing-pci": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 0,
+        "whole_arena_passes": 0
+      },
+      "build41": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 0,
+        "whole_arena_passes": 0
+      },
+      "build42": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 0,
+        "whole_arena_passes": 0
+      },
+      "minor": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 0,
+        "whole_arena_passes": 0
+      },
+      "hung": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 0,
+        "whole_arena_passes": 0
+      },
+      "bo-error": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 0,
+        "whole_arena_passes": 0
+      },
+      "bo-size": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 0,
+        "whole_arena_passes": 0
+      },
+      "submit-first": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 1,
+        "whole_arena_passes": 0
+      },
+      "submit-second": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 2,
+        "whole_arena_passes": 1
+      },
+      "zero-sequence": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 1,
+        "whole_arena_passes": 0
+      },
+      "wait-error": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 1,
+        "whole_arena_passes": 0
+      },
+      "bad-retirement": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 1,
+        "whole_arena_passes": 0
+      },
+      "stale": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 2,
+        "whole_arena_passes": 1
+      },
+      "guard-byte": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_native_submissions": 2,
+        "whole_arena_passes": 1
+      }
+    },
+    "real_full_Vulkan_probe": true,
+    "ASan_UBSan_on_probe_guard_and_platform": true,
+    "reused_IB_bytes": {
+      "first": 256,
+      "second": 256
+    },
+    "release_RADV_sanitizer_instrumented": false,
+    "platform_faked": true,
+    "output_oracle_not_GPU_ISA_or_coherency_simulation": true,
+    "GPU_executed": false,
+    "installed": false,
+    "harness_sha256": "888e7015e2faba7f421e20f1769f401e5fc0c78cc87c0c7eaf093dbad1a961d0"
+  },
+  "guard_CPU": {
+    "result": "passed",
+    "CPU_cases": {
+      "ok": {
+        "passed": true,
+        "CPU_hold": false,
+        "fake_submits_at_boundary": 2
+      },
+      "high-canonical": {
+        "passed": true,
+        "CPU_hold": false,
+        "fake_submits_at_boundary": 2
+      },
+      "proxy": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "second-open": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "matching-retry": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "alternate-enumeration": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "third-Hello": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "tail-bytes": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "tail-padding": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "tail-remap": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "tail-writeable": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "noncanonical": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "overlap": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "graphics": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "wrong-tail": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "missing-IB-map": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "too-many-IBs": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "scanout": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "missing-submit-output": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 0
+      },
+      "close-inflight": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 1
+      },
+      "CPU-unmap-inflight": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 1
+      },
+      "GPU-unmap-inflight": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 1
+      },
+      "free-inflight": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 1
+      },
+      "unchanged-IB": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 2
+      },
+      "third-submit": {
+        "passed": true,
+        "CPU_hold": true,
+        "fake_submits_at_boundary": 2
+      }
+    },
+    "ASan_UBSan": true,
+    "native_platform_compiled": false,
+    "GPU_executed": false,
+    "binary_sha256": "c7a2bc092c85fd861884e32759c0f1d38fc5f3fd920e02241cccae144160c9e7",
+    "native_ABI_header_sha256": "0d990a6ed3484e39a14e47e1f64ed067b1fc78a70ee3f495efb046777ff4d941",
+    "inputs_sha256": {
+      "tools/upstream34_layout/radv_ib_tail_runtime_guard.cpp": "f515734049c9153d2fd38b805e9a996900010c271ebcf59a13226f9214e0618f",
+      "tools/upstream34_layout/radv_ib_tail_runtime_guard.h": "afc40d34bdf4718b22a7bbdd67c868befa8d5ae527bb2e77d07dcd4b044af689",
+      "tests/build34_radv_runtime_platform.cpp": "b962ad11ada7132d39a9acb1681f44f7c1cea24ff41f21aef9c6d8fdc034e2f4",
+      "tests/test_build34_radv_runtime_guard.cpp": "0f70528db3f3f0103739caad1f0331877d37295fb384807fd4c90eec297cac0a",
+      "tools/test_build34_radv_runtime_guard.py": "db73cda7b69ff3d54379ec51a508db8ad7c7f9468efbef902ae3c2b5fefefe96"
+    }
+  },
+  "native_preparation": {
+    "compiled": true,
+    "CPU_platform": false,
+    "guard_selftest_passed": true,
+    "guard_selftest_real_GPU_client_opened": false,
+    "native_GPU_probe_executed": false,
+    "hardware_scope_armed": false,
+    "installed": false,
+    "GPU_executed": false,
+    "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+    "library_sha256": "3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219",
+    "glslang_sha256": "21e5f820f04ba1791ca8b8e0f5181b3af87ceaed0273319d564975a3888d08dc",
+    "binaries_sha256": {
+      "libbuild34_runtime_guard.dylib": "7d4ef842cd884fd02cc3e4be798b501d495ea51a2d76e570cedfabfa95291b81",
+      "build34-radv-runtime-probe": "0646023b2a964d946ddf8d967f0148ae5284a48f4fc33ba68bc844dd1b9b2fa8",
+      "libvulkan_radeon.dylib": "3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219"
+    },
+    "sources_sha256": {
+      "tools/upstream34_layout/radv_ib_tail_runtime_guard.h": "afc40d34bdf4718b22a7bbdd67c868befa8d5ae527bb2e77d07dcd4b044af689",
+      "tools/upstream34_layout/radv_ib_tail_runtime_guard.cpp": "f515734049c9153d2fd38b805e9a996900010c271ebcf59a13226f9214e0618f",
+      "tools/upstream34_layout/radv_ib_tail_runtime_probe.c": "9d272503801a1db5367b3eaa15b4ab13dfc7c365b480a8c64c035492883113be",
+      "tools/upstream34_layout/radv_ib_tail_runtime_probe.comp": "e40d02b7ebe5714103545d17e2db90731b3eb6d3bd4835fb41768a221578a5ba",
+      "tools/upstream34_layout/radv_ib_tail_runtime_probe.py": "b9bd208fd636fca4c6d608189e26fe49c82474886699164c9a357d092beb0090"
+    },
+    "reviewed_header_sha256": {
+      "include/darwin/navi48_native_abi.h": "0d990a6ed3484e39a14e47e1f64ed067b1fc78a70ee3f495efb046777ff4d941",
+      "include/vulkan/vulkan.h": "096f50152d0b298d8df84a561a37d8190c8a60af34dff0e2cc8328b24491a640",
+      "include/vulkan/vk_platform.h": "a2cd9085c66776845d2524c3b0e73ccf4827ba046aa6f676c4b8ddbed47d6552",
+      "include/vulkan/vulkan_core.h": "2f64fd6c7c3f342b0e44f039f1c359b7f0e6cfcb71a7dca1cc5156282faa3b51",
+      "include/vk_video/vulkan_video_codec_h264std.h": "fded484cef9f90fbbd089e0647268f36e5f4292179fbc5428a2c9e8d7709bbe9",
+      "include/vk_video/vulkan_video_codecs_common.h": "d2e7caa396c521d03d491a269572b1d31b925b5127d22fda14199951ebae89f8",
+      "include/vk_video/vulkan_video_codec_h264std_encode.h": "227e092b53c4e7ca1a948ed021704511c1ed16040cd6188ff6703e5ae66db64d",
+      "include/vk_video/vulkan_video_codec_h265std.h": "0b81f8986ada015ef2e127449eff9d9634899bb59a0a9277a4054e9ec4416c12",
+      "include/vk_video/vulkan_video_codec_h265std_encode.h": "abb3e72af22e4e0a3dbe5dff7be1b275949388809fb3987830341e8f495ea1c7",
+      "include/vk_video/vulkan_video_codec_h264std_decode.h": "37b970c3d80536ad1ac074cfe19b58ee03c3075378e02179e1dc5e4351266821",
+      "include/vk_video/vulkan_video_codec_h265std_decode.h": "879a0dd370a1b1ad184638906c52bdfe7d80d639fbc5a5baa8b02d7c5b60b147",
+      "include/vk_video/vulkan_video_codec_av1std.h": "c75c1d324b97d247aef0008024bc7f3adb98c741ab7f66c882ec38fdacc7ee33",
+      "include/vk_video/vulkan_video_codec_av1std_decode.h": "7e3a1ce177c12546d410f3179ce1b81f2da7a8eba4f525b29cd563ab4099c0e5",
+      "include/vk_video/vulkan_video_codec_av1std_encode.h": "8d166b4543260a38347860443b1a59c7a5e86cdb0d0facaf4c704f667de030e3",
+      "include/vk_video/vulkan_video_codec_vp9std.h": "0a47125865376a3fe7014b69ff6db9d04e30ebf8c4d15664f1d894649ad5c09d",
+      "include/vk_video/vulkan_video_codec_vp9std_decode.h": "1ceb1a8d0e3370e508cf688a6e57dc314cd82186b60f3cef420ea4b1b483865d"
+    },
+    "protected_source_sha256": {
+      "LICENSE": "02d7fa970640345480430e246356c99c23436800ef541d57e7217b1337793bf0",
+      "LICENSES/Apache-2.0.txt": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+      "LICENSES/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3",
+      "LICENSES/GPL-3.0.txt": "bc2d6664f6276fa0a72d57633b3ae68dc7dcb677b71018bf08c8e93e509f1357",
+      "LICENSES/LGPL-3.0-or-later.txt": "f56039b5ee783a50114de388f95ffe7173001d63c32ed4c00649045eec0cf506",
+      "LICENSES/LICENSE.amdgpu.txt": "572872598565dc3513470de971a32bf9db301f47afeef3636345eadae33b2eee",
+      "LICENSES/MIT.txt": "381b0b3a8bb7e1aa28502928f75e820339c5878e2bd95d18c25391647bc3c1fd",
+      "LICENSES/PolyForm-Noncommercial-1.0.0.txt": "1b5c7a92697863d38fd2779af76732acfb8f521b758781eab057ad966701b0b7",
+      "THIRD_PARTY_NOTICES.md": "8a89a2766c5b8076afbbfa631c42953230e096477e04399324b075370b9431d4",
+      "src/phxbringup/Info.plist": "05d17cf6d755730497021298d4f57153066d4d64228fdcf28e358b61a82375a5",
+      "src/phxbringup/PhxBringup.cpp": "beffab5dc13e4018ff2ab9f90c82d85c0982ce7e3563e3175999399c7bc083e5",
+      "src/phxbringup/PhxNativeABI.h": "cb37e93dcab4faf8c9e672ad04793f2e363ae1e815c9913251cebcff5cd42c90",
+      "src/phxbringup/build.sh": "70773880841f08640a178d127b162e52dbd59a448c07716ee4716143ab278ba9",
+      "src/phxbringup/kmod_info.c": "b2aba9a49ad7cfccdacb168bb0b08a4f5b4ee1cb45d23ca0dc8d11d8ec4748f0",
+      "tools/phxctl/PhxUpstream34Layout.h": "2f7e3124a99e97469debc9ee5d9bb760092c769ef530f99814257bc314f54de1",
+      "tools/phxctl/alc_le_paths.py": "d4c46fa5fcbecf2fdd88ada0b768186fae540b913397e083e00a9223235a1234",
+      "tools/phxctl/bringup3.sh": "00843d4b3c38c8395d013f11281e3f1178d1afc269ac775dbfdf994e3d86da5c",
+      "tools/phxctl/bringup5.sh": "a0906cceab45f747a1b89d5c75972463e52071b05ae1e6a6c71fac1d207b771d",
+      "tools/phxctl/cetest.sh": "ad1575e70c9a00d6733ee930a57ec242543e028d38215b0b8722b2974abfa5c3",
+      "tools/phxctl/csb_gfx11.h": "f7400527d24ec6a60200ab670a2a78ac0f123d11dda4cc6b745a48e7b1e0d805",
+      "tools/phxctl/deploy_kext.sh": "b5c5b35f86fef0305e42bd6bf781a5bfb9dca735f9467454b79549f53ef46e83",
+      "tools/phxctl/fresh.sh": "4aa3f6c9e0c63bb3ef1c585e2998d22346d3c49ddd9a001741c4d0e7bf80c6c0",
+      "tools/phxctl/full.sh": "36f5c8a01773a3687e6b633c5b0b5e1b3b2031329c5a2065b669b27c45cf0a71",
+      "tools/phxctl/gfx_test.sh": "68b9f9888ff07f2e0b5a273b082e1809b0b34f30eaa2f496f4430fc3db7ede54",
+      "tools/phxctl/hdadump.c": "b80c5174fe03279abad107fcb04d1975d3e0db6cbed9ae9f8c5376c408a29460",
+      "tools/phxctl/inst_accel.sh": "8b7c2b47a9c1f66547b08319a2a64f5c1e3e55eb0743f882bad1bea9ae878ad9",
+      "tools/phxctl/inst_m2.sh": "192949743e2bad7af210a6f0dd43543f8354614b08d2ef3db5ec170ef8bafa71",
+      "tools/phxctl/inst_plugin.sh": "19b9478231f2cba35dd67dcbe63f71f7f2178f6ce9c508e0f49b39462418e787",
+      "tools/phxctl/kinst.sh": "714240464928ff6d37cc516dd4c3ef89012b6bd79fe26bdd02bc5f20c2dab81e",
+      "tools/phxctl/local.phxboot.plist": "80f67b4e715100a879861911c7ff67c4a8e1fabaa496ec854619e695c6a60123",
+      "tools/phxctl/m2arm.sh": "170cac6eeef0b2fead6c0ee47fdaac9718f302b108eddf04313332666d304617",
+      "tools/phxctl/m2check.sh": "567bbc50a894292fa661c1a0ca973d258a28dd15a535e7de3047ba33663631c7",
+      "tools/phxctl/m2seq.sh": "4280294d297d3b4049a0b4bcc6abcd5a7656487de151c648f00aacf1e9ef6836",
+      "tools/phxctl/m2ws.sh": "94e919bda65df0e65a3fa8633eb2174dbe4d6dd4aa983499da295e89871a625a",
+      "tools/phxctl/mes_v11_api_def.h": "7b1b1e895e0faba305f1832bb815c617b51cbbdc6701dea4aa2084b52806b71a",
+      "tools/phxctl/mesboot.c": "7a1e4de45589a40b3259bd33a790d9d537498e139fa56719145438801320a21f",
+      "tools/phxctl/phxaux.c": "c321a3bc10c0a3d9bf9394b8d0cad56aea83559587286aa8323a284fd1838d42",
+      "tools/phxctl/phxbl.c": "3943661f3fafa888921d2d484d646093112d23ffc0fc1228d1f0f3d5da53305e",
+      "tools/phxctl/phxboot.sh": "6a4f7457c4d11d5c230b6620e78ad68b1eb999855b91c4e29b5e81b347ab5201",
+      "tools/phxctl/phxctl.c": "c0a60d07b60b95f3da273bdbedf648980d30f05d337205a6e1bc7dd44a05f279",
+      "tools/phxctl/phxprofile.c": "06d5bf42b5a2e65d62b0c243d657c03ebbad51f871b565a5a66c2e3b240f04a8",
+      "tools/phxctl/phxup.sh": "accd1816d56dc107e4d12a5eb8544f9a540066622bc8a6f4a35892a81a2a5840",
+      "tools/phxctl/plugdeploy.sh": "67402b25f0f5aa4314d242a212f332236a0b4108a661334038ce0654f6ef3a91",
+      "tools/phxctl/rb0.sh": "ecd660822c0d50752104855d8859e26f8a4e87844179785eded25e799c8855d2",
+      "tools/phxctl/relocate_gpubundle.sh": "6e83b282a4522273a16a7f976eb878c50e49a011a9038f3ae91bc39c275f45c7",
+      "tools/phxctl/t48.sh": "7af63224b7beb617d61acaf96fd30347a419724a2533e97eb13db9001057b11b",
+      "tools/phxctl/usbcap.sh": "e388fddc31c6db0ce87e9847901bc0b74a2edf1fccae37ed65fbb5ee516609a7"
+    }
+  },
+  "CPU_preparation_binaries_sha256": {
+    "libbuild34_runtime_guard.dylib": "44892d4da89165ce3387842ef2f0ca1da27686e1cd34f5598afdba7859712323",
+    "build34-radv-runtime-probe": "34ec7fc8632cbf23a9cb1fcd683b2e8d66bc1553ed0526f3327e367333766e5f",
+    "libvulkan_radeon.dylib": "3ee77d9b0dd71c9209ab1f60e6441a64ed66d680a6a239104dd1fd459be30219"
+  },
+  "CPU_same_address_IB_observation": {
+    "first_bytes": 256,
+    "second_bytes": 256,
+    "bytes_changed_in_common_extent": true,
+    "positive_retirement_rows": [
+      {
+        "arena_pass": 0,
+        "whole_bytes": 16384,
+        "offset_0x2010": "0x7800c0de",
+        "fence_complete": true,
+        "last_sequence": 1,
+        "retired_sequence": 1
+      },
+      {
+        "arena_pass": 1,
+        "whole_bytes": 16384,
+        "offset_0x2010": "0x7800c0df",
+        "fence_complete": true,
+        "last_sequence": 2,
+        "retired_sequence": 2
+      }
+    ]
+  },
+  "source_checks": {
+    "CPU_native_common_sources_identical": true,
+    "passed_guard_sources_current": true,
+    "native_contains_CPU_platform_symbols": false,
+    "protected_files_current": true
+  },
+  "stopped_preparations": {
+    "overly_narrow_Hello_and_low_VA_assumptions_corrected_to_actual_original34": true,
+    "dynamic_constant_indexing_did_not_change_IB_and_was_rejected": true,
+    "earlier_preparations_superseded": true,
+    "failures_counted_as_passes": false
+  },
+  "acceptance": {
+    "full_Vulkan_CPU_cases_passed": 15,
+    "guard_CPU_cases_passed": 25,
+    "positive_native_retirement_checked_before_arena": true,
+    "CPU_output_oracle_is_GPU_execution_or_coherency_evidence": false,
+    "signed_native_no_client_selftest_passed": true,
+    "GPU_executed": false,
+    "hardware_scope_armed": false,
+    "installed": false,
+    "binary_uploaded": false,
+    "original34_kernel_helper_ABI_unchanged": true,
+    "A1_A2_corrected_A3_preserved": true,
+    "legacy_profile_sync_clone_orphan_fixed": false,
+    "default_tail_enabled": false,
+    "default_wait_promoted": false,
+    "desktop_enabled": false,
+    "FPS_claim": false,
+    "withdrawn_builds_prepared": false
+  }
+}

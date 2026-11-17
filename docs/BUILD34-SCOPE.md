@@ -72,6 +72,11 @@ single-client trial boundary and leaving the three hardware-tested transport
 files unchanged. Its actual-function CPU tests do not constitute full Vulkan
 or GPU acceptance. The baseline's orphaned profile sync clone is recorded and
 unchanged; default/desktop/wait HOLDs remain.
+The subsequent [complete-runtime probe preparation](BUILD34-RADV-RUNTIME-PROBE.md)
+adds a separate IOKit guard and two-pass Vulkan program. Its 15 complete-program
+and 25 guard CPU cases use fake platform ops; the signed native program has only
+run a no-client guard self-test. This is not a new GPU trial, installation,
+desktop promotion or authorization to replay a consumed scope.
 
 The owner's subsequent request to test and integrate several PRs authorizes
 the narrow [plugin source batch](BUILD34-PLUGIN-PR-INTEGRATION.md): upstream

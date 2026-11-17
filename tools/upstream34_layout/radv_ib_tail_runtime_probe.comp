@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: MIT
+#version 450
+layout(local_size_x = 64) in;
+layout(set = 0, binding = 0, std430) buffer Output { uint words[]; } output_data;
+layout(push_constant) uniform Pattern { uvec4 value; } pattern;
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    uint lane = index & 3u;
+    uvec4 value = pattern.value;
+    output_data.words[2052 + index] = lane == 0u ? value.x : lane == 1u ? value.y : lane == 2u ? value.z : value.w;
+}

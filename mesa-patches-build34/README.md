@@ -134,3 +134,35 @@ Successful compilation does not install the library, select it for an
 application, enable the opt-in policy or authorize a GPU scope. The existing
 bounded probe comparison is separate from any future full-runtime hardware
 acceptance. No binary artifact is uploaded by these commands.
+
+## Complete-runtime probe preparation
+
+Prepare the separate native probe/guard from the verified four-file runtime:
+
+```sh
+nice -n 15 taskpolicy -b python3 -B -I \
+  tools/upstream34_layout/radv_ib_tail_runtime_probe.py \
+  --runtime build/radv-tail-runtime-private \
+  --out build/radv-tail-complete-probe-private \
+  --glslang /path/to/pinned/glslangValidator
+```
+
+This compiles/signs the probe and dependent guard, freezes the private runtime,
+and executes only the no-client interposition/forwarding self-test. It never
+invokes GPU mode. CPU-only fault tests require separate fresh outputs:
+
+```sh
+nice -n 15 taskpolicy -b python3 -B -I tools/test_build34_radv_runtime_probe.py \
+  --runtime build/radv-tail-runtime-private \
+  --out build/radv-tail-complete-probe-cpu-private \
+  --glslang /path/to/pinned/glslangValidator
+nice -n 15 taskpolicy -b python3 -B -I tools/test_build34_radv_runtime_guard.py \
+  --cpu-probe build/radv-tail-complete-probe-cpu-private/compiled \
+  --runtime build/radv-tail-runtime-private \
+  --out build/radv-tail-complete-guard-cpu-private
+```
+
+The [scope and evidence limits](../docs/BUILD34-RADV-RUNTIME-PROBE.md) remain
+mandatory. CPU binaries are explicitly identified and cannot admit a hardware
+scope. Real execution needs a fresh independent recovery/deadline packet; no
+launcher, installation or automatic GPU retry is part of these commands.
