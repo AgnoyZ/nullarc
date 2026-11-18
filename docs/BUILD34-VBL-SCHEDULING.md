@@ -2,9 +2,13 @@
 
 Status on 2026-11-18: **the third, corrected-cache candidate boot passed exact
 loaded-image admission, bounded accelerated startup and independent readback.
-The finite GUI comparison recorded no intervals over 33.34 ms or sampled VBL
-plateaus over 80 ms; the preceding accepted-image control had 23 GUI intervals
-over 100 ms. The candidate remains active.**
+The initial finite GUI comparison improved, but a fresh same-boot check after
+about 15 minutes reproduced 15 GUI intervals over 100 ms while VBL plateaus
+over 80 ms remained zero. Residual GUI stutter is unresolved. The candidate
+remains active.**
+An independent CPU-only timer program subsequently reproduced delayed Mach
+timer messages under normal application scheduling while its direct-wait
+worker remained responsive; see the timer-delivery investigation below.
 CPU, native, complete-cache and independent installed-state checks passed. The initial
 direct-thread-call candidate failed target linking; a private-provider attempt
 was also rejected. The selected implementation uses public IOKit timer APIs.
@@ -31,9 +35,10 @@ the unlocked console session. Its small, nonactivating panel ignored mouse
 events, requested a simple CPU-drawn update at 60 Hz, independently checked its
 own window was onscreen, and closed automatically after a nominal 15-second
 run-loop interval. A separate supervisor enforced a finite process deadline.
-This exercised ordinary composition; it did not create a Metal device or submit
-an explicit native/Metal test workload. Core Animation and WindowServer could
-still use the existing accelerated compositor.
+This exercised ordinary composition; the application source did not explicitly
+create a Metal device or submit a native/Metal test workload. AppKit/Core
+Animation can still discover Metal devices internally, and WindowServer uses
+the existing accelerated compositor.
 
 The useful final run also sampled an independent, user-initiated worker that
 waited approximately 10 ms using `mach_wait_until`, then read the synthetic VBL
@@ -611,3 +616,152 @@ sleep/wake and a separate fresh explicit GPU-workload comparison remain
 unaccepted. See the sanitized
 [post-boot result](validation/build34-vbl-corrected-cache-boot-20261118.json).
 Earlier installation and failed-trial records remain unchanged.
+
+## Delayed same-boot GUI stutter remains
+
+To check the owner's original initially-smooth-then-sluggish symptom, a new
+finite observation scope ran in the same candidate boot after 880.444 seconds
+of uptime at validation entry. It reused the exact immutable diagnostic
+executable and Launch Services method, with new output paths and no replay of
+startup, observer, historical GPU or earlier GUI jobs. Before the observation,
+exact candidate identity, installed-state checks, original EFI/recovery and
+the successful current-boot receipts passed again. No driver, configuration,
+power state or resident-monitor setting was changed.
+
+| Delayed candidate observation | Result |
+| --- | ---: |
+| Elapsed time | 16.336 s |
+| GUI timer intervals | 708 |
+| GUI median / p95 | 16.673 / 18.199 ms |
+| GUI p99 / maximum | 304.781 / 309.691 ms |
+| GUI intervals over 33.34 / 100 ms | 23 / 15 |
+| Independent worker maximum | 15.050 ms |
+| Independent worker intervals over 33.34 ms | 0 |
+| Sampled VBL plateaus over 80 ms | 0 |
+| Onscreen checks passed | 11 of 11 |
+| Copy failure / skip / GPU timeout / hang-kill increases | 0 / 0 / 0 / 0 |
+
+WindowServer remained the same, the diagnostic had normal GUI scheduling,
+and no new matching report appeared. The private observation receipt's
+`status=passed` means collection and its integrity/counter checks completed;
+it does **not** mean the latency result passed. This later result prevents
+promoting the initial smooth run to a general stutter repair.
+
+The synthetic VBL counter continued progressing during this observation while
+the GUI main loop paused. The scheduling candidate therefore has not removed
+all of the owner's symptom, and the residual delays cannot be attributed to
+the previous sampled VBL plateaus. A subsequent passive memory readback showed
+76% available by `memory_pressure -Q`, no compressed pages and no pageouts or
+swap traffic; that readback is not a continuous memory-pressure trace or proof
+of another cause. A first new short stack-sampling scope timed out before
+producing a usable call graph. Its evidence is retained and is not a driver
+failure or a successful stack diagnosis. Further diagnosis must keep fresh
+finite scopes, separate sampling overhead from performance comparisons and
+preserve the current acceleration, daily PR28 wait and monitor-off policy.
+
+A second fresh sampling attempt returned zero only after the diagnostic had
+exited and produced an empty call graph; that is also rejected as usable stack
+evidence. A third fresh attempt explicitly required a nonempty graph and
+obtained one, but its GUI run contained no intervals over 100 ms. It sampled a
+responsive period, so its ordinary run-loop and initialization stacks do not
+identify the residual stall. Neither an empty report nor an instrumented
+smooth run clears the reproduced delayed-stutter result.
+The usable graph also showed AppKit's window/context initialization reaching
+`MTLCopyAllDevices` and `NVMTLDevice` initialization. The source's CPU-drawn
+view and lack of explicit Metal test commands therefore do not establish an
+absence of framework-internal Metal discovery or work. No PR28 wait call was
+identified as the residual cause by this nonstalling sample.
+
+A fresh trigger-based diagnostic then retained the same drawing/worker logic
+but extended its nominal lifetime to 45 seconds. A worker emitted a one-time
+signal when the main timer was more than 80 ms late, triggering two-second
+application and WindowServer samples. An initial attempt was refused before
+GUI launch because the newly created shared directory was not traversable by
+the console user. It is preserved; a new scope with verified console access,
+signature and identical diagnostic code ran successfully.
+
+The trigger fired at 8.828 seconds with an observed 89.717 ms main-loop gap.
+The run lasted 47.705 seconds and recorded 60 GUI intervals over 100 ms, a
+311.400 ms p99 and a 538.836 ms maximum. Sampled VBL plateaus over 80 ms stayed
+at zero; all 31 visibility checks passed, the same WindowServer survived and
+the four error-counter increases remained zero. The independent worker's
+maximum interval was 56.757 ms with three intervals over 33.34 ms, so this
+instrumented run is not interchangeable with the uninstrumented comparison.
+
+Both triggered samples had nonempty call graphs. The application's main
+thread was in its ordinary run-loop Mach-message wait in 31 of 33 recorded
+stack samples. WindowServer's main thread was in message wait in 30 of 44,
+with other samples in display composition, surface transfer and retirement.
+These aggregate samples were collected after the trigger, rather than being
+an exact per-gap trace. They did not identify a PR28 wait or prove a specific
+driver call, EC callback or lock as the residual cause.
+
+## CPU-only timer-delivery investigation
+
+A separate original diagnostic uses the userspace `mk_timer` ABI to request
+10 ms critical, zero-leeway timer messages while another thread waits
+directly with `mach_wait_until` at approximately 10 ms intervals. Both paths
+run in one process and sample the existing read-only VBL counter. This tool
+links only the system C runtime; it creates no IOKit client or explicit GPU
+work. Its native build used warnings as errors and a symbol-presence-only
+preflight before timer creation. Every completed run destroyed its timer port.
+
+The first root-CLI run inherited background task policy. Its direct-wait
+control also suffered long delays, so it is excluded from normal-application
+timer-delivery evidence. The next scope used the same source and identical
+executable text in a signed application bundle launched through Launch
+Services. Process readback showed nice 0 and priority 37. It changed only the
+launch route; no driver, wait budget, framebuffer control or owner policy was
+changed, and the first scope was not replayed.
+
+| Normal-application CPU timer observation | Result |
+| --- | ---: |
+| Elapsed time | 20.057 s |
+| Requested Mach timer period / explicit leeway | 10 / 0 ms |
+| Mach timer messages / API errors | 1,149 / 0 |
+| Mach timer lateness median / p99 / maximum | 0.023 / 291.284 / 521.591 ms |
+| Mach timer deliveries over 80 ms late | 31 |
+| Direct-wait worker intervals | 1,804 |
+| Direct-wait interval median / p99 / maximum | 10.689 / 14.725 / 14.995 ms |
+| Direct-wait intervals over 80 ms | 0 |
+| Sampled VBL plateaus over 80 ms | 0 |
+
+This reproduces a timer-message delivery delay in an independent program
+without an explicit GPU workload while a same-process direct-wait control
+remains responsive. It narrows the investigation beyond the original VBL
+timer; it does not prove all interactive stutter shares one cause.
+
+Apple's public XNU at `f6217f891ac0bb64f3d375211650a4c1ff8ca1ea`
+initializes the Mach timer's callout with `thread_call_setup`; that helper
+assigns `THREAD_CALL_PRIORITY_HIGH`. A critical timer's zero-leeway arm does
+not change that group. This makes shared HIGH-callout contention a supported
+hypothesis for the observation, not proof of the running kernel's exact
+implementation or of which callback blocked a particular expiry. The three
+official source files were actually downloaded and checked before this CPU
+run; source snapshots remain private, no implementation was copied, and their
+APSL-2.0 reference terms do not replace any project component's licence.
+
+| Pinned Apple source path | SHA256 |
+| --- | --- |
+| `osfmk/mach/mk_timer.h` | `f261b01daccc068d710ca87699545d0525f50bd32b80b5302bd9a14e0bf23f7d` |
+| `osfmk/kern/mk_timer.c` | `aa73f8976c8be7e2dbb89bedee9de7d245eb67fa5f29de3b05ee7c3083ea22ff` |
+| `osfmk/kern/thread_call.c` | `c14d9956890389097874811695ce90d436da9a39957124be4a79b4d6a426c876` |
+
+The attempted kernel-only captures did not resolve a `kernel_task` target and
+produced no usable kernel call graph. They do not establish permission denial,
+absence of kernel contention or a new EC diagnosis. No security setting was
+changed to obtain a capture. In particular, the earlier AppleACPIEC contention
+hypothesis remains unproved by these new samples.
+
+Final independent readback again passed exact loaded candidate/disk/cache/job
+identity, all 416 records and full metadata, accepted recovery, original loaded
+ACPI/full EFI recovery, current-boot startup receipts and a passive five-second
+desktop check. No matching report or error counter increased. The candidate
+remains active with daily PR28 waiting on, startup supervision ended and
+resident monitors off. This round adds diagnosis, not a second production
+patch, kernel timer modification, ACPI repair or general-stutter acceptance.
+See the sanitized
+[CPU timer record](validation/build34-timer-delivery-20261118.json).
+
+See the sanitized
+[delayed observation](validation/build34-vbl-delayed-gui-20261118.json).

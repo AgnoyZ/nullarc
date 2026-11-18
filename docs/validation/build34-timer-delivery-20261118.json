@@ -1,0 +1,96 @@
+{
+  "date": "2026-11-18",
+  "branch": "upstream34/vram-layout-fix",
+  "kind": "CPU-only-Mach-timer-versus-direct-wait-observation",
+  "status": "timer-message-latency-reproduced; residual-stutter-unresolved",
+  "OS": {"product_version": "26.7.2", "build": "25G332"},
+  "candidate_source_commit": "439f8a5bc3e086770df7b576897fbb11d7ccc9f1",
+  "accepted_runtime_source": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "original_private_diagnostic": true,
+  "native_compile_warnings_as_errors_and_symbol_preflight_passed": true,
+  "first_background_CLI_scope": {
+    "completed": true,
+    "direct_wait_worker_also_stalled": true,
+    "excluded_from_normal_application_delivery_evidence": true,
+    "timer_port_destroyed": true
+  },
+  "fresh_LaunchServices_scope": {
+    "source_and_executable_text_identical_to_first_scope": true,
+    "ad_hoc_signature_verified": true,
+    "only_launch_route_changed": true,
+    "nice": 0,
+    "observed_process_priority": 37,
+    "elapsed_ms": 20056.859881,
+    "requested_period_ms": 10,
+    "critical_zero_explicit_leeway": true,
+    "timer_API_errors": 0,
+    "timer_port_destroyed": true,
+    "Mach_port_timer_lateness": {
+      "messages": 1149,
+      "median_ms": 0.022905,
+      "p99_ms": 291.284147,
+      "maximum_ms": 521.591188,
+      "deliveries_over80ms_late": 31
+    },
+    "same_process_direct_wait_intervals": {
+      "intervals": 1804,
+      "median_ms": 10.688764,
+      "p99_ms": 14.725177,
+      "maximum_ms": 14.994663,
+      "intervals_over80ms": 0
+    },
+    "sampled_VBL_plateaus_over80ms": 0,
+    "same_WindowServer": true,
+    "controls_and_error_counters_preserved": true,
+    "kernel_sampling_performed_during_this_scope": false,
+    "diagnostic_exited": true
+  },
+  "source_reference_review": {
+    "repository": "apple-oss-distributions/xnu",
+    "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+    "license": "APSL-2.0",
+    "files_actually_downloaded_and_checked_before_execution": true,
+    "files_sha256": {
+      "osfmk/mach/mk_timer.h": "f261b01daccc068d710ca87699545d0525f50bd32b80b5302bd9a14e0bf23f7d",
+      "osfmk/kern/mk_timer.c": "aa73f8976c8be7e2dbb89bedee9de7d245eb67fa5f29de3b05ee7c3083ea22ff",
+      "osfmk/kern/thread_call.c": "c14d9956890389097874811695ce90d436da9a39957124be4a79b4d6a426c876"
+    },
+    "userspace_ABI_declarations_checked": true,
+    "Mach_timer_uses_thread_call_setup_default_HIGH_in_reference": true,
+    "implementation_code_copied": false,
+    "reference_claimed_byte_identical_to_running_kernel": false
+  },
+  "kernel_capture_limits": {
+    "sample_numeric_zero_target_not_resolved": true,
+    "separate_spindump_kernel_task_target_not_resolved": true,
+    "new_usable_kernel_call_graph": false,
+    "security_or_permission_denial_inferred": false,
+    "security_settings_changed": false
+  },
+  "final_independent_runtime_readback": {
+    "passed": true,
+    "candidate_loaded_and_exact_disk_cache_jobs_verified": true,
+    "full_cache_metadata_passed": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images_preserved": 415,
+    "original_loaded_ACPI_and_full_EFI_recovery_verified": true,
+    "exact_accepted_recovery_verified": true,
+    "current_boot_accelerated_startup_and_supervision_ended_verified": true,
+    "passive_seconds": 5,
+    "new_error_counters": 0,
+    "new_matching_diagnostic_reports": 0
+  },
+  "candidate_remains_active": true,
+  "new_production_driver_or_kernel_timer_or_ACPI_patch": false,
+  "PR28_daily_wait_preserved": true,
+  "resident_monitor_enabled": false,
+  "power_actions": 0,
+  "explicit_GPU_test_submissions_by_CPU_diagnostic": 0,
+  "shared_HIGH_contention_is_hypothesis": true,
+  "specific_EC_or_PR28_or_driver_root_cause_proved": false,
+  "general_stutter_repair_accepted": false,
+  "physical_scanout_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "raw_identifiers_logs_binaries_or_reference_source_published": false
+}
