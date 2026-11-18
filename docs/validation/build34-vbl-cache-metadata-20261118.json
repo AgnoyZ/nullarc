@@ -1,0 +1,77 @@
+{
+  "date": "2026-11-18",
+  "branch": "upstream34/vram-layout-fix",
+  "status": "second-failure-recovered; corrected-cache-offline-only",
+  "OS": {"product_version": "26.7.2", "build": "25G332"},
+  "candidate_source_commit": "439f8a5bc3e086770df7b576897fbb11d7ccc9f1",
+  "accepted_runtime_source": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "second_failure": {
+    "original_exception_saved": true,
+    "phase": "loaded-identity",
+    "assertion": "exact PhxAccel loaded image absent",
+    "PhxBringup_loaded": true,
+    "PhxAccel_loaded_record_present": false,
+    "PhxAMDFB_published": false,
+    "accelerator_sysctls_present": false,
+    "startup_journal_created": false,
+    "GUI_comparison_started": false,
+    "VBL_callback_execution_proved": false,
+    "driver_code_root_cause_proved": false
+  },
+  "recovery": {
+    "exact_accepted_executable_cache_and_two_jobs_restored": true,
+    "restoration_errors": 0,
+    "recovery_restarts": 1,
+    "independent_new_boot_accepted_runtime_and_startup_verified": true,
+    "original_loaded_ACPI_and_full_EFI_recovery_verified": true,
+    "same_WindowServer_and_VBL_progress_observed": true,
+    "new_error_counters_or_matching_reports": false,
+    "failed_observation_jobs_retired_without_GUI_replay": true
+  },
+  "packaging_regression": {
+    "old_UUID_only_record_check_passed": true,
+    "new_explicit_load_true_fields": 3,
+    "bundle_paths_moved_to_private_repository": 3,
+    "affected_components": ["PhxAccel", "HighPointIOP", "HighPointRR"],
+    "source_Info_plist_and_personalities_unchanged": true,
+    "loading_explanation_requires_new_boot_confirmation": true
+  },
+  "additional_offline_rejections": {
+    "synthetic_targets_missing_matching_KDK": 2,
+    "filtered_private_repository_missing_records_and_wrong_policy": 1,
+    "any_rejected_cache_installed": false,
+    "KDK_or_authorization_overrides": false
+  },
+  "standard_path_control_and_treatment": {
+    "accepted_image_control_metadata_passed": true,
+    "candidate_code_recompiled_or_changed": false,
+    "candidate_binary_sha256": "a206d983fca62dd7959cc701fb9f95d5490da78986aac02dbb67ed00410325e7",
+    "corrected_candidate_AuxKC_sha256": "f0dbaacf423819c29af7ac0503d6f6c80d897a327dabb6a235385e1cd52728da",
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images_preserved": 415,
+    "explicit_load_policy_and_standard_bundle_paths_preserved": true,
+    "personalities_dependencies_Info_digests_and_collection_links_preserved": true,
+    "bounded_exact_file_interruption_guard_passed_and_exited": true,
+    "accepted_executable_restored_after_offline_build": true,
+    "live_cache_and_startup_jobs_unchanged": true,
+    "corrected_cache_installed": false,
+    "candidate_loaded": false,
+    "explicit_GPU_submissions": 0
+  },
+  "read_only_metadata_gate": {
+    "CPU_regression_tests": 25,
+    "actual_failed_cache_refused": true,
+    "actual_accepted_control_passed": true,
+    "actual_corrected_candidate_passed": true,
+    "production_VBL_CPU_assertions": 60
+  },
+  "PR28_daily_wait_preserved": true,
+  "resident_monitor_enabled": false,
+  "admission_deadlines_or_production_driver_changed": false,
+  "new_reboot_scheduled_at_readback": false,
+  "VBL_hardware_repair_accepted": false,
+  "physical_scanout_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "raw_identifiers_logs_or_binaries_published": false
+}

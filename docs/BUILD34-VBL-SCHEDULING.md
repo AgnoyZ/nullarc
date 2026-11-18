@@ -1,9 +1,9 @@
 # Build34 VBL scheduling candidate
 
-Status on 2026-11-18: **the first candidate boot failed startup admission and
-the exact accepted build34 installation was restored and independently
-verified. The second evidence-instrumented scope is installed on disk;
-candidate loading and hardware acceptance are pending restart.**
+Status on 2026-11-18: **both candidate boots failed before accelerated
+startup. The exact accepted build34 installation is restored and independently
+verified. A corrected offline cache preserves the accepted boot-matching
+metadata; it is not installed or hardware-accepted.**
 CPU, native, complete-cache and independent installed-state checks passed. The initial
 direct-thread-call candidate failed target linking; a private-provider attempt
 was also rejected. The selected implementation uses public IOKit timer APIs.
@@ -434,3 +434,77 @@ The existing owner authorization covers its test restart. Candidate hardware
 repair, GPU workload correctness, physical scanout FPS and long-term stability
 remain unaccepted. See the new
 [second-installation record](validation/build34-vbl-second-installation-20261118.json).
+
+## Second failure isolated a cache-packaging regression
+
+The second restart recorded the original exception before recovery. The
+wrapper failed its exact PhxAccel loaded-image assertion, before a startup
+journal or GPU/GUI test was created. Its five bounded snapshots showed
+PhxBringup loaded, no loaded PhxAccel record, no published PhxAMDFB and absent
+accelerator sysctls. This establishes the failing admission step; it does not
+establish that the VBL callback ran or that its implementation caused a crash.
+
+Exact executable/cache/job restoration completed without errors, followed by
+one recovery restart. An independent readback verified the accepted image,
+current-boot bounded accelerated startup, original loaded ACPI and full
+EFI/recovery identity. VBL advanced with the same WindowServer, no matching
+report or error-counter increase appeared, and both failed-trial observation
+jobs were retired. The GUI was not replayed. Resident monitoring remains
+disabled, daily PR28 waiting remains enabled, and no additional restart was
+scheduled by that recovery readback.
+
+Complete prelink comparison found a real difference missed by the earlier
+416-record/image-UUID check: the private-repository cache added
+`OSBundleRequireExplicitLoad=true` and private staging bundle paths to
+PhxAccel and two companion components. Their accepted metadata had no such
+explicit-load field and used the standard installed paths. Source Info.plist
+bytes and personalities were unchanged. The package therefore failed to
+preserve boot-matching policy despite containing the intended executable.
+This is a supported explanation for the missing automatic load, pending a
+new boot with corrected packaging; it is not a proved VBL-code defect.
+
+Three further offline results were rejected: two synthetic target directories
+failed matching-KDK discovery, and a filtered private-repository build returned
+zero but omitted three expected records while retaining the explicit-load
+marker. None was installed. No missing-KDK or authorization override was used.
+
+An accepted-image control built from the standard installed paths passed a
+full metadata comparison with the original 416 records, including 29 codeless
+entries. A separate finite operation then temporarily published the already
+authorized candidate executable at that same standard path, generated only
+a private output cache, and restored the accepted executable in `finally`.
+A separate bounded exact-file guard covered interruption; it exited after
+restoration without any power action. The live cache and startup jobs stayed
+unchanged, and no new driver was loaded or explicit GPU workload submitted.
+
+The resulting private candidate cache contains the same exact accelerator
+binary as the two failed trials. Its complete metadata comparison passed:
+only PhxAccel's image identity/size and permitted relocation addresses differ;
+bundle paths, explicit-load presence/value, personalities, dependencies,
+Info.plist digests and boot/system links match the accepted baseline. All
+415 unrelated images remain unchanged. No production VBL source or admission
+deadline was changed to obtain this result.
+
+`tools/check_build34_cache_metadata.py` now provides that read-only gate for
+complete three-collection `kmutil inspect --show-prelink-info` captures. It
+requires 416 unique records and 29 codeless records, rejects missing/extra or
+moved bundles, preserves all policy fields and accepts only the explicitly
+named image change plus relocation fields. It prints no raw identifiers or
+metadata. Its 25 CPU regression tests pass, the actual rejected cache is
+refused, and both the actual accepted-image control and corrected candidate
+pass. The existing 60 production VBL assertions also pass. Run:
+
+```sh
+make test-build34-cache-metadata test-build34-vbl-scheduling
+python3 -B tools/check_build34_cache_metadata.py BASELINE_CAPTURE CANDIDATE_CAPTURE \
+  --allow-image-change com.luuumi.PhxAccel
+```
+
+Captures and raw loading logs remain private. A subsequent installation must
+use a new scope, pin this exact corrected cache, run both UUID and complete
+metadata checks against the actual selected cache, and preserve the accepted
+recovery copies and unchanged startup gates. It must not retry either consumed
+activation scope. The corrected cache is offline-only at this record; real
+loading, stutter repair, workload correctness, physical FPS and long-term
+stability remain unaccepted. See the sanitized
+[failure and metadata-repair record](validation/build34-vbl-cache-metadata-20261118.json).

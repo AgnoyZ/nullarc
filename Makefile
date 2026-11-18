@@ -129,3 +129,8 @@ test-upstream34-panel-timing: $(TEST_BIN_DIR)/test_upstream34_panel_timing
 .PHONY: test-build34-vbl-scheduling
 test-build34-vbl-scheduling:
 	python3 -B tests/test_build34_vbl_scheduling.py
+
+# Read-only complete-cache policy comparison; no installation or GPU use.
+.PHONY: test-build34-cache-metadata
+test-build34-cache-metadata:
+	python3 -B tests/test_build34_cache_metadata.py
