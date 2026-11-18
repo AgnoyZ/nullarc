@@ -1,8 +1,9 @@
 # Build34 VBL scheduling candidate
 
-Status on 2026-11-18: **installed on disk under owner authorization; candidate
-loading and hardware acceptance remain pending the next boot.** CPU, native,
-complete-cache and independent installed-state checks passed. The initial
+Status on 2026-11-18: **the first candidate boot failed startup admission and
+the exact accepted build34 installation was restored and independently
+verified. A second evidence-instrumented scope is prepared, not installed.**
+CPU, native, complete-cache and independent installed-state checks passed. The initial
 direct-thread-call candidate failed target linking; a private-provider attempt
 was also rejected. The selected implementation uses public IOKit timer APIs.
 The accepted build34 acceleration and desktop remain active. The original-ACPI
@@ -358,3 +359,54 @@ The new installation record is
 The owner's reboot-test authorization covers the next ordinary restart.
 Candidate loading, the post-boot GUI result, real workload correctness, physical
 scanout FPS and long-term stability remain unaccepted at this installation stage.
+
+## First activation failed; accepted baseline restored
+
+The first authorized candidate restart failed before the wrapper created its
+current-boot startup journal. Its guarded recovery restored the exact accepted
+PhxAccel executable, AuxKC and both original startup-job files without errors,
+then performed its single recovery restart. Independent readback of the
+recovery boot verified the accepted loaded image, successful bounded
+accelerated startup, original loaded ACPI and full EFI/recovery identity.
+The same WindowServer survived the passive check, VBL advanced, and no matching
+diagnostic report or copy/skip/timeout/hang counter increase appeared. PR28
+daily waiting remains enabled and resident monitoring remains disabled.
+The unexecuted GUI job was retired without replaying the diagnostic.
+
+The first wrapper failed to persist its original exception before requesting
+recovery. A later read-only reproduction with modeled candidate identities
+passed, but does not establish what happened in that boot. Targeted historical
+logs show the intended auxiliary collection was selected; they do not prove
+successful accelerator loading or identify the failing startup step. Neither
+a driver defect nor a controller-only cause is established. The original
+installation-stage record is retained unchanged as chronology.
+
+A new scope keeps the exact same candidate binary/cache and unchanged
+admission deadlines. It records the wrapper phase, original exception and
+traceback, then five bounded read-only state snapshots before recovery. Private
+startup stdout/stderr paths preserve early failures. A consumed GUI job on a
+recovery boot now removes only its exact job bytes without starting the GUI.
+All 69 prior scope/startup/observer/admission tests and five added evidence
+tests pass. The inactive same-directory atomic replacement again preserved
+permissions and cache protection flags; the live cache stayed unchanged.
+
+A fresh accepted-image control in the recovery boot reproduced the symptom:
+
+| Recovery-boot original-image control | Result |
+| --- | ---: |
+| Elapsed time | 17.163928 s |
+| GUI timer intervals over 100 ms | 18 |
+| GUI timer p99 / maximum | 315.333 / 539.601 ms |
+| Independent worker maximum interval | 15.177 ms |
+| Sampled VBL plateaus over 80 ms | 20 |
+| Longest sampled VBL plateau | 522.394 ms |
+| Large GUI gaps overlapping sampled VBL plateaus | 18 of 18 |
+| Window visibility checks passed | 9 of 9 |
+| Copy failure / skip / GPU timeout / hang-kill increases | 0 / 0 / 0 / 0 |
+
+At this preparation readback the accepted accelerator/cache and owner jobs
+remain installed; the second candidate is not installed and no new reboot is
+scheduled. Installation and its independent readback must precede a separately
+recorded authorized test restart. No hardware repair, workload correctness,
+physical FPS or long-term stability acceptance is claimed. See the sanitized
+[failure/recovery record](validation/build34-vbl-first-activation-recovery-20261118.json).
