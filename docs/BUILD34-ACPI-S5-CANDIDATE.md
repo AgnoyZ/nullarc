@@ -150,9 +150,9 @@ unsuccessful. The bounded local readback found a genuine `halt by root` at
 and present once; DSDT and FADT matched the previously verified candidate boot.
 This confirms that the unsuccessful trial followed candidate loading. It
 does not prove execution of the S5-only write or identify the physical power
-transition. Whether this particular attempt again stopped the fans/indicator
-before an unprompted restart still needs the owner's observation; a new boot
-alone cannot distinguish that from a reset or a manual power-on.
+transition. At this initial readback, an unprompted restart still needed the
+owner's observation; a new boot alone could not distinguish that from a reset
+or a manual power-on. The owner's subsequent confirmation is recorded below.
 
 A shutdown-stall report was retained privately and decoded offline, without
 sampling the live system. It contains 1.30 seconds of samples beginning two
@@ -182,9 +182,33 @@ Rollback changes the next boot's tables, not those already loaded in memory.
 The failed candidate therefore remains loaded until the owner next restarts;
 the agent did not execute or schedule a power action or new GPU workload.
 Successful shutdown after rollback has not been demonstrated. Preserve the
-accepted default-build34 runtime and obtain the physical symptom before
-selecting another single-variable experiment. The sanitized outcome is
+accepted default-build34 runtime; the owner's follow-up and the next
+single-variable test prerequisite are recorded below. The sanitized outcome is
 [`validation/build34-acpi-s5-failure-rollback-20261118.json`](validation/build34-acpi-s5-failure-rollback-20261118.json).
+
+### Owner confirmation of automatic power-on
+
+The owner subsequently confirmed that shutdown automatically triggers power-on.
+This resolves the initial uncertainty about automatic power-on. The observation
+still does not instrumentally prove a completed S5 transition or identify the
+initiating device/event.
+
+At the follow-up readback on 2026-11-18 17:02 +08:00, the machine was still in
+the 16:39:14 boot. The exact original EFI state, installed build34 runtime and
+recovery checks passed; acceleration/desktop takeover, the same compositor,
+zero copy failures/skips and daily PR28 configuration were preserved. The
+current boot's bounded startup had completed and its supervision had ended.
+There were no scheduled power events, and AC network wake was configured off.
+The bounded wake-log query and read-only native-method review did not identify
+a definite wake source or a proved defect warranting another deployed patch.
+No configuration was changed or new candidate installed in this follow-up.
+
+The failed candidate remains loaded in this boot despite its on-disk removal.
+The next step is an owner-initiated ordinary restart, followed by independent
+verification that the original ACPI tables are loaded. Do not treat another
+shutdown in the current boot as a post-rollback test, or reinstall the failed
+candidate. No restart, shutdown, GPU workload or resident monitor was started
+or scheduled by this follow-up.
 
 ## Historical acceptance procedure and retained rollback
 

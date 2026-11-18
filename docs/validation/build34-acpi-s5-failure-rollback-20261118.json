@@ -25,6 +25,22 @@
     "root_cause_proved": false,
     "candidate_status": "unsuccessful-withdrawn"
   },
+  "owner_followup": {
+    "owner_confirmed_automatic_power_on_after_shutdown": true,
+    "supersedes_initial_uncertainty_about_automatic_power_on": true,
+    "completed_S5_transition_instrumentally_verified": false,
+    "followup_readback_local_time": "2026-11-18T17:02:26+08:00",
+    "same_boot_as_failed_trial": true,
+    "disk_original_state_and_full_integrity_checks_passed": true,
+    "bounded_startup_and_desktop_admission_completed": true,
+    "same_compositor_acceleration_desktop_and_daily_PR28_preserved": true,
+    "copy_failures_and_skips_zero": true,
+    "scheduled_power_events_present": false,
+    "AC_network_wake_configured": false,
+    "wake_source_identified": false,
+    "new_patch_deployed": false,
+    "next_step": "owner ordinary restart, then verify original ACPI loaded before another isolated shutdown trial"
+  },
   "rollback": {
     "exact_original_configuration_restored_before_table_removal": true,
     "only_exact_candidate_AML_removed": true,
