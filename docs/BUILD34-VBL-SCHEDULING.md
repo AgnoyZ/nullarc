@@ -1,12 +1,12 @@
 # Build34 VBL scheduling candidate
 
-Status on 2026-11-18: **not installed or loaded; owner-authorized installation
-preparation passed CPU, native and complete offline-cache checks.** The initial
+Status on 2026-11-18: **installed on disk under owner authorization; candidate
+loading and hardware acceptance remain pending the next boot.** CPU, native,
+complete-cache and independent installed-state checks passed. The initial
 direct-thread-call candidate failed target linking; a private-provider attempt
 was also rejected. The selected implementation uses public IOKit timer APIs.
 The accepted build34 acceleration and desktop remain active. The original-ACPI
-restart baseline subsequently passed the independent readback recorded below;
-candidate-specific activation preparation is the next step.
+restart baseline subsequently passed the independent readback recorded below.
 No on-device stutter repair or higher FPS has been demonstrated.
 
 ## Unattended reproduction
@@ -240,31 +240,8 @@ rechecked. The loaded accelerator is still the accepted original image and
 the candidate is not loaded. Failed intermediate caches remain private and
 must not be selected for installation.
 
-## Original-ACPI restart baseline passed
-
-The owner-authorized ordinary restart completed on 2026-11-18. The next-boot
-observer passed, and a separate read-only check independently reparsed its
-current-boot receipts and rechecked the machine. Both verified exact original
-loaded DSDT/FACP with valid checksums, absence of the withdrawn SSDT, full
-original EFI/recovery identity, the accepted build34 kernel/plugin/accelerator
-and current-boot bounded accelerated desktop admission. The same compositor
-survived the passive check; synthetic VBL advanced without increases in copy
-failures, skipped copies, surface GPU timeouts or hang kills.
-
-Startup supervision ended, the observer removed its own job, and no resident
-monitor was enabled. Daily PR28 waiting remains configured. These read-only
-checks submitted no additional GPU workload. The new boot satisfies the ACPI
-prerequisite; it does not establish VBL treatment success, physical scanout FPS
-or long-term stability. The VBL candidate is still not installed or loaded.
-
-The sanitized result is
-[`validation/build34-original-acpi-reboot-20261118.json`](validation/build34-original-acpi-reboot-20261118.json).
-The earlier preparation record remains unchanged. Continue the authorized
-candidate-specific installation/recovery preparation from this verified
-baseline; do not replay the consumed observer or historical GPU trial.
-
-The machine is still in the failed ACPI candidate's 16:39 boot on 2026-11-18.
-Its exact original EFI rollback is on disk, but loaded tables have not yet
+At that preparation stage, the machine was still in the failed ACPI candidate's
+16:39 boot on 2026-11-18. Its exact original EFI rollback was on disk, but loaded tables had not yet
 changed. **First perform the owner's ordinary restart and independently
 verify original ACPI and the accepted accelerated runtime.** Installing a VBL
 treatment before that baseline would combine ACPI removal and scheduling
@@ -303,3 +280,81 @@ observed separately; neither original-ACPI baseline success nor a VBL repair
 is claimed by this preparation. Private receipts survive a disconnected
 agent session so the subsequent result can be independently read before any
 candidate treatment.
+
+## Original-ACPI restart baseline passed
+
+The owner-authorized ordinary restart completed on 2026-11-18. The next-boot
+observer passed, and a separate read-only check independently reparsed its
+current-boot receipts and rechecked the machine. Both verified exact original
+loaded DSDT/FACP with valid checksums, absence of the withdrawn SSDT, full
+original EFI/recovery identity, the accepted build34 kernel/plugin/accelerator
+and current-boot bounded accelerated desktop admission. The same compositor
+survived the passive check; synthetic VBL advanced without increases in copy
+failures, skipped copies, surface GPU timeouts or hang kills.
+
+Startup supervision ended, the observer removed its own job, and no resident
+monitor was enabled. Daily PR28 waiting remains configured. These read-only
+checks submitted no additional GPU workload. The new boot satisfies the ACPI
+prerequisite; it does not establish VBL treatment success, physical scanout FPS
+or long-term stability. The VBL candidate was not installed by this check.
+
+The sanitized result is
+[`validation/build34-original-acpi-reboot-20261118.json`](validation/build34-original-acpi-reboot-20261118.json).
+The earlier preparation record remains unchanged. Do not replay the consumed
+observer or historical GPU trial.
+
+## Current-ACPI control and candidate installation
+
+The same Launch-Services-launched GUI/worker diagnostic was rebuilt from its
+exact preserved source and run on this original-ACPI boot before changing the
+accelerator. The first diagnostic ended normally, but its supervisor raced a
+process exit while querying process state; that incomplete run is retained and
+excluded. The corrected supervisor accepted a fresh bounded run:
+
+| Original-ACPI control | Result |
+| --- | ---: |
+| Elapsed time | 16.009806 s |
+| GUI timer intervals over 100 ms | 22 |
+| GUI timer p99 / maximum | 308.118 / 528.692 ms |
+| Independent worker maximum interval | 16.179 ms |
+| Sampled VBL plateaus over 80 ms | 22 |
+| Longest sampled VBL plateau | 528.282 ms |
+| Large GUI gaps overlapping sampled VBL plateaus | 22 of 22 |
+| Window visibility checks passed | 9 of 9 |
+| Copy failure / skip / GPU timeout / hang-kill increases | 0 / 0 / 0 / 0 |
+
+The recurring GUI/VBL symptom remains after removing the failed ACPI candidate.
+This is a current control observation, not proof of the contention hypothesis.
+
+A new private activation scope preserves the frozen historical packet and the
+owner's existing policy files. Its only protected-image substitutions are the
+exact selected PhxAccel executable and AuxKC hashes; the kernel, plugin, daily
+PR28 configuration and EFI remain unchanged. A derived contract also pins the
+new loaded accelerator identity. The existing startup implementation changes
+only its journal location, with all 45/150/300-second admission limits and the
+initial 90-second shell observation retained. No resident monitor is enabled.
+
+All 26 scope/refusal/filesystem recovery tests, 25 actual startup-policy tests,
+and nine observer tests passed. An inactive same-directory atomic replacement
+also preserved the live cache's permission and protection-flag convention.
+Installation replaced the two exact image files and two startup job entrypoints;
+independent readback passed signature, 416 combined cache records, unchanged
+415 unrelated records, candidate disk hashes, original EFI/recovery and exact
+accepted recovery copies. The accepted accelerator remains loaded in this boot;
+the candidate has not yet been loaded or hardware-accepted.
+
+Both next-boot observation jobs are one-shot, finite and staged without starting
+them in the current boot. A second nine-test gate requires successful
+current-boot candidate admission before the ordinary GUI/worker comparison.
+It performs no explicit GPU submission, power action, policy change or retry,
+and removes its own job. Its overall limit is 520 seconds; the GUI subprocess
+limit is 55 seconds. Startup failure recovery restores the exact accepted
+accelerator/cache and original owner job bytes before at most one recovery
+restart; it does not modify EFI, security settings or the frozen contract.
+After successful startup there is no resident periodic rollback controller.
+
+The new installation record is
+[`validation/build34-vbl-installation-20261118.json`](validation/build34-vbl-installation-20261118.json).
+The owner's reboot-test authorization covers the next ordinary restart.
+Candidate loading, the post-boot GUI result, real workload correctness, physical
+scanout FPS and long-term stability remain unaccepted at this installation stage.
