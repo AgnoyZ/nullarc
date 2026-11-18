@@ -569,3 +569,52 @@ retained inode, ownership, target and flag checks, plus failure-independent
 recovery. Removing identity checks or reusing this failed scope is not a fix.
 Ordinary-user enumeration/FPS, background-stutter repair, permanent alias-mode
 adoption and persistent desktop acceleration remain unaccepted.
+
+## Eleventh packet: natural writer deadline expired before FPS admission
+
+The next fresh scope used source
+`82063cc550730f37e2f0103adae95675743365c0` and the same build34 kernel,
+plugin, native/Metal probes, frame program and observers. Its private
+controller validated the Metal alias across boots using the internal APFS
+volume identity plus inode, ownership, target and flags, retaining the
+device-number check within the same boot. Link validation remained a GPU
+admission requirement but was removed from the shared EFI restoration guard.
+Thus an alias check or volume query failure could not prevent restoring the
+on-disk kernel. Preparation passed **234 CPU/controller/parser methods**,
+including 18 alias-mode methods and an additional recovery-failure case.
+
+This time startup and the stable-volume guard passed. The original kernel
+was restored on disk before the planned GPU initializer, which passed both
+queue/adoption checks. Both subsequent native dispatches passed the full
+arena comparison with no IB mismatch. The Metal alias was temporarily 0755
+and the runtime alias remained unchanged.
+
+The first PR28 `ready` render then reached its unchanged **250 ms** natural
+writer deadline with publication still unconfirmed. The actual group wait
+lasted **250.851541 ms**, while commit took **251.000741 ms**. Exactly one
+matching group wait was observed; both its return and the immediate group
+query remained nonzero. Command status was **Scheduled (3)**, not Completed;
+no command error was reported. The probe retained its command/resources for
+recovery. There was no successful ready summary, second PR28 probe, FPS
+application launch or frame record. This does not establish where execution
+was waiting, whether it completed later, a permanent GPU hang or an accepted
+ordinary-user enumeration result. The deadline was not raised and the
+timeout was not counted as success.
+
+The independent guardian restored controls, alias mode, plugin and EFI with
+**zero restoration errors**, then requested its single recovery boot.
+Independent reparse and retirement confirmed the original kernel loaded,
+the complete original plugin, alias mode 0700 on the same APFS volume with
+the same inode/owner/target/flags, all 46 protected files and 347 original
+EFI files matching, unchanged security/kernel collections, GPU-off, firmware
+framebuffer only and zero new matching diagnostic reports. Only the exact
+nine recovery files and this scope's job, plugin stage, frame stage/cache
+and observers were removed. No test client, held process or next reboot/GPU
+task remains. The scope is consumed.
+
+Earlier bounded PR28 wait evidence remains historical; this wider alias-mode
+context failed its natural-wait admission. Ordinary-user FPS, background
+stutter, permanent alias-mode adoption and persistent acceleration remain
+unaccepted. A further diagnostic must distinguish execution, GPU retirement
+and surface publication without changing the production wait or claiming
+an expired wait completed successfully.
