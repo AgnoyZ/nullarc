@@ -1394,5 +1394,265 @@
     "permanent_alias_mode_adoption_accepted": false,
     "persistent_accelerated_desktop_adoption_accepted": false,
     "earlier_failures_preserved": true
+  },
+  "GUI_visible_window_repeat_followup": {
+    "date": "2026-11-18",
+    "source_commit": "ee29d00a4f637e9c0d53fb79f1e3759f7708f429",
+    "result": "bounded-GUI-application-frame-witness-passed-later-desktop-progress-refused-independently-recovered",
+    "kernel_build": 34,
+    "owner_explicitly_requested_fresh_repeat_after_window_interaction_question": true,
+    "same_production_kernel_plugin_native_PR28_and_frame_probe_binaries_as_prior_scope": true,
+    "same_phase_observation_frame_parser_and_three_FPS_observers": true,
+    "production_sources_changed": false,
+    "build41_or_build42_used": false,
+    "CPU_controller_parser_methods": 246,
+    "frozen_inputs": 67,
+    "window_condition": {
+      "owner_asked_to_leave_automatic_test_window_visible": true,
+      "visibility_not_programmatically_forced": true,
+      "occlusion_or_user_actions_recorded": false,
+      "prior_failure_causally_attributed_to_owner_window_action": false
+    },
+    "runtime_change": {
+      "Metal_alias_mode": "0755",
+      "runtime_alias_unchanged": true,
+      "permanent_adoption": false
+    },
+    "execution": {
+      "original_kernel_restored_on_disk_before_initializer": true,
+      "initializer_and_both_queue_adoptions_passed": true,
+      "native_dispatches": 2,
+      "native_full_arena_checks_passed": 2,
+      "native_mismatch": null,
+      "PR28_natural_waits": {
+        "budget_ms": 250,
+        "waits": [
+          {
+            "mode": "ready",
+            "group_wait_calls": 1,
+            "actual_wait_ns": 21187530,
+            "commit_elapsed_ns": 23102371,
+            "timed_out": false,
+            "budget_ms": 250,
+            "production_plugin_unmodified": true
+          },
+          {
+            "mode": "ready",
+            "group_wait_calls": 1,
+            "actual_wait_ns": 1301631,
+            "commit_elapsed_ns": 1622774,
+            "timed_out": false,
+            "budget_ms": 250,
+            "production_plugin_unmodified": true
+          },
+          {
+            "mode": "ready",
+            "group_wait_calls": 1,
+            "actual_wait_ns": 1020194,
+            "commit_elapsed_ns": 1106625,
+            "timed_out": false,
+            "budget_ms": 250,
+            "production_plugin_unmodified": true
+          }
+        ],
+        "states": [
+          {
+            "mode": "ready",
+            "matching_group_calls": 1,
+            "actual_wait_ns": 21187530,
+            "commit_elapsed_ns": 23102371,
+            "wait_result": 0,
+            "remaining_group_result": 0,
+            "command_status": 4,
+            "error_present": false,
+            "error_code": 0
+          },
+          {
+            "mode": "ready",
+            "matching_group_calls": 1,
+            "actual_wait_ns": 1301631,
+            "commit_elapsed_ns": 1622774,
+            "wait_result": 0,
+            "remaining_group_result": 0,
+            "command_status": 4,
+            "error_present": false,
+            "error_code": 0
+          },
+          {
+            "mode": "ready",
+            "matching_group_calls": 1,
+            "actual_wait_ns": 1020194,
+            "commit_elapsed_ns": 1106625,
+            "wait_result": 0,
+            "remaining_group_result": 0,
+            "command_status": 4,
+            "error_present": false,
+            "error_code": 0
+          }
+        ],
+        "summary": {
+          "writer_waits": 3,
+          "nonwriter_fast_paths": 1,
+          "GPU_commands_completed": 4,
+          "late_completion_verified": false
+        },
+        "verified_channels": 128,
+        "buffer_only_verified_bytes": 256
+      },
+      "PR28_controlled_timeout": {
+        "budget_ms": 1,
+        "waits": [
+          {
+            "mode": "timeout",
+            "group_wait_calls": 1,
+            "actual_wait_ns": 1111014,
+            "commit_elapsed_ns": 1193379,
+            "timed_out": true,
+            "budget_ms": 1,
+            "production_plugin_unmodified": true
+          }
+        ],
+        "states": [
+          {
+            "mode": "timeout",
+            "matching_group_calls": 1,
+            "actual_wait_ns": 1111014,
+            "commit_elapsed_ns": 1193379,
+            "wait_result": 49,
+            "remaining_group_result": 49,
+            "command_status": 4,
+            "error_present": false,
+            "error_code": 0
+          }
+        ],
+        "summary": {
+          "writer_waits": 1,
+          "nonwriter_fast_paths": 0,
+          "GPU_commands_completed": 1,
+          "late_completion_verified": true
+        },
+        "verified_channels": 64,
+        "execution_status_completed_while_publication_group_still_pending": true,
+        "callback_gate_must_release_before_publication_retirement": true
+      },
+      "first_writer_phase_observation": {
+        "event_count": 18,
+        "thread_count": 2,
+        "entered": {
+          "surface-out": 1,
+          "submit-ahead": 1,
+          "finish-execution": 1,
+          "submit-events": 1,
+          "collect-timing": 1,
+          "finish-callbacks": 1,
+          "mark-scheduled": 2,
+          "advance-part": 1
+        },
+        "returned": {
+          "surface-out": 1,
+          "submit-ahead": 1,
+          "finish-execution": 1,
+          "submit-events": 1,
+          "collect-timing": 1,
+          "finish-callbacks": 1,
+          "mark-scheduled": 2,
+          "advance-part": 1
+        },
+        "open_methods": {},
+        "wait_return_marker": {
+          "elapsed_ns": 24021676,
+          "extra_GPU_calls": 0
+        },
+        "events_after_wait_return": [],
+        "observer_original_IMPs_restored": true,
+        "extra_GPU_calls": 0,
+        "GPU_completion_or_pixel_correctness_inferred": false
+      },
+      "prior_250ms_wait_failure_explained_or_fixed": false
+    },
+    "bounded_ordinary_GUI_frame_witness": {
+      "frames": 2385,
+      "elapsed_ns": 20006966069,
+      "completed_verified_FPS": 119.20847927539913,
+      "frame_ms_mean": 8.388665018448638,
+      "frame_ms_p50": 8.324423,
+      "frame_ms_p95": 9.231074,
+      "frame_ms_p99": 10.43369,
+      "frame_ms_max": 42.469907,
+      "warmup_frames": 220,
+      "warmup_ns": 2009037392,
+      "verified_channels": 152640,
+      "sampled_pixels_per_frame": 16,
+      "width": 1280,
+      "height": 800,
+      "maximum_inflight_commands": 1,
+      "maximum_drawables": 2,
+      "all_commands_completed": true,
+      "target_PCI_verified": true,
+      "loaded_plugin_image_verified": true,
+      "PR28_opt_in": false,
+      "physical_scanout_measured": false,
+      "game_FPS_measured": false,
+      "display_sync_enabled": true,
+      "completion_clock": "CLOCK_UPTIME_RAW",
+      "presentation_callbacks": 2385,
+      "positive_presentation_times": 2385,
+      "reported_presentation_span_seconds": 20.00009602400001,
+      "reported_presentation_FPS": 119.19942769970768,
+      "independent_frame_and_presentation_reparse": true,
+      "verified_frames": 2385,
+      "verified_presentation_timestamps": 2385,
+      "execution_as_root": false,
+      "application_exit_code": 0,
+      "single_enumeration_unique_target": true,
+      "all_presentation_timestamps_positive_and_strictly_ordered": true,
+      "zero_timestamp_callbacks": 0,
+      "original_18_second_coverage_requirement_passed": true,
+      "bounded_application_witness_accepted": true,
+      "whole_desktop_trial_accepted": false,
+      "full_frame_pixel_correctness_measured": false
+    },
+    "desktop_tail_failure": {
+      "message": "no measured frame progress",
+      "after_application_exit_and_FPS_parser_success": true,
+      "planned_observation_seconds": 10,
+      "starting_snapshot_is_pre_application_readiness": true,
+      "failure_delay_seconds_file_metadata_diagnostic": 10.451256513595581,
+      "failing_or_intermediate_counter_snapshots_persisted": false,
+      "idle_desktop_or_compositor_stall_distinguished": false,
+      "requirement_relaxed_or_waived": false,
+      "whole_scope_accepted": false
+    },
+    "independent_final_readback": {
+      "exact_original_loaded": true,
+      "candidate_not_loaded": true,
+      "GPU_off": true,
+      "firmware_framebuffer_only": true,
+      "plugin_original_full_manifest": true,
+      "original_Metal_alias_0700_restored": true,
+      "same_Metal_alias_volume_inode_owner_target_flags": true,
+      "protected_files_unchanged": 46,
+      "original_EFI_file_count": 347,
+      "original_EFI_baseline_exact": true,
+      "protected_links_security_and_kernel_collections_unchanged": true,
+      "restore_only_job_removed": true,
+      "no_remaining_test_jobs_clients_or_held_processes": true,
+      "EFI_unmounted": true,
+      "new_matching_reports": 0,
+      "GPU_calls": 0,
+      "recovery_boots": 1,
+      "restoration_errors": [],
+      "temporary_recovery_files_removed": 9,
+      "exact_temporary_stages_removed": true,
+      "no_replay": true
+    },
+    "bounded_GUI_application_FPS_accepted": true,
+    "complete_desktop_trial_accepted": false,
+    "default_wait_policy_promoted": false,
+    "long_run_stability_accepted": false,
+    "background_stutter_repair_accepted": false,
+    "permanent_alias_mode_adoption_accepted": false,
+    "persistent_accelerated_desktop_adoption_accepted": false,
+    "earlier_failures_preserved": true
   }
 }

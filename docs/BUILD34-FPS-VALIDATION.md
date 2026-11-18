@@ -686,3 +686,72 @@ framebuffer only and no remaining test client, held process or reboot request.
 The scope is consumed. Further work needs presentation/visibility evidence
 while retaining the original measurement and recovery gates; ordinary-user
 FPS, background-stutter repair and persistent adoption remain unaccepted.
+
+## Thirteenth packet: bounded GUI frame witness passed, desktop tail refused
+
+The owner asked whether interaction with the test window could have affected
+the preceding result and explicitly requested another test. A fresh scope
+from `ee29d00a4f637e9c0d53fb79f1e3759f7708f429` repeated the exact same
+production kernel/plugin, native and PR28 probes, phase observation, frame
+program, parsers and three FPS observers. Only packet-local paths, the source
+record and the prior-retirement prerequisite changed. All **246** CPU control
+and parser methods passed again; independent admission verified byte identity
+with the twelfth packet. The owner was asked to leave the automatically opened
+test window visible. No programmatic change forced window visibility, and no
+window-occlusion or user-action record was added.
+
+Initialization and both full-arena native dispatches passed without an IB
+mismatch. All three natural PR28 waits completed, taking **21.187530,
+1.301631 and 1.020194 ms** within the original 250 ms budget. The first writer
+again produced 18 balanced phase records, with successful publication and
+callback return before its wait-return marker. The independent 1 ms timeout
+observed the publication group still pending, then verified actual late
+completion and output. In that induced timeout, status was already Completed
+(4) while the publication group remained pending: the test's callback gate
+had not yet released publication/completion signalling. This is not a natural
+wait failure or a reason to treat command status alone as publication proof.
+
+The ordinary GUI application enumerated one uniquely verified target device
+and exited zero. The **unchanged frame parser passed** all **2385** completed
+and sampled-pixel-verified frames over **20.006966069 seconds**. Every frame
+had a received, positive, strictly ordered presentation timestamp, covering
+**20.000096024 seconds**, above the retained 18-second coverage requirement.
+The bounded application reported **119.208479 completed verified frames/s**
+and **119.199428 reported presentations/s**. Completion intervals were
+8.324423 ms at the median, 9.231074 ms at p95, 10.433690 ms at p99 and
+42.469907 ms maximum. These are independently reparsed results for the
+1280-by-800 test workload, one in-flight command and sampled pixels; they do
+not measure physical scanout, full-frame pixel correctness, games or input
+latency. PR28 opt-in remained off in the FPS application itself.
+
+The **whole desktop trial still failed**. After the frame application exited,
+the existing desktop-tail loop raised `no measured frame progress` rather
+than producing its desktop result. Its starting snapshot was the readiness
+snapshot collected before the application; the failure was recorded about
+10.45 seconds after the tail began. The controller did not persist the
+failing sample or its intermediate counter snapshots. The frozen control flow
+and exact exception identify the failed progress requirement, but the missing
+snapshots prevent distinguishing an idle desktop from a compositor stall.
+The requirement was not weakened or retrospectively waived. Only the bounded
+GUI application frame witness passes; the complete desktop scope, long-run
+stability and background-stutter repair remain unaccepted.
+
+This same-program repeat did not reproduce the previous short presentation
+span. It does **not** establish that the owner's earlier window action caused
+that failure, and it does not explain or fix the eleventh packet's natural
+wait timeout. The visibility hypothesis remains unproven. Earlier failures
+and the default-wait/persistent-adoption HOLDs are preserved.
+
+Automatic restoration completed without errors. A new independent verifier
+reparsed the native and both PR28 results, phase evidence, GUI enumeration and
+complete frame/presentation output, retained the later desktop refusal, and
+then retired this scope's exact nine recovery files, job, plugin stage, GUI
+stage/cache and three observers. Final read-back confirmed the original
+kernel loaded, complete original plugin and 0700 alias restored, unchanged
+link identity, **46 protected files** and **347 original EFI files** matching,
+unchanged security/kernel collections, zero new matching reports, GPU-off,
+firmware framebuffer only, EFI unmounted and no remaining test/reboot task.
+The scope is consumed and cannot be replayed. Further desktop work needs
+persisted progress snapshots and a separately justified distinction between
+idle observation and an active refresh test; it must retain the failed scope
+and existing admission requirements.
