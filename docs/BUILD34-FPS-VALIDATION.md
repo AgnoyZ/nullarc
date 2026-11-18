@@ -420,3 +420,55 @@ read-back confirmed GPU-off, firmware framebuffer only, EFI unmounted, no
 remaining test client/held process and no next GPU/reboot task armed. The
 scope is consumed; the independent verifier performed zero GPU calls. All
 earlier failures and the bounded root-only control remain preserved.
+
+## Ordinary-user path observation: no realpath call captured
+
+A ninth fresh packet on 2026-11-18, based on
+`2bca854911c64b246d04cf31845b3991b6af4611`, retained the eighth packet's
+production binaries, frame probe, workload and existing observers. Its only
+new runtime diagnostic interposed the `realpath$DARWIN_EXTSN` symbol imported
+by the installed Metal framework, inside the final test process only. It
+forwarded each original call once, preserved pointer ownership, caller-buffer
+behavior and `errno`, and recorded only six fixed GPU-bundle path scopes. It
+made no additional filesystem lookup and changed no symlink permissions,
+bundle metadata or trust/admission policy.
+
+Preparation passed **210 CPU/controller/parser methods**, including 37 new
+path-parser methods, plus **11 new ASan/UBSan forwarding cases**. Actual root
+and ordinary-user native checks produced identical results with and without
+the observer. Those separate CPU checks found that root could canonicalize
+both GPU-bundle aliases and the canonical bundle path; the ordinary user
+received `EACCES` for both aliases but succeeded on the canonical path. The
+ordinary user could separately read bundle files and create bundle metadata
+objects. These differences alone do not prove a Metal discovery failure.
+
+The hardware trial again passed initialization, both native full-arena checks
+and both PR28 admission probes. Readiness observed **477 additional successful
+present transactions in 7.893563125 seconds**, unchanged panel timing, the
+same WindowServer and mapped plugin/RADV images. These counters are readiness
+evidence, not FPS. The ordinary-user process then enumerated **zero Metal
+devices** and returned **exit 22 after 0.951223997 seconds**. Neither observed
+device initializer ran; no window setup, frame worker or frame record was
+reached.
+
+The matching/open observers reproduced the eighth packet's exact sequence,
+including an `NMXAccel` iterator result with an unobserved matching source and
+only one observed successful `IOSurfaceRoot` open. The new path observer
+reported **zero scoped and zero unrelated calls**, with no dropped, inflight
+or output-error events. Thus this trial captured no Metal `realpath` denial.
+It does not prove that every internal lookup was intercepted, exclude a path
+issue, or establish a permissions/filtering root cause. The offline alias
+denial is not grounds to change production link permissions. Ordinary-user
+FPS, background-stutter repair and persistent desktop adoption remain
+unaccepted; all previous evidence and failures are retained.
+
+A distinct ninth-packet verifier reparsed the actual path, matching, open,
+startup, native, PR28 and readiness evidence before retirement. The original
+kernel and complete plugin were restored; all 46 protected files and 347
+original EFI files matched, with links/security/kernel collections unchanged
+and zero new matching diagnostic reports. Only the exact nine recovery files,
+restore-only job, plugin stage, FPS stage/cache and three observer stages were
+removed. Final read-back confirmed GPU-off, firmware framebuffer only, EFI
+unmounted, no remaining test client/held process and no next GPU/reboot task
+armed. The scope is consumed; the independent verifier performed zero GPU
+calls.
