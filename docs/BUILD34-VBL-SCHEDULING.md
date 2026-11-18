@@ -1,16 +1,17 @@
 # Build34 VBL scheduling candidate
 
-Status on 2026-11-18: **both candidate boots failed before accelerated
-startup. The exact accepted build34 installation is restored and independently
-verified. The corrected cache now preserves the accepted boot-matching
-metadata and is installed under a third exact-image scope; candidate loading
-and hardware acceptance are pending restart.**
+Status on 2026-11-18: **the third, corrected-cache candidate boot passed exact
+loaded-image admission, bounded accelerated startup and independent readback.
+The finite GUI comparison recorded no intervals over 33.34 ms or sampled VBL
+plateaus over 80 ms; the preceding accepted-image control had 23 GUI intervals
+over 100 ms. The candidate remains active.**
 CPU, native, complete-cache and independent installed-state checks passed. The initial
 direct-thread-call candidate failed target linking; a private-provider attempt
 was also rejected. The selected implementation uses public IOKit timer APIs.
 The accepted build34 acceleration and desktop remain active. The original-ACPI
 restart baseline subsequently passed the independent readback recorded below.
-No on-device stutter repair or higher FPS has been demonstrated.
+This demonstrates an improvement in the bounded GUI/VBL comparison, not a
+general stutter repair, physical scanout FPS or long-term stability result.
 
 ## Unattended reproduction
 
@@ -545,3 +546,68 @@ recovery with at most one recovery restart. Actual candidate loading, stutter
 repair, workload correctness, physical FPS and long-term stability await new
 evidence. See the
 [corrected-cache installation record](validation/build34-vbl-metadata-installation-20261118.json).
+
+## Corrected-cache boot and bounded GUI comparison passed
+
+The authorized third restart entered a new boot at 21:32:27 +0800 on
+2026-11-18, running macOS 26.7.2 build 25G332. The unchanged candidate
+accelerator loaded automatically from the corrected cache. Exact loaded-image
+admission, the existing bounded accelerated startup and the finite read-only
+observer all passed. The GUI comparison ran only after those gates completed.
+Neither failed activation scope was replayed, and no recovery was triggered.
+
+The same Launch Services diagnostic and preserved application source were used
+for the accepted-image control immediately before installation and the
+candidate after restart:
+
+| Observation | Accepted-image control | VBL candidate |
+| --- | ---: | ---: |
+| Elapsed time | 16.450 s | 16.939 s |
+| GUI timer intervals | 562 | 938 |
+| GUI median / p95 | 16.681 / 41.681 ms | 16.659 / 17.309 ms |
+| GUI p99 / maximum | 312.362 / 532.714 ms | 17.599 / 26.169 ms |
+| GUI intervals over 33.34 / 100 ms | 30 / 23 | 0 / 0 |
+| Independent worker maximum | 15.016 ms | 12.578 ms |
+| Sampled VBL plateaus over 80 ms | 24 | 0 |
+| Large GUI gaps overlapping VBL plateaus | 23 | 0 |
+| Onscreen checks passed | 9 of 9 | 15 of 15 |
+| Copy failure / skip / GPU timeout / hang-kill increases | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 |
+
+WindowServer remained the same within each run. These are separate boots, not
+a same-boot reversal, and the comparison contains one selected control and one
+candidate run. It supports the scheduling treatment for the reproduced
+GUI/VBL symptom, but does not prove a particular AppleACPIEC callback caused
+the original delays. GUI timer intervals, draw callbacks, compositor presents
+and synthetic VBL counters must not be reported as physical FPS or direct
+mouse-input latency. The GUI diagnostic submitted no explicit native/Metal
+test workload; it used the existing accelerated desktop compositor.
+
+A separate read-only post-boot verification reparsed all current-boot startup,
+observer and GUI receipts, independently checked the actual loaded candidate,
+disk/cache/job hashes and exact accepted recovery copies, and repeated both
+the 416-record image check and full three-collection metadata comparison.
+The 25 metadata regression tests and 60 production VBL CPU assertions passed
+again; these CPU checks do not add hardware coverage.
+All 29 codeless records, 415 unrelated images, matching policies, standard
+paths, dependencies and collection links remain preserved. Original loaded
+DSDT/FACP, absence of the withdrawn SSDT and full original EFI/recovery
+identity passed again. No EFI or security setting changed.
+
+During an additional passive five-second readback, the same compositor
+survived, VBL advanced, and copy failures, skips, surface GPU timeouts and hang
+kills remained zero. No new matching diagnostic report appeared. Startup
+supervision ended, both one-shot observer/GUI job files were removed, and no
+resident installation/hang monitor or pending reboot remained. Daily PR28
+waiting remains enabled with its unchanged 250 ms budget and WindowServer
+exclusion. The verification submitted no GPU work or power action.
+
+The successful candidate stays active; no post-startup automatic rollback was
+enabled. Exact accepted-image recovery remains available for the unchanged
+bounded startup-failure path. The owner-selected accepted source checkpoint
+remains `1d4968fbc2ce988c77bdd85b2ec36f435b57f496`; this is a minimal default-build34
+treatment from that baseline, not build41/build42 or a new baseline selection.
+Long-duration stability, physical scanout FPS, interactive pointer latency,
+sleep/wake and a separate fresh explicit GPU-workload comparison remain
+unaccepted. See the sanitized
+[post-boot result](validation/build34-vbl-corrected-cache-boot-20261118.json).
+Earlier installation and failed-trial records remain unchanged.
