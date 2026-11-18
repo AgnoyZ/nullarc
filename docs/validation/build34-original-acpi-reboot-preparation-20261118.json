@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-18",
+  "kind": "owner-authorized-original-ACPI-baseline-reboot-preparation",
+  "source_checkpoint": "439f8a5bc3e086770df7b576897fbb11d7ccc9f1",
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "owner_authorized_agent_reboot": true,
+  "CPU_tests_passed": 9,
+  "original_ACPI_EFI_and_recovery_verified": true,
+  "current_boot_still_contains_withdrawn_SSDT": true,
+  "accepted_build34_kernel_plugin_and_AuxKC_verified": true,
+  "exact_accepted_recovery_copies_verified": true,
+  "current_boot_startup_receipts_verified": true,
+  "PR28_daily_wait_preserved": true,
+  "acceleration_and_desktop_preserved": true,
+  "resident_monitor_enabled": false,
+  "new_observer_next_boot_only": true,
+  "new_observer_read_only": true,
+  "new_observer_deadline_seconds": 420,
+  "new_observer_automatic_retry": false,
+  "new_observer_does_not_install_VBL": true,
+  "observer_job_installed_but_not_loaded": true,
+  "VBL_candidate_installed": false,
+  "VBL_hardware_repair_accepted": false,
+  "EFI_runtime_or_existing_startup_policy_changed": false,
+  "reboot_executed_or_scheduled_at_preparation": false,
+  "post_reboot_baseline_verified": false
+}

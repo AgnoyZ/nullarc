@@ -249,3 +249,33 @@ next-boot candidate activation was scheduled. Subsequent installation must
 retain the exact recovery images and all existing GPU/desktop admission
 checks, including the disabled resident-monitor policy. Source/CPU/cache
 validation alone does not establish a hardware repair, stability or FPS.
+
+## Subsequent agent-reboot authorization
+
+The owner subsequently authorized the agent to perform the ordinary restart
+for the pending original-ACPI baseline. This changes who may request that
+restart; it does not remove the baseline prerequisite or combine it with a
+VBL installation.
+
+Preflight rechecked original-ACPI EFI and recovery, accepted build34 kernel,
+plugin and AuxKC, exact accepted accelerator/cache recovery copies, current
+startup/admission receipts and the unchanged daily PR28 configuration. The
+withdrawn SSDT is still present in the current boot's dynamic ACPI property;
+the already restored disk configuration will take effect at the next boot.
+
+A private read-only next-boot observer passed nine CPU tests, including stale
+receipt, withdrawn-table, altered-table and monitor-policy refusal. Its job
+was staged on disk without bootstrap/kickstart in the current boot. It waits
+for the existing startup/admission tasks to finish, independently verifies
+original loaded DSDT/FADT, absence of the withdrawn SSDT, full EFI/recovery,
+accepted runtime and brief passive desktop/VBL progress. Its worker has a
+420-second limit, it never retries, and it removes its own job file after its
+run. It does not install the VBL candidate, launch a GPU test, alter existing
+startup policy or enable a resident monitor.
+
+The [preparation record](validation/build34-original-acpi-reboot-preparation-20261118.json)
+records staging only. A reboot request and post-reboot verification must be
+observed separately; neither original-ACPI baseline success nor a VBL repair
+is claimed by this preparation. Private receipts survive a disconnected
+agent session so the subsequent result can be independently read before any
+candidate treatment.
