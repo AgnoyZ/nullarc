@@ -162,6 +162,13 @@ its live-guardian observation describes that earlier readback. Long-term
 stability, sleep/wake, background stutter and physical scanout FPS remain
 unaccepted, and PR28's default wait opt-in remains disabled.
 
+The later [local ACPI S5 candidate](BUILD34-ACPI-S5-CANDIDATE.md) addresses the
+owner-reported shutdown/restart symptom through two exact OpenCore paths and
+a matching startup-expectation extension. It preserves this accepted runtime,
+recovery images and disabled resident monitoring. Its on-disk deployment,
+76 CPU checks and full EFI readback do not accept a new accelerated boot or
+successful physical shutdown; both remain pending owner validation.
+
 ## Subsequent owner-selected PR28 daily wait
 
 Later on 2026-11-18 the owner requested PR28 waiting by default for daily

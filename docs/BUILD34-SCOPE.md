@@ -294,3 +294,15 @@ fresh installed-plugin configuration checks and 18 runtime-access checks passed.
 No new GPU workload or reboot was performed, and long-term stability, FPS and
 next-boot behavior are not newly accepted. See the
 [daily configuration record](BUILD34-PR28-WAIT-TIMING.md#2026-11-18-owner-selected-daily-configuration).
+
+## Local ACPI shutdown candidate
+
+The owner's subsequent shutdown request is isolated from driver development.
+The [S5 candidate and rollback record](BUILD34-ACPI-S5-CANDIDATE.md) preserves
+the accepted build34 runtime, enabled local PR28 daily setting and disabled
+resident monitoring. It adds one local table, one exact native-method rename
+and narrowly derived EFI expectations without rewriting historical contracts
+or changing kernel/plugin images. Compilation, 76 CPU checks and independent
+on-disk EFI verification passed. Loading the table on a new boot and physical
+shutdown acceptance remain pending; this does not establish a root cause,
+new GPU performance result or build41/build42 candidate.
