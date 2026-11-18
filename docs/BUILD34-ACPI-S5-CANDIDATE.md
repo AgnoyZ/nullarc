@@ -6,7 +6,9 @@ press (symptom C). The local system was read as macOS 26.7.2, build 25G332.
 A real shutdown request reached `halt by root`; the available logs alone
 cannot distinguish a completed S5 transition followed by wake from a reset
 during the final transition. This is an unaccepted local ACPI candidate, not
-a proved cause or successful shutdown repair.
+a proved cause or successful shutdown repair. **The owner subsequently reported
+that shutdown still failed. The candidate has been withdrawn from the local
+EFI; see the failure and rollback result below.**
 
 The accepted default-build34 installation remains the runtime baseline from
 `1d4968fbc2ce988c77bdd85b2ec36f435b57f496`. No driver/plugin image, A1/A2/
@@ -139,16 +141,63 @@ and FPS remain unaccepted. The original deployment record retains its earlier
 pending-boot status as history. The subsequent result is recorded separately in
 [`validation/build34-acpi-s5-reboot-20261118.json`](validation/build34-acpi-s5-reboot-20261118.json).
 
-## Manual acceptance and rollback
+## Failed shutdown trial and exact rollback
 
-The initial restart, loaded-table verification and bounded startup admission
-have now completed. After saving work, the remaining owner action is to use
+After the verified candidate boot, the owner reported that shutdown was still
+unsuccessful. The bounded local readback found a genuine `halt by root` at
+2026-11-18 16:38:47 +08:00 and a later boot, independently read from
+`kern.boottime` as 16:39:14. The loaded candidate SSDT was still byte-identical
+and present once; DSDT and FADT matched the previously verified candidate boot.
+This confirms that the unsuccessful trial followed candidate loading. It
+does not prove execution of the S5-only write or identify the physical power
+transition. Whether this particular attempt again stopped the fans/indicator
+before an unprompted restart still needs the owner's observation; a new boot
+alone cannot distinguish that from a reset or a manual power-on.
+
+A shutdown-stall report was retained privately and decoded offline, without
+sampling the live system. It contains 1.30 seconds of samples beginning two
+seconds into shutdown. No new matching panic report was found in the bounded
+35-minute report search. Neither the short snapshot nor the absence of a new
+panic proves a firmware or driver cause. The candidate is recorded as
+**unsuccessful**, not pending acceptance or a repaired shutdown path.
+
+The existing guarded rollback restored the exact pre-candidate OpenCore
+configuration first, then removed only the byte-checked candidate table.
+Independent readback matched all 357 original EFI files, including Windows
+EFI, and confirmed the candidate AML was absent. Official `ocvalidate` passed.
+The actual owner entrypoint selected the supported original state; full EFI,
+original recovery-backup and installed kernel/plugin checks passed. The
+compatible exact-state admission helper remains in place, with the frozen
+contracts unchanged. No additional ACPI patch or power quirk was introduced.
+
+This boot's startup completion, desktop admission and supervision-ended
+receipts matched the current boot. Acceleration/desktop controls remained
+active, the compositor was unchanged across rollback, copy failures/skips
+were zero, PR28 daily waiting remained configured, and resident monitor
+processes were absent. There were no failure receipts or recovery intent.
+The EFI was unmounted after verification. The 20 public scope tests and 20
+private temporary-file installer/rollback tests passed again.
+
+Rollback changes the next boot's tables, not those already loaded in memory.
+The failed candidate therefore remains loaded until the owner next restarts;
+the agent did not execute or schedule a power action or new GPU workload.
+Successful shutdown after rollback has not been demonstrated. Preserve the
+accepted default-build34 runtime and obtain the physical symptom before
+selecting another single-variable experiment. The sanitized outcome is
+[`validation/build34-acpi-s5-failure-rollback-20261118.json`](validation/build34-acpi-s5-failure-rollback-20261118.json).
+
+## Historical acceptance procedure and retained rollback
+
+Before the failed trial, the initial restart, loaded-table verification and
+bounded startup admission had completed. The prescribed owner action was to use
 the macOS menu to shut down and observe whether the power indicator/fans stay
 off for at least 30 seconds without touching the power button. If they remain
 off, the owner can then press the power button to return and report the result.
 Record failure details if it restarts by itself, stays powered, or hangs.
-A repeated successful cycle is needed before treating this as a daily shutdown
-repair; one cycle does not accept long-term stability, other sleep states or
+The trial failed and the candidate is now withdrawn. This procedure is retained
+as history, not an instruction to repeat the withdrawn candidate. A repeated
+successful cycle would be needed before treating any future candidate as a
+daily shutdown repair; one cycle does not accept long-term stability, other sleep states or
 FPS. For any future ACPI revision, repeat the restart and actual loaded-table
 verification first. The verifier has not executed a restart or shutdown.
 

@@ -173,6 +173,15 @@ passed actual ACPI loading and bounded accelerated startup with the daily PR28
 setting. Physical shutdown remains pending. The startup tasks completed as
 one-shot jobs and no resident monitoring was re-enabled.
 
+The subsequent owner shutdown trial failed. The local S5 ACPI candidate has
+now been removed from disk by its exact rollback, with independent readback
+of the original full EFI manifest, official configuration validation and
+unchanged accepted kernel/plugin images. Acceleration, desktop takeover,
+daily PR28 waiting and the disabled resident-monitor policy remain in place.
+Loaded ACPI tables will change only after the owner's next restart; no power
+action was executed. Shutdown success is still unaccepted. See the
+[failure/rollback record](validation/build34-acpi-s5-failure-rollback-20261118.json).
+
 ## Subsequent owner-selected PR28 daily wait
 
 Later on 2026-11-18 the owner requested PR28 waiting by default for daily

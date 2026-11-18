@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-18",
+  "kind": "owner-reported-S5-candidate-failure-and-exact-local-rollback",
+  "default_branch": "upstream34/vram-layout-fix",
+  "runtime_source_checkpoint": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "failed_trial": {
+    "owner_reported_shutdown_unsuccessful": true,
+    "genuine_halt_request_local_time": "2026-11-18T16:38:47+08:00",
+    "subsequent_kern_boottime_local": "2026-11-18T16:39:14+08:00",
+    "exact_candidate_SSDT_loaded_once": true,
+    "DSDT_and_FADT_match_previously_verified_candidate_boot": true,
+    "S5_only_write_execution_observed": false,
+    "this_trial_physical_power_transition_confirmed": false,
+    "new_boot_alone_proves_automatic_restart": false,
+    "shutdown_stall_report_retained_private": true,
+    "shutdown_stall_report_decoded_offline_without_live_sampling": true,
+    "shutdown_snapshot_duration_seconds": 1.30,
+    "shutdown_snapshot_sampling_started_after_seconds": 2,
+    "matching_new_panic_report_found_in_bounded_search": false,
+    "report_search_window_minutes": 35,
+    "root_cause_proved": false,
+    "candidate_status": "unsuccessful-withdrawn"
+  },
+  "rollback": {
+    "exact_original_configuration_restored_before_table_removal": true,
+    "only_exact_candidate_AML_removed": true,
+    "independent_full_original_EFI_manifest_match": true,
+    "original_EFI_file_count": 357,
+    "candidate_AML_absent_on_disk": true,
+    "official_ocvalidate_passed": true,
+    "actual_owner_entrypoint_selected_original_state": true,
+    "frozen_contracts_unchanged": true,
+    "compatible_exact_state_admission_retained": true,
+    "installed_kernel_plugin_checks_passed": true,
+    "original_recovery_backup_checks_passed": true,
+    "Windows_EFI_unchanged": true,
+    "EFI_unmounted": true,
+    "other_ACPI_patches_or_power_quirks_added": false,
+    "current_boot_memory_still_contains_candidate_until_next_owner_restart": true,
+    "post_rollback_restart_performed": false
+  },
+  "preserved_runtime_readback": {
+    "same_boot_across_rollback": true,
+    "current_boot_startup_completion_receipts_matched": true,
+    "bounded_startup_completed": true,
+    "desktop_admitted": true,
+    "startup_supervision_ended": true,
+    "hardware_acceleration_and_desktop_active": true,
+    "same_WindowServer_across_rollback": true,
+    "copy_failures": 0,
+    "copy_skips": 0,
+    "PR28_daily_wait_preserved": true,
+    "resident_monitor_process_count": 0,
+    "startup_failure_receipts_absent": true,
+    "recovery_intent_absent": true
+  },
+  "CPU_checks_repeated": {
+    "public_scope_tests_passed": 20,
+    "private_temporary_file_installer_rollback_tests_passed": 20
+  },
+  "power_action_executed_or_scheduled_by_agent": false,
+  "new_GPU_workload_executed": false,
+  "physical_shutdown_repaired": false,
+  "physical_shutdown_after_rollback_accepted": false,
+  "long_term_stability_or_FPS_newly_accepted": false,
+  "build41_build42_withdrawn": true,
+  "raw_firmware_configuration_logs_or_identifiers_published": false,
+  "binary_or_ACPI_table_published": false
+}

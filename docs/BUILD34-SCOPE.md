@@ -314,3 +314,14 @@ and no resident monitor remained. Accepted kernel/plugin images, the local
 PR28 daily setting and security are unchanged. This supersedes only the pending
 table-load/next-boot status above; physical shutdown and long-term stability/FPS
 remain pending. See the [separate reboot readback](validation/build34-acpi-s5-reboot-20261118.json).
+
+The owner then reported unsuccessful shutdown with the candidate loaded.
+The failed local ACPI candidate was withdrawn using its exact guarded rollback;
+independent verification matched the original 357-file EFI manifest and
+accepted build34 images. Acceleration/desktop takeover, daily PR28 waiting,
+bounded startup admission and disabled resident monitoring are preserved.
+The in-memory candidate remains until the owner's next restart; no power
+action was executed or scheduled. Physical shutdown is not repaired and its
+precise physical failure mode still requires confirmation. This supersedes
+the candidate's pending-acceptance status, not its historical loading evidence.
+See the [failure and rollback result](validation/build34-acpi-s5-failure-rollback-20261118.json).
