@@ -1,5 +1,10 @@
 # Supervised local build34 installation
 
+The subsequent [unattended stutter investigation](BUILD34-VBL-SCHEDULING.md)
+records correlated GUI/VBL pauses and a CPU/static-validated scheduling
+candidate. It is not installed or loaded and has not demonstrated a runtime
+repair. The accepted acceleration/desktop installation below remains active.
+
 The subsequent [Apple-progress-bar latency investigation](BUILD34-BOOT-LATENCY.md)
 records actual display-hold timing and an isolated CPU-validated hashing
 candidate. It has not changed this installation or demonstrated faster boot;

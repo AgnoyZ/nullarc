@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-18",
+  "branch": "upstream34/vram-layout-fix",
+  "status": "cpu-and-static-validated-uninstalled-candidate",
+  "source_parent": "ab53d1c64d070a3de6d60d6e9a2c7c772d4050d0",
+  "accepted_runtime_source": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "os": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "baseline_observation": {
+    "ordinary_accelerated_composition_exercised": true,
+    "explicit_native_or_metal_test_workload_started": false,
+    "gui_launch": "Launch Services; unlocked console; nonactivating mouse-ignoring panel",
+    "nominal_run_loop_seconds": 15,
+    "reported_elapsed_seconds": 16.876863369000002,
+    "main_thread_base_priority": 46,
+    "draw_callbacks": 618,
+    "main_timer_intervals": {
+      "n": 625,
+      "median_ms": 16.69327900000006,
+      "p95_ms": 18.43976199999986,
+      "p99_ms": 304.9432740000002,
+      "max_ms": 519.117186,
+      "over33ms": 19,
+      "over100ms": 17
+    },
+    "independent_worker_intervals": {
+      "n": 1488,
+      "median_ms": 10.833945499999942,
+      "p95_ms": 14.479019999999565,
+      "p99_ms": 14.800683000000037,
+      "max_ms": 15.351273999999915,
+      "over33ms": 0,
+      "over100ms": 0
+    },
+    "independent_worker_wall_intervals": {
+      "n": 1488,
+      "median_ms": 10.836482048034668,
+      "p95_ms": 14.451026916503906,
+      "p99_ms": 14.78886604309082,
+      "max_ms": 15.213966369628906,
+      "over33ms": 0,
+      "over100ms": 0
+    },
+    "onscreen_checks": 10,
+    "onscreen_passes": 10,
+    "vbl_plateaus_over80ms": 19,
+    "longest_sampled_vbl_plateau_ms": 514.8710000000003,
+    "main_gaps_over100ms_overlapping_vbl_plateau": 17,
+    "counter_deltas": {
+      "debug.phxfb_vbl_n": 1323,
+      "debug.phxfb_vbl_late_us_sum": 6186551,
+      "debug.nvaccel_iop_ok": 586,
+      "debug.nvaccel_iop_copy_us_sum": 1285697,
+      "debug.nvaccel_iop_vsync_late": 4,
+      "debug.nvaccel_iop_fail": 0,
+      "debug.nvaccel_iop_copy_skip": 0,
+      "debug.nvaccel_surface_gpu_timeouts": 0,
+      "debug.phx_hang_kills": 0
+    },
+    "same_windowserver": true,
+    "contention_hypothesis": "Generally serial HIGH callback group; AppleACPIEC/AppleACPIPlatform work observed in that group",
+    "specific_blocking_call_causation_proved": false,
+    "cli_background_runs_excluded": true,
+    "physical_scanout_fps_measured": false,
+    "sampling_limitations": [
+      "Sequential timestamp/counter reads",
+      "Approximately 10-15 ms worker observation resolution",
+      "Correlation does not prove causation",
+      "Current boot still carries withdrawn S5 candidate until owner restart"
+    ]
+  },
+  "candidate": {
+    "production_files": [
+      "src/phxaccel/accel/phxfb.cpp"
+    ],
+    "source_sha256": "244140f6cbcf88ba89c70eb202b7f79473afa326e5cf2999fcea9bf7c0505681",
+    "executable_sha256": "35e9616469d87c75956bfd576dd186fe24bdc75b93c9f546f272a2605d4b5cb8",
+    "scheduler": "THREAD_CALL_PRIORITY_KERNEL with THREAD_CALL_OPTIONS_ONCE",
+    "shutdown": "Atomic stop; drain current invocation and possible successor before free/AGDC removal",
+    "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "native_x86_64_build_passed": true,
+    "signature_check_passed": true,
+    "expected_thread_call_imports": [
+      "_thread_call_allocate",
+      "_thread_call_allocate_with_options",
+      "_thread_call_cancel",
+      "_thread_call_cancel_wait",
+      "_thread_call_enter",
+      "_thread_call_enter_delayed",
+      "_thread_call_free"
+    ],
+    "kernel_file_exports_new_imports": true,
+    "new_vbl_cpu_assertions": 44,
+    "panel_timing_cases": 43,
+    "refresh_timing_cpu_assertions": 511,
+    "framebuffer_cpu_assertions": 3646,
+    "existing_alias_pool_and_baseline_unit_checks": "passed; optional firmware fixture tests skipped because fixtures absent",
+    "sanitizers": [
+      "AddressSanitizer",
+      "UndefinedBehaviorSanitizer"
+    ],
+    "checks": [
+      {
+        "name": "vbl-panel-framebuffer",
+        "rc": 0,
+        "log_sha256": "09157516a8b39a2e1c2602bbe14401f99bc396fb064c90b1d5334926eead9359"
+      },
+      {
+        "name": "baseline-unit",
+        "rc": 0,
+        "log_sha256": "e615b382c519772903b5f32a5eb0482194a40c221f5e4fe517becd5c6131a20e"
+      },
+      {
+        "name": "native-accelerator-build",
+        "rc": 0,
+        "log_sha256": "580e89ac4a4c3b0b518831194395a852d2ca2ffa16850449942fbb84ea768341"
+      },
+      {
+        "name": "native-signature",
+        "rc": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "native-architecture",
+        "rc": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "diff-check",
+        "rc": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "gpu_executed": false,
+    "installed": false,
+    "loaded": false,
+    "uploaded": false,
+    "runtime_stutter_repair_demonstrated": false,
+    "fps_improvement_demonstrated": false,
+    "api_review": {
+      "repository": "apple-oss-distributions/xnu",
+      "ref": "main retrieved 2026-11-18",
+      "path": "osfmk/kern/thread_call.c",
+      "sha256": "c14d9956890389097874811695ce90d436da9a39957124be4a79b4d6a426c876",
+      "running_kernel_byte_identity_claimed": false
+    }
+  },
+  "preserved": {
+    "phxbringup_native_tools_plugin_and_other_accelerator_sources": true,
+    "live_controls": {
+      "debug.phxagdc": 1,
+      "debug.nvaccelfb": 1,
+      "debug.nvaccel_iop": 1,
+      "debug.phxfb_hold": 0
+    },
+    "pr28_daily_wait_enabled": true,
+    "pr28_budget_ms": 250,
+    "windowserver_pr28_exclusion": true,
+    "resident_monitors_reenabled": false,
+    "diagnostic_processes_remaining": false,
+    "power_action_performed": false,
+    "efi_or_security_setting_changed": false,
+    "same_boot_session_at_final_readback": true,
+    "same_windowserver_at_final_readback": true
+  },
+  "rollback": "No installed treatment to undo; running accepted build34 remains active. Future authorized packet must retain exact accepted binary/recovery manifests.",
+  "remaining": [
+    "Original-ACPI owner-initiated restart baseline",
+    "Separately authorized exact-hash candidate installation and recovery packet",
+    "Unchanged real GPU/desktop admission",
+    "Repeated paired GUI/worker latency comparison",
+    "Long-run stability, interactive input and FPS validation"
+  ],
+  "privacy": "Raw process stacks, boot/session identifiers, configuration and diagnostic files remain local and uncommitted"
+}

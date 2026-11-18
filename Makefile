@@ -124,3 +124,8 @@ $(TEST_BIN_DIR)/test_upstream34_panel_timing: tests/test_upstream34_panel_timing
 test-upstream34-panel-timing: $(TEST_BIN_DIR)/test_upstream34_panel_timing
 	./$(TEST_BIN_DIR)/test_upstream34_panel_timing
 	python3 tests/test_upstream34_panel_callbacks.py
+
+# CPU clock/scheduler doubles only; never initializes or submits to a GPU.
+.PHONY: test-build34-vbl-scheduling
+test-build34-vbl-scheduling:
+	python3 -B tests/test_build34_vbl_scheduling.py

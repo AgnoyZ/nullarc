@@ -235,7 +235,7 @@ class PhxAMDFB : public IOFramebuffer {
 
     static void vblFire(thread_call_param_t p0, thread_call_param_t) {
         PhxAMDFB *me = (PhxAMDFB *)p0;
-        if (me->fStopping) return;
+        if (__atomic_load_n(&me->fStopping, __ATOMIC_ACQUIRE)) return;
         const uint64_t at = mach_absolute_time(), due = me->fVblNext;
         uint64_t near; nanoseconds_to_absolutetime(50000, &near);
         if (gVblStaged && due > at + near) { thread_call_enter_delayed(me->fVblTimer, due); return; }   // an early stage
@@ -747,7 +747,10 @@ bool PhxAMDFB::start(IOService *provider)
     setProperty("PhxFBRefreshMilliHz", fRefreshMilliHz, 32);
     if (fHTotal) { setProperty("PhxFBHTotal", fHTotal, 32); setProperty("PhxFBVTotal", fVTotal, 32); }   // the AGDC's panel timing
     nanoseconds_to_absolutetime(fFrameNs, &gPhxFrameAbs);
-    fVblTimer = thread_call_allocate(vblFire, this);
+    // HIGH calls are generally serial: an unrelated ACPI/EC callback can stall VBL delivery.
+    // Use the parallel kernel group, but keep this self-rearming callback non-reentrant.
+    fVblTimer = thread_call_allocate_with_options(vblFire, this,
+        THREAD_CALL_PRIORITY_KERNEL, THREAD_CALL_OPTIONS_ONCE);
     if (fVblTimer) { uint64_t d; clock_interval_to_deadline((uint32_t)(fFrameNs / 1000), kMicrosecondScale, &d); fVblNext = d; thread_call_enter_delayed(fVblTimer, d); }
     static IOPMPowerState states[2] = {
         { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -764,9 +767,17 @@ bool PhxAMDFB::start(IOService *provider)
 
 void PhxAMDFB::stop(IOService *provider)
 {
-    fStopping = true;
+    __atomic_store_n(&fStopping, true, __ATOMIC_RELEASE);
+    if (fVblTimer) {
+        // A callback already past its stop check can rearm during the first drain.
+        // ONCE permits at most one successor; the second drain cancels/waits for it.
+        do {
+            thread_call_cancel_wait(fVblTimer);
+            thread_call_cancel_wait(fVblTimer);
+        } while (!thread_call_free(fVblTimer));
+        fVblTimer = nullptr;
+    }
     phxAgdcRemove();
-    if (fVblTimer) { thread_call_cancel(fVblTimer); while (!thread_call_free(fVblTimer)) { thread_call_cancel(fVblTimer); IOSleep(5); } fVblTimer = nullptr; }
     if (gAliasSysctl) { for (auto *o : kFbOids) sysctl_unregister_oid(o); gAliasSysctl = false; }
     gPhxFrameAbs = 0;
     if (fBacklight) { fBacklight->terminate(); OSSafeReleaseNULL(fBacklight); }
