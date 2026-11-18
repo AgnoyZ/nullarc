@@ -618,3 +618,71 @@ stutter, permanent alias-mode adoption and persistent acceleration remain
 unaccepted. A further diagnostic must distinguish execution, GPU retirement
 and surface publication without changing the production wait or claiming
 an expired wait completed successfully.
+
+## Twelfth packet: GUI rendering reached, presentation coverage refused
+
+A fresh one-use scope from `393c3e38fa5b4072df89233fb18e208c701fdc89`
+kept the eleventh packet's production kernel, plugin, native probe, frame
+workload, three FPS observers and original admission/recovery requirements.
+The Metal alias again used temporary mode 0755, with independent restoration
+to 0700. The only new execution variable was forwarding observation inside
+the PR28 probe process, limited to the first natural writer. It recorded
+entry/return of eight existing methods without adding GPU calls or changing
+arguments, results, the 250 ms budget or failure/HOLD behavior.
+
+The first CPU preparation stopped because the new packet's fallback script
+still named the previous recovery directory. This was corrected before any
+scope contract, installation or GPU execution. The corrected preparation and
+independent admission passed **246 controller/parser methods**, six new
+native phase cases, the same six cases under ASan/UBSan and both existing
+observer routes per build variant. Missing methods, forwarding, arguments,
+BOOL results, unrelated objects, bounded overflow, concurrent records and
+restoration were checked. The frozen production images were unchanged.
+
+Startup restoration, initialization, both queue adoptions and both full-arena
+native dispatches passed without an IB mismatch. This scope's three natural
+PR28 writer waits completed in **4.912839, 1.002408 and 0.742321 ms**; each
+reported Completed (4), a retired group and no command error. The buffer-only
+fast path also passed. The separate 1 ms controlled timeout remained pending
+at its deadline and subsequently verified actual completion and output.
+
+The first writer produced 18 balanced phase records on two threads, with no
+dropped or open methods and the original implementations restored. From its
+observation epoch, device-timing collection began at 1.884512 ms, surface
+publication returned successfully at 5.294644 ms and callbacks returned at
+5.823325 ms, all before the wait-return marker at 6.053436 ms. This describes
+this successful command only. The added observation can affect scheduling;
+it neither explains nor repairs the preceding scope's 250 ms failure. That
+failure and the default-wait HOLD remain in force.
+
+After compositor readiness, the application ran once as the ordinary GUI
+user. Its single enumeration returned one uniquely verified target device;
+the plugin and superclass initializer each ran once and neither returned nil.
+The application exited zero after recording **1714 completed frames** over
+**20.00567433 seconds**, with 16 sampled pixels / 64 checked channels per
+frame and no sampled mismatch. However, only the first **568** presentation
+callbacks had positive timestamps, covering **5.558318958 seconds**. All
+remaining **1146** callbacks were received with timestamp zero. The unchanged
+independent parser correctly refused `presentation span does not cover
+measurement window` because the required 18-second presentation span was not
+established. A zero exit and completed-frame statistics do not override this
+refusal; **there is no accepted GUI FPS result**.
+
+The completion intervals also include a maximum gap of 1022.53857 ms. This is
+a diagnostic observation from the bounded workload, not proof of a background
+stutter cause, physical scanout, game performance or repaired input latency.
+The packet did not record window occlusion or visibility changes, so it cannot
+distinguish those from a presentation-path cause of the zero timestamps.
+
+Automatic recovery reported no restoration errors. Independent reparse
+retained the presentation failure, verified both native dispatches, both PR28
+probes and the phase/GUI observations, then retired the exact nine recovery
+files, job, plugin stage, GUI stage/cache and three FPS observers. Final
+read-back confirmed the original kernel loaded, complete original plugin,
+0700 Metal alias on the same volume with the same link identity, all **46
+protected files** and **347 original EFI files** matching, unchanged security
+and kernel collections, zero new matching reports, GPU-off, firmware
+framebuffer only and no remaining test client, held process or reboot request.
+The scope is consumed. Further work needs presentation/visibility evidence
+while retaining the original measurement and recovery gates; ordinary-user
+FPS, background-stutter repair and persistent adoption remain unaccepted.
