@@ -1,0 +1,69 @@
+{
+  "date": "2026-11-18",
+  "branch": "upstream34/vram-layout-fix",
+  "source_parent": "a57f4a3506b8c2d367dea9d915d158f9b42760b7",
+  "runtime_source_checkpoint": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "kernel_build": 34,
+  "OS": {"product_version": "26.7.2", "build": "25G332"},
+  "owner_reported_slow_phase": "Apple logo/progress bar after selecting macOS in OpenCore",
+  "observed_current_boot": {
+    "display_hold_seconds": 29.106549,
+    "approximate_script_entry_to_display_release_seconds": 12.54,
+    "approximate_post_display_release_observation_seconds": 90.46,
+    "post_release_tail_proved_to_block_progress_bar": false,
+    "complete_progress_bar_duration_measured": false,
+    "actual_disk_root_device_timeout_found_in_bounded_query": false
+  },
+  "candidate": {
+    "kind": "full-SHA256-with-reused-1MiB-buffer",
+    "digest_cache": false,
+    "reads_every_byte_per_call": true,
+    "refuses_observed_file_or_path_changes": true,
+    "wrapper_lines_added": 2,
+    "binding_changed": "desktop.sha",
+    "other_module_hash_bindings_preserved": true,
+    "prior_integrity_policy_entries_retained": true,
+    "helper_hash_pin_added_to_proposed_policy": true,
+    "historical_contracts_unchanged": true,
+    "installed": false
+  },
+  "CPU_tests": {
+    "streaming_integrity": 11,
+    "bounded_policy_redirected_to_candidate": 25,
+    "daily_policy_and_historical_snapshots": 11,
+    "ACPI_expectation_scope": 20,
+    "total": 67,
+    "all_passed": true
+  },
+  "candidate_readonly_checks": {
+    "actual_static_and_installed_runtime_checks_passed": true,
+    "complete_EFI_and_recovery_checks_passed": true,
+    "EFI_left_unmounted": true,
+    "bounded_startup_and_shell_byte_identical": true,
+    "live_owner_entry_and_policy_unchanged": true
+  },
+  "single_file_microbenchmark_not_boot_benchmark": {
+    "file_bytes": 369213440,
+    "whole_file_peak_RSS_bytes": [378073088, 377692160],
+    "whole_file_seconds": [1.270883785, 1.300787767],
+    "streaming_prototype_peak_RSS_bytes": [9515008, 9515008],
+    "streaming_prototype_seconds": [2.447856441, 0.60469517],
+    "actual_guarded_helper_peak_RSS_bytes": 10735616,
+    "actual_guarded_helper_seconds": 2.185332071,
+    "all_digests_matched": true,
+    "elapsed_time_improvement_demonstrated": false
+  },
+  "preserved_runtime": {
+    "accepted_kernel_and_plugin_unchanged": true,
+    "acceleration_and_desktop_takeover_enabled": true,
+    "daily_PR28_wait_enabled": true,
+    "WindowServer_wait_exclusion_unchanged": true,
+    "resident_monitoring_disabled": true,
+    "bounded_admission_and_hardware_waits_unchanged": true
+  },
+  "startup_jobs_launched": false,
+  "GPU_workload_executed": false,
+  "power_action_executed_or_scheduled": false,
+  "boot_speed_repair_or_acceptance_claimed": false,
+  "next_prerequisite": "Owner ordinary restart and original-ACPI startup baseline, before activating a separate hashing treatment"
+}

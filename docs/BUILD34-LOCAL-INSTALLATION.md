@@ -1,5 +1,10 @@
 # Supervised local build34 installation
 
+The subsequent [Apple-progress-bar latency investigation](BUILD34-BOOT-LATENCY.md)
+records actual display-hold timing and an isolated CPU-validated hashing
+candidate. It has not changed this installation or demonstrated faster boot;
+the pending original-ACPI restart baseline comes before a separate treatment.
+
 On 2026-11-18 the owner explicitly requested installation of the default branch,
 hardware acceleration and desktop takeover on the local machine. The running OS
 was read as macOS 26.7.2, build 25G332. This is an experimental owner opt-in;
