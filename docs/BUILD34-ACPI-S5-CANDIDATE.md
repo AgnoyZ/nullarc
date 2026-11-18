@@ -70,7 +70,7 @@ policy last, with exact original backups and guarded exception rollback.
 Multi-file deployment is not transactional under a power loss; retained
 backups and the inactive/original states support manual recovery.
 
-## Verification and current state
+## Preparation and deployment verification
 
 The following checks passed without executing AML, a power action or a new
 GPU workload:
@@ -95,8 +95,8 @@ EFI/runtime checks. It triggered no recovery or live-file change. The check
 was corrected to the independently read current boot time and repeated
 successfully; the initial refusal and correction remain in private evidence.
 
-The candidate is installed on disk. It is not loaded in the current boot.
-Readback confirmed the same compositor, active acceleration/desktop controls,
+At the deployment readback, the candidate was installed on disk but not yet
+loaded in that boot. Readback confirmed the same compositor, active acceleration/desktop controls,
 zero copy failures/skips, unchanged security and no new matching reports.
 Windows EFI, original recovery backups, accepted kernel/plugin images and
 the PR28 daily setting are unchanged. The EFI was unmounted after checks.
@@ -105,18 +105,52 @@ There is no new monitoring job or automatic power action.
 The sanitized record is
 [`validation/build34-acpi-s5-candidate-20261118.json`](validation/build34-acpi-s5-candidate-20261118.json).
 
+## Subsequent owner-initiated restart
+
+The owner subsequently reported completing a restart on 2026-11-18. Independent
+readback confirmed a new boot on the same macOS 26.7.2 build 25G332, rather than
+reusing the deployment boot. The loaded ACPI property contained exactly one
+byte-identical candidate SSDT with a valid checksum. The loaded DSDT matched
+the prior boot's table with only the exact native `_PTS` rename and checksum
+correction; the original method body, existing `PWDE` patch and FADT remained
+unchanged. This verifies table loading, not execution of the S5-only write.
+
+The actual owner policy, installed kernel/plugin checks, full candidate EFI
+and original recovery-backup checks passed. Both startup completion and
+supervision-ended receipts matched this boot, with accelerated desktop
+admission complete and no startup-failure receipts or recovery intent. Passive
+readback confirmed the same WindowServer as admission, active acceleration and
+desktop controls, zero copy failures/skips, no new matching reports and
+unchanged security. The PR28 daily configuration remains enabled; compiled
+opt-in, the 250 ms budget and WindowServer exclusion are unchanged.
+
+An extra observer initially required the completed startup services to remain
+registered in launchd. That query stopped the observer because both configured
+jobs use `LaunchOnlyOnce` and were already absent. Their current-boot completion
+receipts and zero remaining monitor processes were verified, and the corrected
+observer accepted the completed one-shot state. This was an observer assumption,
+not a startup failure; no service was recreated, enabled or restarted, and no
+recovery was triggered. The verifier changed no EFI/runtime configuration and
+issued no GPU work or power action. The EFI was unmounted after verification.
+
+Candidate loading and this bounded accelerated startup are accepted. Physical
+S5 shutdown, the reported restart-after-power-off symptom, long-term stability
+and FPS remain unaccepted. The original deployment record retains its earlier
+pending-boot status as history. The subsequent result is recorded separately in
+[`validation/build34-acpi-s5-reboot-20261118.json`](validation/build34-acpi-s5-reboot-20261118.json).
+
 ## Manual acceptance and rollback
 
-After saving work, the owner must first restart normally so OpenCore loads
-the new ACPI table. On that new boot, verify that the bounded startup admission
-and accelerated desktop complete, and independently confirm the new table and
-native-method rename in the loaded ACPI. Do not infer activation solely from
-the file being present on disk. Then use the macOS menu to shut down and
-observe whether the power indicator/fans stay off for at least 30 seconds
-without touching the power button. Record failure details if it restarts,
-stays powered, or hangs. A repeated successful cycle is needed before treating
-this as a daily shutdown repair; one cycle does not accept long-term stability,
-other sleep states or FPS. No restart or shutdown was executed for deployment.
+The initial restart, loaded-table verification and bounded startup admission
+have now completed. After saving work, the remaining owner action is to use
+the macOS menu to shut down and observe whether the power indicator/fans stay
+off for at least 30 seconds without touching the power button. If they remain
+off, the owner can then press the power button to return and report the result.
+Record failure details if it restarts by itself, stays powered, or hangs.
+A repeated successful cycle is needed before treating this as a daily shutdown
+repair; one cycle does not accept long-term stability, other sleep states or
+FPS. For any future ACPI revision, repeat the restart and actual loaded-table
+verification first. The verifier has not executed a restart or shutdown.
 
 The private local rollback entry is retained at
 `/private/var/db/nullarc-acpi-shutdown-20261118/install-s5-candidate.py rollback`.

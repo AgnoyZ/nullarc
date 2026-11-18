@@ -306,3 +306,11 @@ or changing kernel/plugin images. Compilation, 76 CPU checks and independent
 on-disk EFI verification passed. Loading the table on a new boot and physical
 shutdown acceptance remain pending; this does not establish a root cause,
 new GPU performance result or build41/build42 candidate.
+
+The owner's subsequent restart passed independent verification of the exact
+loaded candidate SSDT/native rename, full EFI/recovery checks and current-boot
+bounded accelerated desktop admission. The one-shot startup supervision ended
+and no resident monitor remained. Accepted kernel/plugin images, the local
+PR28 daily setting and security are unchanged. This supersedes only the pending
+table-load/next-boot status above; physical shutdown and long-term stability/FPS
+remain pending. See the [separate reboot readback](validation/build34-acpi-s5-reboot-20261118.json).

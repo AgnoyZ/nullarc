@@ -167,7 +167,11 @@ owner-reported shutdown/restart symptom through two exact OpenCore paths and
 a matching startup-expectation extension. It preserves this accepted runtime,
 recovery images and disabled resident monitoring. Its on-disk deployment,
 76 CPU checks and full EFI readback do not accept a new accelerated boot or
-successful physical shutdown; both remain pending owner validation.
+successful physical shutdown; both were pending owner validation at deployment.
+The subsequent [owner-initiated reboot readback](validation/build34-acpi-s5-reboot-20261118.json)
+passed actual ACPI loading and bounded accelerated startup with the daily PR28
+setting. Physical shutdown remains pending. The startup tasks completed as
+one-shot jobs and no resident monitoring was re-enabled.
 
 ## Subsequent owner-selected PR28 daily wait
 
