@@ -1,5 +1,13 @@
 # PR28 bounded publication wait on build34
 
+**Current local setting:** on 2026-11-18 the owner requested daily waiting for
+ordinary applications, and the existing installed plugin's persistent
+configuration was enabled. WindowServer remains excluded and the default
+budget remains 250 ms. See the
+[daily configuration record](#2026-11-18-owner-selected-daily-configuration).
+The source-integration and earlier trial policies below are historical; the
+compiled policy itself remains opt-in.
+
 On 2026-11-16 the owner requested continued PR28 repair, then specifically
 focused the task on wait timing. This source change derives from default
 `upstream34/vram-layout-fix` at
@@ -56,7 +64,8 @@ comparison does not establish execution-queue identity or target inheritance.
 
 ## Controls and limits
 
-The build34 **default remains off**, consistent with the wait-promotion HOLD.
+At the source-integration checkpoint, the build34 **default remained off**,
+consistent with the wait-promotion HOLD.
 Only exact `NVMTL_SURFACE_COMMIT_WAIT=1` opts in; WindowServer is always excluded,
 and presence of `NVMTL_NO_SURFACE_COMMIT_WAIT` overrides opt-in. Nothing in this
 batch sets these variables on the machine or installs the compiled plugin.
@@ -272,3 +281,61 @@ WindowServer exclusion remain intact; no permanent adoption, camera repair,
 UI-stutter repair or general performance result is claimed. Longer stability
 must pass before the separate FPS stage. The sanitized evidence file retains
 the earlier failed packets and appends this successful follow-up.
+
+## 2026-11-18 owner-selected daily configuration
+
+After the accepted local installation and subsequent monitor shutdown, the
+owner explicitly requested PR28 waiting on by default for daily application
+use. The existing supported configuration file
+`/Library/GPUBundles/nvmtl/nvrm610.conf` now contains this additional setting:
+
+```ini
+NVMTL_SURFACE_COMMIT_WAIT=1
+```
+
+All previous configuration bytes are preserved. No budget override or
+WindowServer policy change was added. The compiled default remains opt-in;
+the local persistent configuration opts newly launched ordinary applications
+in automatically. The unchanged release constructor clears inherited knobs
+before reading this file, so a launchd environment setting alone would not
+establish the requested behavior. Existing applications cache their policy
+and must be reopened to read the new setting. WindowServer is explicitly
+excluded in the production predicate even when the setting is present.
+
+The wait budget remains 250 ms. Expiry still preserves pending work and
+reports publication unconfirmed; it neither forges completion nor waits for
+completion handlers. Kernel source/image, plugin source/image, ABI and all
+accepted A1/A2/corrected-A3 and IB-fix behavior remain unchanged. The runtime
+source checkpoint is still `1d4968fbc2ce988c77bdd85b2ec36f435b57f496`.
+
+The local startup-integrity policy records the exact original and new
+configuration digests. Its scoped allowance changes only this protected
+configuration entry in a copy of the old contract; the frozen contract and
+all other protected entries remain intact. Startup telemetry distinguishes
+the compiled opt-in policy from the enabled local daily configuration.
+The resident installation/hang monitors remain disabled.
+
+All 46 CPU methods passed: the existing ten ASan/UBSan production wait tests,
+eleven exact-allowance/configuration tests and the retained 25 startup-policy
+tests. A preparation guard initially refused a nonunique telemetry edit before
+any live change; the refusal was retained and the edit narrowed to the actual
+startup record. After application, new administrator and ordinary desktop-user
+processes loaded the exact installed release plugin, verified its image and
+PR28 ABI, and observed the persistent opt-in after inherited controls were
+cleared. Both loader checks created no Metal device, queue or GPU resources.
+All 18 runtime file-access checks passed. Independent readback confirmed the
+same WindowServer, active acceleration/desktop controls, zero copy failures
+or skips, no new matching diagnostic reports and unchanged security settings.
+
+No application restart, WindowServer restart, GPU test workload or reboot was
+performed for this configuration change. The earlier bounded GPU wait evidence
+is retained; it is not a new long-term stability, camera, stutter or FPS result.
+The next boot with the updated local policy has not been tested.
+
+For an owner-requested rollback, restore the saved pre-change configuration
+and its matching startup-policy snapshot together, preserving unrelated
+settings and the disabled resident-monitor policy. A subsequent setting change
+also requires reopening affected applications. Exact private backups, loader
+output and receipts remain local; no binary or raw diagnostic is published.
+The sanitized result is
+[`validation/build34-pr28-daily-config-20261118.json`](validation/build34-pr28-daily-config-20261118.json).

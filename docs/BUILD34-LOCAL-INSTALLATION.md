@@ -5,7 +5,8 @@ hardware acceleration and desktop takeover on the local machine. The running OS
 was read as macOS 26.7.2, build 25G332. This is an experimental owner opt-in;
 long-term stability, background stutter, sleep/wake and physical scanout FPS are
 not accepted by this request or by the bounded observations below. Build41 and
-build42 remain withdrawn. PR28's default GPU-wait opt-in remains disabled.
+build42 remain withdrawn. The original activation kept the PR28 daily wait
+off; the owner's later persistent daily setting is recorded below.
 
 The installation uses the already reviewed build34 ACQUIRE-prefix kernel and
 the unchanged default-branch plugin, including A1/A2/corrected-A3. Its activation
@@ -160,3 +161,24 @@ The earlier supervised-installation JSON is retained as historical evidence;
 its live-guardian observation describes that earlier readback. Long-term
 stability, sleep/wake, background stutter and physical scanout FPS remain
 unaccepted, and PR28's default wait opt-in remains disabled.
+
+## Subsequent owner-selected PR28 daily wait
+
+Later on 2026-11-18 the owner requested PR28 waiting by default for daily
+applications. The installed release plugin's supported persistent configuration
+now supplies `NVMTL_SURFACE_COMMIT_WAIT=1` to newly started processes. The
+compiled policy, accepted kernel and plugin binaries remain unchanged;
+WindowServer is still excluded and the default budget is still 250 ms.
+This supersedes the earlier local default-off setting in this installation
+record and its historical JSON, not the original recorded observations.
+
+Fresh administrator and ordinary desktop-user loader checks observed the
+setting after release-constructor environment cleanup. All 18 file-access
+checks and 46 CPU methods passed. The startup-integrity policy allows only
+the exact authorized configuration change, retaining all other checks and
+the owner's disabled resident-monitor policy. The same compositor and active
+acceleration remained healthy. Existing applications were not restarted and
+need reopening to adopt the setting. No new GPU workload or reboot was run;
+next-boot and long-term behavior remain unaccepted. See
+[the policy, validation and rollback record](BUILD34-PR28-WAIT-TIMING.md#2026-11-18-owner-selected-daily-configuration)
+and [sanitized result](validation/build34-pr28-daily-config-20261118.json).

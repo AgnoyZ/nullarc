@@ -279,3 +279,18 @@ background stutter, sleep/wake, physical scanout FPS and the disabled default
 PR28 wait opt-in are unchanged. See the
 [installation-policy update](BUILD34-LOCAL-INSTALLATION.md#owner-requested-monitor-shutdown-and-future-baseline)
 and [sanitized baseline record](validation/build34-owner-baseline-20261118.json).
+
+## Later local PR28 daily-wait selection
+
+The owner's subsequent 2026-11-18 request enables PR28 waiting for newly
+started ordinary applications through the installed plugin's existing
+persistent configuration. This supersedes the prior local default-off setting;
+the compiled policy still requires opt-in and WindowServer remains excluded.
+The 250 ms budget, pending-work semantics, accepted build34 kernel/plugin
+images and disabled resident monitoring are preserved. The exact configuration
+allowance and startup-policy snapshots are recorded separately; the frozen
+trial contract and historical evidence are unchanged. All 46 CPU methods,
+fresh installed-plugin configuration checks and 18 runtime-access checks passed.
+No new GPU workload or reboot was performed, and long-term stability, FPS and
+next-boot behavior are not newly accepted. See the
+[daily configuration record](BUILD34-PR28-WAIT-TIMING.md#2026-11-18-owner-selected-daily-configuration).
