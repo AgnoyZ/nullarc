@@ -755,3 +755,93 @@ The scope is consumed and cannot be replayed. Further desktop work needs
 persisted progress snapshots and a separately justified distinction between
 idle observation and an active refresh test; it must retain the failed scope
 and existing admission requirements.
+
+## Fourteenth packet: persisted post-application desktop progress refusal
+
+The owner's continuation authorized a new one-use diagnostic on 2026-11-18
+from synchronized default-branch checkpoint
+`aa7ed621f1887b23f3cbbb2284334cc70da0332f`. It kept the thirteenth packet's
+exact kernel, plugin, native/PR28/frame programs, frame parser and observers.
+Only the private controller's tail evidence collection changed: it saved an
+actual post-application snapshot and each subsequent before/after snapshot
+before running the original ordered checks, then saved the outcome or exact
+exception. The original pre-application readiness baseline, five-second
+sampling interval, ten-second tail, progress requirement, 250 ms natural-wait
+budget and independent recovery remained. No active redraw stimulus or
+programmatic visibility change was added. Fourteen new CPU cases checked
+failure persistence, refusal propagation and preservation of the original
+gate; all **260 controller/parser CPU methods** passed. Independent prearm
+read-back verified **67 frozen inputs**, the unchanged production/probe
+binaries and the recovery prerequisites. Build41/build42 were not used.
+
+Initialization and both queue adoptions passed. Both native dispatches again
+passed the full-arena checks without an IB mismatch. Three real PR28 natural
+publication waits completed within the unchanged 250 ms budget, taking
+90.306014 ms, 0.250320 ms and 0.327324 ms. The induced one-millisecond timeout
+observed a pending publication group after 1.112829 ms, with command status
+Scheduled (3), then verified actual late completion and output after releasing
+the callback gate. The first-writer phase record again contained 18 balanced
+events on two threads, with no open/dropped events or events after wait return.
+This passing repeat does not explain or repair the eleventh packet's natural
+250 ms failure, and it does not promote the default wait policy.
+
+The ordinary GUI application enumerated the unique target, exited zero and
+passed the unchanged strict frame parser. It completed and verified **2123
+frames in 20.004846155 seconds**, or **106.124285 completed verified frames/s**.
+All 2123 presentation callbacks had positive, strictly ordered timestamps,
+covering 19.991555412 seconds and reporting **106.144817 presentations/s**;
+the original 18-second coverage requirement passed. The 1280-by-800 workload
+verified 135872 sampled pixel channels, with one in-flight command. Completion
+intervals were 8.402358 ms at the median, 16.774650 ms at p95, 19.109392 ms
+at p99 and 27.512582 ms maximum. These bounded application results measure
+neither physical scanout nor full-frame pixels, games, input latency or
+long-run stability. PR28 opt-in remained off in the FPS application. The
+difference from the preceding 119.2 FPS run is not a controlled performance
+comparison and is not attributed to a driver change or the owner's actions.
+
+The **complete desktop scope failed again**, now with the previously missing
+samples preserved:
+
+| Snapshot | Successful display-pipe transactions | Synthetic VBL count |
+| --- | ---: | ---: |
+| Original readiness baseline before the application | 30 | 3236 |
+| Actual snapshot after the application | 2908 | 8962 |
+| First tail sample, 5.170308 seconds after that snapshot | 2954 | 9579 |
+| Second tail sample, another 5.155347 seconds later | 2954 | 10203 |
+
+The first tail check passed the original progress, compositor, panel and
+report checks. Its baseline remained the original readiness sample; the
+additional post-application sample was diagnostic only. Between the two
+tail samples, the successful-transaction count did not increase while the
+synthetic VBL count increased by **624**. The unchanged gate therefore raised
+`no measured frame progress`. Both raw samples were saved before their
+checks, and the refusal receipt records that the second sample's later panel
+and report checks were not reached. Independent re-read of the captured
+values found the same single WindowServer, unchanged control values, and zero
+failure/copy-skip counts. The counter reads are sequential, not atomic.
+
+The source's `gCntIopOk` advances on successful display-pipe transactions
+in `NVDisplayPipe::performTransaction`; `gVblN` advances separately in
+`PhxAMDFB::vblFire`. The observations establish a zero-transaction interval
+with a continuing synthetic timer. They do not establish whether a new
+desktop update was expected, whether the visible desktop froze, or whether
+physical scanout continued. No active redraw or input-response witness was
+collected. Idle observation and a compositor stall therefore remain
+undistinguished. Neither the original failure nor its requirement was
+waived. A further test must establish a bounded, independently observed
+redraw demand and correlate it with the transaction samples; repeating a
+static desktop interval alone cannot establish that distinction.
+
+Automatic restoration and an independent evidence/recovery verification
+completed without errors. The verifier reparsed native, PR28, phase,
+enumeration and complete frame/presentation output, independently reproduced
+the exact tail refusal from the saved samples, and retired this scope's
+exact nine recovery files, job, plugin stage, GUI stage/cache and three
+observers. Final read-back verified the original kernel loaded, original
+plugin and 0700 alias restored with unchanged link identity, **46 protected
+files** and **347 original EFI files** matching, unchanged security/kernel
+collections, zero new matching reports, GPU-off, firmware framebuffer only,
+EFI unmounted and no remaining test/reboot task. The scope is consumed and
+cannot be replayed. Only the bounded GUI application witness passes; the
+complete desktop trial, background-stutter repair, long-run stability and
+persistent adoption remain unaccepted. No further GPU scope is armed.
