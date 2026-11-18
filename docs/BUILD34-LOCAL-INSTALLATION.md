@@ -62,6 +62,47 @@ switch, a dangling symlink or inconsistent acceptance state is an error.
 
 This helper changes no driver, ABI, wait budget, native/FPS acceptance gate or
 recovery deadline. It does not perform installation, initialize a device or
-submit GPU work. Its CPU/filesystem tests cover the observed missing-marker
-regression and refusal paths. A fresh activation packet is required to validate
-the corrected controller; no successful continued installation is claimed here.
+submit GPU work. Its 19 CPU/filesystem tests cover the observed missing-marker
+regression and refusal paths. Another 11 private integration tests exercise the
+actual controller's protected-file loop, including an accepted installation
+with the marker absent, restored markers during recovery, unauthorized
+acceptance, and unrelated missing or changed protected files.
+
+## Third activation: corrected handoff passed and acceleration remains enabled
+
+A fresh packet pinned the pushed default-branch source checkpoint
+`1d4968fbc2ce988c77bdd85b2ec36f435b57f496`. All 311 CPU controller/parser checks
+passed, including the 30 new marker regression and integration checks. The
+production driver and probe binaries were unchanged from the preceding packet.
+
+The new boot passed initialization, both queue adoptions, both native full-arena
+checks and the original Metal admission tests. All three natural writer waits
+completed within the unchanged 250 ms budget; the longest was about 121.96 ms.
+The intentional timeout retained its pending state and later completion proof.
+
+The ordinary GUI application passed 2,146 verified frames and 137,344 sampled
+channels, reporting about 107.30 completed verified FPS over its 20-second
+measurement. Both active-demand tail intervals passed the original desktop
+gates. Each contained 21 draw callbacks; the second interval had 29 additional
+compositor presents. The panel timing remained 2560 by 1600 at the reported
+120,000 mHz setting, without treating its synthetic VBL counter as measured FPS.
+
+After independent reparsing, installation handoff completed. A separate live
+readback verified the exact loaded build34 kernel, candidate plugin and readable
+alias, WindowServer's plugin/RADV mappings, the same compositor process,
+enabled desktop controls, zero copy failures/skips, no new matching diagnostic
+reports, and a live installation guardian. The expected missing OFF marker no
+longer triggered rollback. The EFI candidate and original recovery backup were
+read back exactly, unrelated EFI files matched, and the volume was unmounted.
+No test clients or pending reboot remained. OS security settings were unchanged.
+
+At that readback, hardware acceleration and desktop takeover were **active**,
+and supervised persistent startup was configured. A subsequent accelerated
+restart has not been tested by this packet. Original kernel/plugin backups,
+failure recovery, and the owner's kill switch remain available; this successful
+local opt-in does not establish long-term stability, sleep/wake behavior,
+background-stutter repair, universal workload compatibility or a general release
+recommendation. PR28's default wait opt-in remains disabled.
+
+The sanitized result is recorded in
+[`validation/build34-local-installation-20261118.json`](validation/build34-local-installation-20261118.json).

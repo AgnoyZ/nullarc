@@ -236,3 +236,16 @@ not functional adoption or hardware acceptance. Future merges will not re-offer
 the deferred patches automatically; use the disposition ledger for a separately
 reviewed minimal build34 backport. All existing scope, publication and hardware
 execution boundaries continue to apply.
+
+## 2026-11-18 local installation clarification
+
+The owner separately requested local installation, hardware acceleration and
+desktop takeover on the default build34 branch. A fresh supervised activation
+from source checkpoint `1d4968fbc2ce988c77bdd85b2ec36f435b57f496` passed bounded
+native, Metal, GUI frame and active-demand compositor checks and remained
+enabled after correcting an installation-monitor OFF-marker regression. This
+is an experimental local opt-in, with exact backup and independent failure
+recovery retained. It does not clear the unresolved long-term stability,
+background-stutter, sleep/wake or default PR28 wait-policy holds. Build41/build42
+remain withdrawn. See [the installation record](BUILD34-LOCAL-INSTALLATION.md)
+for the earlier controller-triggered rollback, current live readback and limits.
