@@ -1,0 +1,137 @@
+{
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "kind": "bounded-native-HIGH-callout-pending-to-dispatch-observation",
+  "status": "long-queue-delays-measured; residual-stutter-unresolved",
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "accepted_runtime_source": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "candidate_source_commit": "439f8a5bc3e086770df7b576897fbb11d7ccc9f1",
+  "same_candidate_boot_preserved": true,
+  "capture": {
+    "requested_seconds": 12,
+    "fresh_scope": true,
+    "probe_errors": 0,
+    "reported_drops": 0,
+    "stderr_empty": true,
+    "tracer_returncode": 0,
+    "supervisor_timeout_triggered": false,
+    "new_applications_launched": 0,
+    "explicit_GPU_submissions": 0,
+    "normal_app_or_physical_FPS_benchmark": false,
+    "query_entries": 16,
+    "paired_query_exits": 16,
+    "callback_entries": 372,
+    "paired_callback_exits": 372,
+    "pending_enqueue_entries": 374,
+    "enqueue_entries_without_observed_dispatch": 2,
+    "reason_for_unobserved_dispatch_not_determined": true
+  },
+  "identity_and_clock_guard": {
+    "matching_current_KDK_native_function_arguments_and_offsets_verified": true,
+    "ONCE_RUNNING_deferrals_not_treated_as_fresh_pending_enqueues": true,
+    "every_dispatch_matches_pending_entry_call_pointer_and_native_timestamp": true,
+    "matched_dispatches": 372,
+    "unmatched_dispatches": 0,
+    "queue_delays_use_DTrace_timestamps_on_both_ends": true,
+    "native_Mach_timestamp_used_for_identity_only_not_cross_clock_subtraction": true,
+    "no_new_physical_memory_access_or_AML_evaluation": true
+  },
+  "same_group_queue_delays": {
+    "n": 372,
+    "median_ms": 0.07689399999999999,
+    "p99_ms": 460.048911,
+    "maximum_ms": 466.238003,
+    "over80ms": 105
+  },
+  "selected_callback_queue_delays": {
+    "mk_timer_expire": {
+      "n": 48,
+      "median_ms": 0.0355265,
+      "p99_ms": 202.173707,
+      "maximum_ms": 202.173707,
+      "over80ms": 3
+    },
+    "filt_timerexpire": {
+      "n": 225,
+      "median_ms": 0.093235,
+      "p99_ms": 460.063498,
+      "maximum_ms": 466.238003,
+      "over80ms": 73
+    },
+    "tcp_run_timerlist": {
+      "n": 34,
+      "median_ms": 0.0553785,
+      "p99_ms": 456.214327,
+      "maximum_ms": 456.214327,
+      "over80ms": 8
+    }
+  },
+  "query_relationship": {
+    "long_queue_windows": 105,
+    "coverage_uses_clipped_interval_unions": true,
+    "minimum_complete_query_nonblocked_union_coverage_percent": 99.326834332801,
+    "median_complete_query_nonblocked_union_coverage_percent": 99.92047031494512,
+    "all_long_delay_enqueue_active_count_snapshots_equal_one": true,
+    "both_Q47_and_Q48_matter_not_only_Q48_polling": true,
+    "nonblocked_means_running_or_runnable_not_exact_CPU_time": true,
+    "group_counter_snapshots_not_a_continuous_schedule": true,
+    "controlled_causal_intervention_performed": false,
+    "all_interactive_stutter_explained": false
+  },
+  "long_Mach_timer_queue_windows": [
+    {
+      "queue_delay_ms": 145.476522,
+      "all_query_nonblocked_union_coverage_percent": 99.91978155760418,
+      "enqueue_active_snapshot": 1,
+      "enqueue_pending_snapshot": 3
+    },
+    {
+      "queue_delay_ms": 202.173707,
+      "all_query_nonblocked_union_coverage_percent": 99.85136840766341,
+      "enqueue_active_snapshot": 1,
+      "enqueue_pending_snapshot": 2
+    },
+    {
+      "queue_delay_ms": 132.236852,
+      "all_query_nonblocked_union_coverage_percent": 99.8068087706746,
+      "enqueue_active_snapshot": 1,
+      "enqueue_pending_snapshot": 7
+    }
+  ],
+  "final_independent_readback": {
+    "status": "passed",
+    "candidate_installed_and_loaded": true,
+    "exact_candidate_cache_and_accepted_recovery_verified": true,
+    "full_cache_metadata_and_image_records_verified": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images_preserved": 415,
+    "original_loaded_ACPI_and_full_EFI_recovery_verified": true,
+    "current_boot_accelerated_startup_passed": true,
+    "startup_supervision_ended": true,
+    "one_shot_observer_and_GUI_jobs_removed": true,
+    "new_diagnostic_reports": 0,
+    "new_error_counters": 0
+  },
+  "all_finite_tracers_and_supervisors_exited": true,
+  "ACPI_debug_flags_preserved": true,
+  "existing_ktrace_session_preserved": true,
+  "candidate_remains_active": true,
+  "accepted_owner_baseline_reselected": false,
+  "PR28_daily_wait_preserved": true,
+  "wait_budget_ms": 250,
+  "WindowServer_wait_exclusion_preserved": true,
+  "resident_monitor_enabled": false,
+  "driver_or_policy_or_EFI_changes": 0,
+  "power_actions": 0,
+  "firmware_acknowledgment_contract_validated": false,
+  "production_repair_installed": false,
+  "general_stutter_repair_accepted": false,
+  "physical_scanout_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "raw_identifiers_stacks_logs_firmware_or_KDK_material_published": false,
+  "next_constraint": "Evaluate a bounded reversible query-queue isolation mechanism that preserves query ordering, serialization, firmware acknowledgment and power updates; existing observations are not a controlled isolation treatment or hardware acceptance."
+}

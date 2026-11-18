@@ -1042,3 +1042,55 @@ stutter is unresolved. Next distinguish pending-to-dispatch delay and runnable
 interpreter work from acknowledgment latency before selecting a minimal
 semantics-preserving intervention. See the sanitized
 [scheduler compensation record](validation/build34-ec-scheduler-compensation-20261119.json).
+
+
+## Pending-to-dispatch delay measured directly
+
+A further fresh 12-second native trace on November 19, 2026 measures actual
+pending-to-dispatch delay in the same query callback group. The matching KDK
+confirms the pending-enqueue and invoke argument layout. Every measured dispatch
+matches its pending entry by both call-object pointer and the native pending
+timestamp; ONCE/RUNNING deferrals are not recorded as new pending entries.
+Only DTrace timestamps are subtracted. The native Mach timestamp is an identity
+guard, avoiding the earlier cross-clock-origin pitfall.
+
+All 372 observed callback entries match a pending entry, and all 372 pair with
+an exit. There are 374 pending-enqueue entries; the two without an observed
+dispatch may be pending, canceled or otherwise outside the finite window and
+are not labeled as failed callbacks. All 16 query entries have exits and paired
+scheduler transitions. No probe error, buffer drop, stderr output or timeout
+was reported.
+
+| Same-group pending-to-dispatch delay | Calls | Over 80 ms | Maximum |
+| --- | ---: | ---: | ---: |
+| All observed callbacks | 372 | 105 | 466.238 ms |
+| Mach timer expiry | 48 | 3 | 202.174 ms |
+| kqueue timer expiry | 225 | 73 | 466.238 ms |
+| TCP timer list | 34 | 8 | 456.214 ms |
+
+The three long Mach timer queue waits were 145.477, 202.174 and 132.237 ms.
+Across all 105 long queue windows, clipped interval unions of complete
+queries' nonblocked intervals cover at least 99.327%, with a 99.920% median.
+Every long-delay enqueue snapshot had one active group worker. Both `_Q47`
+and `_Q48` matter: `_Q48` alone does not cover every long queue window.
+Nonblocked intervals include running/runnable time; these are not continuous
+CPU schedules, and snapshots do not replace a controlled isolation test.
+
+This directly demonstrates delayed system timer dispatch alongside runnable
+AML query work. It substantially strengthens the queue-contention explanation
+while preserving the earlier finding that query **sleep** releases capacity.
+It does not establish every GUI pause's cause, firmware acknowledgment success,
+physical FPS or a production repair. A future isolation treatment must preserve
+query ordering, serialization, acknowledgment and power updates; no supported
+priority setting was found in the reviewed native start path, and no private
+Apple object or callback was modified here.
+
+No new application, explicit GPU workload, driver, EFI, ACPI, policy or power
+action was introduced. The finite tracer/supervisor exited. Final independent
+readback again passed the exact active candidate/cache and accepted recovery,
+all 416 records/29 codeless records and 415 unrelated images, original loaded
+ACPI/full EFI recovery, current-boot accelerated startup and the same
+WindowServer. Error counters and matching reports did not increase. PR28 daily
+waiting remains enabled, its 250 ms budget and WindowServer exclusion remain
+unchanged, and resident monitors remain disabled. See the sanitized
+[direct queue-delay record](validation/build34-high-callout-queue-delay-20261119.json).
