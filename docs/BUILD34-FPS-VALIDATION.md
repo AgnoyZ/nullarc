@@ -354,3 +354,69 @@ Final read-back confirmed GPU-off, firmware framebuffer only, EFI unmounted
 and no next GPU/reboot task armed. The scope is consumed and the verifier
 performed zero GPU calls. All earlier failures and the limited root-control
 acceptance remain preserved.
+
+## Ordinary-user matching observation: accelerator returned, Metal list empty
+
+An eighth fresh packet on 2026-11-18, based on
+`5f6d9a03d2e5c250cee45df6816a4552a9a137da`, retained the seventh packet's
+ordinary-user launch route, exact frame probe, initialization/open observers,
+existing parsers, kernel, plugin and frame workload. Its only new runtime
+diagnostic observed the test process's original `IOServiceGetMatchingServices`,
+`IOServiceGetMatchingService` and `IOIteratorNext` calls. It copied only bounded
+matching metadata before the consuming API received the dictionary, forwarded
+each original call once, preserved its result and `errno`, and queried service
+classes only after the original call returned. It made no additional matching,
+iterator-consumption or client-open call and changed no admission policy.
+
+Preparation passed **173 CPU/controller/parser methods**, including 45 new
+matching-parser methods, plus **21 ASan/UBSan forwarding/ownership cases**.
+Root and ordinary-user native checks preserved the results for a deliberately
+nonexistent service class and one null-iterator call; non-null iterator
+forwarding and correlation were separately CPU-fake tested. The exact FPS
+launch route and original/candidate plugin loaders passed with both observation
+libraries injected and no initializer or client-open calls during those checks.
+
+The trial passed initialization, both native full-arena checks and both PR28
+admission probes. Readiness observed **five additional successful present
+transactions in 9.196628987 seconds**, unchanged panel timing, the same
+WindowServer and mapped plugin/RADV images. The ordinary-user application
+nevertheless enumerated **zero Metal devices**, invoked neither observed
+initializer and returned **exit 22 after 9.426746181 seconds**. It reached no
+window setup or frame worker and produced zero frame records; ordinary-user
+FPS remains unaccepted.
+
+All four matching-observer events occurred inside the Metal-enumeration
+interval, in this order:
+
+1. A successful matching-services call returned a nonzero iterator; its
+   provider-class metadata was unknown.
+2. The original next call on that observed iterator returned `IOSurfaceRoot`.
+3. An original next call on an iterator whose matching source was **not
+   observed** returned **`NMXAccel`**.
+4. Another original next call returned no service.
+
+The unchanged open observer separately recorded only the successful
+`IOSurfaceRoot` open, between the second and third matching events. Both
+observers completed without dropped, inflight or output-error events. The
+matching observer also reported no iterator-map errors or additional calls.
+
+This demonstrates that the ordinary-user process received an `NMXAccel`
+service from an existing iterator. It does not establish that service's
+matching dictionary, capture every internal discovery path, explain the later
+empty Metal list, or prove a permissions denial. Diagnosis should now inspect
+the filtering/plugin-discovery path after that service result and before the
+uninvoked device initializer. The later allow-list/Vulkan initialization must
+not be treated as an established rejection point. No production fix, game
+FPS, background-stutter repair or persistent desktop adoption is accepted.
+
+Independent review reparsed the original observations, exact event ordering,
+startup/device summaries, readiness binding, native output and both PR28
+outputs before retirement. The original kernel and complete plugin were
+restored; all 46 protected files and 347 original EFI files matched, with
+protected links/security/kernel collections unchanged and zero new matching
+diagnostic reports. Only the exact nine recovery files, restore-only job,
+plugin stage, FPS stage/cache and both observer stages were removed. Final
+read-back confirmed GPU-off, firmware framebuffer only, EFI unmounted, no
+remaining test client/held process and no next GPU/reboot task armed. The
+scope is consumed; the independent verifier performed zero GPU calls. All
+earlier failures and the bounded root-only control remain preserved.
