@@ -222,3 +222,17 @@ original34 native probe again failed its second guarded dispatch at `0x2010`
 publication wait was exercised. The pre-test plugin was restored, one recovery
 reboot returned to GPU-off/firmware framebuffer, and the consumed job was
 removed. This does not clear any existing HOLD or authorize automatic retries.
+
+
+## Upstream history reconciliation on 2026-11-18
+
+The owner's request to resolve the 46-commit upstream history gap is recorded in
+[the per-commit compatibility merge review](UPSTREAM-SYNC-20261118.md). The
+merge retains the complete pre-merge `src/` and `tools/phxctl/` trees and all
+existing hardware records, including A14's desktop-tail failure. Only the
+release-package PCI guard, its CPU test and the output-ignore rule are adopted
+from upstream; the other runtime changes are explicitly deferred. Ancestry is
+not functional adoption or hardware acceptance. Future merges will not re-offer
+the deferred patches automatically; use the disposition ledger for a separately
+reviewed minimal build34 backport. All existing scope, publication and hardware
+execution boundaries continue to apply.

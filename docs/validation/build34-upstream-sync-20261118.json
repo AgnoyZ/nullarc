@@ -1,0 +1,658 @@
+{
+  "date": "2026-11-18",
+  "kind": "reviewed-build34-compatible-history-merge",
+  "default_branch": "upstream34/vram-layout-fix",
+  "pre_merge_head": "908bbd2e5b62785f1344ed493ca795cd87089f46",
+  "upstream_tip": "3497d87b229e4839d8d2a03ebe9127f2a30f332b",
+  "merge_base": "9dd76b604fca5e0125bd3caa5723df0f611ff27f",
+  "before_local_ahead": 78,
+  "before_local_behind": 46,
+  "upstream_commits_reconciled": 46,
+  "all_upstream_runtime_fixes_adopted": false,
+  "runtime_source_changed": false,
+  "deployment_performed": false,
+  "GPU_execution_performed": false,
+  "new_binary_or_firmware_published": false,
+  "protected_subtree_ids": {
+    "src": "444b0e4d78516f4de5ee032eca2f8d094c5f5997",
+    "tools/phxctl": "f50ec449fc923206f9c64bfdc025bc8939aa3041",
+    "mesa-patches-build34": "40292ab6eb5a5b1f6afc6132062c4b77447f6f1c",
+    ".github": "976309876738a61471e4334a86347e6a7d6bbfcf",
+    "hardware": "70f13423db0c02156c53b189dfe6d20d59474ef5",
+    "LICENSES": "d1295d8f029de4492f3059512f7e19cb22e02356"
+  },
+  "kernel_source_sha256": "fffd2bdfea25ca87312679e194949f2538807b43610d157f06c9dde0d33a70d0",
+  "license_review": {
+    "license_files_changed": false,
+    "new_code_scope": "tools/release and CPU-only tests",
+    "applicable_license": "MIT OR GPL-2.0-only (repository LICENSE)",
+    "copied_runtime_or_vendor_binary": false
+  },
+  "upstream_commits": [
+    {
+      "commit": "e0ee87f1cc8646524e0144739519176a81c84231",
+      "subject": "tests: add test_wait_seq unit test for doWaitSeq adaptive polling & retirement",
+      "decision": "deferred",
+      "reason": "Wait-sequence model test; keep the build34 production-function regressions and wait policy pinned."
+    },
+    {
+      "commit": "27c741b038257ab1419ce70e7175b5e5da6378b6",
+      "subject": "build: ignore release/ output directory",
+      "decision": "adopted",
+      "reason": "Ignore release/ output alongside the existing local privacy/build exclusions."
+    },
+    {
+      "commit": "8aba872560a3c9b7dc7a0ddebfad001c6dddf315",
+      "subject": "docs: update README and README_RU with v0.4.0 status, benchmarks, and multi-GPU support",
+      "decision": "deferred",
+      "reason": "Upstream release, multi-GPU and benchmark claims are not local build34 validation; preserve the fork status."
+    },
+    {
+      "commit": "6c19fccc9df6a3a08e105fc4eaad2f36f8b05145",
+      "subject": "BUGS.md: mark B-32, B-30, B-14, B-01, B-28, B-33 as resolved; update B-24 with Isaac telemetry",
+      "decision": "deferred",
+      "reason": "Upstream resolved-bug status does not prove these fixes are present or accepted on pinned build34."
+    },
+    {
+      "commit": "7c22f1ae18b018259d1384469c176bad5f1ec6af",
+      "subject": "BUGS.md: mark B-02, B-06, B-07, B-24 as resolved, B-25 as bypassed",
+      "decision": "deferred",
+      "reason": "Preserve local bug-status context rather than importing reference-machine acceptance."
+    },
+    {
+      "commit": "de42aed357f1b4d3368200268046fbf9a843fabb",
+      "subject": "phxfb: fix backlight power cut on sleep via PANEL_BLON (kBlPwrSeq) and displayPower state tracking",
+      "decision": "deferred",
+      "reason": "PANEL_BLON/display power sequencing changes runtime hardware behavior; needs an isolated build34 review."
+    },
+    {
+      "commit": "e31ad72dd93335475dc37f93face3290e82bb4e7",
+      "subject": "BUGS.md: mark B-08 sleep backlight bug as resolved",
+      "decision": "deferred",
+      "reason": "Do not mark the upstream sleep/backlight fix accepted locally without adopting and validating its code."
+    },
+    {
+      "commit": "b55302b63551d5d20992c9a9fb142f639fb20ee4",
+      "subject": "phxfb, phxbringup: fix dangling PTE on boFree, vbl drift on sleep, and joinPMtree hierarchy",
+      "decision": "deferred",
+      "reason": "BO PTE teardown, vblank sleep accounting and power-tree direction alter the pinned kernel/framebuffer."
+    },
+    {
+      "commit": "a66fe083f8f388067d5c4e2b7866816aca5a650a",
+      "subject": "BUGS.md: record audit bugs B-34, B-35, B-36, B-37 and move B-08 to fixed",
+      "decision": "deferred",
+      "reason": "Keep the upstream audit in its original history; do not replace local bug-status context."
+    },
+    {
+      "commit": "08c53866107e92df04e55a7a60518364c7f10bfa",
+      "subject": "fix(input,perf): fix Isaac slow-motion, hoist SSE blit save/restore, and trackpad corner click/drag",
+      "decision": "partly-already-present",
+      "reason": "A1 sampler/surface keys are already locally backported; retain the tested local implementation. GL pacing and SSE changes are deferred."
+    },
+    {
+      "commit": "0f894c10427bfbc33f75ddb434346721ba1936a7",
+      "subject": "fix(sleep): enable XS3 to _S3 patch, implement familyDidWake in PhxAMDFB to unblock WindowServer",
+      "decision": "deferred",
+      "reason": "Sleep/wake callback and ACPI changes require a separate hardware scope; do not import them for ancestry."
+    },
+    {
+      "commit": "1e0dbe97f0078d386c762084287a50bf535475aa",
+      "subject": "fix(fan,acpi): add EC fan quiet mode to SSDT-FAN, sysctl to PhxAccel, and fix ALIB AE_AML_NO_RETURN_VALUE",
+      "decision": "deferred",
+      "reason": "Reference-machine EC/fan/ACPI addresses and behavior are not portable build34 fixes."
+    },
+    {
+      "commit": "61ee3f9c93d87e1d56ea6260c5ebcb398499ffd3",
+      "subject": "fix(display,fan): fix B-41 boot hang via SSE BAR0 scanout blit, quiet fan profile, and document DCN 3.1.4 DMUB requirement for B-11",
+      "decision": "deferred",
+      "reason": "BAR0 SSE scanout and fan changes alter the display path and hardware policy; retain the accepted local path."
+    },
+    {
+      "commit": "b7c6d4a3fa6b986ae7236cc919c89061f413c695",
+      "subject": "feat(display,hdmi): implement dynamic HDMI head spawn via debug.phxfb_hdmi and multi-head publication",
+      "decision": "deferred",
+      "reason": "Dynamic HDMI head publication and multi-head modesetting are outside the accepted eDP build34 configuration."
+    },
+    {
+      "commit": "130bd0aea761f168fb562a3fa1c0646b9293be5e",
+      "subject": "fix(install): preserve kernel collections on failure and verify release PCI matches",
+      "decision": "partially-adopted",
+      "reason": "Adopt the source-versus-package PCI guard and its CPU test only. Keep install/uninstall and tools/phxctl/kinst.sh pinned; AuxKC failure-safety changes are not claimed adopted."
+    },
+    {
+      "commit": "df56129122396a251b54063e1283cea158599928",
+      "subject": "fix(gpu): serialize queue retirement and validate watchdog VMID ownership",
+      "decision": "deferred",
+      "reason": "Queue retirement serialization and watchdog VMID generations need a minimal build34-specific backport, not a wholesale kernel replacement."
+    },
+    {
+      "commit": "7017335da92656bf2135cdb601a5520e3493e7fe",
+      "subject": "fix(gpu): retain and queue every pending client fence",
+      "decision": "deferred",
+      "reason": "Pending-fence list and retained DMA destinations change client lifetime and retirement; review together with its dependency chain."
+    },
+    {
+      "commit": "ce3f9693296e0ad795ba8095221223bb613e7bf3",
+      "subject": "fix(gpu): wait for client commands before freeing mapped buffers",
+      "decision": "deferred",
+      "reason": "Waiting before BO unmap/free changes blocking and lifetime behavior; no new native wait is admitted here."
+    },
+    {
+      "commit": "bfdedeb95a336671c9e18eaa747521334edb5d0f",
+      "subject": "fix(gpu): defer closed clients until GPU retirement",
+      "decision": "deferred",
+      "reason": "Deferred client-close teardown depends on the new retirement/lifetime implementation."
+    },
+    {
+      "commit": "cc70745fd79d1e03343cba3566be1fafa82ed153",
+      "subject": "fix(gpu): preserve DMA resources when stopping an active service",
+      "decision": "deferred",
+      "reason": "Service-stop DMA quarantine and lifecycle locks change unloading and resource ownership."
+    },
+    {
+      "commit": "5fbc11a4f8c046913fb1359437de5a804aaea727",
+      "subject": "fix(gpu): reject overflowing ranges and roll back failed GPU mappings",
+      "decision": "deferred",
+      "reason": "Range/VM-map rollback safety is a high-priority future isolated backport; preserve the approved kernel for this sync."
+    },
+    {
+      "commit": "67dce08b30c624592e0ae4e05768574360551688",
+      "subject": "fix(gpu): serialize debug DMA buffer access and preserve exposed pages",
+      "decision": "deferred",
+      "reason": "Serialized debug-DMA ownership and boot-lifetime page retention change original helper/kernel semantics."
+    },
+    {
+      "commit": "5ee5f231b1cf4cf9e3e829372f56f95ec249efe6",
+      "subject": "fix(gpu): propagate TLB invalidation failures and retain affected mappings",
+      "decision": "deferred",
+      "reason": "TLB failure propagation and resource retention depend on the newer VM/lifecycle implementation."
+    },
+    {
+      "commit": "212b4484a0e7d46b742376b065b1fdc8c2746c3d",
+      "subject": "fix(network): scope UE200 recovery to the current dongle interface",
+      "decision": "deferred",
+      "reason": "UE200 network recovery is unrelated to the selected GPU baseline; do not copy reference-machine interface configuration."
+    },
+    {
+      "commit": "b4cd87213906165cd403bdba8b74fbfc8fcb90e1",
+      "subject": "fix(boot): apply the hang window before deciding to reboot",
+      "decision": "deferred",
+      "reason": "Boot hang-window/reboot behavior remains pinned; this repository sync does not change automatic recovery."
+    },
+    {
+      "commit": "b787e240f5199ae36ffa1e0843d61e8559ae9b0f",
+      "subject": "fix(gpu): preserve permanent bind failures through submission",
+      "decision": "deferred",
+      "reason": "Permanent VM-bind failure propagation belongs with the deferred VM/TLB changes."
+    },
+    {
+      "commit": "22efbe67946f25b776ac7c6462ad36c92bbe3cac",
+      "subject": "fix(boot): propagate bring-up failures and retain owned watchdogs",
+      "decision": "deferred",
+      "reason": "The local 90bb06f helper correction already handles absent watchdogs/initializer errors narrowly; retain it rather than replacing boot/admission behavior."
+    },
+    {
+      "commit": "605be2e7318c75634f5c4b7db4a92df28ff322a9",
+      "subject": "fix: reject incomplete scanout captures and record cursor artifacts",
+      "decision": "deferred",
+      "reason": "Scanout-dumper validation is separate from this package-only change; retain the current capture tool and local evidence."
+    },
+    {
+      "commit": "531bac34989f32b861c77f5788290b9b6615405d",
+      "subject": "fix: preserve surface contents outside render clears",
+      "decision": "deferred",
+      "reason": "Render-clear preservation changes runtime synchronization and content transfer; requires isolated plugin validation."
+    },
+    {
+      "commit": "ffa4635e26d4c51f231e81f367415feba43ee527",
+      "subject": "test: reproduce incomplete format-view clear on native Metal",
+      "decision": "deferred",
+      "reason": "Native Metal reproducer belongs with the deferred format-view fix; do not imply it was run locally."
+    },
+    {
+      "commit": "10c9e6560cd283cefeb9918b24d1e61b41b3f173",
+      "subject": "fix: clear full format-view attachments before smaller render passes",
+      "decision": "deferred",
+      "reason": "Full format-view clear semantics affect rendering correctness and remain a separate plugin backport."
+    },
+    {
+      "commit": "87aa3542c0997a64b1a5e3991a9c915f57e0a74a",
+      "subject": "test: verify format-view clear using isolated plugin on Radeon 780M",
+      "decision": "deferred",
+      "reason": "Upstream hardware evidence is retained in upstream history, not adopted as evidence for this machine."
+    },
+    {
+      "commit": "fa09ff0ed8bcc01b4310d1d55ae9fd0d0113a658",
+      "subject": "test: cover sRGB clear conversion and secondary color attachment",
+      "decision": "deferred",
+      "reason": "sRGB/secondary-attachment cases depend on the deferred format-view change and its reproducer."
+    },
+    {
+      "commit": "e44deb7ab3c9029e69a3b4d2fb0bce324f8999ba",
+      "subject": "fix: refuse unavailable LOAD render passes instead of clearing attachments",
+      "decision": "deferred",
+      "reason": "Refusing unavailable LOAD render passes changes runtime failure behavior; review with error propagation."
+    },
+    {
+      "commit": "9543d435d7a12f8c60d3eedc6ee00c2ad12e6308",
+      "subject": "fix: reject submissions containing failed render-pass recordings",
+      "decision": "deferred",
+      "reason": "Recording-failure propagation renames/extends command-buffer error state and must be integrated as a coherent plugin change."
+    },
+    {
+      "commit": "5fcbdd9dc3e7fedfa2e9570a92d61463b1d983d6",
+      "subject": "test: verify failed render recording is retired without native GPU submit",
+      "decision": "deferred",
+      "reason": "Failed-render native test depends on that deferred plugin implementation; no GPU execution in this sync."
+    },
+    {
+      "commit": "5c175e54eaa0af10fa2644c96bd676f5748328eb",
+      "subject": "fix: preserve encoding failures through empty-part optimization",
+      "decision": "deferred",
+      "reason": "Empty-part optimization must preserve the deferred encoding_error state; do not import only one side."
+    },
+    {
+      "commit": "86111f21a9e2ba869e5cd91f5c02fc5001ed98dd",
+      "subject": "docs: record verified Metal candidate and remaining desktop validation",
+      "decision": "deferred",
+      "reason": "Reference-machine candidate/desktop-validation documentation is not local acceptance."
+    },
+    {
+      "commit": "f2e3cfbafd782ac194b8f0565adf00e0a5e5d544",
+      "subject": "docs: record staged signed Metal bundle ready for desktop validation",
+      "decision": "deferred",
+      "reason": "Upstream signed-bundle staging state is not a candidate on this build34 worktree."
+    },
+    {
+      "commit": "ee87ec70d18bf80d201c63bedd81ea6088851f8f",
+      "subject": "docs: record Metal deployment backup and pending reboot recovery check",
+      "decision": "deferred",
+      "reason": "Upstream installation/backup/reboot records are not local deployment instructions or evidence."
+    },
+    {
+      "commit": "fa84e7d31ac1e2c2453beaf57d3c68b605acb050",
+      "subject": "docs: record applied picker timeout and persistent cursor artifacts",
+      "decision": "deferred",
+      "reason": "Reference-machine picker/cursor state must not replace local failure and recovery records."
+    },
+    {
+      "commit": "e63f19449470bcee7a5c519e36d3323af2d63cc8",
+      "subject": "docs: record confirmed cursor-trail workaround with compositor GPU wait",
+      "decision": "deferred",
+      "reason": "Upstream compositor-wait cursor workaround does not clear local default-wait/desktop HOLDs."
+    },
+    {
+      "commit": "93b51514b8231c7f4fb83861c408919ddfe4c10b",
+      "subject": "fix: validate HDMI modeset before disabling the live stream",
+      "decision": "deferred",
+      "reason": "HDMI mode validation changes the modeset header/path; review with the unadopted HDMI implementation."
+    },
+    {
+      "commit": "7d2b799e61f2894ed5dccc60768aa2a53ef2b8bb",
+      "subject": "fix: reject HDMI modeset without a ready DMUB channel",
+      "decision": "deferred",
+      "reason": "DMUB readiness admission belongs with the deferred HDMI mode path."
+    },
+    {
+      "commit": "3f01d91a5078463ed5c56fa4e6edd86cc2e0d726",
+      "subject": "docs: record live HDMI firmware prerequisite and DMUB validation",
+      "decision": "deferred",
+      "reason": "Keep upstream HDMI firmware prerequisites as reference history; no local firmware/candidate claim."
+    },
+    {
+      "commit": "3497d87b229e4839d8d2a03ebe9127f2a30f332b",
+      "subject": "docs: pin DCN zero-copy mapping path and recover real MPS reproducer",
+      "decision": "deferred",
+      "reason": "Zero-copy mapping/MPS planning and reference-machine records are retained upstream, not promoted as local fixes."
+    }
+  ],
+  "upstream_path_decisions": [
+    {
+      "path": ".gitignore",
+      "decision": "adopt-release-ignore-preserving-local-exclusions"
+    },
+    {
+      "path": "BUGS.md",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "Makefile",
+      "decision": "retain-build34-tests-and-add-PCI-guard-test-only"
+    },
+    {
+      "path": "README.md",
+      "decision": "retain-pre-merge-build34-and-add-sync-disclosure"
+    },
+    {
+      "path": "README_RU.md",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "docs/AUDIT-2026-11-14.md",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "docs/CANDIDATE-2026-11-14.md",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "docs/DISPLAY-COMPUTE-2026-11-14.md",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "hardware/acpi/SSDT-FAN.aml",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "hardware/acpi/SSDT-FAN.dsl",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "hardware/dumps/firebat_u6c/acpi/SSDT-FAN.aml",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "hardware/dumps/firebat_u6c/acpi/SSDT-FAN.dsl",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "install/install.sh",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "install/uninstall.sh",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/amd/phx_dcn314_modeset.h",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/nmplugin/NVMTLEventSync.m",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/nmplugin/NVMTLGLVBlank.m",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/nmplugin/NVMTLObjects.m",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/nmplugin/nvmtl_sampler_key.h",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/nmplugin/nvmtl_vk.c",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/nmplugin/nvmtl_vk.h",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/phxaccel/accel/nvrm-accel.cpp",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/phxaccel/accel/phxagdc.cpp",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/phxaccel/accel/phxfb.cpp",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/phxbringup/PhxBringup.cpp",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/phxbringup/PhxGpuQueue.h",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/phxbringup/PhxPendingFences.h",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "src/phxbringup/PhxRange.h",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_bringup_failures.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_format_view_clear.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_hdmi_modeset_validation.cpp",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_install_safety.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_native_bo_lifetime.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_native_stop.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_native_submit.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_native_sysmem.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_native_vm.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_phx_gpu_queue.cpp",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_phx_pending_fences.cpp",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_phxboot_watch.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_phxctl_cli.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_release_pci_matches.py",
+      "decision": "adopt-exact-upstream"
+    },
+    {
+      "path": "tests/test_render_encoding_failure.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_render_load_failure.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_render_surface_clear.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_scanout_dump.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_ue200watch.py",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tests/test_wait_seq.cpp",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/iosurf/clearprobe.m",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/iosurf/renderfailprobe.m",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/iosurf/scanout_dump.c",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/phxctl/bringup5.sh",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/phxctl/full.sh",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/phxctl/kinst.sh",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/phxctl/mesboot.c",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/phxctl/phxboot.sh",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/phxctl/phxctl.c",
+      "decision": "retain-pre-merge-build34"
+    },
+    {
+      "path": "tools/release/build_release.sh",
+      "decision": "adopt-exact-upstream"
+    },
+    {
+      "path": "tools/release/check_pci_matches.py",
+      "decision": "adopt-exact-upstream"
+    },
+    {
+      "path": "tools/ue200/ue200watch.sh",
+      "decision": "retain-pre-merge-build34"
+    }
+  ],
+  "validation": {
+    "scoped_CPU_checks": "passed",
+    "legacy_full_input_make_target": "refused; not claimed passed",
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "serial_low_priority": true,
+    "checks": [
+      {
+        "name": "baseline unit suite and new release PCI test",
+        "command": "make -j1 test",
+        "result": "passed",
+        "firmware_fixture_cases": "skipped: fixtures absent; synthetic cases passed"
+      },
+      {
+        "name": "build34 layout",
+        "command": "make -j1 test-upstream34-layout",
+        "result": "passed",
+        "unittest_methods": 20
+      },
+      {
+        "name": "integrated submit source identity and refusals",
+        "command": "python3 -B -m unittest discover -s tests -p test_upstream34_submit_memsync.py -v",
+        "result": "passed",
+        "unittest_methods": 6
+      },
+      {
+        "name": "independent hash-pinned production gpuSubmit CPU unit fixture",
+        "result": "passed",
+        "scenarios": 36111,
+        "sanitizers": "ASan/UBSan",
+        "IOKit_or_CoreFoundation_linked": false,
+        "scope": "production function only; not full-input admission",
+        "kernel_source_sha256": "fffd2bdfea25ca87312679e194949f2538807b43610d157f06c9dde0d33a70d0",
+        "function_sha256": "12fcaa4cb7ab0a19df9ac16491e7654362547625e4fbe879840cbfb9d351e722",
+        "fixture_sha256": "27c391c188287d62b72dbc2189e6abe782a6f9a06d1e26205291ca2274ad351c"
+      },
+      {
+        "name": "A1 sampler and surface keys",
+        "command": "make -j1 test-nmplugin-sampler-key test-nmplugin-surface-key",
+        "result": "passed",
+        "sampler_indices": 517,
+        "concurrent_sampler_lookups": 262144,
+        "surface_boundary_keys": 77,
+        "surface_registry_monitor_cycles": 16384
+      },
+      {
+        "name": "A1 descriptor masks",
+        "command": "python3 -B tests/test_nmplugin_descriptor_mask.py",
+        "result": "passed",
+        "cases_per_mode": 321,
+        "modes": [
+          "unset",
+          "0",
+          "1"
+        ],
+        "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+        "dependency_setup": "Initial invocation lacked include path; rerun uses the existing verified clean pinned headers via CPPFLAGS. No source changed."
+      },
+      {
+        "name": "A2 framebuffer and alias, corrected A3 panel",
+        "command": "make -j1 test-upstream34-framebuffer test-upstream34-panel-timing",
+        "result": "passed",
+        "framebuffer_CPU_assertions": 3646,
+        "panel_timing_cases": 43,
+        "panel_callback_CPU_assertions": 511
+      },
+      {
+        "name": "existing plugin PRs and bounded surface publication wait",
+        "command": "make -j1 test-upstream34-plugin-prs test-nmplugin-surface-commit-wait",
+        "result": "passed"
+      },
+      {
+        "name": "existing a613363 alias-mode fixture",
+        "command": "python3 -B tests/test_gpubundle_link_mode.py",
+        "result": "passed",
+        "unittest_methods": 4
+      },
+      {
+        "name": "release script syntax",
+        "command": "bash -n tools/release/build_release.sh",
+        "result": "passed"
+      },
+      {
+        "name": "staged diff whitespace, privacy, exact source and helper subtree preservation",
+        "result": "passed"
+      }
+    ],
+    "preserved_refusals": [
+      {
+        "name": "fixed CPU output destination already exists",
+        "result": "refused as designed",
+        "recipe_changed": false
+      },
+      {
+        "name": "fresh full-input exercise",
+        "result": "refused",
+        "path": "tools/phxctl/relocate_gpubundle.sh",
+        "introduced_by_existing_commit": "a61336393c8d1182af531abb8b544510a8a5765a",
+        "pre_merge_bytes_equal_current": true,
+        "old_recipe_expected_sha256": "6e83b282a4522273a16a7f976eb878c50e49a011a9038f3ae91bc39c275f45c7",
+        "pre_merge_and_current_sha256": "974e72d3abf70c795e1c861ba375df8c589a6bb792d9a9fe9e3b04118654360b",
+        "admission_relaxed": false
+      }
+    ],
+    "new_GPU_or_hardware_acceptance": false,
+    "raw_logs_committed": false
+  }
+}
