@@ -1093,5 +1093,67 @@
     "hardware_mode_rollback_trial_required": true,
     "earlier_GPU_failures_and_root_only_control_preserved": true,
     "GPU_calls": 0
+  },
+  "Metal_alias_mode_trial_boot_guard_followup": {
+    "date": "2026-11-18",
+    "source_commit": "a61336393c8d1182af531abb8b544510a8a5765a",
+    "result": "Metal-alias-mode-hardware-trial-stopped-at-boot-local-device-number-guard-independently-recovered",
+    "kernel_build": 34,
+    "same_kernel_plugin_frame_program_and_observers_as_ninth_packet": true,
+    "only_runtime_trial_variable": "Metal alias mode 0700 to 0755",
+    "CPU_controller_parser_methods": 227,
+    "alias_mode_CPU_methods": 12,
+    "desktop_control_CPU_methods": 46,
+    "boot_guard_failure": {
+      "message": "Metal alias identity drift",
+      "only_changed_identity_field": "boot-local st_dev device number",
+      "inode_owner_target_flags_unchanged": true,
+      "shared_static_guard_blocked_restore_only_job": true,
+      "same_boot_CPU_checks_missed_cross_boot_dependency": true
+    },
+    "execution": {
+      "candidate_kernel_native_framebuffer_loaded": true,
+      "planned_GPU_initializer_started": false,
+      "native_dispatches": 0,
+      "PR28_admission_processes": 0,
+      "FPS_application_launches": 0,
+      "FPS_frame_records": 0,
+      "automatic_retry": false
+    },
+    "independent_restore_only_recovery": {
+      "frozen_controller_and_contract_unchanged": true,
+      "all_frozen_inputs_and_full_kernel_manifests_verified": true,
+      "exact_postboot_link_identity_verified": true,
+      "controls_alias_plugin_and_disk_restored": true,
+      "restoration_errors": [],
+      "recovery_boots": 1,
+      "GPU_calls": 0
+    },
+    "independent_final_readback": {
+      "exact_original_kernel_loaded": true,
+      "candidate_not_loaded": true,
+      "complete_original_plugin_manifest_restored": true,
+      "original_Metal_alias_mode": "0700",
+      "same_alias_inode_owner_target_flags": true,
+      "protected_files_unchanged": 46,
+      "original_EFI_files_exact": 347,
+      "security_links_and_kernel_collections_unchanged": true,
+      "new_matching_reports": 0,
+      "GPU_off": true,
+      "firmware_framebuffer_only": true,
+      "EFI_unmounted": true,
+      "temporary_recovery_files_removed": 9,
+      "restore_only_job_and_exact_temporary_stages_removed": true,
+      "no_remaining_test_jobs_clients_held_processes_or_reboot_requests": true,
+      "no_replay": true,
+      "GPU_calls": 0
+    },
+    "GUI_Metal_enumeration_accepted": false,
+    "GUI_FPS_accepted": false,
+    "background_stutter_repair_accepted": false,
+    "permanent_alias_mode_adoption_accepted": false,
+    "persistent_accelerated_desktop_adoption_accepted": false,
+    "cross_boot_stable_volume_identity_and_independent_recovery_required": true,
+    "earlier_CPU_comparisons_and_GPU_failures_preserved": true
   }
 }

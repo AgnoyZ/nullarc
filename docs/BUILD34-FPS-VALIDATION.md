@@ -525,3 +525,47 @@ enumeration and complete visible-frame trial with an independently armed
 mode rollback are still required. Ordinary-user Metal/FPS, background-stutter
 repair, permanent alias-mode adoption and persistent desktop acceleration
 remain unaccepted. The installed alias is back at its original 0700 mode.
+
+## Tenth packet: stopped by a boot-local identity check, independently recovered
+
+A fresh one-use trial from `a61336393c8d1182af531abb8b544510a8a5765a`
+retained the exact ninth-packet kernel, plugin, frame program, parsers and
+observers. Only the Metal alias mode was temporarily changed from 0700 to
+0755; its inode, owner, target and flags were unchanged. Preparation passed
+**227 CPU/controller/parser methods**, including 12 alias-mode methods and
+46 desktop-control methods. Failure-injection checks required controls,
+alias mode, plugin and disk restoration to be attempted independently.
+
+The first boot stopped before the initializer, native dispatches, PR28
+admission processes or FPS application could run. The new alias guard had
+incorrectly treated the filesystem's boot-local `st_dev` number as a stable
+cross-boot identity. That number changed; the link's inode, owner, target
+and flags did not. Placing this guard in the shared static check also blocked
+the restore-only job before its independent restoration loop. The passing
+same-boot CPU checks had not covered that cross-boot dependency. This is a
+controller failure, not evidence that the alias-mode repair failed or that
+ordinary-user Metal enumeration succeeded.
+
+A separate restore-only script verified every frozen input, both full kernel
+manifests, the exact post-boot link identity, original/candidate plugin
+manifests, protected files and OS security before restoration. It retained
+the failed controller and contract unchanged, restored the original controls,
+0700 alias mode, complete plugin and on-disk kernel, and requested one recovery
+boot. It performed no driver initialization, GPU submission or retry. The
+candidate image's native framebuffer had loaded during the first boot;
+this is not counted as execution of the planned GPU workload.
+
+Independent final verification confirmed the original kernel loaded,
+GPU-off, firmware framebuffer only, all **46 protected files** and **347
+original EFI files** matching, the same alias inode/owner/target/flags at
+0700, unchanged security/kernel collections and **zero new matching
+diagnostic reports**. Only the exact nine recovery files, restore-only job,
+candidate plugin stage, frame stage/cache and three observers were retired.
+There is no remaining test client, held process, next GPU task or reboot
+request. The tenth packet is consumed and cannot be replayed.
+
+Cross-boot link validation needs a stable volume identity together with the
+retained inode, ownership, target and flag checks, plus failure-independent
+recovery. Removing identity checks or reusing this failed scope is not a fix.
+Ordinary-user enumeration/FPS, background-stutter repair, permanent alias-mode
+adoption and persistent desktop acceleration remain unaccepted.
