@@ -2,8 +2,9 @@
 
 Status on 2026-11-18: **both candidate boots failed before accelerated
 startup. The exact accepted build34 installation is restored and independently
-verified. A corrected offline cache preserves the accepted boot-matching
-metadata; it is not installed or hardware-accepted.**
+verified. The corrected cache now preserves the accepted boot-matching
+metadata and is installed under a third exact-image scope; candidate loading
+and hardware acceptance are pending restart.**
 CPU, native, complete-cache and independent installed-state checks passed. The initial
 direct-thread-call candidate failed target linking; a private-provider attempt
 was also rejected. The selected implementation uses public IOKit timer APIs.
@@ -508,3 +509,39 @@ activation scope. The corrected cache is offline-only at this record; real
 loading, stutter repair, workload correctness, physical FPS and long-term
 stability remain unaccepted. See the sanitized
 [failure and metadata-repair record](validation/build34-vbl-cache-metadata-20261118.json).
+
+## Corrected-cache installation under a fresh scope
+
+A third private scope pins the exact corrected cache and the unchanged
+candidate accelerator binary. It preserves both consumed activation scopes,
+the frozen historical packet, accepted recovery copies, original owner policy
+files and all existing startup deadlines. Its preflight and install paths now
+check the actual selected cache's full prelink metadata as well as its image
+identities. This adds a refusal condition; it does not replace or bypass the
+exact loaded-image startup gate with an explicit driver load.
+
+All 99 scoped CPU tests passed: the 74 scope/startup/observer/failure-evidence
+checks plus 25 complete-cache metadata cases. An inactive same-directory
+atomic transition preserved the existing cache permission/flag convention.
+Before installation a fresh Launch Services control in the recovered boot
+again recorded 23 GUI intervals over 100 ms, all overlapping sampled VBL
+plateaus; GUI p99/maximum were 312.362/532.714 ms, while the independent worker
+maximum was 15.016 ms. The same WindowServer survived, all nine onscreen checks
+passed, and no copy/skip/timeout/hang counter increased. This remains a sampled
+GUI/VBL observation, not physical scanout FPS or a root-cause proof.
+
+Actual installation and separate independent readback passed. The disk
+candidate/cache and exact accepted recovery hashes match, all 416 combined
+records and their full policy metadata pass, and all 415 unrelated images are
+preserved. Original loaded ACPI/full EFI recovery and the active accepted
+accelerator identity were rechecked. The candidate is still not loaded in this
+boot. Two finite next-boot jobs are staged without bootstrap; the GUI comparison
+requires successful exact candidate admission and observer acceptance first.
+
+At that installation readback no new reboot had been requested. The existing
+owner authorization covers the test restart. Daily PR28 waiting remains on,
+resident monitoring remains off, and startup failure retains exact accepted
+recovery with at most one recovery restart. Actual candidate loading, stutter
+repair, workload correctness, physical FPS and long-term stability await new
+evidence. See the
+[corrected-cache installation record](validation/build34-vbl-metadata-installation-20261118.json).
