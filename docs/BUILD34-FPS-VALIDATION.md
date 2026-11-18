@@ -472,3 +472,56 @@ removed. Final read-back confirmed GPU-off, firmware framebuffer only, EFI
 unmounted, no remaining test client/held process and no next GPU/reboot task
 armed. The scope is consumed; the independent verifier performed zero GPU
 calls.
+
+## Bundle class lookup: isolated symlink-mode repair, CPU verified
+
+Subsequent CPU-only analysis on 2026-11-18, from
+`7a7618078ab6412e45818a0526bb7ed562b0f5e8`, identified the installed Metal
+framework's plugin-class lookup sequence: read `MetalPluginName`, query the
+trusted GPU-bundle path, create an `NSBundle`, look up `MetalPluginClassName`
+and require an appropriate device subclass. The framework code was read but
+none of these Metal functions was executed; no Apple code or binary is
+redistributed. This narrows the earlier diagnostic without treating the
+ninth packet's absent `realpath` events as proof of complete interception.
+
+A native CPU probe preloaded the unchanged original plugin, as the FPS probe
+does, then performed the same trusted-path and bundle-class queries without
+creating a device. Root and the ordinary GUI user both received a successful
+trust result and the same bundle path. Root obtained the expected
+`NVMTLDevice` class; the ordinary user obtained neither that class nor a
+principal-class fallback. The actual initializer observers recorded zero
+plugin and superclass calls and restored their original implementations.
+The trust check is therefore not the reproduced CPU rejection point.
+
+A separate temporary-alias comparison used the same binary, alias pathname
+and target in fresh processes. With alias mode **0700**, root class lookup
+passed and ordinary-user lookup failed. Changing **only that alias's mode
+to 0755** made both pass. The target plugin's bytes and permissions were
+unchanged, and the exact temporary stage was removed.
+
+A further bounded CPU check reproduced this on the actual installed Metal
+alias: ordinary-user lookup failed at 0700, passed at 0755 with the class
+coming from the exact original plugin and satisfying the device-subclass
+check, then failed again after rollback to 0700. Root passed both modes.
+All five fresh processes passed the original trust query, invoked zero
+device initializers and performed no device enumeration or GPU work. The
+alias's original mode, inode, owner and target were verified after rollback;
+the complete original plugin and GPU-off state were unchanged. The runtime
+alias was not modified and no reboot was requested.
+
+The minimal source repair in `tools/phxctl/relocate_gpubundle.sh` now gives
+only the expected Metal alias mode 0755, using `chmod -h` so the target is
+not followed. It applies to newly created and existing aliases and refuses
+an unexpected Metal link target. It does not change the runtime alias,
+driver/plugin sources, trust checks, OS security or build34 admission. Four
+actual-shell filesystem tests passed, covering a restrictive creation
+umask, existing-link repair with preserved target bytes/metadata, repeated
+execution and rejection before unrelated relocation. Those tests use
+temporary paths and a signature-command stub; the production relocation
+script was not executed against the installed runtime.
+
+This accepts the isolated CPU class-lookup repair only. An accelerator
+enumeration and complete visible-frame trial with an independently armed
+mode rollback are still required. Ordinary-user Metal/FPS, background-stutter
+repair, permanent alias-mode adoption and persistent desktop acceleration
+remain unaccepted. The installed alias is back at its original 0700 mode.

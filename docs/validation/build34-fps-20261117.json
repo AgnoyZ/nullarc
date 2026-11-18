@@ -1015,5 +1015,83 @@
       "exact_IO_matching_observer_stage_removed": true,
       "exact_IO_path_observer_stage_removed": true
     }
+  },
+  "bundle_class_lookup_CPU_followup": {
+    "date": "2026-11-18",
+    "source_commit": "7a7618078ab6412e45818a0526bb7ed562b0f5e8",
+    "result": "CPU-only-ordinary-user-bundle-class-lookup-repaired-by-isolated-Metal-symlink-mode-change-and-rolled-back",
+    "kernel_build": 34,
+    "build41_or_build42_used": false,
+    "installed_framework_code_read_only": true,
+    "Metal_functions_invoked_for_static_analysis": 0,
+    "Apple_code_or_binaries_redistributed": false,
+    "same_trusted_bundle_query_succeeds_for_root_and_GUI": true,
+    "same_trusted_path_returned_for_root_and_GUI": true,
+    "original_plugin_preloaded_as_in_FPS_probe": true,
+    "original_0700_alias": {
+      "root_class_lookup_passed": true,
+      "GUI_classNamed_returned_nil": true,
+      "GUI_principalClass_returned_nil": true,
+      "plugin_initializer_calls": 0,
+      "superclass_initializer_calls": 0,
+      "original_IMPs_restored": true
+    },
+    "temporary_alias_comparison": {
+      "same_binary_alias_path_and_target": true,
+      "only_variable": "Metal alias mode 0700 versus 0755",
+      "root_class_lookup_passed_both_modes": true,
+      "GUI_class_lookup_failed_0700_and_passed_0755": true,
+      "target_bytes_unchanged": true,
+      "exact_stage_removed": true,
+      "GPU_calls": 0
+    },
+    "actual_installed_alias_CPU_comparison": {
+      "fresh_processes": 5,
+      "GUI_control_0700_class_lookup_failed": true,
+      "GUI_treatment_0755_class_lookup_passed": true,
+      "GUI_rollback_0700_class_lookup_failed": true,
+      "root_class_lookup_retained": true,
+      "trust_query_succeeded_in_all_processes": true,
+      "selected_class_matches_exact_original_plugin_and_MTLDevice_subclass": true,
+      "no_device_enumeration_or_initializer_calls": true,
+      "GPU_calls": 0
+    },
+    "source_fix": {
+      "path": "tools/phxctl/relocate_gpubundle.sh",
+      "expected_Metal_alias_only": true,
+      "mode": "0755",
+      "operation": "chmod -h",
+      "new_and_existing_links_handled": true,
+      "unexpected_target_refused": true,
+      "runtime_alias_unchanged": true,
+      "kernel_plugin_ABI_sources_unchanged": true,
+      "trust_and_OS_security_policy_unchanged": true
+    },
+    "actual_shell_fixture_tests": {
+      "path": "tests/test_gpubundle_link_mode.py",
+      "methods_passed": 4,
+      "temporary_paths_only": true,
+      "signature_command_stubbed": true,
+      "GPU_calls": 0
+    },
+    "independent_CPU_final_readback": {
+      "complete_original_plugin_manifest_unchanged": true,
+      "original_0700_Metal_alias_mode_restored": true,
+      "same_alias_inode_owner_and_target": true,
+      "runtime_alias_unchanged": true,
+      "GPU_off": true,
+      "no_kernel_or_plugin_install": true,
+      "no_reboot": true,
+      "exact_CPU_stage_removed": true
+    },
+    "GUI_plugin_class_lookup_CPU_fix_verified": true,
+    "GUI_Metal_enumeration_fix_verified": false,
+    "GUI_FPS_accepted": false,
+    "background_stutter_repair_accepted": false,
+    "permanent_alias_mode_adoption_accepted": false,
+    "persistent_accelerated_desktop_adoption_accepted": false,
+    "hardware_mode_rollback_trial_required": true,
+    "earlier_GPU_failures_and_root_only_control_preserved": true,
+    "GPU_calls": 0
   }
 }
