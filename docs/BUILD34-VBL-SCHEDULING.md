@@ -867,3 +867,92 @@ speculative EC disable, AML rewrite, timer-budget change or rollback.
 
 See the sanitized
 [kernel and ACPI timing record](validation/build34-timer-acpi-correlation-20261118.json).
+
+
+## Executing EC query and power handshake identified
+
+A subsequent fresh native trace identifies the actual EC-query names. The
+original CPU timer application kept its exact executable text and normal
+Launch Services scheduling. The finite diagnostic observes existing kernel
+function entries; it does not request AML evaluation, submit GPU work or
+change ACPI debug flags. The system's existing ktrace owner/configuration is
+identical before and after the capture.
+
+The exact current KDK/report images were matched privately. Generic system
+symbol/sleep probes were restricted to the ACPI wrappers' actual callsites.
+An initial address-based filter missed those callsites because its live
+address origin was wrong; zero hits are not evidence of zero EC work. A short
+broader control exposed that origin difference consistently in two modules,
+but also reported 28 unaligned string-read errors. That control is retained
+and excluded from quantitative attribution. A new scope uses byte reads and
+the independently matched live callsites; it reports no probe errors or
+buffer drops and pairs all 26 query entries with their post-evaluation exits.
+
+| Corrected, instrumented observation | Result |
+| --- | ---: |
+| Native trace / CPU timer elapsed | 24 / 20.328 s |
+| Complete `_Q48` / `_Q47` calls | 13 / 13 |
+| `_Q48` outer-call duration minimum / maximum | 473.805 / 1,318.067 ms |
+| `_Q48` sleep requests / operand | 407 / 10 ms |
+| Sleep requests per complete `_Q48` call | 21–35 |
+| `_Q47` observed direct AML sleep requests | 0 |
+| Mach timer deliveries / deliveries over 80 ms late | 1,155 / 27 |
+| Timer lateness p99 / maximum | 271.008 / 478.853 ms |
+| Direct-wait maximum / intervals over 80 ms | 15.861 ms / 0 |
+| Sampled VBL plateaus over 80 ms | 0 |
+| Long timer windows overlapping `_Q48` | 27 of 27 |
+| Windows contained in one `_Q48`, before clock uncertainty | 14 of 27 |
+
+DTrace's raw clock origin was not assumed equal to the application's Mach
+clock. Wall timestamps were aligned with tight before/after wall-to-Mach
+brackets; their offset differed by 0.048 ms. Clipped `_Q48` interval unions
+cover at least 99.928% of each long timer window, with a median of 100%.
+Overlapping queries and different threads are not added twice. This is
+specific temporal association, not a controlled causal intervention or proof
+that all GUI pauses share one cause. Method duration includes sleeping and
+other waits; it does not mean continuous CPU execution. A paired outer exit
+also does not establish the AML return status.
+
+The matching KDK shows `IOSleep` tail-jumping into `delay_for_interval`.
+Earlier generic return-probe records are therefore not used as actual wake
+or sleep-duration measurements. The durations above instead bracket the
+outer ACPI evaluation wrapper using its symbol creation and post-evaluation
+release callsites.
+
+Private offline disassembly found `_Q47` and `_Q48` in a previously
+undisassembled SSDT. Its saved binary was independently byte-matched to one
+currently loaded dynamic table. `_Q48` conditionally updates power-limit
+fields and calls `VPC0.NEUP` up to twice. That helper writes a firmware
+handshake field in a `SystemMemory` operation region, then polls up to 25
+times with a 10 ms sleep per poll. Its nominal requested-sleep budget is
+250 ms per invocation, or 500 ms for two; these are not hard execution
+limits. Runtime firmware acknowledgment values were not read, so the trace
+does not establish whether a particular poll completed or exhausted its
+counter. Ordinary EC command/timeout counters cannot describe each of these
+memory-region accesses.
+
+The offline tool was obtained from a pinned MaciASL repository blob after
+separate review of the application's GPL-3.0 notice and the ACPICA component's
+own alternative notices. Its build recipe names ACPICA `R09_25_20`, and the
+binary reports version `20200925`; Git blob verification is not a claim of a
+reproduced source build. All tool bytes, notices, raw tables, disassembly,
+addresses and reports remain private. No third-party implementation or
+firmware excerpt is added to this repository.
+
+This narrows the residual investigation to a real power-update/polling path.
+Do not disable `_Q48`, shorten its polling, force acknowledgment, change OS
+identity or bypass the power-limit writes merely to remove the observed
+wait. Next review the firmware acknowledgment contract and native callback
+scheduling while preserving those semantics. PR28's unrelated 250 ms budget
+is not changed by this result.
+
+Final independent readback passed the exact active candidate/cache and
+accepted recovery, full metadata for 416 records/29 codeless records with
+415 unrelated images preserved, original loaded ACPI/full EFI recovery and
+current-boot accelerated startup. The same WindowServer survived; no error
+counter or matching report increased. All finite applications, tracers and
+supervisors exited. Keep daily PR28 waiting and desktop acceleration active,
+the owner-selected baseline unchanged and resident monitors disabled. There
+is no new production patch, restart, physical-FPS result or general-stutter
+repair acceptance. See the sanitized
+[query-identification record](validation/build34-ec-query-identification-20261118.json).

@@ -1,0 +1,184 @@
+{
+  "date": "2026-11-18",
+  "branch": "upstream34/vram-layout-fix",
+  "kind": "bounded-native-EC-query-identification",
+  "status": "Q48-power-handshake-observed; residual-stutter-unresolved",
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "accepted_runtime_source": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "candidate_source_commit": "439f8a5bc3e086770df7b576897fbb11d7ccc9f1",
+  "same_candidate_boot_preserved": true,
+  "collection": {
+    "fresh_finite_scopes": true,
+    "normal_LaunchServices_application": true,
+    "nice": 0,
+    "observed_priority": 37,
+    "same_TimerProbe_executable_text": true,
+    "native_FBT_capture_seconds": 24,
+    "captured_event_counts": {
+      "query_entries": 26,
+      "paired_query_exits": 26,
+      "AML_sleep_requests": 407
+    },
+    "all_query_entries_paired": true,
+    "prior_query_still_open_at_next_entry": 0,
+    "probe_errors": 0,
+    "reported_drops": 0,
+    "tracer_returncode": 0,
+    "query_and_sleep_entry_callers_matched_to_exact_current_images": true,
+    "current_KDK_and_same_boot_report_image_identifiers_privately_matched": true,
+    "two_independent_module_callers_used_to_correct_live_address_origin": true,
+    "method_exit_observed_at_post_evaluation_symbol_release_callsite": true,
+    "exit_does_not_establish_AML_return_status": true,
+    "clock_alignment": "DTrace wall timestamps mapped with before/after wall-to-Mach calibration; not equal raw clock origins",
+    "clock_offset_drift_ms": 0.04792213439941406,
+    "maximum_clock_read_bracket_ms": 0.0012030004654661752,
+    "registry_samples": 202,
+    "maximum_registry_read_ms": 8.97897700087924,
+    "maximum_observer_poll_interval_ms": 920.143177000682,
+    "coarse_registry_intervals_not_used_for_method_event_timestamps": true,
+    "instrumented_not_uninstrumented_FPS_comparison": true
+  },
+  "timer_observation": {
+    "elapsed_ms": 20327.688338,
+    "Mach_timer_lateness": {
+      "n": 1155,
+      "median_ms": 0.037673,
+      "p99_ms": 271.007524,
+      "max_ms": 478.852743,
+      "over80ms": 27
+    },
+    "direct_wait_intervals": {
+      "n": 1796,
+      "median_ms": 10.79359,
+      "p99_ms": 14.815346,
+      "max_ms": 15.861058,
+      "over80ms": 0
+    },
+    "sampled_VBL_plateaus_over80ms": 0,
+    "timer_API_errors": 0,
+    "timer_port_destroyed": true
+  },
+  "executing_queries": {
+    "_Q48": {
+      "complete_calls": 13,
+      "duration_min_ms": 473.80471,
+      "duration_max_ms": 1318.06745,
+      "AML_sleep_request_ms": 10,
+      "total_sleep_requests": 407,
+      "sleep_requests_per_complete_call_min": 21,
+      "sleep_requests_per_complete_call_max": 35,
+      "outer_duration_includes_sleep_and_other_waits_not_continuous_CPU_usage": true
+    },
+    "_Q47": {
+      "complete_calls": 13,
+      "duration_min_ms": 0.269916,
+      "duration_max_ms": 267.88248,
+      "observed_AML_sleep_requests": 0,
+      "zero_direct_sleeps_does_not_prove_no_interpreter_wait": true
+    }
+  },
+  "temporal_association": {
+    "long_timer_windows": 27,
+    "windows_overlapping_Q48": 27,
+    "windows_fully_contained_in_one_Q48_before_clock_uncertainty": 14,
+    "minimum_Q48_union_coverage_percent": 99.92757486980565,
+    "median_Q48_union_coverage_percent": 100.0,
+    "coverage_uses_clipped_interval_union_not_sum": true,
+    "Q47_and_Q48_overlap_not_double_counted": true,
+    "controlled_causal_intervention_performed": false,
+    "all_interactive_stutter_explained": false
+  },
+  "offline_AML_review": {
+    "retained_SSDT_binary_exactly_matches_one_current_dynamic_loaded_table": true,
+    "specific_query_definitions_are_in_previously_undisassembled_SSDT_not_DSDT": true,
+    "identified_call_path": [
+      "_Q48",
+      "VPC0.NEUP",
+      "AcpiExSystemDoSleep",
+      "IOSleep"
+    ],
+    "polling_object_region_type": "SystemMemory",
+    "purpose_observed_in_static_method": "power-limit update followed by firmware acknowledgment polling",
+    "sleep_request_per_poll_ms": 10,
+    "maximum_polls_per_helper_call": 25,
+    "conditional_helper_calls_in_Q48_max": 2,
+    "nominal_sleep_request_budget_per_helper_ms": 250,
+    "nominal_sleep_request_budget_for_two_helpers_ms": 500,
+    "nominal_budget_not_an_actual_execution_deadline": true,
+    "firmware_ack_values_and_success_not_read": true,
+    "no_AML_methods_explicitly_evaluated_by_diagnostic": true,
+    "no_AML_or_EC_or_power_policy_patch": true,
+    "tool": {
+      "repository": "acidanthera/MaciASL",
+      "pinned_commit": "2e1d219913e3b41be68afff1610434a9769b0a0f",
+      "ACPICA_build_recipe_ref": "R09_25_20",
+      "version": "20200925",
+      "pinned_Git_blob_verified": true,
+      "component_license_review_separate_from_application_license": true,
+      "private_local_use_only": true,
+      "source_build_reproduction_not_claimed": true
+    },
+    "hardware_acknowledgment_contract_validated": false
+  },
+  "excluded_or_limited_attempts": {
+    "initial_exact_caller_trace_had_no_hits_due_to_uncorrected_live_address_origin_not_no_EC_activity": true,
+    "initial_paired_timer_run_over80ms": 25,
+    "short_broad_control_string_alignment_errors": 28,
+    "broad_control_not_used_for_quantitative_method_timer_association": true,
+    "typed_byte_reads_and_current_callsite_origin_used_in_fresh_corrected_scope": true,
+    "IOSleep_return_probe_events_not_treated_as_actual_wake_times": true,
+    "matching_KDK_IOSleep_tail_jump_to_delay_for_interval_verified": true,
+    "all_failed_compile_attempts_retained_and_no_probes_enabled_by_compile_only_checks": true
+  },
+  "ACPI_counter_increases": {
+    "GpeCount": 56,
+    "MethodCount": 890,
+    "SciCount": 56
+  },
+  "EC_counter_increases": {
+    "CommandCount": 28,
+    "CommandRetry": 0,
+    "IBFPollTimeout": 0,
+    "IBFSciTimeout": 0,
+    "OBFPollTimeout": 0,
+    "OBFSciTimeout": 0,
+    "MissingSCI": 0,
+    "SpuriousSCI": 0,
+    "SpuriousQuery": 0
+  },
+  "final_independent_readback": {
+    "status": "passed",
+    "candidate_installed_and_loaded": true,
+    "exact_candidate_cache_and_accepted_recovery_verified": true,
+    "full_cache_metadata_and_image_records_verified": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images_preserved": 415,
+    "original_loaded_ACPI_and_full_EFI_recovery_verified": true,
+    "current_boot_accelerated_startup_passed": true,
+    "startup_supervision_ended": true,
+    "one_shot_observer_and_GUI_jobs_removed": true,
+    "new_diagnostic_reports": 0,
+    "new_error_counters": 0
+  },
+  "diagnostic_applications_tracers_and_supervisors_exited": true,
+  "ACPI_debug_flags_unchanged": true,
+  "existing_ktrace_configuration_and_owner_unchanged": true,
+  "candidate_remains_active": true,
+  "accepted_owner_baseline_reselected": false,
+  "PR28_daily_wait_preserved": true,
+  "wait_budget_ms": 250,
+  "WindowServer_wait_exclusion_preserved": true,
+  "resident_monitor_enabled": false,
+  "driver_or_policy_or_EFI_changes": 0,
+  "explicit_GPU_test_submissions": 0,
+  "power_actions": 0,
+  "general_stutter_repair_accepted": false,
+  "physical_scanout_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "raw_identifiers_logs_tables_firmware_binaries_or_KDK_material_published": false,
+  "next_constraint": "Investigate firmware acknowledgment and native callback scheduling without bypassing the power-limit handshake, changing OS identity, or disabling EC queries."
+}
