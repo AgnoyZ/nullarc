@@ -8,9 +8,10 @@ not accepted by this request or by the bounded observations below. Build41 and
 build42 remain withdrawn. PR28's default GPU-wait opt-in remains disabled.
 
 The installation uses the already reviewed build34 ACQUIRE-prefix kernel and
-the unchanged default-branch plugin, including A1/A2/corrected-A3. It retains
-exact original kernel/plugin backups, a bounded first-boot guardian and separate
-failure recovery. Raw manifests, startup logs and recovery packets remain local
+the unchanged default-branch plugin, including A1/A2/corrected-A3. Its activation
+retained exact original kernel/plugin backups, a bounded first-boot guardian
+and separate failure recovery. The owner's subsequent monitor shutdown is
+recorded below. Raw manifests, startup logs and recovery packets remain local
 and ignored. No Windows EFI files, partitions, firmware settings or OS security
 configuration are changed.
 
@@ -106,3 +107,56 @@ recommendation. PR28's default wait opt-in remains disabled.
 
 The sanitized result is recorded in
 [`validation/build34-local-installation-20261118.json`](validation/build34-local-installation-20261118.json).
+
+## Owner-requested monitor shutdown and future baseline
+
+After acceptance, on 2026-11-18 the owner requested closing monitoring and using
+the current installation as the baseline for later optimization. The accepted
+runtime source remains `1d4968fbc2ce988c77bdd85b2ec36f435b57f496`; the successful
+GPU/desktop observations above are recorded by result commit
+`d369e219f3986b82a9424cef315459a3c9e45a98`. Later documentation commits do not
+change the running driver. All future optimizations must build on this accepted
+default-build34 state, preserving A1/A2/corrected-A3 and the validated minimal
+IB correction and plugin integrations. The older source checkpoints remain
+provenance and comparison controls, not replacement candidates.
+
+The exact live installation guardian was stopped and its old launch service
+disabled and unloaded. Acceleration and desktop takeover remained enabled;
+the same WindowServer stayed alive. No recovery was triggered. This disables
+the added installation monitor, not macOS's own watchdog or security services.
+
+A separate root-owned startup-only policy preserves the frozen installation
+packet and the protected original startup script. It verifies the same runtime
+identity, plugin, layout, original recovery backup and original admission
+conditions. The existing 45-second guardian readiness and 150-second desktop
+admission limits remain; incomplete overall startup is capped at 300 seconds.
+Only after both the startup command and desktop admission succeed does the
+startup supervisor exit. A private byte-checked copy of the original startup
+script omits only its final invocation of the continuous hang watcher; its
+pending-boot protection and initial 90-second desktop checks are retained.
+There is no resident periodic installation/hang monitor or its post-startup
+automatic rollback after successful startup. The new boot jobs were configured
+without starting them in the current boot.
+
+All 25 CPU tests of the actual generated policy passed, covering completion
+ordering, refusal of stale/wrong completion records, startup failures, guardian
+identity, retained deadlines and controls, and refusal to replay this boot.
+The shell and launchd plist syntax checks and installed-policy readback passed.
+An initial CPU fixture incorrectly reported a firmware framebuffer and was
+corrected; the failed test output is retained privately. No GPU workload was
+run for this monitoring change. Another accelerated boot with the new startup
+policy has not yet been tested.
+
+Original kernel/plugin backups and the prior startup-job bytes remain available
+for an explicitly requested manual recovery. Reverting this policy requires
+disabling its new startup-admission job and restoring the saved startup job
+before re-enabling the appropriate supervised boot route; do not replay a
+consumed trial or launch startup work in this already-admitted boot. Do not
+silently re-enable resident monitoring during later optimization.
+
+The independent baseline readback and owner policy are summarized in
+[`validation/build34-owner-baseline-20261118.json`](validation/build34-owner-baseline-20261118.json).
+The earlier supervised-installation JSON is retained as historical evidence;
+its live-guardian observation describes that earlier readback. Long-term
+stability, sleep/wake, background stutter and physical scanout FPS remain
+unaccepted, and PR28's default wait opt-in remains disabled.

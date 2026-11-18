@@ -249,3 +249,33 @@ recovery retained. It does not clear the unresolved long-term stability,
 background-stutter, sleep/wake or default PR28 wait-policy holds. Build41/build42
 remain withdrawn. See [the installation record](BUILD34-LOCAL-INSTALLATION.md)
 for the earlier controller-triggered rollback, current live readback and limits.
+
+## Owner-selected optimization baseline and monitoring policy
+
+On 2026-11-18, after the successful local activation above, the owner requested
+that monitoring be stopped and that this running installation become the
+baseline for subsequent optimization. The runtime source checkpoint is
+`1d4968fbc2ce988c77bdd85b2ec36f435b57f496`; its accepted bounded hardware results
+were published in `d369e219f3986b82a9424cef315459a3c9e45a98`. Continue from the
+default branch containing these commits. The earlier `64f3d991` checkpoint
+remains A1/A2/corrected-A3 provenance, rather than a request to discard the
+subsequently accepted minimal IB correction or plugin integrations. Build41
+and build42 remain withdrawn.
+
+The resident installation monitor was stopped and its launch service disabled
+without changing the loaded kernel, plugin or active desktop controls. The
+owner-selected startup policy retains bounded initialization/admission checks
+and manual recovery backups, but ends supervision after startup completes and
+does not invoke the continuous post-startup hang watcher. Its 25 CPU tests,
+shell/plist syntax checks and installed-policy readback passed. No new GPU
+workload or reboot was run for this policy change; its next-boot behavior is
+not yet hardware-accepted. The original frozen trial evidence and protected
+startup script remain intact. Do not silently restore resident monitoring or
+post-startup automatic rollback during later optimization. OS watchdogs and
+security settings are unchanged.
+
+The local opt-in is still experimental. Existing limits on long-term stability,
+background stutter, sleep/wake, physical scanout FPS and the disabled default
+PR28 wait opt-in are unchanged. See the
+[installation-policy update](BUILD34-LOCAL-INSTALLATION.md#owner-requested-monitor-shutdown-and-future-baseline)
+and [sanitized baseline record](validation/build34-owner-baseline-20261118.json).
