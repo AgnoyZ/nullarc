@@ -13,7 +13,8 @@
 #include <IOKit/IOPlatformExpert.h>
 #include <IOKit/IODeviceTreeSupport.h>
 #include <pexpert/pexpert.h>
-#include <kern/thread_call.h>
+#include <IOKit/IOTimerEventSource.h>
+#include <IOKit/IOWorkLoop.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <IOKit/IORangeAllocator.h>
 #include <IOKit/IOSubMemoryDescriptor.h>
@@ -86,7 +87,8 @@ class PhxAMDFB : public IOFramebuffer {
     volatile UInt32 fAliasBusy = 0;
     struct Irq { IOFBInterruptProc proc = nullptr; OSObject *target = nullptr; void *ref = nullptr; };
     Irq fVbl[4], fConnect;   // IOFramebuffer itself and, when it asks, IOAccelDisplayPipe each register a VBL handler
-    thread_call_t fVblTimer = nullptr;
+    IOTimerEventSource *fVblTimer = nullptr;
+    IOWorkLoop *fVblWorkLoop = nullptr;
     uint64_t fVblNext = 0;
     volatile bool fStopping = false;
     bool fBeside = false;   // another framebuffer (the firmware's IONDRV one) already drives this GPU: not the console
@@ -233,12 +235,12 @@ class PhxAMDFB : public IOFramebuffer {
         return kIOReturnUnsupported;
     }
 
-    static void vblFire(thread_call_param_t p0, thread_call_param_t) {
+    static void vblFire(OSObject *p0, IOTimerEventSource *) {
         PhxAMDFB *me = (PhxAMDFB *)p0;
         if (__atomic_load_n(&me->fStopping, __ATOMIC_ACQUIRE)) return;
         const uint64_t at = mach_absolute_time(), due = me->fVblNext;
         uint64_t near; nanoseconds_to_absolutetime(50000, &near);
-        if (gVblStaged && due > at + near) { thread_call_enter_delayed(me->fVblTimer, due); return; }   // an early stage
+        if (gVblStaged && due > at + near) { me->fVblTimer->wakeAtTime(due); return; }   // an early stage
         if (due && at > due) {
             uint64_t ns; absolutetime_to_nanoseconds(at - due, &ns);
             const SInt64 us = (SInt64)(ns / 1000);
@@ -256,7 +258,17 @@ class PhxAMDFB : public IOFramebuffer {
         const uint64_t now = mach_absolute_time();
         me->fVblNext = (me->fVblNext && me->fVblNext + period > now) ? me->fVblNext + period : now + period;
         uint64_t lead; nanoseconds_to_absolutetime(1500000, &lead);
-        thread_call_enter_delayed(me->fVblTimer, gVblStaged ? me->fVblNext - lead : me->fVblNext);
+        me->fVblTimer->wakeAtTime(gVblStaged ? me->fVblNext - lead : me->fVblNext);
+    }
+
+    static IOReturn vblRetire(OSObject *owner, void *, void *, void *, void *) {
+        PhxAMDFB *me = (PhxAMDFB *)owner;
+        // runAction holds the same gate as the timer action: an in-flight action
+        // has returned before its pending successor is disabled and detached.
+        me->fVblTimer->disable();
+        me->fVblTimer->cancelTimeout();
+        me->fVblWorkLoop->removeEventSource(me->fVblTimer);
+        return kIOReturnSuccess;
     }
 
     // The firmware lit the panel at its native refresh, which the VBL timer and the mode must report: they said 60 Hz while
@@ -747,11 +759,18 @@ bool PhxAMDFB::start(IOService *provider)
     setProperty("PhxFBRefreshMilliHz", fRefreshMilliHz, 32);
     if (fHTotal) { setProperty("PhxFBHTotal", fHTotal, 32); setProperty("PhxFBVTotal", fVTotal, 32); }   // the AGDC's panel timing
     nanoseconds_to_absolutetime(fFrameNs, &gPhxFrameAbs);
-    // HIGH calls are generally serial: an unrelated ACPI/EC callback can stall VBL delivery.
-    // Use the parallel kernel group, but keep this self-rearming callback non-reentrant.
-    fVblTimer = thread_call_allocate_with_options(vblFire, this,
-        THREAD_CALL_PRIORITY_KERNEL, THREAD_CALL_OPTIONS_ONCE);
-    if (fVblTimer) { uint64_t d; clock_interval_to_deadline((uint32_t)(fFrameNs / 1000), kMicrosecondScale, &d); fVblNext = d; thread_call_enter_delayed(fVblTimer, d); }
+    // Use the parallel KERNEL timer group without allowing callback reentry.
+    // The private workloop gate also synchronizes timer retirement with its action.
+    fVblWorkLoop = IOWorkLoop::workLoop();
+    if (fVblWorkLoop) {
+        fVblTimer = IOTimerEventSource::timerEventSource(
+            kIOTimerEventSourceOptionsPriorityKernel, this, vblFire);
+        if (!fVblTimer || fVblWorkLoop->addEventSource(fVblTimer) != kIOReturnSuccess) {
+            OSSafeReleaseNULL(fVblTimer);
+            OSSafeReleaseNULL(fVblWorkLoop);
+        }
+    }
+    if (fVblTimer) { uint64_t d; clock_interval_to_deadline((uint32_t)(fFrameNs / 1000), kMicrosecondScale, &d); fVblNext = d; fVblTimer->wakeAtTime(d); }
     static IOPMPowerState states[2] = {
         { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
         { 1, kIOPMDeviceUsable, kIOPMPowerOn, kIOPMPowerOn, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -768,14 +787,10 @@ bool PhxAMDFB::start(IOService *provider)
 void PhxAMDFB::stop(IOService *provider)
 {
     __atomic_store_n(&fStopping, true, __ATOMIC_RELEASE);
-    if (fVblTimer) {
-        // A callback already past its stop check can rearm during the first drain.
-        // ONCE permits at most one successor; the second drain cancels/waits for it.
-        do {
-            thread_call_cancel_wait(fVblTimer);
-            thread_call_cancel_wait(fVblTimer);
-        } while (!thread_call_free(fVblTimer));
-        fVblTimer = nullptr;
+    if (fVblWorkLoop) {
+        fVblWorkLoop->runAction(vblRetire, this);
+        OSSafeReleaseNULL(fVblTimer);
+        OSSafeReleaseNULL(fVblWorkLoop);
     }
     phxAgdcRemove();
     if (gAliasSysctl) { for (auto *o : kFbOids) sysctl_unregister_oid(o); gAliasSysctl = false; }

@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-18",
+  "branch": "upstream34/vram-layout-fix",
+  "status": "offline-validated-uninstalled; original-ACPI restart baseline pending",
+  "kind": "owner-authorized-VBL-offline-installation-preparation",
+  "source_base_commit": "dd2b4b920ad6e9d16dde2b2d5005429ecd418597",
+  "production_change_after_base": "public IOTimerEventSource KERNEL priority and dedicated-workloop gated retirement",
+  "framebuffer_source_sha256": "282d520c0284cd498d0bcf5226cf957793e7bc3f2e4ad95baceb6cb43398394e",
+  "accelerator_Info_plist_sha256": "ec81d6840ce8354be2a007165e31b19956df1349d266ec63be207510e52aea4f",
+  "runtime_source_checkpoint": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "offline_candidate_bundle_signature_and_architecture_passed": true,
+  "candidate_binary_sha256": "a206d983fca62dd7959cc701fb9f95d5490da78986aac02dbb67ed00410325e7",
+  "offline_AuxKC_build_passed": true,
+  "candidate_AuxKC_sha256": "9e0639f6327a77f09db78cf4fc8d2c42a2514d9322b17f98cd534728482cc507",
+  "matching_KDK_used": true,
+  "approval_checks_skipped": false,
+  "missing_KDK_override_used": false,
+  "first_offline_build": {
+    "succeeded": false,
+    "reason": "unselected Apple component had an unavailable dependency",
+    "live_files_changed": false
+  },
+  "original_candidate_link_failure": {
+    "symbol": "thread_call_cancel_wait",
+    "cause": "private KPI only; direct import is not usable by this third-party kext",
+    "installed": false
+  },
+  "private_provider_declaration_attempt": {
+    "selected": false,
+    "command_returned_zero": true,
+    "candidate_missing_from_cache": true,
+    "Apple_only_restriction_confirmed_in_system_log": true,
+    "installed": false
+  },
+  "successful_offline_build": "explicit x86_64 component set matching the accepted auxiliary collection",
+  "combined_cached_records": 416,
+  "codeless_records_preserved": 29,
+  "changed_image_identifiers": [
+    "com.luuumi.PhxAccel"
+  ],
+  "unrelated_cached_records_preserved": 415,
+  "exact_accepted_bundle_and_AuxKC_recovery_copies_verified": true,
+  "owner_policy_and_job_recovery_copies_verified": true,
+  "existing_read_only_startup_integrity_check_passed": true,
+  "frozen_prior_installation_contract_unchanged": true,
+  "actual_VBL_CPU_harness_recheck_passed": true,
+  "actual_VBL_CPU_assertions": 60,
+  "panel_timing_cases": 43,
+  "actual_refresh_timing_assertions": 511,
+  "actual_framebuffer_assertions": 3646,
+  "Apple_only_KPI_refusal_regression_added": true,
+  "real_host_thread_gate_teardown_case_passed": true,
+  "accelerator_Info_plist_unchanged_from_accepted": true,
+  "Apple_timer_source_review_sha256": "97ddf1e91351f4e034250412c81e8e6541c95a64435ef28a2529c316492b1141",
+  "live_candidate_installed": false,
+  "candidate_loaded": false,
+  "new_GPU_workload_executed": false,
+  "VBL_hardware_repair_accepted": false,
+  "ready_for_live_installation": false,
+  "blocking_prerequisite": "owner ordinary restart and independent original-ACPI/accepted-runtime readback before VBL treatment",
+  "same_boot_as_failed_ACPI_trial": true,
+  "accepted_accelerator_still_loaded": true,
+  "acceleration_and_desktop_preserved": true,
+  "PR28_daily_wait_preserved": true,
+  "resident_monitor_enabled": false,
+  "power_action_executed_or_scheduled": false,
+  "live_launch_or_startup_policy_modified": false,
+  "EFI_modified": false,
+  "private_cache_published": false,
+  "raw_diagnostics_identifiers_firmware_or_binaries_published": false,
+  "source_reference_review": {
+    "reviewed_date": "2026-11-18",
+    "NullMoth": {
+      "repository": "nullmoth/nvidia-macos-driver",
+      "branch": "main",
+      "commit": "87e524ab36f12d17c04626d6cf7fc3bde1cc63e4",
+      "commit_date_UTC": "2026-11-14T00:36:40Z",
+      "license": "PolyForm Noncommercial 1.0.0; existing required notice preserved",
+      "files": [
+        {
+          "path": "LICENSE",
+          "sha256": "1b5c7a92697863d38fd2779af76732acfb8f521b758781eab057ad966701b0b7"
+        },
+        {
+          "path": "kexts/NMIntelFB/intelfb.cpp",
+          "sha256": "97954a2acf4d100d01bb3a6e0ef32c5b6aca76d85dfdbb0492b6d23aaadca47a"
+        },
+        {
+          "path": "kexts/NVRMFB/fb/nvrm-fb.cpp",
+          "sha256": "06c99bb431f4a0592e98bfe51bb1891d52bfc82e75ba0d83e1710b62481b0aa4"
+        }
+      ],
+      "findings": [
+        "NMIntelFB explicitly avoids direct cancel/wait import and cancels/retries free",
+        "NMIntelFB virtual sampler uses IOKit timers; its VBL still uses a plain thread call",
+        "NVRMFB uses HIGH plus ONCE, serialized schedule/stop and per-call owner references",
+        "NVRMFB source describes reentry/thread-exhaustion failure; this is not reproduced here",
+        "NVIDIA NVKMS hardware-vblank interface is not an AMD Radeon interface",
+        "Reviewed HIGH-group timers do not isolate this machine's suspected HIGH-group contention"
+      ],
+      "additional_code_or_binaries_imported": false,
+      "production_change_required_after_reference_review": false
+    },
+    "Apple_timer_wrapper": {
+      "repository": "apple-oss-distributions/xnu",
+      "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+      "path": "iokit/Kernel/IOTimerEventSource.cpp",
+      "sha256": "97ddf1e91351f4e034250412c81e8e6541c95a64435ef28a2529c316492b1141",
+      "pinned_source_matches_reviewed_snapshot": true,
+      "implementation_copied": false,
+      "claimed_identical_to_running_kernel": false
+    }
+  }
+}

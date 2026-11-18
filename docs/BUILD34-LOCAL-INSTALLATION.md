@@ -2,8 +2,12 @@
 
 The subsequent [unattended stutter investigation](BUILD34-VBL-SCHEDULING.md)
 records correlated GUI/VBL pauses and a CPU/static-validated scheduling
-candidate. It is not installed or loaded and has not demonstrated a runtime
-repair. The accepted acceleration/desktop installation below remains active.
+candidate subsequently corrected to use public IOKit timers. Its native build
+and complete offline AuxKC/readback checks passed; the initial private-KPI
+attempts were rejected. It is not installed or loaded and has not demonstrated
+a runtime repair. The owner's ordinary restart and original-ACPI baseline
+readback are required before that separate treatment. The accepted
+acceleration/desktop installation below remains active.
 
 The subsequent [Apple-progress-bar latency investigation](BUILD34-BOOT-LATENCY.md)
 records actual display-hold timing and an isolated CPU-validated hashing

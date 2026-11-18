@@ -1,27 +1,32 @@
-// CPU doubles exercise production VBL logic; they do not validate XNU or a GPU.
+// Public IOKit timer/gate doubles. These do not validate XNU or a physical GPU.
+#include <atomic>
 #include <cassert>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
+#include <mutex>
+#include <thread>
 #include <vector>
 using SInt64 = int64_t;
-using thread_call_param_t = void *;
+using OSObject = void;
+using IOReturn = int;
 using IOFBInterruptProc = void (*)(void *, void *);
-using Callback = void (*)(void *, void *);
-constexpr unsigned THREAD_CALL_PRIORITY_HIGH = 0, THREAD_CALL_PRIORITY_KERNEL = 1;
-constexpr unsigned THREAD_CALL_OPTIONS_ONCE = 1, kMicrosecondScale = 1000;
-struct Call {
-    Callback function;
-    void *owner;
-    unsigned priority, options;
-    uint64_t deadline = 0;
-    bool pending = false, running = false, freed = false;
-};
-using thread_call_t = Call *;
+constexpr IOReturn kIOReturnSuccess = 0;
+constexpr unsigned kIOTimerEventSourceOptionsPriorityHigh = 0;
+constexpr unsigned kIOTimerEventSourceOptionsPriorityKernel = 2;
+constexpr unsigned kIOTimerEventSourceOptionsAllowReenter = 0x100;
+constexpr unsigned kMicrosecondScale = 1000;
+struct IOTimerEventSource;
+struct IOWorkLoop;
+static IOTimerEventSource *allocatedTimer;
+static IOWorkLoop *allocatedLoop;
 static uint64_t clockNow, highBusyUntil, gPhxVblLastAbs, gPhxVblSeq;
 static SInt64 gVblN, gVblLateUsSum, gVblLateUsMax;
 static int gVblStaged;
-static unsigned checks, handlers, depth, maxDepth, waitCalls;
-static bool allocationFails, injectReentry, injectStopRearm, agdcRemoved;
+static std::atomic<unsigned> checks{0};
+static std::atomic<bool> gateAttempted{false};
+static unsigned handlers, depth, maxDepth;
+static bool loopFails, timerFails, addFails, injectReentry, agdcRemoved;
 static void check(bool value) { assert(value); ++checks; }
 static uint64_t mach_absolute_time() { return clockNow; }
 static void nanoseconds_to_absolutetime(uint64_t v, uint64_t *out) { *out = v; }
@@ -30,51 +35,83 @@ static SInt64 OSAddAtomic64(SInt64 v, SInt64 *out) { return *out += v; }
 static void clock_interval_to_deadline(uint32_t v, unsigned scale, uint64_t *out) {
     *out = clockNow + uint64_t(v) * scale;
 }
-static Call *thread_call_allocate_with_options(Callback f, void *owner, unsigned priority, unsigned options) {
-    return allocationFails ? nullptr : new Call{f, owner, priority, options};
-}
-static bool dispatch(Call *c);
-static bool thread_call_enter_delayed(Call *c, uint64_t deadline) {
-    assert(c && !c->freed);
-    const bool pending = c->pending;
-    c->pending = true; c->deadline = deadline;
-    if (c->running && injectReentry) {
-        injectReentry = false; clockNow = deadline;
-        dispatch(c); // Simulate another worker observing the newly due rearm.
+struct IOWorkLoop {
+    using Action = IOReturn (*)(OSObject *, void *, void *, void *, void *);
+    std::recursive_mutex gate;
+    bool freed = false;
+    static IOWorkLoop *workLoop() {
+        return allocatedLoop = loopFails ? nullptr : new IOWorkLoop;
     }
-    return pending;
+    IOReturn addEventSource(IOTimerEventSource *);
+    IOReturn removeEventSource(IOTimerEventSource *);
+    IOReturn runAction(Action action, OSObject *owner) {
+        gateAttempted = true;
+        std::lock_guard<std::recursive_mutex> lock(gate);
+        return action(owner, nullptr, nullptr, nullptr, nullptr);
+    }
+    void release() { freed = true; }
+};
+static bool dispatch(IOTimerEventSource *);
+struct IOTimerEventSource {
+    using Action = void (*)(OSObject *, IOTimerEventSource *);
+    unsigned options;
+    OSObject *owner;
+    Action action;
+    IOWorkLoop *loop = nullptr;
+    uint64_t deadline = 0;
+    bool pending = false, enabled = true, running = false, freed = false;
+    static IOTimerEventSource *timerEventSource(unsigned options, OSObject *owner, Action action) {
+        return allocatedTimer = timerFails ? nullptr : new IOTimerEventSource{options, owner, action};
+    }
+    IOReturn wakeAtTime(uint64_t when) {
+        assert(!freed); pending = true; deadline = when;
+        if (running && injectReentry) {
+            injectReentry = false; clockNow = deadline;
+            check(!dispatch(this));
+        }
+        return kIOReturnSuccess;
+    }
+    void disable() { enabled = false; pending = false; }
+    void cancelTimeout() { pending = false; }
+    void release() { assert(!loop && !running); freed = true; }
+};
+IOReturn IOWorkLoop::addEventSource(IOTimerEventSource *timer) {
+    if (addFails) return -1;
+    timer->loop = this;
+    return kIOReturnSuccess;
 }
-static bool dispatch(Call *c) {
-    if (!c->pending || c->deadline > clockNow ||
-        (c->priority == THREAD_CALL_PRIORITY_HIGH && clockNow < highBusyUntil) ||
-        (c->running && (c->options & THREAD_CALL_OPTIONS_ONCE))) return false;
-    c->pending = false; c->running = true;
+IOReturn IOWorkLoop::removeEventSource(IOTimerEventSource *timer) {
+    assert(timer->loop == this && !timer->enabled && !timer->pending && !timer->running);
+    timer->loop = nullptr;
+    return kIOReturnSuccess;
+}
+static bool dispatch(IOTimerEventSource *timer) {
+    if (!timer->loop) return false;
+    std::lock_guard<std::recursive_mutex> lock(timer->loop->gate);
+    if (!timer->enabled || !timer->pending || timer->deadline > clockNow ||
+        (timer->options == kIOTimerEventSourceOptionsPriorityHigh && clockNow < highBusyUntil) ||
+        (timer->running && !(timer->options & kIOTimerEventSourceOptionsAllowReenter))) return false;
+    timer->pending = false; timer->running = true;
     ++depth; if (depth > maxDepth) maxDepth = depth;
-    c->function(c->owner, nullptr);
-    --depth; c->running = false;
+    timer->action(timer->owner, timer);
+    --depth; timer->running = false;
     return true;
 }
-static bool thread_call_cancel_wait(Call *c) {
-    ++waitCalls; bool pending = c->pending; c->pending = false;
-    if (injectStopRearm) {
-        // An invocation that passed the stop check before stop() rearmed late.
-        injectStopRearm = false; c->running = false; c->pending = true;
-    } else c->running = false;
-    return pending;
+#define OSSafeReleaseNULL(p) do { if (p) { (p)->release(); (p) = nullptr; } } while (0)
+static void phxAgdcRemove() {
+    assert(!allocatedTimer || allocatedTimer->freed);
+    assert(!allocatedLoop || allocatedLoop->freed);
+    agdcRemoved = true;
 }
-static bool thread_call_free(Call *c) {
-    assert(!c->running); // Must drain before releasing callback-owned state.
-    if (c->pending) return false;
-    c->freed = true; return true;
-}
-static void phxAgdcRemove() { agdcRemoved = true; }
 struct PhxAMDFB {
     struct Irq { IOFBInterruptProc proc; void *target, *ref; };
     std::vector<Irq> fVbl;
     bool fStopping = false;
     uint64_t fVblNext = 0, fFrameNs = 8333333;
-    Call *fVblTimer = nullptr;
+    IOTimerEventSource *fVblTimer = nullptr;
+    IOWorkLoop *fVblWorkLoop = nullptr;
     // ACTUAL_VBL_CALLBACK
+    // ACTUAL_VBL_RETIRE
     void startTimer() {
         // ACTUAL_VBL_ALLOCATION
     }
@@ -83,55 +120,83 @@ struct PhxAMDFB {
     }
 };
 static void handler(void *, void *) { ++handlers; }
+static void cleanup() {
+    if (allocatedTimer) { check(allocatedTimer->freed); delete allocatedTimer; allocatedTimer = nullptr; }
+    if (allocatedLoop) { check(allocatedLoop->freed); delete allocatedLoop; allocatedLoop = nullptr; }
+}
 static void reset() {
-    clockNow = 1000000000; highBusyUntil = 0; gPhxVblLastAbs = gPhxVblSeq = 0;
+    cleanup(); clockNow = 1000000000; highBusyUntil = 0; gPhxVblLastAbs = gPhxVblSeq = 0;
     gVblN = gVblLateUsSum = gVblLateUsMax = 0; gVblStaged = 1;
-    handlers = depth = maxDepth = waitCalls = 0;
-    allocationFails = injectReentry = injectStopRearm = agdcRemoved = false;
+    handlers = depth = maxDepth = 0; gateAttempted = false;
+    loopFails = timerFails = addFails = injectReentry = agdcRemoved = false;
 }
 static void release(PhxAMDFB &f) {
-    Call *c = f.fVblTimer; f.stopTimer();
-    check(f.fStopping && !f.fVblTimer && agdcRemoved);
-    if (c) { check(c->freed && !c->pending && !c->running); delete c; }
+    f.stopTimer(); check(f.fStopping && !f.fVblTimer && !f.fVblWorkLoop && agdcRemoved);
+    if (allocatedTimer) check(!allocatedTimer->pending && !dispatch(allocatedTimer));
+}
+static std::mutex heldMutex;
+static std::condition_variable heldCondition;
+static bool handlerEntered, handlerReleased;
+static void heldHandler(void *, void *) {
+    std::unique_lock<std::mutex> lock(heldMutex);
+    handlerEntered = true; heldCondition.notify_all();
+    heldCondition.wait(lock, [] { return handlerReleased; });
 }
 int main() {
     for (int staged : {0, 1}) {
         reset(); gVblStaged = staged; PhxAMDFB f;
         f.fVbl.push_back({handler, nullptr, nullptr});
-        f.startTimer(); Call *c = f.fVblTimer;
-        check(c && c->priority == THREAD_CALL_PRIORITY_KERNEL);
-        check(c->options & THREAD_CALL_OPTIONS_ONCE);
-        // Model the observed unrelated HIGH callback without sleeping or hardware.
+        f.startTimer(); auto *timer = f.fVblTimer;
+        check(timer && timer->options == kIOTimerEventSourceOptionsPriorityKernel);
+        check(!(timer->options & kIOTimerEventSourceOptionsAllowReenter));
         highBusyUntil = clockNow + 300000000;
-        Call control{PhxAMDFB::vblFire, &f, THREAD_CALL_PRIORITY_HIGH, 0};
-        control.pending = true; control.deadline = c->deadline;
-        clockNow = c->deadline;
-        check(!dispatch(&control)); check(dispatch(c));
+        IOTimerEventSource control{kIOTimerEventSourceOptionsPriorityHigh, &f, PhxAMDFB::vblFire};
+        control.loop = timer->loop; control.pending = true; control.deadline = timer->deadline;
+        clockNow = timer->deadline;
+        check(!dispatch(&control)); check(dispatch(timer));
         check(gVblN == 1 && gPhxVblSeq == 1 && handlers == 1);
         check(gPhxVblLastAbs == 1008333000 && !gVblLateUsSum);
-        check(c->pending && c->deadline == f.fVblNext - (staged ? 1500000 : 0));
+        check(timer->pending && timer->deadline == f.fVblNext - (staged ? 1500000 : 0));
         if (staged) {
-            clockNow = c->deadline; check(dispatch(c));
-            check(gVblN == 1 && handlers == 1 && c->deadline == f.fVblNext);
+            clockNow = timer->deadline; check(dispatch(timer));
+            check(gVblN == 1 && handlers == 1 && timer->deadline == f.fVblNext);
         }
-        // A late callback produces one notification, not a catch-up burst.
         clockNow = f.fVblNext + 300000000;
-        check(dispatch(c)); check(gVblN == 2 && handlers == 2);
-        check(gVblLateUsSum == 300000 && gVblLateUsMax == 300000);
+        check(dispatch(timer)); check(gVblN == 2 && handlers == 2);
+        check(gVblLateUsSum == 300000000 / 1000 && gVblLateUsMax == 300000);
         check(f.fVblNext == clockNow + f.fFrameNs);
-        // ONCE prevents another worker entering while the current call returns.
         clockNow = f.fVblNext; injectReentry = true;
-        check(dispatch(c)); check(maxDepth == 1 && c->pending);
-        release(f); check(waitCalls >= 2);
+        check(dispatch(timer)); check(maxDepth == 1 && timer->pending);
+        release(f);
     }
-    reset(); PhxAMDFB stopped; stopped.startTimer();
-    stopped.fStopping = true; clockNow = stopped.fVblTimer->deadline;
-    check(dispatch(stopped.fVblTimer));
+    reset(); PhxAMDFB stopped; stopped.startTimer(); stopped.fStopping = true;
+    clockNow = stopped.fVblTimer->deadline; check(dispatch(stopped.fVblTimer));
     check(!gVblN && !stopped.fVblTimer->pending); release(stopped);
-    reset(); PhxAMDFB racing; racing.startTimer();
-    racing.fVblTimer->running = true; injectStopRearm = true;
-    release(racing); check(waitCalls == 2);
-    reset(); allocationFails = true; PhxAMDFB missing; missing.startTimer();
-    check(!missing.fVblTimer && !missing.fVblNext); release(missing); check(!waitCalls);
-    std::printf("actual VBL callback/allocation/drain: %u CPU assertions passed\n", checks);
+    for (int failure : {0, 1, 2}) {
+        reset(); loopFails = failure == 0; timerFails = failure == 1; addFails = failure == 2;
+        PhxAMDFB missing; missing.startTimer();
+        check(!missing.fVblTimer && !missing.fVblWorkLoop && !missing.fVblNext);
+        release(missing);
+    }
+    // A real host thread holds the modeled gate inside the extracted action.
+    // stop() must await it, then cancel its late self-rearm before freeing.
+    reset(); PhxAMDFB active; active.fVbl.push_back({heldHandler, nullptr, nullptr});
+    active.startTimer(); clockNow = active.fVblTimer->deadline;
+    handlerEntered = handlerReleased = false; std::atomic<bool> stopDone{false};
+    std::thread firing([&] { check(dispatch(active.fVblTimer)); });
+    {
+        std::unique_lock<std::mutex> lock(heldMutex);
+        heldCondition.wait(lock, [] { return handlerEntered; });
+    }
+    std::thread stopping([&] { active.stopTimer(); stopDone = true; });
+    while (!gateAttempted.load()) std::this_thread::yield();
+    check(!stopDone.load());
+    {
+        std::lock_guard<std::mutex> lock(heldMutex); handlerReleased = true;
+    }
+    heldCondition.notify_all(); firing.join(); stopping.join();
+    check(stopDone && active.fStopping && !active.fVblTimer && !active.fVblWorkLoop);
+    check(allocatedTimer->freed && !allocatedTimer->pending && agdcRemoved);
+    cleanup();
+    std::printf("actual IOKit VBL callback/allocation/gated retirement: %u CPU assertions passed\n", checks.load());
 }
