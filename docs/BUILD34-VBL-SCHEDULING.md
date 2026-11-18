@@ -2,7 +2,8 @@
 
 Status on 2026-11-18: **the first candidate boot failed startup admission and
 the exact accepted build34 installation was restored and independently
-verified. A second evidence-instrumented scope is prepared, not installed.**
+verified. The second evidence-instrumented scope is installed on disk;
+candidate loading and hardware acceptance are pending restart.**
 CPU, native, complete-cache and independent installed-state checks passed. The initial
 direct-thread-call candidate failed target linking; a private-provider attempt
 was also rejected. The selected implementation uses public IOKit timer APIs.
@@ -410,3 +411,26 @@ scheduled. Installation and its independent readback must precede a separately
 recorded authorized test restart. No hardware repair, workload correctness,
 physical FPS or long-term stability acceptance is claimed. See the sanitized
 [failure/recovery record](validation/build34-vbl-first-activation-recovery-20261118.json).
+
+## Second exact-image installation
+
+The second scope subsequently passed its actual preflight and installation.
+A separate readback rechecked exact installed and recovery hashes, public
+signature, all 416 combined cache records with the same 415 unrelated records,
+original loaded ACPI and full EFI/recovery identity. The still-running image
+is the accepted original accelerator; this installation did not load the
+candidate or submit a new GPU workload. Acceleration, desktop takeover, daily
+PR28 waiting and the disabled resident-monitor policy remain intact.
+
+The new one-shot observer and post-admission GUI jobs are staged without
+bootstrap in the current boot. They require successful current-boot candidate
+loading, bounded accelerated startup and observer acceptance before the finite
+GUI comparison. An original exception is now recorded before recovery; the
+same exact accepted-image recovery and unchanged admission deadlines apply.
+This is a separate consumed-once scope, not a replay of the failed activation.
+
+At the independent installation readback no reboot had yet been requested.
+The existing owner authorization covers its test restart. Candidate hardware
+repair, GPU workload correctness, physical scanout FPS and long-term stability
+remain unaccepted. See the new
+[second-installation record](validation/build34-vbl-second-installation-20261118.json).
