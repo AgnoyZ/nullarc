@@ -956,3 +956,89 @@ the owner-selected baseline unchanged and resident monitors disabled. There
 is no new production patch, restart, physical-FPS result or general-stutter
 repair acceptance. See the sanitized
 [query-identification record](validation/build34-ec-query-identification-20261118.json).
+
+
+## Native sleep compensation and runnable AML work
+
+Two further fresh finite observations crossed midnight on November 18–19,
+2026, in the same candidate boot. They add scheduler evidence, not a new
+latency/FPS benchmark or a production repair. No diagnostic application or
+explicit GPU workload was launched. Each native trace requested 12 seconds,
+exited normally under an independent timeout, and reported zero probe errors,
+zero drops and empty stderr.
+
+Private review of the matching KDK resolves an important limitation of the
+HIGH-group hypothesis. AppleACPIEC allocates its query callback through the
+default `thread_call_allocate`; the reviewed start path does not expose a
+priority configuration branch. However, the native scheduler callback also
+contains blocked-worker compensation: a BLOCK transition reduces the group's
+active count, and pending work can wake another worker. UNBLOCK restores that
+count. The previously downloaded pinned Apple XNU `thread_call.c` snapshot was
+hash-verified again and describes the same accounting. Further source-download
+attempts were incomplete; this is not a claim to have reviewed a newer Apple
+implementation. No Apple code, KDK material or firmware excerpt is published.
+
+The first observation directly confirms compensation during the real queries:
+
+| Scheduler-only observation | Result |
+| --- | ---: |
+| Complete `_Q47` / `_Q48` calls | 8 / 8 |
+| `_Q48` outer duration minimum / maximum | 584.407 / 1,310.926 ms |
+| `_Q48` direct 10 ms sleep requests | 247 |
+| Paired `_Q48` scheduler BLOCK / UNBLOCK transitions | 259 / 259 |
+| Same-group Mach timer starts inside complete `_Q48` calls | 21 |
+| Those starts inside observed `_Q48` blocked intervals | 21 |
+
+All 247 sleep requests were followed by a same-thread scheduler BLOCK event
+within 0.053 ms. All completed queries have alternating, paired BLOCK/UNBLOCK
+records. Therefore a long `_Q48` outer duration does **not** mean that its sleep
+period continuously excludes other callbacks from the group. Conversely,
+observing other timer callbacks start does not establish that they met their
+deadlines. The earlier calibrated query/timer overlap remains a correlation;
+it is not evidence that sleep compensation failed.
+
+Across the eight complete `_Q48` calls, per-call outer durations sum to
+7,889.322 ms, of which scheduler-blocked intervals sum to 2,976.937 ms.
+The remaining 4,912.385 ms includes running and runnable time. These are sums
+over calls, not interval-union fractions of the trace, and the complement is
+not an exact CPU-time measurement. They motivate examining work outside the
+recorded blocking intervals rather than shortening the firmware poll.
+
+The second fresh observation added only 99 Hz native on-CPU sampling. It
+collected 623 nonempty query stacks: 79 for `_Q47` and 544 for `_Q48`; 72
+contained namespace search. Samples are distributed across AML parsing,
+namespace lookup, allocation and support routines, without an established
+single repair target. Per-CPU sample totals were 1,184–1,185 across 16 CPUs.
+On-CPU samples cannot exclude waiting or interrupt-masked access paths, and
+sample counts are not exact CPU time. Do not infer that acknowledgment or
+interpreter waits were absent merely because a particular frame was not
+sampled.
+
+This second finite cutoff contains 19 query entries and 18 exits, plus one
+unfinished callback entry. Those right-censored operations are excluded from
+complete-duration accounting; trace exit does not mean firmware execution was
+stopped. The 18 complete queries comprise nine of each method. Same-group Mach
+timers started 24 times inside complete `_Q48` calls, 23 during recorded query
+blocking. All completed queries again have paired scheduler transitions.
+No new Mach-timer delivery deadline or normal GUI latency comparison was run.
+
+Native SystemMemory handling and its physical-access wrappers were inspected
+privately. Candidate physical/helper probes are unavailable, and the wrappers
+tail-jump; an entry or tail-call return must not be presented as an observed
+acknowledgment value. No new physical-memory read, write or explicit AML
+evaluation was requested. The hardware acknowledgment contract remains
+unverified. Do not disable queries, shorten polling, force completion, change
+OS identity or alter power-limit updates to suppress the symptom.
+
+Final independent readback passed the exact active candidate/cache, complete
+metadata and image gate for 416 records/29 codeless records, all 415 unrelated
+images, exact accepted recovery, original loaded ACPI/full EFI recovery and
+current-boot accelerated startup. The same WindowServer survived; no error
+counter or matching diagnostic report increased. Both tracers/supervisors
+exited, ACPI debug flags and the existing ktrace owner/configuration were
+preserved, daily PR28 waiting remains on and resident monitors remain off.
+Keep the active candidate and accepted owner baseline distinct. The residual
+stutter is unresolved. Next distinguish pending-to-dispatch delay and runnable
+interpreter work from acknowledgment latency before selecting a minimal
+semantics-preserving intervention. See the sanitized
+[scheduler compensation record](validation/build34-ec-scheduler-compensation-20261119.json).
