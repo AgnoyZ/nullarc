@@ -5,7 +5,8 @@ preparation passed CPU, native and complete offline-cache checks.** The initial
 direct-thread-call candidate failed target linking; a private-provider attempt
 was also rejected. The selected implementation uses public IOKit timer APIs.
 The accepted build34 acceleration and desktop remain active. The original-ACPI
-restart baseline is still required before installing the scheduling treatment.
+restart baseline subsequently passed the independent readback recorded below;
+candidate-specific activation preparation is the next step.
 No on-device stutter repair or higher FPS has been demonstrated.
 
 ## Unattended reproduction
@@ -238,6 +239,29 @@ daily wait configuration and their exact recovery copies were independently
 rechecked. The loaded accelerator is still the accepted original image and
 the candidate is not loaded. Failed intermediate caches remain private and
 must not be selected for installation.
+
+## Original-ACPI restart baseline passed
+
+The owner-authorized ordinary restart completed on 2026-11-18. The next-boot
+observer passed, and a separate read-only check independently reparsed its
+current-boot receipts and rechecked the machine. Both verified exact original
+loaded DSDT/FACP with valid checksums, absence of the withdrawn SSDT, full
+original EFI/recovery identity, the accepted build34 kernel/plugin/accelerator
+and current-boot bounded accelerated desktop admission. The same compositor
+survived the passive check; synthetic VBL advanced without increases in copy
+failures, skipped copies, surface GPU timeouts or hang kills.
+
+Startup supervision ended, the observer removed its own job, and no resident
+monitor was enabled. Daily PR28 waiting remains configured. These read-only
+checks submitted no additional GPU workload. The new boot satisfies the ACPI
+prerequisite; it does not establish VBL treatment success, physical scanout FPS
+or long-term stability. The VBL candidate is still not installed or loaded.
+
+The sanitized result is
+[`validation/build34-original-acpi-reboot-20261118.json`](validation/build34-original-acpi-reboot-20261118.json).
+The earlier preparation record remains unchanged. Continue the authorized
+candidate-specific installation/recovery preparation from this verified
+baseline; do not replay the consumed observer or historical GPU trial.
 
 The machine is still in the failed ACPI candidate's 16:39 boot on 2026-11-18.
 Its exact original EFI rollback is on disk, but loaded tables have not yet
