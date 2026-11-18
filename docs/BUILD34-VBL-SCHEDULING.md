@@ -765,3 +765,105 @@ See the sanitized
 
 See the sanitized
 [delayed observation](validation/build34-vbl-delayed-gui-20261118.json).
+
+## Synchronized kernel and EC-query investigation
+
+A later fresh, bounded CPU timer scope obtained a usable kernel call graph
+by selecting the live diagnostic process and including PID zero as an
+additional spindump process. This supersedes the earlier target-lookup limit;
+no permission or security setting was changed. The Launch Services application
+kept nice 0 / priority 37. The original timer algorithm was unchanged; the only
+native diagnostic addition reports its existing absolute-clock start value
+for private timestamp comparison.
+
+The 20.016-second run recorded 29 Mach timer deliveries more than 80 ms late,
+with a 298.258 ms p99 and 521.681 ms maximum. Its same-process direct-wait
+worker maximum was 14.924 ms with no interval over 80 ms, and sampled VBL
+plateaus over 80 ms stayed at zero. Timer APIs succeeded and the timer port
+was destroyed. These are timer-delivery measurements, not physical FPS.
+
+The kernel capture covered 3.204 seconds and contained 72 samples. One HIGH
+thread contained AppleACPIEC in 52 samples; another contained it in seven
+already overlapping sample indices, so their counts must not be added.
+All five long timer windows overlapping the capture had explicit EC HIGH
+leaf timestamps inside them; four windows were fully contained and one
+extended past the captured interval. The association uses actual reported
+leaf endpoints without inventing timestamps between samples.
+
+The capture also reported approximately 210, 214 and 210 ms gaps with no
+samples, and spindump emitted a processing-stuck warning before producing
+the nonempty report and returning zero. The raw warning and additional
+private capture are retained. This instrumented, incomplete timeline cannot
+prove uninterrupted EC execution through a gap or assign every timer delay
+to a particular callback.
+
+The installed KDK matches the OS build. Private image-identifier comparison
+matched the loaded stack images, selected BootKC images and KDK images for
+the kernel, AppleACPIEC, AppleACPIPlatform and IOACPIFamily. KDK DWARF and
+native symbol readback confirmed the following sampled path:
+
+```text
+thread_call_thread -> thread_call_invoke
+  -> AppleACPIEC::handleQuery
+  -> IOACPIPlatformDevice / AppleACPIPlatformExpert::evaluateObject
+  -> AcpiEvaluateObject -> AcpiPsExecuteMethod -> AcpiDsExecEndOp
+  -> AcpiExOpcode_1A_0T_0R -> AcpiExSystemDoSleep
+```
+
+Other sampled branches reached `AcpiExEnterInterpreter`,
+`AcpiUtAcquireMutex` and `AcpiOsWaitSemaphore`. These observations identify
+native EC-query AML execution and sleep/interpreter-wait paths. They do not
+identify the actual `_Qxx` method, its sleep operand or the initiating EC
+event. No Apple implementation, binary, KDK material or firmware-derived
+code is copied into this repository.
+
+A separate fresh 20.022-second timer/property observation happened to show
+no long timer delay (1.435 ms maximum). Independent accessor validation then
+proved that EC single-property reads can return a stale statistics dictionary:
+full property serialization refreshed the command count, and a subsequent
+single-property read returned the refreshed value. The earlier zero EC delta
+is therefore excluded from activity and causal conclusions. The smooth timer
+interval remains an intermittent observation, not a repair or evidence that
+EC work was absent.
+
+A new finite scope changed only the counter accessor to independently
+validated full property serialization, preserving identical TimerProbe
+executable text and normal Launch Services scheduling. It reproduced the
+problem without kernel stack sampling:
+
+| Corrected counter observation | Result |
+| --- | ---: |
+| Elapsed time | 20.229 s |
+| Mach timer deliveries over 80 ms late | 27 |
+| Timer lateness p99 / maximum | 288.252 / 516.392 ms |
+| Direct-wait worker maximum / intervals over 80 ms | 14.976 ms / 0 |
+| Sampled VBL plateaus over 80 ms | 0 |
+| GPE / SCI counter increases | 60 / 60 |
+| AML method / EC command counter increases | 958 / 30 |
+| Registry property samples | 217 |
+| Maximum property-read duration / observer poll interval | 9.920 / 275.105 ms |
+
+All 27 long windows overlapped coarse observer intervals containing method
+count increases; 12 overlapped intervals containing GPE count increases.
+These intervals are not exact event timestamps. The last sampled GPE value
+matches the EC declaration in the retained DSDT, whose binary was independently
+matched to the currently loaded dynamic table. A last-GPE value does not
+identify each event or the `_Qxx` query code, and unchanged retry/timeout
+counters do not exclude lengthy AML. A separate bounded four-minute kernel
+ACPI-log query returned no messages; this is not proof of inactivity.
+
+Both the property observation and kernel capture are finite diagnostics, not
+resident monitoring. All diagnostic applications and supervisors exited;
+there was no new driver, policy, EFI, ACPI or power change and no explicit GPU
+test submission. Final independent readback passed exact candidate/disk/cache/
+job and accepted-recovery identities, full metadata for all 416 records and
+29 codeless records with 415 unrelated images preserved, original loaded
+ACPI/full EFI recovery, current-boot accelerated startup and ended supervision.
+No matching report or error counter increased. Keep the running VBL candidate,
+owner-selected baseline, daily PR28 waiting, 250 ms budget, WindowServer
+exclusion and disabled resident monitors unchanged. The next missing causal
+fact is the executing query method; these observations do not justify a
+speculative EC disable, AML rewrite, timer-budget change or rollback.
+
+See the sanitized
+[kernel and ACPI timing record](validation/build34-timer-acpi-correlation-20261118.json).

@@ -1,0 +1,201 @@
+{
+  "date": "2026-11-18",
+  "branch": "upstream34/vram-layout-fix",
+  "kind": "bounded-kernel-and-ACPI-timer-investigation",
+  "status": "EC-query-AML-sleep-path-observed; residual-stutter-unresolved",
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "candidate_source_commit": "439f8a5bc3e086770df7b576897fbb11d7ccc9f1",
+  "accepted_runtime_source": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "same_candidate_boot_preserved": true,
+  "synchronized_kernel_capture": {
+    "fresh_finite_scope": true,
+    "LaunchServices_application": true,
+    "nice": 0,
+    "observed_priority": 37,
+    "original_timer_timing_unchanged_only_output_clock_anchor_added": true,
+    "native_compile_warnings_as_errors_and_signature_passed": true,
+    "elapsed_ms": 20016.247174,
+    "Mach_timer_lateness": {
+      "n": 1123,
+      "median_ms": 0.023526,
+      "p99_ms": 298.257901,
+      "max_ms": 521.680876,
+      "over80ms": 29
+    },
+    "direct_wait_intervals": {
+      "n": 1797,
+      "median_ms": 10.727166,
+      "p99_ms": 14.752238,
+      "max_ms": 14.924431,
+      "over80ms": 0
+    },
+    "sampled_VBL_plateaus_over80ms": 0,
+    "kernel_capture_returncode": 0,
+    "kernel_capture_seconds": 3.203966601000047,
+    "nominal_sample_interval_ms": 20,
+    "kernel_samples": 72,
+    "EC_HIGH_sample_indices_union_count": 52,
+    "two_EC_HIGH_thread_sample_counts": [
+      52,
+      7
+    ],
+    "thread_sample_counts_must_not_be_added_due_to_overlap": true,
+    "overlapping_long_timer_windows": 5,
+    "fully_contained_long_timer_windows": 4,
+    "long_windows_with_explicit_EC_HIGH_leaf_timestamp": 5,
+    "timestamp_association_uses_explicit_leaf_endpoints_without_interpolation": true,
+    "unobserved_sampling_gaps_ms": [
+      209.788995,
+      213.800101,
+      210.147878
+    ],
+    "spindump_processing_warning_recorded": true,
+    "not_an_uninstrumented_performance_comparison": true,
+    "timer_API_errors": 0,
+    "timer_port_destroyed": true
+  },
+  "same_image_symbol_resolution": {
+    "installed_KDK_matches_OS_build": true,
+    "loaded_images_and_cache_and_KDK_image_identifiers_matched_privately": true,
+    "kernel_frames_confirmed_with_KDK_DWARF": true,
+    "confirmed_path": [
+      "thread_call_thread",
+      "thread_call_invoke",
+      "AppleACPIEC::handleQuery",
+      "IOACPIPlatformDevice::evaluateObject",
+      "AppleACPIPlatformExpert::evaluateObject",
+      "AcpiEvaluateObject",
+      "AcpiPsExecuteMethod",
+      "AcpiDsExecEndOp",
+      "AcpiExOpcode_1A_0T_0R",
+      "AcpiExSystemDoSleep"
+    ],
+    "other_confirmed_ACPI_wait_frames": [
+      "AcpiExEnterInterpreter",
+      "AcpiUtAcquireMutex",
+      "AcpiOsWaitSemaphore"
+    ],
+    "specific_query_method_or_sleep_operand_identified": false,
+    "Apple_implementation_or_binary_copied_to_repository": false
+  },
+  "single_property_counter_scope": {
+    "fresh_finite_scope": true,
+    "same_TimerProbe_executable_text": true,
+    "LaunchServices_application": true,
+    "elapsed_ms": 20021.589939,
+    "Mach_timer_lateness": {
+      "n": 1992,
+      "median_ms": 0.017345,
+      "p99_ms": 0.070414,
+      "max_ms": 1.434994,
+      "over80ms": 0
+    },
+    "direct_wait_intervals": {
+      "n": 1782,
+      "median_ms": 10.733117,
+      "p99_ms": 14.740285,
+      "max_ms": 14.993921,
+      "over80ms": 0
+    },
+    "sampled_VBL_plateaus_over80ms": 0,
+    "kernel_stack_sampling": false,
+    "EC_single_property_read_staleness_independently_proved": true,
+    "EC_zero_delta_result_excluded_from_activity_or_causal_conclusions": true,
+    "smooth_timer_interval_is_not_a_repair": true,
+    "timer_port_destroyed": true
+  },
+  "corrected_full_property_scope": {
+    "fresh_finite_scope": true,
+    "same_TimerProbe_executable_text": true,
+    "LaunchServices_application": true,
+    "nice": 0,
+    "observed_priority": 37,
+    "counter_read_method_only_changed": true,
+    "full_serialization_verified_to_refresh_EC_counters": true,
+    "read_only_registry_properties_without_user_client_or_AML_evaluation_request": true,
+    "elapsed_ms": 20229.434064,
+    "property_samples": 217,
+    "maximum_property_read_ms": 9.920362000229943,
+    "maximum_observer_poll_interval_ms": 275.10450900081196,
+    "Mach_timer_lateness": {
+      "n": 1215,
+      "median_ms": 0.022424,
+      "p99_ms": 288.251958,
+      "max_ms": 516.392234,
+      "over80ms": 27
+    },
+    "direct_wait_intervals": {
+      "n": 1803,
+      "median_ms": 10.781939,
+      "p99_ms": 14.715168,
+      "max_ms": 14.975927,
+      "over80ms": 0
+    },
+    "sampled_VBL_plateaus_over80ms": 0,
+    "kernel_stack_sampling": false,
+    "ACPI_counter_increases": {
+      "GpeCount": 60,
+      "MethodCount": 958,
+      "SciCount": 60
+    },
+    "EC_counter_increases": {
+      "CommandCount": 30,
+      "CommandRetry": 0,
+      "IBFPollTimeout": 0,
+      "IBFSciTimeout": 0,
+      "OBFPollTimeout": 0,
+      "OBFSciTimeout": 0,
+      "MissingSCI": 0,
+      "SpuriousSCI": 0,
+      "SpuriousQuery": 0
+    },
+    "last_sampled_GPE_matches_EC_declaration_in_current_loaded_DSDT": true,
+    "retained_private_DSDT_binary_exactly_matches_current_dynamic_loaded_table": true,
+    "long_timer_windows": 27,
+    "long_windows_overlapping_observer_intervals_with_method_count_increase": 27,
+    "long_windows_overlapping_observer_intervals_with_GPE_count_increase": 12,
+    "observer_intervals_are_coarse_not_exact_event_timestamps": true,
+    "last_GPE_is_not_a_per_event_query_code": true,
+    "timer_API_errors": 0,
+    "timer_port_destroyed": true
+  },
+  "scoped_kernel_ACPI_log_query": {
+    "lookback_minutes": 4,
+    "completed": true,
+    "messages": 0,
+    "absence_of_log_messages_not_proof_of_no_ACPI_work": true
+  },
+  "final_independent_readback": {
+    "status": "passed",
+    "candidate_installed_and_loaded": true,
+    "exact_candidate_cache_and_accepted_recovery_verified": true,
+    "full_cache_metadata_and_image_records_verified": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images_preserved": 415,
+    "original_loaded_ACPI_and_full_EFI_recovery_verified": true,
+    "current_boot_accelerated_startup_passed": true,
+    "startup_supervision_ended": true,
+    "one_shot_observer_and_GUI_jobs_removed": true,
+    "new_diagnostic_reports": 0,
+    "new_error_counters": 0
+  },
+  "all_finite_diagnostics_exited": true,
+  "candidate_remains_active": true,
+  "accepted_owner_baseline_reselected": false,
+  "PR28_daily_wait_preserved": true,
+  "wait_budget_ms": 250,
+  "WindowServer_wait_exclusion_preserved": true,
+  "resident_monitor_enabled": false,
+  "driver_or_policy_or_EFI_changes": 0,
+  "power_actions": 0,
+  "explicit_GPU_test_submissions": 0,
+  "specific_EC_query_or_PR28_or_driver_root_cause_proved": false,
+  "general_stutter_repair_accepted": false,
+  "physical_scanout_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "raw_identifiers_logs_tables_firmware_binaries_or_KDK_material_published": false
+}
