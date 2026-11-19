@@ -1,0 +1,76 @@
+{
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "source_parent": "be2e4b33375e93afee56805af9ea4402f7e376d3",
+  "kernel_build": 34,
+  "OS": {"product_version": "26.7.2", "build": "25G332"},
+  "upstream_comparison": {
+    "pinned_commit": "3497d87b229e4839d8d2a03ebe9127f2a30f332b",
+    "latest_upstream_claimed": false,
+    "original_launch_job_enters_shell_directly": true,
+    "post_release_90_second_observation_already_present": true,
+    "paired_original_boot_benchmark_available": false
+  },
+  "existing_boot_evidence": {
+    "source": "current-boot PhxAGDC kernel hold events and existing startup logs",
+    "display_hold_seconds": 26.346563,
+    "approximate_hold_before_script_entry_seconds": [19, 20],
+    "approximate_script_entry_to_display_release_seconds": 7,
+    "script_timestamp_resolution_seconds": 1,
+    "approximate_post_release_script_tail_seconds": 91,
+    "post_release_tail_proved_to_block_progress_bar": false,
+    "guardian_ready_to_desktop_ready_seconds": 16.041575367,
+    "receipt_interval_uses_matching_mach_clocks_and_timebase": true,
+    "receipt_interval_must_not_be_added_to_display_hold": true,
+    "complete_boot_or_progress_bar_duration_measured": false,
+    "prior_29_second_hold_is_a_different_boot": true
+  },
+  "read_only_profile": {
+    "status": "passed",
+    "warm_cache_instrumented_sequential_not_cold_boot_benchmark": true,
+    "stages_seconds": {
+      "owner_build_and_static_admission": 11.637907917,
+      "loaded_kernel_identity": 1.286355993,
+      "installed_checks_and_repeated_static": 4.776677146,
+      "full_EFI_recovery_verification": 3.484623287
+    },
+    "nonoverlapping_stage_total_seconds": 21.185564343,
+    "sha256_exclusive_seconds": 10.749049708,
+    "sha256_calls": 1797,
+    "read_bytes_exclusive_seconds": 2.784551942,
+    "function_timings_already_included_in_stage_totals": true,
+    "nested_cumulative_function_timings_not_additive": true,
+    "protected_entries": 46,
+    "present_protected_files": 45,
+    "intentionally_absent_kill_switch_entries": 1,
+    "present_protected_inventory_bytes": 787782761,
+    "largest_protected_file_bytes": 369213440,
+    "initial_optional_inventory_failure": "Expected-absent marker stat failed after gates completed; timing output was not saved",
+    "corrected_collector": "Saved completed gate timings first; recorded absent inventory without creating a marker or changing gate semantics",
+    "full_EFI_recovery_verified": true,
+    "EFI_left_unmounted": true,
+    "bounded_hold_log_query_returncode": 0,
+    "exact_cold_boot_delay_attributed_to_profile": false
+  },
+  "assessment": {
+    "first_optimization_target": "Repeated integrity and EFI/recovery admission before original initialization shell",
+    "exact_causal_savings_demonstrated": false,
+    "GPU_execution_IB_or_ACPI_regression_proved": false,
+    "historical_streaming_hash_candidate_installed": false,
+    "boot_speed_repair_or_acceptance_claimed": false
+  },
+  "preserved_runtime": {
+    "build34_VBL_AML_and_render_clear_plugin_preserved": true,
+    "acceleration_and_desktop_takeover_enabled": true,
+    "daily_PR28_wait_enabled": true,
+    "PR28_wait_budget_ms": 250,
+    "WindowServer_wait_exclusion_unchanged": true,
+    "resident_monitoring_disabled": true,
+    "integrity_admission_recovery_and_hardware_waits_unchanged": true
+  },
+  "startup_jobs_replayed": false,
+  "GPU_workload_executed": false,
+  "power_action_executed_or_scheduled": false,
+  "live_installation_or_policy_changed": false,
+  "raw_logs_identifiers_and_private_paths_committed": false
+}
