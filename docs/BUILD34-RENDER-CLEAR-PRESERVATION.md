@@ -145,7 +145,7 @@ The initial window observer also crashed because it decoded a bounds
 dictionary with the wrong API; that observer defect was corrected before the
 reported collection and is not a driver crash.
 
-## Next-boot admission and remaining acceptance
+## Restart admission and remaining acceptance
 
 A fresh, separate plugin admission scope was installed and independently read
 back. Both existing startup entrypoints now use its owner wrapper. Its
@@ -169,10 +169,11 @@ metadata, loaded AML, EFI/recovery, current-boot receipts and exact plugin
 identity, with no new matching reports or driver error counters. It submitted
 no GPU work and scheduled no power action.
 
-**The new plugin startup scope has not been tested across an OS restart.** Its
-installation was limited to next-boot entrypoints; it was not bootstrapped and
-no power action was scheduled. Current-boot successful AML/startup receipts
-remain evidence for the current boot, not for that future plugin scope.
+At initial installation, the new plugin startup scope had not been tested
+across an OS restart. Only next-boot entrypoints were installed; they were not
+bootstrapped and no power action was scheduled at that stage. Earlier
+successful AML/startup receipts were not counted as evidence for the future
+plugin boot.
 
 The owner subsequently authorized the test restart on November 19. A fresh
 full preflight passed, and a separate next-boot-only read-only observer was
@@ -186,6 +187,32 @@ receipt wait and a 420-second total limit, submits no GPU test, performs no
 recovery/power action and does not retry. This preparation is not a successful
 restart result. See the separate
 [reboot preparation record](validation/build34-render-clear-reboot-preparation-20261119.json).
+
+**The authorized plugin restart subsequently passed on November 19, 2026.** A
+new OS boot on macOS 26.7.2 build 25G332 produced fresh plugin-scope startup,
+desktop-admission and supervision-completion receipts. Both the one-shot
+observer and a separate independent full readback verified the exact mapped
+candidate in WindowServer, both plugin signatures and recovery copies, all
+416 cache records / 29 codeless entries / 415 unrelated images, loaded AML,
+EFI/recovery, historical contracts and startup entrypoints. Recovery was not
+triggered. The observer exited and removed its own job; startup supervision
+also ended, leaving resident monitoring disabled.
+
+The same WindowServer survived the observer and independent readback. The
+observer's finite enclosure recorded 908 synthetic VBL increments and 577
+successful display copies; the independent enclosure recorded 559 and 5.
+All four driver error counters stayed zero and no matching crash reports were
+added. PR28 daily waiting remains enabled at 250 ms with WindowServer excluded.
+No explicit GPU test was submitted during these readbacks; the earlier GPU
+smoke and animation/cursor observations were not replayed. These results
+accept this plugin's bounded accelerated restart, not visual repair, physical
+FPS or long-term stability. See the
+[restart validation record](validation/build34-render-clear-reboot-20261119.json).
+
+The delayed shutdown command's capture timed out while its root-owned shutdown
+descendant continued. A separate readback confirmed that process and retained
+the request receipt. No duplicate power command was issued; the new boot and
+fresh receipts above establish that the restart actually completed.
 
 **Hardware repair of the reported artifacts remains unaccepted.** The GPU smoke
 and finite desktop progress checks passed, but there is no valid hardware

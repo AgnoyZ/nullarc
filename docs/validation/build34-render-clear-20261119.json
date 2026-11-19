@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-11-19",
-  "status": "installed-GPU-smoke-and-bounded-desktop-passed-visual-and-next-boot-pending",
+  "status": "installed-GPU-smoke-bounded-desktop-and-restart-passed-visual-pending",
   "branch": "upstream34/vram-layout-fix",
   "parent": "4c52280b1ae75602fadbc2992d020baeb2cf07a0",
   "kernel_build": 34,
@@ -51,7 +51,7 @@
     "expected_class_exports": "passed"
   },
   "current_runtime_readback": {
-    "status": "passed-installation-and-independent-post-test-readback",
+    "status": "passed-independent-new-boot-readback",
     "active_VBL_and_AML_treatment_preserved": true,
     "complete_cache_metadata_verified": true,
     "combined_records": 416,
@@ -68,14 +68,17 @@
     "same_WindowServer": true,
     "exact_installed_plugin_recovery_files_copied_and_verified": true,
     "candidate_plugin_signature_verified": true,
-    "WindowServer_restarted_once_same_boot": true,
     "WindowServer_sample_exact_candidate_image_verified": true,
     "exact_previous_plugin_full_bundle_and_atomic_copy_verified": true,
     "recovery_triggered": false,
     "historical_contracts_unchanged": true,
     "kernel_cache_EFI_ACPI_unchanged_by_plugin_trial": true,
-    "same_WindowServer_scope": "same new compositor across finite observations and final readback",
-    "full_post_cursor_readback_passed": true
+    "same_WindowServer_scope": "same current-boot compositor across one-shot observer and independent full readback",
+    "full_post_cursor_readback_passed": true,
+    "new_boot_plugin_startup_verified": true,
+    "one_shot_boot_observer_exited_and_job_removed": true,
+    "new_boot_full_readback_passed": true,
+    "pre_reboot_WindowServer_restart_count": 1
   },
   "retained_nonpassing_attempts": [
     "candidate fixture unused-parameter compilation before fixture correction",
@@ -116,7 +119,9 @@
     "IOSurface_sampled_pixels": 32,
     "verified_channels": 128,
     "valid_partial_clear_discriminator": false,
-    "reported_visual_symptom_test": false
+    "reported_visual_symptom_test": false,
+    "performed_before_test_restart": true,
+    "repeated_after_restart": false
   },
   "bounded_desktop_observations": {
     "animation": {
@@ -181,10 +186,13 @@
     "recovery": "exact prior plugin and preceding AML startup entrypoints only",
     "recovery_triggered": false,
     "bootstrapped_during_installation": false,
-    "cross_boot_tested": false,
+    "cross_boot_tested": true,
     "power_action_scheduled": false,
     "installation_tool_timed_out_child_completed_and_read_back": true,
-    "installer_replayed": false
+    "installer_replayed": false,
+    "cross_boot_accepted": true,
+    "authorized_test_restart_completed": true,
+    "post_boot_validation_record": "build34-render-clear-reboot-20261119.json"
   },
   "plugin_installation_scope": "executed; never replay",
   "private_validation_log_sha256": {
@@ -194,6 +202,10 @@
     "startup-installation-private.json": "f8f4eecd527800bc236721984f1962eee611d079ea14627c436a3d091f843a3e",
     "final-plugin-readback-private.json": "c47a65c116b64288fdeec408bd4039e50b5e87d71ac395712e697632445b4c65",
     "bounded-cursor-result-private.json": "f675267846586d16c7f5e436329c0355fcd6dbe16df0ebd851d7f2426e8b9ff9",
-    "post-cursor-full-readback-private.json": "d987845123a0491ea95ea3068306123288d382a9d3785e2e50742c653e139149"
-  }
+    "post-cursor-full-readback-private.json": "d987845123a0491ea95ea3068306123288d382a9d3785e2e50742c653e139149",
+    "observed-observer-terminal-private.json": "263085adcfef9ad1b852053f88b45cb3a1dcdff3009212fb37830cb6e76e839a",
+    "independent-new-boot-readback-private.json": "09053eabfa84bc3578b829beada13ec50877000fda9bd3af06fe4f192b99fb43",
+    "reboot-request-readback-private.json": "b3fdd4aee22752367b9d8327d2ffab9efa415badc3f3c75823be84a8de45aafd"
+  },
+  "authorized_test_restart_completed": true
 }

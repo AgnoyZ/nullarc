@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "status": "passed-new-boot-admission-and-independent-readback-visual-pending",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "plugin_runtime_source": "9f838846f6a8eeab80890014eace3a5de1b16067",
+  "preparation_commit": "488a67486286b9c2dfb867fa6ae4733b296472b1",
+  "environment": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332"
+  },
+  "authorized_restart": {
+    "new_boot_verified": true,
+    "fresh_plugin_scope_receipts_verified": true,
+    "delayed_shutdown_capture_timed_out_descendant_independently_verified": true,
+    "duplicate_power_action_issued": false,
+    "recovery_restart_triggered": false
+  },
+  "startup_acceptance": {
+    "exact_mapped_WindowServer_candidate_verified_twice": true,
+    "complete_cache_metadata_verified_twice": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images": 415,
+    "loaded_AML_and_full_EFI_recovery_verified_twice": true,
+    "both_plugin_signatures_verified": true,
+    "exact_previous_plugin_recovery_copies_verified": true,
+    "historical_contracts_and_startup_entrypoints_unchanged": true,
+    "current_boot_startup_desktop_admission_and_completion_receipts_verified": true,
+    "startup_supervision_ended": true,
+    "recovery_triggered": false
+  },
+  "finite_observations": {
+    "observer": {
+      "synthetic_VBL_counter_delta": 908,
+      "successful_display_copy_delta": 577,
+      "driver_error_counter_deltas": {
+        "debug.nvaccel_iop_fail": 0,
+        "debug.nvaccel_iop_copy_skip": 0,
+        "debug.nvaccel_surface_gpu_timeouts": 0,
+        "debug.phx_hang_kills": 0
+      },
+      "physical_FPS_measurement": false
+    },
+    "independent_readback": {
+      "synthetic_VBL_counter_delta": 559,
+      "successful_display_copy_delta": 5,
+      "driver_error_counter_deltas": {
+        "debug.nvaccel_iop_fail": 0,
+        "debug.nvaccel_iop_copy_skip": 0,
+        "debug.nvaccel_surface_gpu_timeouts": 0,
+        "debug.phx_hang_kills": 0
+      },
+      "physical_FPS_measurement": false
+    },
+    "same_WindowServer_across_observer_and_independent_readback": true,
+    "new_matching_reports": 0
+  },
+  "observer_retirement": {
+    "observer_terminal_status": "passed-new-boot-candidate-admission",
+    "one_shot_job_file_removed": true,
+    "observer_exited": true,
+    "automatic_retry": false,
+    "GPU_test_submissions": 0,
+    "power_actions": 0
+  },
+  "preserved_owner_policy": {
+    "startup_limits_seconds": [
+      45,
+      150,
+      300
+    ],
+    "resident_monitor_enabled": false,
+    "PR28_daily_wait": true,
+    "wait_budget_ms": 250,
+    "WindowServer_wait_excluded": true,
+    "running_plugin_VBL_and_AML_preserved": true
+  },
+  "checks": {
+    "independent_full_readback": "passed-independent-new-boot-readback",
+    "earlier_GPU_smoke_or_GUI_stress_replayed": false,
+    "kernel_cache_EFI_ACPI_or_security_changed_during_verification": false
+  },
+  "cross_boot_accepted": true,
+  "reported_visual_artifact_repair_accepted": false,
+  "physical_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "public_plugin_binary_uploaded": false,
+  "private_validation_log_sha256": {
+    "observed-observer-terminal-private.json": "263085adcfef9ad1b852053f88b45cb3a1dcdff3009212fb37830cb6e76e839a",
+    "independent-new-boot-readback-private.json": "09053eabfa84bc3578b829beada13ec50877000fda9bd3af06fe4f192b99fb43",
+    "reboot-request-readback-private.json": "b3fdd4aee22752367b9d8327d2ffab9efa415badc3f3c75823be84a8de45aafd"
+  }
+}
