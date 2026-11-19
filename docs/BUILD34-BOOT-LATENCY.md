@@ -628,3 +628,73 @@ Do not ask for the same authorization again, replay the installer/observer,
 overwrite a sealed scope or send a duplicate power command after uncertainty.
 
 See the [sanitized installation record](validation/build34-startup-order-installation-20261119.json).
+
+## Startup-order boot accepted: 2026-11-19
+
+The single authorized ordinary restart completed on macOS 26.7.2 build 25G332.
+Fresh startup-order startup, desktop and completion receipts passed the finite
+observer, followed by a separate independent full readback. Both verified the
+exact two installed jobs, mapped WindowServer plugin, full 416-record cache
+metadata (29 codeless records and 415 unrelated images), loaded AML, full EFI
+and exact recovery copies. The same WindowServer survived each finite
+observation with framebuffer and GPU-completion progress; all four checked
+driver error counters stayed zero and no matching report appeared. No recovery
+was triggered. Both startup processes ended, and the observer removed its
+exact own job and exited. Resident monitoring remains disabled.
+
+### Observed timing
+
+Current-boot kernel display-hold events were independently matched to this
+boot before calculating their interval. The completed startup and guardian
+captures contain 18 and 59 records respectively; both interval trees passed
+offline analysis without errors or hitting the record budget.
+
+| Measurement | Earlier separate timing boot | Startup-order boot |
+| --- | ---: | ---: |
+| Kernel display hold | 26.677336 s | 23.479593 s |
+| Startup entry to initial full EFI-check end | 19.843049 s | 11.042395 s |
+| Guardian initial owner construction | 9.909287 s | 9.357501 s |
+| Guardian process CPU over finite startup supervision | 50.490247 s | 49.722352 s |
+
+The display hold was **3.197743 seconds shorter in this observation**. These
+are separate, unpaired boots with scheduling and cache variation; this does
+not establish repeatable savings or attribute the entire difference to the
+ordering change. The earlier warm 9–12-second handoff differences are still
+not cold-boot savings. No complete power-on-to-desktop duration was measured.
+
+The EFI-check row measures the same check's end relative to its own process
+entry, but the candidate deliberately moves that check **before** guardian
+readiness validation. It therefore does not measure the candidate's complete
+pre-shell admission or prove an 8.8-second improvement in that admission.
+Process clock origins were not compared across processes.
+
+The startup process took 114.478644 elapsed seconds and 7.513571 process CPU
+seconds. Guardian took 126.524672 elapsed seconds and 49.722352 process CPU
+seconds, including finite supervision after display release. Its nine complete
+installed-check calls took 68.268529 inclusive seconds; ten protected-file
+calls took 28.159743 seconds already nested in larger phases. This repeated
+verification work remains substantial. Concurrent or nested intervals must
+not be added, and post-release supervision is not demonstrated progress-bar
+blocking time.
+
+### Retained installation and limits
+
+Keep this passed startup-order installation active. The accepted build34
+kernel/cache, VBL, AML, render-clear plugin, original GPU shell, complete
+serial hashes, guardian/readiness/hardware gates and original 45/150/300-second
+limits remain preserved. PR28 daily waiting remains enabled at 250 ms with
+WindowServer excluded. Exact recovery still restores only the two accepted
+timing jobs. This result supersedes the installation record's pending-boot
+status; it does not change its historical pre-restart evidence.
+
+The existing 50 integrity/clock/preflight and 12 analyzer CPU methods were
+rerun successfully, and both actual completed interval trees passed. No driver,
+plugin, cache, EFI, ACPI or startup-policy edit, GPU-test submission, additional
+startup execution or extra power action was performed during acceptance.
+
+This accepts the candidate's observed startup behavior. Repeatable boot-speed
+improvement, physical FPS, visual-artifact repair and long-term stability remain
+unaccepted. The authorized single restart is consumed; do not replay this
+installer/observer or request another restart under that authorization.
+
+See the [sanitized boot record](validation/build34-startup-order-boot-20261119.json).
