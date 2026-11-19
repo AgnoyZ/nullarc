@@ -144,11 +144,58 @@ integrity checks, existing 45/150/300-second limits, daily PR28 250 ms with
 WindowServer exclusion, disabled resident monitors and unchanged AuxKC.
 Keep the global fence contract and queue lock unchanged for R1a.
 
-No new reboot authorization has been consumed or power command sent by this
-preparation. Earlier one-restart permissions remain consumed. Do not install
+At the initial source-preparation checkpoint, no new reboot authorization had
+been consumed or power command sent. Earlier one-restart permissions remain
+consumed. Do not install
 the candidate into EFI, alter live boot entrypoints or schedule a power action
-under an old scope. The owner must authorize the new baseline restart before
-that transition. No new next-boot observer/job has been staged by this patch.
+under an old scope. A new authorization was required before that transition;
+the following separate preparation records the owner's subsequent grant.
+No next-boot observer/job was staged by the initial source patch.
+
+## Authorized plugin baseline reboot preparation
+
+The owner subsequently authorized one ordinary baseline restart on November
+19, 2026, preserving the accepted kernel. A fresh private next-boot-only
+observer has been prepared, CPU-tested, staged and independently read back.
+It is not bootstrapped in the preparation boot. The full actual runtime,
+cache, loaded AML, EFI and recovery check passed, including the unchanged
+accepted kernel and all 358 EFI file contents. The surviving WindowServer
+still maps the pretrial plugin, so the isolation prerequisite remains real.
+Another actual owner check passed after observer staging. Only the new
+observer job was added; both existing startup jobs remain exact.
+
+The observer's 27 CPU methods and six separate staging methods pass. An
+initial success-path CPU fixture attempted to inspect the protected real
+journal because its path was not redirected to the temporary fixture;
+that fixture was corrected before staging. It is not hardware-failure
+evidence. The final checks cover new-boot enforcement, fresh receipts,
+startup failure/recovery/deadlines, exact plugin identity, all EFI contents
+and the accepted kernel, serial timing records, errors, desktop progress,
+exact job retirement, no overwrite and no current-boot bootstrap.
+
+On the next boot the observer waits at most 360 seconds for this installed
+Weather scope's fresh startup/desktop/supervision-ended receipts, under a
+420-second total limit. It then independently verifies the exact mapped
+candidate plugin, unchanged accepted kernel, complete 416/29/415 cache
+metadata, loaded AML, full EFI/recovery, current policy and finite desktop
+progress. It collects the current startup/guardian timing records, removes
+only its exact own job, and exits. It has no GPU-test, recovery, power or
+automatic-retry capability. Existing startup recovery, 45/150/300-second
+limits, serial hashing, daily PR28 250 ms/WindowServer exclusion and disabled
+resident monitoring are unchanged.
+
+At this documented preparation readback no reboot request has been sent;
+cross-boot acceptance remains pending. The fresh owner authorization permits
+exactly one ordinary baseline restart after repository synchronization,
+without asking again. Inspect the new scope's persisted request intent and
+actual state after any uncertain command; never duplicate a power request.
+After boot, require both its fresh result and a separate current-boot
+readback before preparing the kernel treatment. The R1a kernel remains
+uninstalled, and no later recommendation has started. These preparation
+checks do not establish visual repair, physical FPS or long-term stability.
+
+The sanitized checkpoint is recorded in
+[`validation/build34-wait-plugin-baseline-reboot-preparation-20261119.json`](validation/build34-wait-plugin-baseline-reboot-preparation-20261119.json).
 
 ## Rollback and record
 
