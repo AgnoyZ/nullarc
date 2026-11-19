@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "source_checkpoint": "625420d73271cfaaea7e98477806163d25495d1c",
+  "kernel_build": 34,
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "status": "opaque-liquid-glass-unresolved-awaiting-visual-discrimination",
+  "owner_observation": "completely opaque despite restored transparency setting",
+  "effective_settings": {
+    "reduce_transparency": false,
+    "increase_contrast": false,
+    "reduce_motion": true,
+    "changed_by_this_followup": false
+  },
+  "finite_comparison": {
+    "collection_passed": true,
+    "launch_attempts": 1,
+    "launch_services": true,
+    "normal_nice_priority": true,
+    "duration_seconds": 8,
+    "materials": [
+      "regular NSGlassEffectView",
+      "clear NSGlassEffectView",
+      "active within-window NSVisualEffectView"
+    ],
+    "same_checkerboard_and_color_background": true,
+    "visible_and_unoccluded_at_recorded_check": true,
+    "effective_settings_agree_in_all_three_readings": true,
+    "exited": true,
+    "screen_capture_access_preflight": false,
+    "screen_capture_requested_or_attempted": false,
+    "capture_permission_bypassed": false,
+    "visual_output_measured": false,
+    "owner_material_comparison_received": false,
+    "explicit_Metal_test_submissions": 0,
+    "ordinary_AppKit_compositor_rendering": true
+  },
+  "release_failure_log_comparison": {
+    "before_entries": 49,
+    "after_entries": 49,
+    "new_entries": 0,
+    "coverage": "filtered release-failure messages across the comparison interval",
+    "proves_rendering_correctness": false,
+    "existing_messages_prove_glass_root_cause": false
+  },
+  "control_center_refresh": {
+    "exact_console_user_executable_and_process_verified": true,
+    "old_process_predated_preference_change": true,
+    "termination_signal_attempts": 1,
+    "automatic_replacement_verified": true,
+    "effective_settings_preserved": true,
+    "visual_improvement_accepted": false,
+    "Dock_or_ordinary_apps_restarted": false,
+    "WindowServer_restart_requests": 0
+  },
+  "independent_runtime_readback": {
+    "fresh_complete_before_and_after_passed": true,
+    "same_boot_and_WindowServer": true,
+    "exact_mapped_WindowServer_plugin": true,
+    "complete_cache_metadata_preserved": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images": 415,
+    "loaded_AML_full_EFI_and_recovery_verified": true,
+    "accepted_build34_VBL_AML_render_clear_startup_order_preserved": true,
+    "PR28_daily_wait_enabled": true,
+    "wait_budget_ms": 250,
+    "WindowServer_wait_excluded": true,
+    "resident_monitors_enabled": false,
+    "startup_supervision_ended": true,
+    "finite_check_worker_exited": true,
+    "all_four_checked_driver_error_counters_zero": true,
+    "new_matching_reports": 0,
+    "recovery_triggered": false
+  },
+  "changes": {
+    "driver_source_or_binary_changed": false,
+    "cache_EFI_ACPI_or_startup_policy_changed": false,
+    "security_or_capture_permission_changed": false,
+    "power_actions": 0
+  },
+  "acceptance": {
+    "glass_or_visual_artifact_repair": false,
+    "physical_FPS_measured": false,
+    "long_term_stability": false,
+    "driver_patch_selected": false
+  },
+  "next_discriminator": "owner appearance report for refreshed ControlCenter and other glass surfaces",
+  "raw_logs_identifiers_private_paths_screenshots_or_binaries_committed": false
+}
