@@ -309,3 +309,51 @@ takeover, PR28 daily 250 ms/WindowServer exclusion and disabled resident
 monitoring remain unchanged at this preparation.
 
 See the [sanitized preparation record](validation/build34-boot-phase-preparation-20261119.json).
+
+## Authorized phase-clock installation: 2026-11-19
+
+The owner subsequently authorized this measurement-only installation and one
+ordinary test restart. The two startup job files now match the previously
+sealed timing-scope copies. They were changed through the preserved atomic
+writer without bootstrapping startup in the installation boot. The accepted
+plugin, kernel, selected cache, AML, EFI and runtime settings are unchanged.
+The parallel hashing candidate remains disabled.
+
+The actual new owner entry's `check` passed with the new live job files, and
+produced 15 successful **check-only** timing records. An independent full
+readback passed the exact mapped WindowServer plugin, complete 416-record
+cache/29 codeless records/415 unrelated images, loaded AML, full EFI/recovery,
+plugin signatures and exact recovery copies. The actual derived contract and
+all previous policy entries except the intended job pins remain preserved.
+The same WindowServer survived the finite observation, all four driver error
+counters stayed zero, no matching report appeared, and recovery was not used.
+These installation-boot `check` records are not startup measurements.
+
+The installation added seven CPU/temp-directory methods covering exact job
+replacement, consumed-scope/unknown-state refusal, partial-write readback and
+same-boot job-only recovery dispatch. A fresh observer adds 15 CPU methods for
+new-boot/receipt/deadline refusal, runtime progress/error checks, exact job
+retirement and selecting only the new boot's startup/guardian phase logs.
+Together with the existing 30 phase/scope/binding methods, **52 methods pass**.
+Temporary recovery-dispatch coverage does not prove real live recovery.
+
+The new observer is staged but remains unloaded in this boot. It requires
+fresh successful receipts from this timing scope, independently verifies the
+runtime and complete recovery state, collects the startup/guardian phase
+records, and removes only its exact own job. Its receipt-wait/total limits
+remain 360/420 seconds; it cannot submit GPU tests, recover the installation,
+request power actions or retry. A separate independent readback verified all
+observer pins and actual live jobs, then repeated the actual new owner check
+after staging. The original 45/150/300-second startup limits are unchanged.
+
+At this installation/pre-restart checkpoint no power command has been sent,
+and cross-boot behavior remains **pending**. The authorized restart must be
+requested only once and verified from new-boot evidence. Do not replay this
+installation, stage a second observer, or interpret the existing roughly
+90-second post-release observation as progress-bar blocking. An instrumented
+restart measures phase attribution; it does not itself prove faster boot.
+Keep build34/VBL/AML/render-clear, daily PR28 250 ms with WindowServer exclusion,
+and disabled resident monitors. Controller recovery restores only the two
+startup jobs and never rolls back the accepted plugin.
+
+See the [sanitized installation record](validation/build34-boot-phase-installation-20261119.json).
