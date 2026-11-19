@@ -174,6 +174,19 @@ installation was limited to next-boot entrypoints; it was not bootstrapped and
 no power action was scheduled. Current-boot successful AML/startup receipts
 remain evidence for the current boot, not for that future plugin scope.
 
+The owner subsequently authorized the test restart on November 19. A fresh
+full preflight passed, and a separate next-boot-only read-only observer was
+staged without bootstrap. Its ten CPU checks cover new-boot admission,
+complete receipts, deadlines, recovery/failure refusal, driver counters,
+WindowServer continuity and exact own-job removal. After current-boot startup
+receipts appear, it independently checks the mapped candidate plugin,
+complete cache metadata, loaded AML, EFI/recovery and owner policy, records a
+finite progress observation and removes its own job. It has a 360-second
+receipt wait and a 420-second total limit, submits no GPU test, performs no
+recovery/power action and does not retry. This preparation is not a successful
+restart result. See the separate
+[reboot preparation record](validation/build34-render-clear-reboot-preparation-20261119.json).
+
 **Hardware repair of the reported artifacts remains unaccepted.** The GPU smoke
 and finite desktop progress checks passed, but there is no valid hardware
 partial-clear discriminator or visual acceptance of pointer trails and gray

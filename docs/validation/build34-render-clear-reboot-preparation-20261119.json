@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "status": "preflight-passed-next-boot-observer-staged",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "plugin_runtime_source": "9f838846f6a8eeab80890014eace3a5de1b16067",
+  "prior_validation_commit": "ab2638e0996506a0a5f85490e5e497d8e99694c1",
+  "owner_authorized_test_restart": true,
+  "environment": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332"
+  },
+  "preflight": {
+    "full_current_runtime_cache_AML_EFI_recovery_readback": true,
+    "combined_cache_records": 416,
+    "codeless_records": 29,
+    "unrelated_images_preserved": 415,
+    "exact_live_plugin_and_atomic_recovery": true,
+    "both_plugin_signatures_verified": true,
+    "historical_contracts_unchanged": true,
+    "new_driver_errors": 0,
+    "new_matching_reports": 0,
+    "preparation_tool_timeout_child_completed_and_read_back": true,
+    "preparation_replayed": false
+  },
+  "next_boot_observer": {
+    "CPU_tests_passed": 10,
+    "next_boot_only": true,
+    "staged_and_read_back": true,
+    "bootstrapped": false,
+    "requires_successful_current_boot_plugin_startup_receipts": true,
+    "verifies_exact_mapped_WindowServer_candidate": true,
+    "verifies_complete_cache_loaded_AML_EFI_recovery_and_owner_policy": true,
+    "receipt_wait_limit_seconds": 360,
+    "total_limit_seconds": 420,
+    "removes_only_exact_own_job_after_completion_or_failure": true,
+    "automatic_retry": false,
+    "GPU_test_submissions": 0,
+    "recovery_actions": 0,
+    "power_actions": 0
+  },
+  "preserved_policy": {
+    "existing_startup_limits_seconds": [45, 150, 300],
+    "resident_monitor_enabled": false,
+    "PR28_daily_wait": true,
+    "wait_budget_ms": 250,
+    "WindowServer_wait_excluded": true,
+    "exact_plugin_recovery_retained": true,
+    "active_VBL_and_AML_preserved": true
+  },
+  "kernel_cache_EFI_ACPI_or_security_changed": false,
+  "new_GPU_test_executed": false,
+  "power_action_scheduled_at_preparation_readback": false,
+  "cross_boot_accepted": false,
+  "reported_visual_artifact_repair_accepted": false,
+  "physical_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "private_machine_identifiers_logs_and_binaries_published": false
+}
