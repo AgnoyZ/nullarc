@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "status": "installed-independent-readback-passed-restart-pending",
+  "owner_authorized_installation_and_ordinary_restart": true,
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "owner_accepted_runtime_source": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "active_VBL_source": "439f8a5bc3e086770df7b576897fbb11d7ccc9f1",
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "candidate": "local AML log-buffer batch copy",
+  "candidate_AML_bytes": 172,
+  "installation": {
+    "full_EFI_files_before": 357,
+    "full_EFI_files_after": 358,
+    "only_existing_EFI_file_changed": "OC/config.plist",
+    "only_EFI_file_added": "OC/ACPI/SSDT-BFCOPY.aml",
+    "ACPI_declaration_only_rename": true,
+    "original_method_body_and_callsite_preserved": true,
+    "drivers_and_selected_cache_changed": false,
+    "Windows_EFI_changed": false,
+    "startup_entrypoints_changed": 2,
+    "fresh_next_boot_observer_staged": true,
+    "fresh_finite_GUI_pair_staged": true,
+    "old_receipts_replayed": false,
+    "current_boot_still_uses_original_ACPI": true
+  },
+  "validation": {
+    "CPU_tests_passed": 45,
+    "official_ocvalidate_passed": true,
+    "actual_original_DSDT_whole_table_guard_passed": true,
+    "independent_installed_readback_passed": true,
+    "complete_cache_metadata_verified": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images_preserved": 415,
+    "current_boot_accelerated_startup_passed": true,
+    "exact_original_ACPI_and_job_recovery_preserved": true,
+    "new_errors": 0,
+    "new_reports": 0
+  },
+  "control": {
+    "normal_Launch_Services_GUI": true,
+    "nice": 0,
+    "observed_dynamic_priority": 46,
+    "GUI": {
+      "n": 599,
+      "median_ms": 16.671068000000176,
+      "p95_ms": 18.304482999999983,
+      "p99_ms": 296.976576,
+      "max_ms": 512.5522270000005,
+      "over33ms": 22,
+      "over100ms": 19
+    },
+    "independent_worker": {
+      "n": 1427,
+      "median_ms": 10.881965999999466,
+      "p95_ms": 14.273400000000436,
+      "p99_ms": 14.840704000000926,
+      "max_ms": 16.17463699999999,
+      "over33ms": 0,
+      "over100ms": 0
+    },
+    "onscreen_checks": 10
+  },
+  "preparation_failures_preserved": [
+    "First control wrapper incorrectly required a fixed process priority of 37; normal Launch Services priority was 46 with nice 0. Fresh control passed a normal scheduling range check.",
+    "Initial loaded-table fixture assumed RSDT entries were 32-bit; the Apple RSDT property holds an XSDT on this machine. The parser now uses the actual signature and tests 64-bit entries.",
+    "A recovery fixture initially did not supply its isolated transaction module. Corrected before all 45 final CPU checks passed."
+  ],
+  "next_boot": {
+    "unchanged_bounded_startup_limits": true,
+    "exact_candidate_DSDT_and_SSDT_required": true,
+    "FADT_only_physical_pointer_fields_may_relocate": true,
+    "root_table_exact_header_and_one_added_pointer_required": true,
+    "unrelated_loaded_table_bytes_required": true,
+    "early_and_after_900_seconds_GUI_pair": true,
+    "observer_worker_deadline_seconds": 420,
+    "finite_pair_deadline_seconds": 1230,
+    "automatic_retry": false
+  },
+  "policy": {
+    "acceleration_enabled": true,
+    "desktop_takeover_enabled": true,
+    "PR28_daily_wait": true,
+    "wait_budget_ms": 250,
+    "WindowServer_wait_excluded": true,
+    "resident_monitor_enabled": false
+  },
+  "reboot_requested": false,
+  "loaded_candidate_ACPI_verified": false,
+  "GUI_repair_accepted": false,
+  "physical_scanout_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "privacy": {
+    "raw_firmware_EFI_configuration_and_logs_published": false,
+    "private_candidate_binary_published": false
+  }
+}

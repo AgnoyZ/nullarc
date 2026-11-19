@@ -3,7 +3,8 @@
 The residual GUI stutter now has a specific AML hot method to evaluate. A fresh
 finite native observation found 395 of 406 query on-CPU samples in the firmware
 log-buffer `MOVE` method. A narrow local batch-copy candidate passes offline
-AML equivalence checks, but is **not installed or hardware-accepted**. The active
+AML equivalence checks and is now **installed on disk, pending restart and
+hardware acceptance**. The active
 build34 VBL candidate and the accepted owner baseline remain distinct.
 
 This follows the [direct HIGH queue-delay measurement](BUILD34-VBL-SCHEDULING.md#pending-to-dispatch-delay-measured-directly).
@@ -86,8 +87,10 @@ preview, not a generic patch for other firmware.
 The configuration preview preserves all existing Add/Patch entries and all
 other configuration sections. Its only existing-file change is `OC/config.plist`,
 with one new `SSDT-BFCOPY.aml` table: 357 original files become 358 preview files.
-Official OpenCore 1.0.8 `ocvalidate` reports no issues. Neither file was written
-to the real EFI, no startup job was staged and no power action was scheduled.
+Official OpenCore 1.0.8 `ocvalidate` reports no issues. At this offline-preview
+checkpoint neither file had been written to the real EFI, no startup job had
+been staged and no power action had been scheduled. The later authorized
+installation is recorded below.
 
 Rollback retains the exact original configuration and full original manifest.
 For a future authorized trial, restore that exact configuration and remove only
@@ -154,10 +157,55 @@ remain enabled; its 250 ms budget and WindowServer exclusion are unchanged.
 Resident monitors remain disabled. The accepted owner baseline remains
 `1d4968fbc2ce988c77bdd85b2ec36f435b57f496`.
 
-The next stage is a separately reviewed and authorized ACPI trial with a fresh
-scope compatible with the currently active VBL image. It needs an exact original
-control, candidate-only ACPI/EFI expectations, unchanged startup/admission limits,
-independent loaded-table/body verification and exact recovery before a bounded
-normal-priority GUI/timer comparison. Old startup/GUI/GPU receipts must not be
+The owner subsequently authorized the separately reviewed ACPI trial described
+below, with a fresh scope compatible with the currently active VBL image. Its
+next boot still requires candidate-only ACPI/EFI expectations, unchanged
+startup/admission limits, independent loaded-table/body verification and exact
+recovery before the bounded normal-priority GUI/timer comparison. Old startup/GUI/GPU receipts must not be
 replayed. No general stutter repair, physical FPS or long-term stability is
 accepted yet. See the [sanitized record](validation/build34-aml-buffer-copy-20261119.json).
+
+
+## Authorized installation, restart pending
+
+The owner explicitly authorized this candidate's installation and ordinary
+restart test on November 19, 2026. The new private ACPI scope has now installed
+only the previewed configuration change and the 172-byte SSDT. Independent
+readback passed the real 358-file EFI, exact original configuration/recovery,
+two new bounded-startup entrypoints, the unchanged active VBL driver/cache and
+all 416 cache records/29 codeless entries with 415 unrelated images preserved.
+The candidate is **on disk only**: original ACPI remains loaded until restart.
+No GPU test or power action was performed by installation/readback.
+
+Forty-five CPU tests passed before installation. They cover interrupted writes,
+exact rollback, unrelated-file and symlink refusal, original method-body drift,
+loaded-table expectations, fresh receipt identity and unchanged startup limits.
+A failed first control assertion and two initial fixture/parser failures are
+retained privately; none is counted as a pass. The first control wrapper
+incorrectly required a fixed process priority of 37. A fresh Launch Services
+control passed normal scheduling checks with nice 0 and a dynamic priority of
+46, again showing 19 GUI intervals over 100 ms in about 12 seconds (maximum
+512.552 ms), while the independent worker's maximum was 16.175 ms.
+
+The next-boot observer requires the exact declaration-only DSDT and candidate
+SSDT, preserves the original method body/call site, and checks all unrelated
+loaded-table bytes. FADT physical-address fields alone may relocate; power and
+other semantic fields must remain identical. Apple's property named `RSDT`
+holds an `XSDT` here, so root-entry width comes from the actual table signature;
+its header/checksum and exactly one added pointer are checked. This extends the
+original DSDT/FADT gate rather than treating arbitrary table drift as acceptable.
+
+The startup controller and admission limits are unchanged. A new one-shot
+observer has a 420-second worker deadline. Only after exact candidate admission
+and independent full-cache readback may a separate finite diagnostic collect
+an early GUI result and another after 900 seconds uptime. Its 1,230-second outer
+limit and self-removal prevent a resident monitor. Collection success is
+separate from accepting latency. No old startup/GPU/GUI receipt is reused.
+
+Exact recovery restores the original ACPI configuration, removes only the
+byte-matched new table, and restores the two current VBL startup jobs. It keeps
+the successfully running VBL images and the owner-selected daily PR28 policy.
+It does not restore the older accelerator, reinstall the withdrawn S5 table,
+unload a desktop driver or enable post-startup automatic monitoring/rollback.
+Hardware stutter repair, physical FPS and long-term stability remain pending.
+See the [installation record](validation/build34-aml-buffer-installation-20261119.json).
