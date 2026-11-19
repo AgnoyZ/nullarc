@@ -458,3 +458,123 @@ installers/observers, weaken admission or issue another reboot under the
 already consumed single-restart request.
 
 See the [sanitized boot record](validation/build34-boot-phase-boot-20261119.json).
+
+## Startup-order candidate, offline only: 2026-11-19
+
+A subsequent ordinary boot has now passed its own independent current-boot
+readback. This is separate from the consumed phase-clock observer's earlier
+boot result. The actual two live jobs, current-boot startup completion,
+18 startup/59 guardian timing records, exact mapped plugin, loaded AML,
+complete 416/29/415 cache metadata, full EFI/recovery and daily policy passed.
+Startup supervision ended; no recovery or matching report appeared, and all
+four checked driver error counters remained zero. This follow-up did not run
+startup, initialize the GPU, submit a GPU test or request another restart.
+
+### Relationship to original nullarc
+
+The upstream startup script at the locally available pinned upstream commit
+`3497d87b229e4839d8d2a03ebe9127f2a30f332b` retains the same broad sequence:
+wait for the framebuffer, initialize/claim the accelerator, arm scanout and
+AGDC, release the display, then observe WindowServer for 90 seconds. It also
+has the separate resident hang watcher. Its `tools/phxctl` component was
+reviewed under the repository's MIT/GPL-2.0-only option; no upstream code or
+binary was copied for this candidate, and all license/notice files remain
+unchanged. This comparison is to that pinned source, not a claim about the
+latest upstream revision or an original-driver boot benchmark.
+
+Replacing the installed entry with the whole upstream script would not isolate
+the measured pre-shell admission cost, and would conflict with the owner's
+disabled resident-monitor policy. Keep the accepted protected GPU shell and
+hardware waits. The startup-order experiment instead targets the wrapper's
+full checks that currently run after waiting for guardian readiness.
+
+### Exact proposed order and failure boundaries
+
+The new import-only helper,
+[`build34_startup_preflight.py`](../tools/build34_startup_preflight.py), runs
+the **same complete installed checks and full EFI/recovery verification once
+each before waiting for readiness**, then requires the existing current-boot
+receipt/age/root-PID/command validation. This can overlap work with the
+already independent guardian process; it creates no reader threads, digest
+cache or additional guardian, and skips no successful-path full validator.
+The guardian's own code is unchanged.
+
+Private exact-source review confirmed that the existing EFI context serializes
+access through its root-owned, no-follow, exclusive lock with a 60-second
+acquisition limit. It requires the selected EFI initially unmounted, mounts
+read-only, verifies the entire selected manifest and recovery copies, and
+unmounts in `finally`. The experiment retains that implementation. The active
+phase scope's recovery changes only the two startup jobs; it never changes the
+accepted plugin, kernel/cache or EFI. Extra candidate boundary checks refuse
+pending startup/guardian failure, current/historical recovery, or either live
+job differing from its pinned after copy. Moving checks earlier is not an
+atomic snapshot against a privileged concurrent writer.
+
+The original 45-second readiness limit starts **before** the moved checks and
+is checked after them and after receipt validation, even if readiness is
+already present. This is stricter than timing only the old readiness loop.
+The helper does not interrupt a blocked validator: the existing EFI-lock and
+outer-worker bounds remain necessary. The original final framebuffer/hold
+gates, protected shell launch, completion conditions and recovery handler are
+byte-for-byte unchanged by the private adapter. The 150/300-second desktop/
+supervision limits and exact job-only recovery remain required for any future
+scope; no current scope or sealed file was edited.
+
+### CPU verification and adoption limit
+
+The helper's 18 CPU methods pass. Eighteen additional private methods execute
+the actual pinned `future_startup` function with CPU/temp-directory substitutes,
+including source-drift refusal, unchanged shell arguments/recovery handler,
+full-check counts, pending-startup refusal, stale/wrong-boot/nonroot/wrong-action
+guardian rejection, timeout, live-job replacement and recovery/failure during
+the wait. The unchanged framebuffer and hold gates still reject bad states.
+Thirteen candidate-scope CPU/temp-directory methods cover exact sealed inputs,
+two-job-only recovery, one-use/same-boot power refusal and unknown-state refusal.
+Together with 44 existing integrity/clock/analyzer methods, **93 methods pass**.
+These fixtures cannot prove real startup recovery or cold-boot improvement.
+
+### Read-only warm comparison and inactive scope
+
+Two fresh processes per trial ran the real current owner construction, loaded
+identity, full installed checks and full EFI/recovery checks. The synthetic
+readiness signal lived only in a new private evaluation directory; it is not
+a real startup/desktop receipt. Neither `future_startup`, guardian monitoring,
+the GPU shell nor a recovery function was called. One parent's clock measured
+each handoff; worker clocks were not aligned or added to elapsed time.
+
+| Trial order | Original handoff | Candidate handoff | Difference |
+| --- | ---: | ---: | ---: |
+| Original, then candidate | 39.592668 s | 30.230798 s | -9.361870 s |
+| Candidate, then original | 37.729802 s | 25.843169 s | -11.886632 s |
+
+Both orders favor the candidate in this warm harness. Summed worker CPU was
+31.397746/31.058465 seconds in the first pair and 27.530304/26.505264 seconds
+for original/candidate in the reverse pair. These CPU sums describe work,
+not boot elapsed time. Construction/identity durations varied substantially,
+so these four samples do not isolate the ordering effect from scheduling,
+cache or other system variation. Do not promise a 9–12 second boot saving.
+Each pair ended with a separate full current-runtime/cache/loaded-AML/EFI/
+recovery/policy readback; both passed with no new matching report, error
+increase or recovery. All evaluation processes exited.
+
+A fresh **inactive** private scope is now sealed and independently read back.
+Its 13 sealed inputs include the exact CPU-tested helper, candidate bounded
+startup, unchanged owner/timing/guardian/AML/shell sources, both prospective
+jobs, policy and both exact accepted timing-job recovery copies. Before/after
+job attributes differ only in scope paths. The prospective runtime contract
+equals the accepted current contract, and prior policy entries are retained
+apart from the two prospective live-job pins. The prior timing contract is
+pinned as historical evidence, rather than calling its old live-job admission
+after a future transition to third-state job bytes. Source compilation and
+actual adjacent-helper binding passed without executing startup.
+
+This helper remains an **uninstalled evaluation candidate**. The actual live
+jobs and policy still match the accepted timing scope; no installation intent,
+new observer job or power action was created. A separately authorized live
+trial must use the new exact scope, preserve its job-only recovery and obtain
+fresh current-boot evidence. Never overwrite the accepted sealed timing scope or
+replay its consumed installer/observer/restart authorization. Preserve
+build34/VBL/AML/render-clear, PR28 daily 250 ms with WindowServer exclusion and
+disabled resident monitors.
+
+See the [sanitized evaluation record](validation/build34-startup-order-candidate-20261119.json).
