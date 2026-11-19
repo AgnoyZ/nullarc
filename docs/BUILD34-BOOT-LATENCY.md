@@ -247,3 +247,65 @@ is required before a boot-speed acceptance claim. No optimization deployment,
 startup replay, resident monitoring or reboot was performed here.
 
 See the [sanitized candidate record](validation/build34-boot-hash-batch-20261119.json).
+
+## Inactive phase-clock preparation: 2026-11-19
+
+Because the parallel candidate has not demonstrated consistent whole-gate
+benefit, a separate **measurement-only** scope is prepared but **not installed**.
+It retains the original serial file verification. The bounded startup module,
+AML selector and initialization shell are byte-identical to the accepted
+installation. The owner entry adds timing enablement inside its existing
+exception/recovery boundary; original calls, return values, exceptions and
+deadline logic are retained.
+
+The new original utility
+[`build34_startup_phase_clock.py`](../tools/build34_startup_phase_clock.py)
+records process-local monotonic start/end, elapsed and CPU intervals for fixed
+labels. It records no arguments, results or exception messages. Nested records
+overlap and must not be added; clock origins are not compared between processes.
+Each process can collect at most 256 records in this scope; later calls still
+execute every original check. A log reaching that budget must be treated as
+potentially incomplete. Logging adds its own overhead, so an instrumented boot
+cannot be presented as an uninstrumented speed comparison.
+
+Private source bindings observe owner policy/build/entry, route/static,
+protected-file validation, loaded identity, complete EFI/recovery checks and
+bounded startup/guardian functions. The sink uses root-owned regular files,
+mode 0600, no symlink following and one hard link. A logging failure cannot
+mask an original validator exception. If logging fails after an otherwise
+successful action, the existing entry's failure handling is used; it is not
+counted as a successful measurement.
+
+The fresh scope pins its complete source/policy/job copies and preserves the
+accepted plugin scope's historical contracts and derivation. Its policy keeps
+all old pins except the two *prospective* startup-job digests, and adds the new
+scope's pins. Those two live jobs still contain their exact accepted original
+bytes; the prospective policy is intentionally not admitted as installed yet.
+No activation intent, phase log, startup bootstrap or power action exists.
+
+The new controller's recovery can restore only the two exact saved startup
+jobs, using the preserved atomic job writer. It never invokes the historical
+plugin rollback. Unknown job bytes are rejected, uninstalled scopes cannot
+recover, and recovery power actions are prohibited in the preparation boot.
+This is controller recovery; the existing initialization shell's own failure
+handling is unchanged.
+
+**30 CPU methods pass**: 11 public timing transparency/budget/failure tests,
+13 private scope-contract and temporary-directory recovery-dispatch tests,
+and six root-owned temporary binding/sink tests with fake action modules.
+The latter tests do not run the real startup or guardian. Preparation passed
+the current installation's complete read-only admission and EFI/recovery
+checks. Independent inactive readback verified the seals, unchanged actual
+derived contract, exact original live jobs, prospective plist syntax and
+attributes, preserved policy pins and byte-identical bounded/AML/shell inputs.
+It did not run the new entry against substituted live jobs or test a boot.
+
+Any next activation must first read back the actual new live job/policy state
+before an explicitly authorized test restart. Do not bootstrap this prepared
+scope in the current boot or replay old observations. After a new boot,
+require fresh admission/completion receipts and independent exact runtime
+readback before interpreting phase timings. Hardware acceleration, desktop
+takeover, PR28 daily 250 ms/WindowServer exclusion and disabled resident
+monitoring remain unchanged at this preparation.
+
+See the [sanitized preparation record](validation/build34-boot-phase-preparation-20261119.json).

@@ -1,0 +1,78 @@
+{
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "controller_source_parent": "7e7a27b30671200c7919e5ca5dd8f6444fc7043b",
+  "kernel_build": 34,
+  "OS": {"product_version": "26.7.2", "build": "25G332"},
+  "status": "prepared-inactive-not-installed-or-boot-tested",
+  "measurement": {
+    "helper": "tools/build34_startup_phase_clock.py",
+    "helper_sha256": "26bbe8d4b0fa204a814500251cefd4bc91ce08a076af4cfeb79b63df7b7a7ea0",
+    "kind": "phase-clock-only",
+    "parallel_hash_candidate_enabled": false,
+    "serial_verification_and_all_original_calls_preserved": true,
+    "process_local_monotonic_start_end_elapsed_and_CPU": true,
+    "cross_process_clock_origin_comparisons": false,
+    "nested_intervals_overlap_and_are_not_additive": true,
+    "maximum_records_per_process": 256,
+    "checks_still_execute_after_record_budget_exhaustion": true,
+    "record_budget_hit_requires_incomplete_timing_assessment": true,
+    "arguments_results_and_exception_messages_logged": false,
+    "instrumentation_overhead_not_an_uninstrumented_boot_benchmark": true
+  },
+  "CPU_tests": {
+    "public_phase_clock_methods": 11,
+    "private_scope_contract_and_temp_recovery_dispatch_methods": 13,
+    "private_root_temp_binding_and_sink_methods": 6,
+    "total_methods": 30,
+    "all_passed": true,
+    "real_startup_guardian_or_GPU_action_invoked_by_tests": false
+  },
+  "preparation": {
+    "fresh_root_owned_inactive_scope_sealed": true,
+    "required_sealed_files": 12,
+    "current_installation_full_readonly_admission_passed": true,
+    "current_full_EFI_recovery_verified_and_left_unmounted": true,
+    "bounded_startup_AML_selector_and_shell_byte_identical": true,
+    "owner_only_adds_timing_enable_inside_existing_exception_boundary": true,
+    "prospective_job_count": 2,
+    "live_job_files_changed": false,
+    "live_policy_changed": false,
+    "installation_intent_present": false,
+    "startup_or_observer_bootstrapped": false
+  },
+  "independent_inactive_readback": {
+    "passed": true,
+    "actual_derived_contract_identical_to_accepted_installation": true,
+    "source_pins_match_tested_public_and_private_inputs": true,
+    "staged_plist_syntax_and_unchanged_attributes_verified": true,
+    "all_old_policy_pins_preserved_except_two_prospective_job_pins": true,
+    "live_jobs_match_exact_saved_accepted_before_images": true,
+    "prospective_entry_admitted_with_actual_new_live_jobs": false,
+    "phase_log_files_present": false
+  },
+  "controller_recovery": {
+    "targets_only_two_exact_startup_job_paths": true,
+    "unknown_live_job_bytes_rejected": true,
+    "accepted_plugin_rollback_invoked": false,
+    "uninstalled_scope_refused": true,
+    "maximum_recovery_restarts": 1,
+    "same_preparation_boot_power_action_refused": true,
+    "existing_atomic_writer_preserved": true,
+    "real_live_job_recovery_executed_here": false,
+    "existing_initialization_shell_failure_handling_unchanged": true
+  },
+  "preserved_runtime": {
+    "build34_VBL_AML_and_render_clear_plugin": true,
+    "acceleration_and_desktop_takeover": true,
+    "daily_PR28_wait_enabled": true,
+    "PR28_wait_budget_ms": 250,
+    "WindowServer_wait_exclusion_unchanged": true,
+    "resident_monitoring_disabled": true,
+    "kernel_plugin_cache_ACPI_EFI_changed": false
+  },
+  "power_action_executed_or_scheduled": false,
+  "GPU_workload_executed": false,
+  "boot_speed_improvement_or_cross_boot_acceptance_claimed": false,
+  "raw_logs_identifiers_or_private_paths_committed": false
+}
