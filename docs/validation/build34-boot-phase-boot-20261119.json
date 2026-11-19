@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "installation_documentation_commit": "ba67910d18d5c1f35f97f01a1331a91d133966b7",
+  "status": "new-boot-phase-admission-and-independent-readback-passed",
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "acceptance": {
+    "new_boot_independently_verified": true,
+    "fresh_timing_scope_receipts": true,
+    "exact_live_jobs_and_mapped_WindowServer_plugin": true,
+    "complete_cache_metadata": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images": 415,
+    "loaded_AML_full_EFI_and_exact_plugin_recovery_verified": true,
+    "observer_exact_job_removed_and_process_exited": true,
+    "startup_supervision_ended": true,
+    "same_WindowServer_within_each_finite_observation": true,
+    "all_four_driver_error_counters_zero": true,
+    "new_matching_reports": 0,
+    "recovery_triggered": false
+  },
+  "display_hold": {
+    "seconds": 26.677336,
+    "previous_separate_uninstrumented_boot_seconds": 26.346563,
+    "difference_seconds": 0.330773,
+    "paired_speed_benchmark": false,
+    "script_entry_to_release_approximately_seconds": 7,
+    "hold_before_script_entry_approximately_seconds": [
+      19.4,
+      20.4
+    ],
+    "post_release_observation_approximately_seconds": 91,
+    "post_release_observation_not_proved_progress_bar_blocking": true
+  },
+  "process_local_phases": {
+    "startup": {
+      "records": 18,
+      "entry_elapsed_seconds": 117.887082161,
+      "entry_process_CPU_seconds": 7.830191,
+      "by_phase": {
+        "owner.main": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 117.887082161,
+          "exclusive_recorded_elapsed_seconds": 0.017211248
+        },
+        "owner.build": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 6.665780839,
+          "exclusive_recorded_elapsed_seconds": 1.680922878
+        },
+        "owner.policy": {
+          "calls": 3,
+          "inclusive_elapsed_seconds": 1.507717462,
+          "exclusive_recorded_elapsed_seconds": 1.507717462
+        },
+        "route.static": {
+          "calls": 5,
+          "inclusive_elapsed_seconds": 0.046337774,
+          "exclusive_recorded_elapsed_seconds": 0.046337774
+        },
+        "desktop.static": {
+          "calls": 2,
+          "inclusive_elapsed_seconds": 5.497974525,
+          "exclusive_recorded_elapsed_seconds": 0.896488326
+        },
+        "protected.verify": {
+          "calls": 2,
+          "inclusive_elapsed_seconds": 4.588071683,
+          "exclusive_recorded_elapsed_seconds": 4.588071683
+        },
+        "loaded.identity": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 0.407657681,
+          "exclusive_recorded_elapsed_seconds": 0.407657681
+        },
+        "bounded.future_startup": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 110.796432393,
+          "exclusive_recorded_elapsed_seconds": 106.598869531
+        },
+        "bounded.installed_checks": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 2.641324127,
+          "exclusive_recorded_elapsed_seconds": 0.593847057
+        },
+        "efi.verify_disk": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 1.556238735,
+          "exclusive_recorded_elapsed_seconds": 1.549958521
+        }
+      }
+    },
+    "guardian": {
+      "records": 59,
+      "entry_elapsed_seconds": 120.492625548,
+      "entry_process_CPU_seconds": 50.490247,
+      "by_phase": {
+        "owner.main": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 120.492625548,
+          "exclusive_recorded_elapsed_seconds": 0.007173106
+        },
+        "owner.build": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 9.909287345,
+          "exclusive_recorded_elapsed_seconds": 6.356948374
+        },
+        "owner.policy": {
+          "calls": 11,
+          "inclusive_elapsed_seconds": 13.079283952,
+          "exclusive_recorded_elapsed_seconds": 13.079283952
+        },
+        "route.static": {
+          "calls": 13,
+          "inclusive_elapsed_seconds": 0.206001736,
+          "exclusive_recorded_elapsed_seconds": 0.206001736
+        },
+        "desktop.static": {
+          "calls": 10,
+          "inclusive_elapsed_seconds": 42.187535514,
+          "exclusive_recorded_elapsed_seconds": 12.254705048
+        },
+        "protected.verify": {
+          "calls": 10,
+          "inclusive_elapsed_seconds": 29.749854739,
+          "exclusive_recorded_elapsed_seconds": 29.749854739
+        },
+        "loaded.identity": {
+          "calls": 2,
+          "inclusive_elapsed_seconds": 1.873262573,
+          "exclusive_recorded_elapsed_seconds": 1.873262573
+        },
+        "bounded.future_guardian": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 110.117552223,
+          "exclusive_recorded_elapsed_seconds": 39.42685278
+        },
+        "bounded.installed_checks": {
+          "calls": 9,
+          "inclusive_elapsed_seconds": 66.98180979,
+          "exclusive_recorded_elapsed_seconds": 15.251636892
+        },
+        "efi.verify_disk": {
+          "calls": 1,
+          "inclusive_elapsed_seconds": 2.294239954,
+          "exclusive_recorded_elapsed_seconds": 2.286906348
+        }
+      }
+    }
+  },
+  "initial_admission": {
+    "startup_entry_to_end_of_final_pre_shell_EFI_check_seconds": 19.843048531,
+    "startup_readiness_path_before_first_installed_check_seconds": 8.565975788,
+    "readiness_path_includes_journal_receipt_PID_checks_and_wait": true,
+    "guardian_entry_to_initial_EFI_check_end_seconds": 15.405609395
+  },
+  "separate_warm_readonly_profile": {
+    "owner_build_elapsed_seconds": 10.219648614,
+    "owner_build_process_CPU_seconds": 7.120726,
+    "SHA256_calls": 823,
+    "SHA256_exclusive_seconds": 5.673888008,
+    "cold_boot_time_attribution": false,
+    "EFI_recovery_and_loaded_identity_passed": true
+  },
+  "exploratory_CPU_only_backend_screen": {
+    "current_Python_hash_backend": "LibreSSL 2.8.3",
+    "comparison_backend": "system CommonCrypto",
+    "same_complete_SHA256_digest": true,
+    "bytes_per_memory_buffer": 8724144,
+    "passes_per_sample": 4,
+    "forward_Python_native_wall_seconds": [0.06400696, 0.05107686],
+    "reverse_native_Python_wall_seconds": [0.058285834, 0.05296634],
+    "consistent_improvement_demonstrated": false,
+    "protected_file_or_boot_benchmark": false,
+    "native_backend_replacement_prepared_or_installed": false
+  },
+  "analysis_validation": {
+    "offline_analyzer_CPU_methods_passed": 12,
+    "phase_clock_CPU_methods_passed": 11,
+    "actual_completed_process_records_validated": 77,
+    "exclusive_intervals_reconcile_to_each_root": true,
+    "nested_inclusive_totals_not_additive": true,
+    "cross_process_clock_origins_compared": false,
+    "maximum_records_per_process": 256,
+    "record_budget_hit": false
+  },
+  "preserved_runtime": {
+    "build34_VBL_AML_render_clear": true,
+    "acceleration_and_desktop_takeover": true,
+    "PR28_daily_wait": true,
+    "wait_budget_ms": 250,
+    "WindowServer_wait_excluded": true,
+    "resident_monitoring_disabled": true,
+    "original_startup_limits_seconds": [
+      45,
+      150,
+      300
+    ],
+    "serial_full_file_hashing": true,
+    "parallel_hash_candidate_enabled": false
+  },
+  "followup_priority": [
+    "Reduce complete admission execution cost on the guardian readiness and pre-shell paths without skipping checks.",
+    "Evaluate full-content protected-file verification cost; the earlier two-reader candidate remains uninstalled and unaccepted.",
+    "Review finite post-release supervision overhead separately; its duration is not progress-bar duration."
+  ],
+  "startup_or_GPU_workload_replayed_this_followup": false,
+  "power_actions_this_followup": 0,
+  "driver_plugin_cache_ACPI_EFI_or_startup_policy_changed_this_followup": false,
+  "boot_speed_improvement_proven": false,
+  "visual_artifact_repair_accepted": false,
+  "physical_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "raw_logs_machine_identifiers_private_paths_or_binaries_committed": false
+}

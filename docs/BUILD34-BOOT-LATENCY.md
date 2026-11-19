@@ -357,3 +357,104 @@ and disabled resident monitors. Controller recovery restores only the two
 startup jobs and never rolls back the accepted plugin.
 
 See the [sanitized installation record](validation/build34-boot-phase-installation-20261119.json).
+
+## Phase-clock boot accepted: 2026-11-19
+
+The single authorized restart completed. Fresh timing-scope receipts, the
+finite observer and a separate independent full readback all passed on macOS
+26.7.2 build 25G332. Exact live jobs, the mapped render-clear plugin, complete
+416/29/415 cache metadata, loaded AML, full EFI/recovery and preserved owner
+policy passed. No recovery occurred, no matching report appeared and all four
+driver error counters remained zero. The same WindowServer stayed alive
+within each finite observation. Both startup processes ended; the observer
+deleted its exact own job and exited. No additional startup, GPU workload or
+power action was executed during this follow-up.
+
+### Measured display hold and admission
+
+This boot's display hold was **26.677336 seconds**, versus 26.346563 seconds
+in the preceding separate boot: a difference of +0.330773 seconds. This is an
+instrumented, unpaired observation with no demonstrated speed improvement.
+The script log starts at approximately 15:26:50 and records release at
+15:26:57, leaving about 19.4–20.4 seconds of hold before script entry and about
+seven seconds inside initialization before release. Its completion around
+15:28:28 includes approximately 91 seconds after release, not proved
+progress-bar blocking time.
+
+The startup process produced 18 completed records and the guardian 59; neither
+hit the 256-record budget. Their clocks are analyzed independently:
+
+| Measured interval | Startup process | Guardian process |
+| --- | ---: | ---: |
+| Initial owner construction/admission | 6.666 s | 9.909 s |
+| Initial loaded-identity check | 0.408 s | 0.459 s |
+| Initial installed checks | 2.641 s | 2.727 s |
+| Initial full EFI/recovery verification | 1.556 s | 2.294 s |
+
+The startup process reached the end of its final pre-shell EFI check
+**19.843049 seconds after its own recorded entry**. Its bounded-startup entry
+to first installed-check interval was 8.565976 seconds, including guardian
+readiness waiting plus journal, receipt and PID checks. Do not add that
+interval to the table as if it were independent of guardian work. The guardian
+reached its initial EFI-check end 15.405609 seconds after its own entry.
+There is no cross-process raw-clock alignment or complete power-on-to-desktop
+measurement here.
+
+### Repeated work and next priorities
+
+Across the finite startup supervision, the guardian made nine installed-check
+calls totaling **66.981810 inclusive seconds**. Its ten protected-file
+verification calls totaled **29.749855 seconds**, already included within
+larger phases. The guardian entry took 120.492626 elapsed seconds and
+50.490247 process CPU seconds; this includes the post-release supervision and
+does not mean the progress bar lasted two minutes. The startup entry took
+117.887082 elapsed seconds and 7.830191 process CPU seconds, largely waiting
+for readiness and the original shell. Totals from these concurrent processes
+must not be added into boot duration.
+
+A separate current-owner, read-only warm `build` profile passed in
+10.219649 seconds, including 823 SHA-256 calls using 5.673888 exclusive
+seconds. Loaded identity and full EFI/recovery were verified afterward. This
+supports the integrity-work hotspot, but does not attribute those warm-profile
+seconds to the earlier cold boot or prove a GUI-stutter cause.
+
+A small CPU-only backend screen compared the current Python's LibreSSL 2.8.3
+SHA-256 with the system CommonCrypto implementation. Both produced the same
+complete digest. For four repeated passes over the same 8,724,144-byte memory
+buffer, the forward-order Python/native wall times were 0.064007/0.051077
+seconds; reverse-order native/Python times were 0.058286/0.052966 seconds.
+Results are mixed, so no native-backend replacement was prepared or installed.
+This memory-only screen is neither protected-file verification nor a startup
+benchmark, and does not establish a faster backend for this installation.
+
+Priorities from this evidence are:
+
+1. Reduce execution cost of complete admission on the guardian-readiness and
+   pre-shell paths while preserving every required check and failure boundary.
+2. Evaluate the complete protected-file verification phase. The earlier
+   two-reader candidate remains uninstalled; its mixed whole-gate results
+   still do not establish a boot-speed benefit.
+3. Review finite post-release supervision overhead separately. Preserve its
+   current bounded policy until a separately validated minimal change exists;
+   removing its roughly 90-second observation cannot be counted as saving
+   that much progress-bar time.
+
+The new offline-only
+[`analyze_build34_startup_phases.py`](../tools/analyze_build34_startup_phases.py)
+validates completed single-process interval trees and subtracts immediate
+children for exclusive recorded elapsed time. Twelve CPU methods and both
+actual process captures pass; exclusive totals reconcile to each process's
+root interval. It rejects malformed/incomplete parentage, overlapping siblings,
+mixed duplicate sequences and inconsistent durations, flags a full record
+budget, and omits clock origins. Exclusive time still includes uninstrumented
+work and waits; inclusive totals overlap. This tool changes no startup entry
+or deployed helper.
+
+This accepts the **measurement scope's boot behavior**, not a boot-speed fix,
+visual-artifact repair, physical FPS result or long-term stability. Preserve
+build34/VBL/AML/render-clear, daily PR28 250 ms with WindowServer exclusion,
+serial full-file checks and disabled resident monitors. Do not replay consumed
+installers/observers, weaken admission or issue another reboot under the
+already consumed single-restart request.
+
+See the [sanitized boot record](validation/build34-boot-phase-boot-20261119.json).
