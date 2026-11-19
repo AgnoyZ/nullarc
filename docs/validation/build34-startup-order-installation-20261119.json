@@ -1,0 +1,97 @@
+{
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "source_parent": "828174143cb83859ec2c7d6cce147a2e914a4bb9",
+  "kernel_build": 34,
+  "OS": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "owner_authorization": {
+    "candidate_installation": true,
+    "ordinary_test_restarts": 1,
+    "retry_authorized": false
+  },
+  "candidate": {
+    "helper": "tools/build34_startup_preflight.py",
+    "helper_sha256": "b7b6b2e7e3db7aa94b7c3c50e30376e071442d448c24772b4453207d4b2bcfad",
+    "moves_complete_checks_before_guardian_wait": true,
+    "serial_full_hashing_preserved": true,
+    "guardian_receipt_PID_framebuffer_hold_shell_and_recovery_gates_preserved": true,
+    "fixed_readiness_seconds_including_checks_and_receipt_validation": 45,
+    "original_desktop_admission_seconds": 150,
+    "original_supervision_seconds": 300,
+    "parallel_hashing_enabled": false,
+    "digest_or_metadata_cache": false
+  },
+  "CPU_tests": {
+    "existing_candidate_and_scope_methods": 93,
+    "installer_methods": 7,
+    "observer_methods": 15,
+    "total_methods": 115,
+    "all_passed": true,
+    "real_GPU_or_startup_executed_by_tests": false
+  },
+  "installation": {
+    "status": "passed-startup-order-installation-and-independent-readback",
+    "two_live_jobs_match_exact_sealed_after_copies": true,
+    "actual_new_owner_check_passed": true,
+    "initial_check_only_phase_records": 15,
+    "same_boot_check_records_are_not_startup_measurements": true,
+    "independent_full_readback_passed": true,
+    "exact_mapped_WindowServer_plugin": true,
+    "complete_cache_metadata": {
+      "combined": 416,
+      "codeless": 29,
+      "unrelated_images": 415
+    },
+    "loaded_AML_full_EFI_recovery_verified": true,
+    "exact_plugin_recovery": true,
+    "derived_contract_preserved": true,
+    "new_matching_reports": 0,
+    "recovery_triggered": false,
+    "same_WindowServer_and_finite_progress_verified": true,
+    "all_four_checked_driver_error_counters_zero": true,
+    "current_startup_supervision_ended": true,
+    "startup_bootstrapped_in_installation_boot": false
+  },
+  "observer": {
+    "status": "passed-startup-order-observer-staging",
+    "next_boot_only": true,
+    "bootstrapped": false,
+    "receipt_wait_limit_seconds": 360,
+    "total_limit_seconds": 420,
+    "automatic_retry": false,
+    "removes_only_exact_own_job": true,
+    "independent_sources_job_and_contract_pin_readback_passed": true,
+    "actual_new_owner_check_repeated_after_staging": true,
+    "unloaded_until_restart": true,
+    "fresh_new_boot_receipts_and_timing_logs_required": true,
+    "GPU_submissions": 0,
+    "recovery_actions": 0,
+    "power_actions": 0
+  },
+  "recovery": {
+    "restores_only_two_exact_accepted_timing_jobs": true,
+    "maximum_recovery_boots": 1,
+    "automatic_retry": false,
+    "accepted_plugin_kernel_cache_EFI_ACPI_rollback": false
+  },
+  "preserved_runtime": {
+    "accepted_build34_VBL_AML_render_clear": true,
+    "PR28_daily_wait_enabled": true,
+    "PR28_wait_budget_ms": 250,
+    "WindowServer_wait_exclusion": true,
+    "resident_monitors_enabled": false,
+    "plugin_kernel_cache_EFI_ACPI_changed": false
+  },
+  "pre_restart_checkpoint": {
+    "power_action_sent": false,
+    "cross_boot_accepted": false,
+    "cold_boot_speed_improvement_proved": false,
+    "GPU_test_submissions": 0,
+    "physical_FPS_visual_repair_or_long_term_stability_accepted": false
+  },
+  "raw_logs_identifiers_or_private_paths_committed": false,
+  "next_step": "Request the newly authorized ordinary restart exactly once after synchronization; accept only fresh new-boot evidence, never replay consumed installer or observer scopes"
+}

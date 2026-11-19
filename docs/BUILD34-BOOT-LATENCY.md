@@ -578,3 +578,53 @@ build34/VBL/AML/render-clear, PR28 daily 250 ms with WindowServer exclusion and
 disabled resident monitors.
 
 See the [sanitized evaluation record](validation/build34-startup-order-candidate-20261119.json).
+
+## Authorized startup-order installation: 2026-11-19
+
+The owner separately authorized installing the sealed startup-order candidate
+and one ordinary test restart. The two actual startup job files now match the
+candidate's exact after copies. Installation used the preserved atomic writer;
+neither startup process was bootstrapped in this boot. The accepted driver,
+selected cache, plugin, AML, EFI and runtime settings are unchanged.
+
+The actual new owner entry's `check` passed and produced 15 successful
+**check-only** timing records. A separate full readback of the installed route
+passed the exact mapped WindowServer plugin, full 416-record cache metadata
+including 29 codeless records and 415 unrelated images, loaded AML, full EFI
+and recovery copies, plugin signatures and unchanged runtime contract. The
+same WindowServer survived the finite observation, all four checked driver
+error counters stayed zero, no matching report appeared and recovery was not
+used. Startup supervision remains ended and resident monitoring stays off.
+
+All 93 candidate/scope methods plus seven installer and 15 observer methods
+pass: **115 CPU methods**. Installer coverage includes refusing a consumed
+scope, another boot and unknown live jobs; a simulated partial write is read
+back before dispatching exact same-boot job-only recovery. These fixtures do
+not prove real live recovery or faster startup.
+
+A new finite observer is sealed and staged for the next boot, without loading
+it now. It requires a new boot, successful fresh candidate startup/desktop/
+completion receipts and the exact new startup/guardian timing files. It
+independently checks the full runtime/cache/loaded-AML/EFI/recovery state,
+then removes only its exact own job. Its receipt-wait and total limits remain
+360/420 seconds, with no GPU submission, recovery, power action, retry or
+resident supervision. Independent staging readback verified the actual jobs,
+observer/source/contract pins and unloaded state, then repeated the actual new
+owner check. No current-boot startup or guardian action was replayed.
+
+The original guardian implementation, complete serial hashes, hardware waits
+and 150/300-second desktop/supervision limits are preserved. The candidate's
+fixed 45-second readiness limit includes its moved full checks and receipt
+validation. Its recovery restores only the two exact accepted timing jobs;
+it cannot roll back the accepted plugin, kernel/cache, AML or EFI.
+
+At this documented pre-restart checkpoint, no power command has been sent
+and **cross-boot acceptance is pending**. Synchronize this record, request the
+newly authorized ordinary restart exactly once, then read the new boot's
+receipts and independently verify runtime before interpreting timings. The
+four warm handoff samples remain supporting evidence only; no cold-boot
+speedup, physical FPS, visual repair or long-term acceptance is claimed.
+Do not ask for the same authorization again, replay the installer/observer,
+overwrite a sealed scope or send a duplicate power command after uncertainty.
+
+See the [sanitized installation record](validation/build34-startup-order-installation-20261119.json).
