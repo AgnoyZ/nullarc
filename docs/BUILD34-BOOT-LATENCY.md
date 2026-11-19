@@ -175,3 +175,75 @@ the uninstalled 1 MiB hashing helper. No startup optimization, driver install,
 GPU workload, resident monitor or power action was activated by this inquiry.
 The [sanitized follow-up record](validation/build34-boot-latency-20261119.json)
 contains derived values only; raw logs and profiling snapshots remain private.
+
+## Bounded parallel-verification candidate: 2026-11-19
+
+Following the owner's continuation, `verify_sha256_files` was added to the
+existing integrity utility as an **uninstalled candidate**. It reads every
+selected file in full on every invocation, using the same identity-checked
+1 MiB reader. It permits one or two workers, checks exact full lowercase
+SHA-256 digests, and waits for all workers before returning or raising.
+There is no digest/metadata cache and no cross-phase reuse. Invalid expected
+digests, read failures, observed file changes and mismatches remain errors.
+The limit is per invocation, not system-wide: if adopted by both independent
+startup processes, their protected-file phases could use four readers in
+total. Two readers can increase simultaneous CPU demand.
+
+An offline private adapter was derived from the exact installed validator's
+source. It preserves the complete receipt/authorization/recovery prelude,
+kill-switch semantics and selected-path exclusions, replacing only the serial
+protected-file digest loop. Its source matcher rejects an unknown selection
+loop. All surrounding policy, kernel identity, plugin, cache, historical
+contract, EFI/recovery and startup-deadline checks remain unchanged. This
+adapter is a read-only evaluation harness, not an authenticated installation
+scope or a ready-to-run startup entrypoint.
+
+### Correctness and read-only validation
+
+- **21 public CPU methods** pass: the original 11 streaming-integrity checks
+  plus 10 batch checks, including actual binary/chunk-boundary digests,
+  two-reader concurrency/bounds, fresh reads in each phase, missing/changed
+  files, malformed expectations, and joining sibling work on failure.
+- **14 private CPU methods** compare the actual installed validator with the
+  adapter: accepted-state and selected-path equivalence, all four receipt
+  conditions, authorization/installation intent, exact kill-switch/recovery
+  handling, changed/missing files, fresh phases and unknown-source refusal.
+- Four complete read-only gate sequences pass, with identical derived
+  contracts, unchanged live wrapper/desktop source, full EFI/recovery checks
+  and no startup, GPU workload or power action. EFI was left unmounted.
+- Two additional same-contract phase comparisons pass in opposite execution
+  orders. Every option re-reads and verifies the selected files. Raw snapshots
+  and source adapters stay private; no new runtime was installed.
+
+### Performance result and decision
+
+All values below are warm read-only observations, not boot measurements:
+
+| Protected-file phase | Original whole-file serial | Streaming single reader | Streaming two readers |
+| --- | ---: | ---: | ---: |
+| Forward order | 2.536 s | 3.037 s | 2.043 s |
+| Reverse order | 1.877 s | 3.784 s | 1.133 s |
+
+The two-reader phase was about **19.45% and 39.65% shorter** in these paired
+observations. Its process CPU time was 3.416/1.521 seconds versus the original
+2.530/1.874 seconds, so lower CPU consumption is not consistently demonstrated.
+The 2 MiB bound describes the two read buffers only; it is not total process
+or boot memory, because other admission functions remain unchanged.
+
+Complete sequential gate samples were mixed: original/candidate totals were
+18.099/19.499 seconds in the first pair and 21.220/17.744 seconds in the
+opposite-order phase-instrumented pair. The individual gate functions and
+system scheduling also varied. These limited observations do not establish
+an overall startup improvement or justify adding their savings to the
+previous display-hold measurement.
+
+**Do not install this candidate solely on the local phase result.** Keep the
+current accepted build34/VBL/AML/plugin and startup jobs. A prospective
+activation needs a fresh exact startup scope, helper/adapter hash pins,
+CPU-tested entrypoints and exact job-only recovery that preserves the
+accepted plugin; the historical plugin rollback must not undo that accepted
+plugin for a new controller experiment. Phase-specific cold-start evidence
+is required before a boot-speed acceptance claim. No optimization deployment,
+startup replay, resident monitoring or reboot was performed here.
+
+See the [sanitized candidate record](validation/build34-boot-hash-batch-20261119.json).

@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "source_parent": "a6337a9b2938c85265419a437d03a6a69b5f499b",
+  "kernel_build": 34,
+  "OS": {"product_version": "26.7.2", "build": "25G332"},
+  "candidate": {
+    "helper": "tools/build34_startup_integrity.py",
+    "helper_sha256": "83eb0d94f37fe9180362dfab0ae4b63ac5ffa27991e524f9a5cfd892c354575b",
+    "function": "verify_sha256_files",
+    "maximum_readers_per_invocation": 2,
+    "read_buffer_bytes_per_reader": 1048576,
+    "buffer_bound_is_not_total_process_or_boot_memory": true,
+    "two_startup_processes_may_use_four_readers": true,
+    "reads_every_selected_byte_on_every_call": true,
+    "digest_or_metadata_cache": false,
+    "joins_all_workers_before_return_or_exception": true,
+    "read_identity_and_path_change_checks_retained": true,
+    "private_adapter_prelude_marker_and_selection_preserved": true,
+    "private_adapter_is_evaluation_harness_not_deployment_scope": true,
+    "installed": false
+  },
+  "CPU_tests": {
+    "public_streaming_methods": 11,
+    "public_batch_methods": 10,
+    "private_actual_validator_equivalence_methods": 14,
+    "total_methods": 35,
+    "all_passed": true
+  },
+  "actual_readonly_gate_sequences": {
+    "passed": 4,
+    "derived_contracts_identical": true,
+    "live_owner_and_desktop_sources_unchanged": true,
+    "full_EFI_recovery_verified": true,
+    "EFI_left_unmounted": true,
+    "same_helper_source_used": true,
+    "new_matching_report_or_recovery_intent_found": false
+  },
+  "warm_phase_comparisons_not_boot_benchmarks": [
+    {
+      "order": ["original", "streaming_one", "streaming_two"],
+      "wall_seconds": {"original": 2.535867918, "streaming_one": 3.036749469, "streaming_two": 2.042589582},
+      "process_CPU_seconds": {"original": 2.530212, "streaming_one": 3.022738, "streaming_two": 3.416089},
+      "two_reader_local_wall_reduction_percent": 19.452051603
+    },
+    {
+      "order": ["streaming_two", "streaming_one", "original"],
+      "wall_seconds": {"original": 1.877390592, "streaming_one": 3.784094474, "streaming_two": 1.132919121},
+      "process_CPU_seconds": {"original": 1.874229, "streaming_one": 3.753998, "streaming_two": 1.52108},
+      "two_reader_local_wall_reduction_percent": 39.65458622
+    }
+  ],
+  "complete_sequential_readonly_gate_totals_seconds": {
+    "first_original": 18.098711764,
+    "first_candidate": 19.498779013,
+    "second_candidate_with_phase_timing": 17.744353914,
+    "second_original_with_phase_timing": 21.219887121,
+    "nested_phase_times_are_included_not_additional": true
+  },
+  "assessment": {
+    "local_protected_phase_shorter_in_both_orders": true,
+    "CPU_consumption_consistently_lower": false,
+    "complete_gate_improvement_consistently_demonstrated": false,
+    "cold_boot_or_progress_bar_speedup_demonstrated": false,
+    "selected_for_deployment": false,
+    "next_prerequisite": "Fresh exact startup scope with pinned candidate inputs and job-only recovery; phase-specific cold-start comparison before any boot-speed claim"
+  },
+  "preserved_runtime": {
+    "build34_VBL_AML_and_render_clear_plugin_preserved": true,
+    "daily_PR28_wait_enabled": true,
+    "PR28_wait_budget_ms": 250,
+    "WindowServer_wait_exclusion_unchanged": true,
+    "resident_monitoring_disabled": true,
+    "all_admission_and_hardware_waits_unchanged": true
+  },
+  "startup_jobs_replayed": false,
+  "GPU_workload_executed": false,
+  "power_action_executed_or_scheduled": false,
+  "live_installation_or_policy_changed": false,
+  "raw_logs_identifiers_or_private_paths_committed": false
+}
