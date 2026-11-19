@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "status": "source-and-native-compile-passed-hardware-pending",
+  "branch": "upstream34/vram-layout-fix",
+  "parent": "4c52280b1ae75602fadbc2992d020baeb2cf07a0",
+  "kernel_build": 34,
+  "owner_accepted_runtime_source": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "active_VBL_source": "439f8a5bc3e086770df7b576897fbb11d7ccc9f1",
+  "upstream_commit": "531bac34989f32b861c77f5788290b9b6615405d",
+  "production_files_changed": [
+    "src/nmplugin/NVMTLObjects.m"
+  ],
+  "production_patch": "upstream primary/additional render Clear SurfaceIn preservation only",
+  "reported_symptom_cause_proven": false,
+  "environment": {
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "Vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1"
+  },
+  "CPU_regression": {
+    "actual_production_branches_extracted": true,
+    "backing_and_partial_clear_are_models": true,
+    "ASan_UBSan": true,
+    "test_methods": 2,
+    "candidate_combinations_passed": 8,
+    "baseline_Clear_combinations_failing_on_untouched_pixel": 4,
+    "baseline_Load_combinations_passing": 4,
+    "final_test_replayed_against_unchanged_baseline": true
+  },
+  "related_checks": {
+    "publication_wait_test_methods_passed": 10,
+    "plugin_integration_test_methods_passed": 4,
+    "surface_key_boundary_cases_passed": 77,
+    "concurrent_surface_key_cycles_passed": 16384,
+    "default_worktree_make_test": "passed",
+    "firmware_file_fixtures": "absent; skipped; synthetic parsing passed",
+    "separate_upstream_wait_seq_status": "previously failed on unchanged clean-main control; not rerun or claimed passing"
+  },
+  "native_validation": {
+    "baseline_and_candidate_release_compile": "passed",
+    "release_macro": "NVMTL_RELEASE=1",
+    "minimum_macos": "15.0",
+    "availability_errors_enabled": true,
+    "baseline_warnings": 336,
+    "candidate_warnings": 336,
+    "warning_multisets_identical": true,
+    "architecture": "x86_64",
+    "ad_hoc_signatures": "passed",
+    "expected_class_exports": "passed"
+  },
+  "current_runtime_readback": {
+    "status": "passed-read-only",
+    "active_VBL_and_AML_treatment_preserved": true,
+    "complete_cache_metadata_verified": true,
+    "combined_records": 416,
+    "codeless_records": 29,
+    "unrelated_images_preserved": 415,
+    "current_boot_accelerated_startup_verified": true,
+    "startup_supervision_ended": true,
+    "resident_monitor_enabled": false,
+    "PR28_daily_wait": true,
+    "wait_budget_ms": 250,
+    "WindowServer_wait_excluded": true,
+    "new_error_counters": 0,
+    "new_matching_reports": 0,
+    "same_WindowServer": true,
+    "exact_installed_plugin_recovery_files_copied_and_verified": true
+  },
+  "retained_nonpassing_attempts": [
+    "candidate fixture unused-parameter compilation before fixture correction",
+    "existing wait-test output permission failure before privileged unchanged rerun",
+    "initial current-runtime validator used historical failed GUI receipt before successful fresh-scope validator"
+  ],
+  "performance_limit": "A changed CPU seed can require an additional import on a full clear; FPS and stability are unmeasured.",
+  "installed": false,
+  "plugin_loaded": false,
+  "new_GPU_workload_executed": false,
+  "new_GUI_workload_executed": false,
+  "power_action_scheduled": false,
+  "hardware_scope_armed": false,
+  "reported_artifact_hardware_repair_accepted": false,
+  "physical_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "licenses_reviewed": [
+    "src/nmplugin/NVMTLObjects.m SPDX header",
+    "LICENSES/PolyForm-Noncommercial-1.0.0.txt",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "public_plugin_binary_uploaded": false,
+  "source_sha256": {
+    "src/nmplugin/NVMTLObjects.m": "ba06947fc4421dcdb643d1cc80996ee66e130d7d391a74619c3e7ce12345c473",
+    "tests/test_render_surface_clear.py": "70c4f3de2f3e4db0f6addf20dae6f4cc2d8a38d383994e8576a1a99caca88042"
+  },
+  "private_native_log_sha256": {
+    "baseline-release-build-private.txt": "6f6f490768c5abedf42b56fd80c53509e4f5c1676f5625393a93a92a24a01c7b",
+    "candidate-release-build-private.txt": "f402ed328e1b995b298c4f35bd6e8a3ada327a21c615f3c97db68a78cc4dbb9e"
+  }
+}

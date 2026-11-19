@@ -191,3 +191,18 @@ changes without rewriting history. It does not remove upstream ancestry or
 restore a behind count. This task makes no machine installation, so there is
 no driver/system rollback action. `main` remains an exact upstream mirror;
 only a normal fast-forward to the pinned upstream commit is appropriate there.
+
+
+## Later isolated render-clear backport, 2026-11-19
+
+The later owner report of pointer trails and gray squares prompted a separate
+review of `531bac3`. Its two production render-clear preparation hunks are now
+adopted on default build34, with an adapted actual-branch CPU regression and
+native release compilation. The historical table above records the original
+merge decision. The other rendering commits remain deferred.
+
+This confirms a reproducible pixel-preservation source defect, not that the
+reported desktop corruption has the same cause. No changed plugin is installed
+or GPU-tested; the active VBL/AML treatment, PR28 daily policy and disabled
+resident monitoring remain preserved. See the [backport and acceptance
+record](BUILD34-RENDER-CLEAR-PRESERVATION.md).
