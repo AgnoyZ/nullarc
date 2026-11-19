@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-11-19",
-  "status": "source-and-native-compile-passed-hardware-pending",
+  "status": "installed-GPU-smoke-and-bounded-desktop-passed-visual-and-next-boot-pending",
   "branch": "upstream34/vram-layout-fix",
   "parent": "4c52280b1ae75602fadbc2992d020baeb2cf07a0",
   "kernel_build": 34,
@@ -51,7 +51,7 @@
     "expected_class_exports": "passed"
   },
   "current_runtime_readback": {
-    "status": "passed-read-only",
+    "status": "passed-installation-and-independent-post-test-readback",
     "active_VBL_and_AML_treatment_preserved": true,
     "complete_cache_metadata_verified": true,
     "combined_records": 416,
@@ -66,20 +66,31 @@
     "new_error_counters": 0,
     "new_matching_reports": 0,
     "same_WindowServer": true,
-    "exact_installed_plugin_recovery_files_copied_and_verified": true
+    "exact_installed_plugin_recovery_files_copied_and_verified": true,
+    "candidate_plugin_signature_verified": true,
+    "WindowServer_restarted_once_same_boot": true,
+    "WindowServer_sample_exact_candidate_image_verified": true,
+    "exact_previous_plugin_full_bundle_and_atomic_copy_verified": true,
+    "recovery_triggered": false,
+    "historical_contracts_unchanged": true,
+    "kernel_cache_EFI_ACPI_unchanged_by_plugin_trial": true,
+    "same_WindowServer_scope": "same new compositor across finite observations and final readback",
+    "full_post_cursor_readback_passed": true
   },
   "retained_nonpassing_attempts": [
     "candidate fixture unused-parameter compilation before fixture correction",
     "existing wait-test output permission failure before privileged unchanged rerun",
-    "initial current-runtime validator used historical failed GUI receipt before successful fresh-scope validator"
+    "initial current-runtime validator used historical failed GUI receipt before successful fresh-scope validator",
+    "partial-render-area GPU probe clears the whole attachment; excluded as a preservation discriminator",
+    "window observer initially decoded bounds dictionary with wrong API; corrected before final collection; not a driver crash",
+    "initial next-boot scope preparation wrongly required CodeResources to change; no live jobs changed; fresh successful scope used"
   ],
-  "performance_limit": "A changed CPU seed can require an additional import on a full clear; FPS and stability are unmeasured.",
-  "installed": false,
-  "plugin_loaded": false,
-  "new_GPU_workload_executed": false,
-  "new_GUI_workload_executed": false,
+  "performance_limit": "A changed CPU seed can require an additional import on a full clear. Synthetic VBL and cursor request counts do not measure physical FPS; long-term stability and visual repair remain unaccepted.",
+  "installed": true,
+  "plugin_loaded": true,
+  "new_GPU_workload_executed": true,
+  "new_GUI_workload_executed": true,
   "power_action_scheduled": false,
-  "hardware_scope_armed": false,
   "reported_artifact_hardware_repair_accepted": false,
   "physical_FPS_measured": false,
   "long_term_stability_accepted": false,
@@ -96,5 +107,93 @@
   "private_native_log_sha256": {
     "baseline-release-build-private.txt": "6f6f490768c5abedf42b56fd80c53509e4f5c1676f5625393a93a92a24a01c7b",
     "candidate-release-build-private.txt": "f402ed328e1b995b298c4f35bd6e8a3ada327a21c615f3c97db68a78cc4dbb9e"
+  },
+  "plugin_runtime_source": "9f838846f6a8eeab80890014eace3a5de1b16067",
+  "real_GPU_smoke": {
+    "target_PCI_verified": true,
+    "loaded_candidate_identity_verified": true,
+    "completed_commands": 3,
+    "IOSurface_sampled_pixels": 32,
+    "verified_channels": 128,
+    "valid_partial_clear_discriminator": false,
+    "reported_visual_symptom_test": false
+  },
+  "bounded_desktop_observations": {
+    "animation": {
+      "observer_seconds": 39.935,
+      "window_samples": 357,
+      "onscreen_samples": 273,
+      "visible_span_seconds": 30.545,
+      "position_changes": 269,
+      "synthetic_VBL_counter_delta": 4811,
+      "successful_display_copy_delta": 2815,
+      "observer_polling_interval_ms": 100,
+      "observer_intervals_are_latency_or_FPS": false,
+      "new_driver_error_counters": 0
+    },
+    "cursor": {
+      "launch": "Launch Services, user session",
+      "seconds": 12.000244,
+      "warp_calls": 1440,
+      "warp_failures": 0,
+      "observed_position_changes": 1440,
+      "original_position_restoration_passed": true,
+      "interrupted": false,
+      "synthetic_VBL_counter_delta": 1615,
+      "successful_display_copy_delta": 1199,
+      "error_counter_deltas": {
+        "debug.nvaccel_iop_fail": 0,
+        "debug.nvaccel_iop_copy_skip": 0,
+        "debug.nvaccel_surface_gpu_timeouts": 0,
+        "debug.phx_hang_kills": 0
+      },
+      "request_frequency_is_display_FPS": false
+    },
+    "same_WindowServer_through_observations": true,
+    "finite_applications_and_observers_exited": true,
+    "all_system_logs_claimed_clean": false
+  },
+  "screen_capture": {
+    "earlier_automatic_capture": "failed to create image from display",
+    "fresh_cursor_application_preflight": false,
+    "permission_requested": false,
+    "pixels_captured": false,
+    "earlier_capture_failure_cause_proven": false,
+    "scanout_utility": "compiled privately, not executed",
+    "raw_VRAM_capture_used_to_bypass_access": false
+  },
+  "next_boot_plugin_admission": {
+    "installed_and_independently_read_back": true,
+    "entrypoints_updated": 2,
+    "CPU_tests_passed": 20,
+    "real_derivation_and_temporary_atomic_rollback_tested": true,
+    "bounded_startup_AML_and_no_postboot_monitor_implementations_unchanged": true,
+    "historical_contracts_unchanged": true,
+    "startup_limits_seconds": [
+      45,
+      150,
+      300
+    ],
+    "PR28_daily_wait": true,
+    "wait_budget_ms": 250,
+    "WindowServer_wait_excluded": true,
+    "resident_monitor_enabled": false,
+    "recovery": "exact prior plugin and preceding AML startup entrypoints only",
+    "recovery_triggered": false,
+    "bootstrapped_during_installation": false,
+    "cross_boot_tested": false,
+    "power_action_scheduled": false,
+    "installation_tool_timed_out_child_completed_and_read_back": true,
+    "installer_replayed": false
+  },
+  "plugin_installation_scope": "executed; never replay",
+  "private_validation_log_sha256": {
+    "plugin-install-result-private.json": "28c34c29d3132f3ca04cf8d1cfccbc4f2edf6447f63e75120c45f1e31586c6d1",
+    "candidate-installed-smoke-final-private.txt": "1fab0bcb25c86ac34f932fca65bac789ed3536859618ea180ea0a7d454271f99",
+    "windowserver-restart-result-private.json": "73e6f3edd182652a832bd647b2ea09279284714fcfc72f73f4d093c0dd9bd12d",
+    "startup-installation-private.json": "f8f4eecd527800bc236721984f1962eee611d079ea14627c436a3d091f843a3e",
+    "final-plugin-readback-private.json": "c47a65c116b64288fdeec408bd4039e50b5e87d71ac395712e697632445b4c65",
+    "bounded-cursor-result-private.json": "f675267846586d16c7f5e436329c0355fcd6dbe16df0ebd851d7f2426e8b9ff9",
+    "post-cursor-full-readback-private.json": "d987845123a0491ea95ea3068306123288d382a9d3785e2e50742c653e139149"
   }
 }

@@ -30,10 +30,10 @@ overwrite. The existing full-blit/replace overwrite checks, pending-writer
 handling and seed-based import avoidance are preserved.
 
 The patch preserves the owner-selected build34 runtime lineage, A1/A2/corrected
-A3, the ACQUIRE-prefix correction and PR28 policy. No build41/build42 source,
-kernel, native ABI, framebuffer, VBL, ACPI, installed runtime, startup job or
-monitor policy changes are included. The active VBL and local AML batch-copy
-treatment remain in use.
+A3, the ACQUIRE-prefix correction and PR28 policy. The source patch changes no
+build41/build42 source, kernel, native ABI, framebuffer, VBL or ACPI. The
+subsequent authorized plugin installation and next-boot admission update are
+recorded below. The active VBL and local AML batch-copy treatment remain in use.
 
 ## Validation
 
@@ -77,7 +77,8 @@ The native compile uses pinned Vulkan-Headers
 `21.0.0 (clang-2100.1.1.101)`, and the existing framework list from
 `src/nmplugin/build.sh`. Baseline and candidate source snapshots differ in
 exactly one plugin file. The release artifacts, dependencies and logs stay
-private and ignored; neither artifact is installed or loaded.
+private and ignored. The candidate was subsequently installed under a fresh
+plugin-only hardware scope; the baseline artifact was not installed.
 
 One initial candidate-fixture compilation failed because the extracted
 branches no longer use their fake descriptor parameters under `-Werror`.
@@ -87,35 +88,99 @@ output; running the unchanged test with the existing artifact permissions
 resolved that environmental failure. Neither failure is counted as a
 successful regression check.
 
-## Current machine and remaining acceptance
+## Installed plugin and bounded hardware observations
 
-Read-only checks identify macOS 26.7.2 build 25G332 and the same current
-WindowServer. Display submission failures, skipped copies, surface GPU
-timeouts and hang-kill counters are zero. These counters cannot detect every
-wrong pixel and do not disprove the owner's report.
+The owner-authorized installation on November 19, 2026 uses source commit
+`9f838846f6a8eeab80890014eace3a5de1b16067` on the default branch and macOS
+26.7.2 build 25G332. An atomic bundle exchange retained the exact previous
+plugin. Full manifest comparison found only the executable changed; the signed
+resource file did not need to change. The installed ad-hoc signature passed.
 
-A fresh read-only validator verifies the current build34/VBL installation,
+The installation readback verifies the current build34/VBL installation,
 loaded AML treatment, complete selected-cache metadata (416 records,
 including 29 codeless entries), all 415 unrelated images, EFI/recovery,
 bounded startup receipts, PR28 daily setting and disabled resident monitors.
-It submits no GPU work. An initial validator selected the original, already
-documented failed GUI-permission receipt; the corrected fresh validator uses
+That validator submits no GPU work. An initial validator selected the original,
+already documented failed GUI-permission receipt; the corrected fresh validator uses
 the existing successful replacement observation and separately checks the
 failed original receipt and job retirement. The failed attempt is retained.
 No guard was relaxed to accept a failing runtime.
 
-The currently installed plugin executable, Info.plist and signed-resource
-file have separate private, byte-verified backup copies. No installation,
-restart, logout, new GUI/GPU workload or background observer was scheduled.
+A fresh process verified the target PCI device and loaded candidate identity,
+then completed three real GPU commands and checked 32 IOSurface pixels / 128
+channels. This is a smoke test, not proof of the partial-clear preservation
+case. An attempted partial-render-area probe still cleared the whole
+attachment in this implementation and is not a valid baseline-versus-candidate
+discriminator. Exclude its results from repair acceptance; the eight-case CPU
+model remains the discriminating regression evidence.
 
-**Hardware repair of the reported artifacts remains unaccepted.** After owner
-authorization, use a fresh candidate-compatible plugin installation and
-bounded hardware scope, preserving the current kernel/cache, active VBL,
-loaded AML, PR28 daily setting and startup-only policy. Validate partial-clear
-pixels with actual GPU readback before judging pointer trails and gray squares
-in normal desktop use. Capture compositor versus scanout evidence if the
-visual symptom persists. Historical consumed hardware/GUI/startup jobs must
-not be replayed. A CPU fixture is not a screenshot or Vulkan execution.
+WindowServer was restarted once in the same OS boot so that it could load the
+candidate. A later independent one-second process sample identified the exact
+candidate image UUID. That new WindowServer survived both finite desktop
+checks and the final readback; no further logout or power action was scheduled.
+
+- A roughly 40-second animation observation collected 357 window samples,
+  273 on-screen samples, 30.545 seconds of visible span and 269 position
+  changes. The synthetic VBL counter increased by 4,811 and successful display
+  copies by 2,815. The window observer deliberately sampled every 100 ms;
+  its intervals do not measure GUI stalls or FPS.
+- A fresh Launch Services application performed 1,440 cursor-warp calls in
+  12.000244 seconds, all successful, and observed 1,440 position changes. It
+  restored the original cursor position successfully and exited. During the
+  enclosing observation the synthetic VBL counter increased by 1,615 and
+  successful display copies by 1,199. Request frequency is not display FPS.
+- Display submission failures, skipped copies, surface GPU timeouts and
+  hang-kill counters stayed zero across these observations. The finite test
+  applications and observers exited. These counters cannot identify every
+  wrong pixel. Existing `Invalid window`, brightness and application ping
+  messages were not established as effects of the patch; do not describe all
+  system logs as clean.
+
+An earlier automatic screenshot failed. The fresh cursor application returned
+false from `CGPreflightScreenCaptureAccess()` and did not request permission or
+capture pixels. This establishes lack of capture access for that application,
+not the cause of every earlier capture failure. A scanout utility was compiled
+privately but not executed; raw VRAM was not used to bypass capture access.
+The initial window observer also crashed because it decoded a bounds
+dictionary with the wrong API; that observer defect was corrected before the
+reported collection and is not a driver crash.
+
+## Next-boot admission and remaining acceptance
+
+A fresh, separate plugin admission scope was installed and independently read
+back. Both existing startup entrypoints now use its owner wrapper. Its
+derivation retains the frozen AML/VBL contracts and changes only the exact
+plugin manifest/image identity, input hash and related protected entries.
+The bounded startup, AML selection and no-postboot-monitor implementations
+remain byte-identical. The startup deadlines remain 45 / 150 / 300 seconds;
+PR28 daily waiting remains enabled with 250 ms budget and WindowServer
+excluded. Resident monitoring remains disabled.
+
+Twenty CPU tests passed, including the real contract derivation, rejected
+unknown manifests/UUIDs/permissions/jobs/policies and temporary-directory
+atomic rollback using `renamex_np`. The first preparation attempt rejected an
+incorrect assumption that CodeResources must change and did not change live
+jobs. It was retained; the successful installation used a fresh scope. An
+installation-tool timeout did not terminate its child; completion was checked
+from the final receipt, followed by independent live-plugin, exact-recovery,
+startup-job and historical-contract readback. The installer was not replayed.
+A final full readback after the cursor test again verified complete cache
+metadata, loaded AML, EFI/recovery, current-boot receipts and exact plugin
+identity, with no new matching reports or driver error counters. It submitted
+no GPU work and scheduled no power action.
+
+**The new plugin startup scope has not been tested across an OS restart.** Its
+installation was limited to next-boot entrypoints; it was not bootstrapped and
+no power action was scheduled. Current-boot successful AML/startup receipts
+remain evidence for the current boot, not for that future plugin scope.
+
+**Hardware repair of the reported artifacts remains unaccepted.** The GPU smoke
+and finite desktop progress checks passed, but there is no valid hardware
+partial-clear discriminator or visual acceptance of pointer trails and gray
+squares. Obtain visual evidence or owner observation in normal use; any later
+instrumented GPU/startup trial needs a fresh compatible scope. Never replay
+consumed hardware, GUI or startup jobs. Synthetic VBL, cursor-warp frequency
+and CPU fixtures are not physical frame-rate measurements.
 
 Preserving CPU content can add an import on a full clear after a changed CPU
 seed. Existing seed/pending-write checks still avoid unnecessary imports;
@@ -132,11 +197,15 @@ copied into the public tree; license and notice files remain unchanged. The
 plugin binary publication block remains in force.
 
 For source rollback, review later dependencies and `git revert` this isolated
-backport; never reset or rewrite default history. This source-only operation
-needs no machine rollback. A later authorized installation must separately
-freeze the exact current plugin/signature and compatible startup expectations
-and define restoration of that current state. It must not restore the older
-accelerator or original ACPI as a side effect of a plugin trial.
+backport; never reset or rewrite default history. Reverting source alone does
+not revert the installed plugin. The installed private scope retains an exact
+full previous bundle and the sibling atomic-exchange recovery copy. Its
+recovery restores only that plugin and the preceding AML startup entrypoints;
+it does not restore the older accelerator, change the active VBL, undo the
+loaded AML treatment or alter kernel/cache/EFI/security settings. Final
+independent readback verified both recovery copies and that recovery had not
+been triggered. Keep the running candidate pending visual acceptance rather
+than silently reverting a completed finite observation.
 
 The sanitized machine-readable record is
 [validation/build34-render-clear-20261119.json](validation/build34-render-clear-20261119.json).
