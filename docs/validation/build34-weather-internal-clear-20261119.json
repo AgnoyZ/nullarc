@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "source_checkpoint_before_change": "12dff42be81a796e2ded987ed9684388690c40ec",
+  "kernel_build": 34,
+  "OS_readback": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "owner_clarification": "clouds and text repeatedly overlap inside the Weather window",
+  "status": "render-pass-corrections-tested-in-source-candidate-not-installed",
+  "upstream_review": {
+    "main_ref_independently_read_via_git": "3497d87b229e4839d8d2a03ebe9127f2a30f332b",
+    "audited_production_backports_in_test_order": [
+      "10c9e6560cd283cefeb9918b24d1e61b41b3f173",
+      "e44deb7ab3c9029e69a3b4d2fb0bce324f8999ba",
+      "9543d435d7a12f8c60d3eedc6ee00c2ad12e6308"
+    ],
+    "already_in_local_history_but_production_source_previously_absent": true,
+    "affected_plugin_source_license": "PolyForm-Noncommercial-1.0.0",
+    "existing_copyright_and_licenses_preserved": true,
+    "LICENSE_and_LICENSES_and_THIRD_PARTY_NOTICES_unchanged": true,
+    "upstream_test_scaffolding_license": "MIT or GPL-2.0-only under repository default",
+    "unrelated_upstream_changes_copied": false
+  },
+  "CPU_regressions": {
+    "suite": "tests/test_nmplugin_render_pass_integrity.py",
+    "compiled_actual_production_clear_loop_selection_wrapper_and_submit_guard": true,
+    "actual_public_plugin_structures_used": true,
+    "fake_Vulkan_recording_callbacks": true,
+    "pixel_history_is_only_a_model": true,
+    "ASan_and_UBSan_enabled": true,
+    "compiler_and_binary_timeouts": true,
+    "baseline_methods": 13,
+    "baseline_semantic_binary_failures": 5,
+    "baseline_selection_order_failure": 1,
+    "baseline_missing_error_latch_checks_failed": 3,
+    "baseline_unaffected_cases_passed": 4,
+    "final_baseline_fixture_compile_errors": 0,
+    "candidate_full_view_methods_passed_before_next_patch": 6,
+    "candidate_LOAD_selection_methods_passed_before_next_patch": 4,
+    "candidate_combined_methods_passed": 13,
+    "included_in_make_test": true,
+    "original_PR28_wait_methods_passed": 10,
+    "original_plugin_integration_methods_passed": 4,
+    "original_surface_boundary_keys_passed": 77,
+    "original_surface_concurrent_cycles_passed": 16384,
+    "original_compatibility_modules_only_BUILD_output_overridden": true,
+    "make_test_passed": true,
+    "firmware_file_fixtures_absent_and_skipped": true,
+    "GPU_execution_or_Weather_pixel_validation": false
+  },
+  "native_release_build": {
+    "baseline_and_candidate_built": true,
+    "NVMTL_RELEASE": 1,
+    "architecture": "x86_64",
+    "minimum_macos": "15.0",
+    "availability_errors_enabled": true,
+    "pinned_Vulkan_Headers": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+    "baseline_warnings": 336,
+    "candidate_warnings": 336,
+    "warning_multisets_identical": true,
+    "expected_classes_exported": true,
+    "ad_hoc_signatures_verified": true,
+    "loaded_or_installed": false,
+    "binary_uploaded": false
+  },
+  "boundaries": {
+    "accepted_build34_VBL_AML_plugin_startup_baseline_changed": false,
+    "PR28_wait_policy_or_WindowServer_exclusion_changed": false,
+    "resident_monitoring_enabled": false,
+    "driver_deployment_or_cache_change": false,
+    "EFI_ACPI_security_or_accessibility_change": false,
+    "application_launches": 0,
+    "explicit_GPU_test_submissions": 0,
+    "WindowServer_restart_requests": 0,
+    "power_actions": 0,
+    "old_action_scopes_replayed": false
+  },
+  "remaining_acceptance": {
+    "Weather_uses_the_corrected_path_proved": false,
+    "Weather_visual_trails_repaired_on_hardware": false,
+    "Liquid_Glass_opacity_repaired": false,
+    "shared_cause_of_both_symptoms_proved": false,
+    "physical_FPS_measured": false,
+    "long_term_stability": false,
+    "new_compatible_trial_admission_recovery_scope_required": true
+  },
+  "raw_logs_identifiers_locations_screenshots_or_binaries_committed": false
+}

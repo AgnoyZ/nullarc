@@ -36,6 +36,7 @@ $(TEST_BIN_DIR)/test_r3n_abi: src/uapi/r3n_user_client.cpp src/winsys/radv_r3n_w
 test: $(TESTS)
 	python3 -B tests/test_release_pci_matches.py
 	python3 -B tests/test_render_surface_clear.py
+	python3 -B tests/test_nmplugin_render_pass_integrity.py
 	python3 -B tests/test_nmplugin_release_logging.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
@@ -116,6 +117,10 @@ test-nmplugin-release-logging:
 .PHONY: test-nmplugin-render-surface-clear
 test-nmplugin-render-surface-clear:
 	python3 -B tests/test_render_surface_clear.py
+
+.PHONY: test-nmplugin-render-pass-integrity
+test-nmplugin-render-pass-integrity:
+	python3 -B tests/test_nmplugin_render_pass_integrity.py
 
 $(TEST_BIN_DIR)/test_upstream34_alias_policy: tests/test_upstream34_alias_policy.cpp src/phxaccel/PhxHardwarePolicy.hpp Makefile | $(TEST_BIN_DIR)
 	$(CXX) -std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined \

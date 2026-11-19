@@ -47,7 +47,8 @@ int main(int argc, char **argv) {
     const int action = std::atoi(argv[3]);
     Texture texture{surface,!surface}; Buffer cb; Descriptor d{{{action}}};
     if (primaryPath) primary(&cb,&texture,d); else secondary(&cb,&texture,d.colorAttachments[0]);
-    // Model a pass whose render area covers only the first pixel of the root.
+    // Model a clear of a one-pixel view/subresource of the root. This does not
+    // model renderTargetWidth/Height: a smaller draw area still clears its whole attachment.
     if (action==MTLLoadActionClear) texture.gpu[0]=0;
     for (int i=0;i<4;i++) {
         const int expected = (action==MTLLoadActionClear && i==0) ? 0 : texture.cpu[i];

@@ -11,8 +11,12 @@ The default branch still contained a separately reproducible correctness bug:
 render `MTLLoadActionClear` skipped importing the CPU backing. For an IOSurface
 it also recorded the entire root texture in `_surfOverwrites`, suppressing
 later imports in the same command buffer. A clear can cover only a texture
-view, subresource or the pass's smaller render area. Pixels outside that area
-must retain their defined contents; they cannot inherit stale GPU pixels.
+view or subresource of a larger root backing. Pixels outside the selected
+attachment must retain their defined contents; they cannot inherit stale GPU
+pixels. The earlier description also included a smaller render area as a
+preservation boundary. That was too broad: a smaller draw area still clears
+the whole selected attachment. The subsequent format-view correction is
+documented in [the Weather follow-up](BUILD34-WEATHER-INTERNAL-TRAILS.md).
 
 Upstream fixed this in
 [`531bac34989f32b861c77f5788290b9b6615405d`](https://github.com/luuumi-dev/nullarc/commit/531bac34989f32b861c77f5788290b9b6615405d),
@@ -39,7 +43,7 @@ recorded below. The active VBL and local AML batch-copy treatment remain in use.
 
 The CPU regression adapts the upstream test and compiles the actual two
 production preparation branches, with modeled CPU/GPU pixel arrays and a
-one-pixel clear. Each action runs through primary/additional attachment and
+one-pixel view/subresource clear. Each action runs through primary/additional attachment and
 IOSurface/buffer-backed combinations under ASan/UBSan. Nonzero exit codes
 report mismatched pixels without deliberately crashing a process.
 

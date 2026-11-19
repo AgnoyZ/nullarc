@@ -4803,7 +4803,7 @@ static void *nvmtl_rp_variant(nvk_pipeline *p, uint32_t load, uint32_t was)
     }
     if (!rp && !legacy && p->nrpx >= p->crpx)
         nvlog("vk: apps2 load variant 0x%x on pipeline %p: rpx holds %u of a DERIVED ceiling of %u and did not grow — "
-              "THIS PASS CLEARS INSTEAD OF LOADING and the attachment's previous contents are LOST",
+              "required LOAD variant unavailable; pass will be refused",
               load, (void *)p, p->crpx, NVMTL_RPX_MAX);
     else if (!rp) {
         VkRenderPass made = VK_NULL_HANDLE;
@@ -4811,8 +4811,8 @@ static void *nvmtl_rp_variant(nvk_pipeline *p, uint32_t load, uint32_t was)
         if (r == VK_SUCCESS && legacy) { rp = p->rpv[load] = (void *)made; nvlog("vk: G11 load-action render pass variant %u made (%u colour slot(s), colour %s, depth %s)", load, ncol, (load & 1u) ? "LOAD" : "clear", (load & 2u) ? "LOAD" : "clear"); }
         else if (r == VK_SUCCESS) { rp = (void *)made; p->rpxk[p->nrpx] = load; p->rpx[p->nrpx++] = rp;
             nvlog("vk: apps2 load variant 0x%x made (%u colour slot(s), stencil %s)", load, ncol, (load & NVMTL_LOAD_STENCIL) ? "LOAD" : "clear"); }
-        else if (legacy) nvlog("vk: G11 vkCreateRenderPass(variant %u) -> %d — this pass CLEARS instead of loading", load, r);
-        else nvlog("vk: apps2 vkCreateRenderPass(variant 0x%x) -> %d — this pass CLEARS instead of loading", load, r);
+        else if (legacy) nvlog("vk: G11 vkCreateRenderPass(variant %u) -> %d — required LOAD variant unavailable", load, r);
+        else nvlog("vk: apps2 vkCreateRenderPass(variant 0x%x) -> %d — required LOAD variant unavailable", load, r);
     }
     pthread_mutex_unlock(&g_rpv_lock);
     if (rp && (load & 1u) && was != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && was != VK_IMAGE_LAYOUT_UNDEFINED) {
@@ -4845,7 +4845,7 @@ static void nvmtl_clear_colour(VkClearColorValue *cv, uint32_t fmt, const float 
 }
 
 static void nvmtl_private_depth_layout(nvk_cmdbuf *, nvk_image *, VkImageLayout);
-int nvmtl_vk_cmd_begin_pass(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
+static int nvmtl_vk_cmd_begin_pass_impl(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
 {
     if (!p->rp || !ps->w || !ps->h) { nvlog("begin_render: apps2 no render pass or a %ux%u pass — pass REFUSED", ps->w, ps->h); return -1; }
     nvmtl_sample_pattern pattern = ps->sample_pattern;
@@ -4891,6 +4891,20 @@ int nvmtl_vk_cmd_begin_pass(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
         for (uint32_t i = 0; i < ncol; i++) {
             nvk_image *img = ps->col[i];
             if (!cf[i] || !img || (ps->load & NVMTL_LOAD_COLOUR(i)) || (ps->colw[i] <= ps->w && ps->colh[i] <= ps->h)) continue;
+            if (!c->in_rp && img->mtl_type != 7 && ps->colfmt[i] && ps->colfmt[i] != img->fmt) {
+                // Transfer clears use the image format; a full-size empty pass clears in the view's format instead.
+                nvk_pass viewclear; memset(&viewclear, 0, sizeof viewclear);
+                viewclear.col[0] = img; viewclear.colview[0] = ps->colview[i];
+                viewclear.colfmt[0] = ps->colfmt[i];
+                viewclear.colw[0] = viewclear.w = ps->colw[i];
+                viewclear.colh[0] = viewclear.h = ps->colh[i];
+                viewclear.col_level[0] = ps->col_level[i]; viewclear.col_layer[0] = ps->col_layer[i];
+                viewclear.layers = nl;
+                memcpy(viewclear.clear[0], ps->clear[i], sizeof viewclear.clear[0]);
+                if (nvmtl_vk_cmd_empty_pass(c, &viewclear)) return -1;
+                add |= NVMTL_LOAD_COLOUR(i);
+                continue;
+            }
             if (c->in_rp || img->mtl_type == 7 || (ps->colfmt[i] && ps->colfmt[i] != img->fmt)) {
                 static int said; if (said++ < 4) nvlog("begin_render: fullclear colour %u (%ux%u) is larger than the %ux%u render area but is a %s — only the area is cleared",
                     i, ps->colw[i], ps->colh[i], ps->w, ps->h, c->in_rp ? "pass in progress" : img->mtl_type == 7 ? "3D slice" : "format view");
@@ -4953,7 +4967,7 @@ int nvmtl_vk_cmd_begin_pass(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
     if (p->has_depth && ps->ds && ps->ds->samples > 1 && g_sample_locations &&
         (ps->load & (NVMTL_LOAD_DEPTH | NVMTL_LOAD_STENCIL)))
         nvmtl_private_depth_layout(c, ps->ds, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-    VkImageView views[2 * NVMTL_NCOL + 2]; uint32_t nviews = 0, was = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL; int first = 1;
+    VkImageView views[2 * NVMTL_NCOL + 2]; uint32_t nviews = 0, was = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     uint32_t prm = 0;
     for (uint32_t i = 0; p->samples > 1 && i < ncol; i++) if (cf[i] && (rmask & (1u << i)) && ps->res[i] && ps->resview[i]) prm |= 1u << i;
     const int dres = p->samples > 1 && p->has_depth && ps->dres && ps->dresview && (ps->dresmode || ps->sresmode);
@@ -4963,9 +4977,11 @@ int nvmtl_vk_cmd_begin_pass(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
         if (!rpShape) { nvlog("begin_render: par1 no resolve-shape render pass — pass REFUSED"); return -1; }
         static int said; if (said++ < 8) nvlog("begin_render: par1 %u-sample pass resolves colour 0x%x of 0x%x%s", p->samples, prm, rmask, dres ? " + depth/stencil" : "");
     }
+    for (uint32_t i = 0; i < ncol; i++) if (cf[i]) { was = ps->col[i]->layout; break; }
+    void *rpUse = rpShape ? rpShape : nvmtl_rp_variant(p, ps->load, was);
+    if (!rpUse) { nvlog("begin_render: required load variant unavailable — pass REFUSED"); return -1; }
     for (uint32_t i = 0; i < ncol; i++) {
         if (!cf[i]) continue;
-        if (first) { was = ps->col[i]->layout; first = 0; }
         ps->col[i]->layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         views[nviews++] = (VkImageView)ps->colview[i];
     }
@@ -4995,8 +5011,6 @@ int nvmtl_vk_cmd_begin_pass(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
     VkClearValue cv[2 * NVMTL_NCOL + 1]; uint32_t ncv = 0; memset(cv, 0, sizeof cv);
     for (uint32_t i = 0; i < ncol; i++) if (cf[i]) { nvmtl_clear_colour(&cv[ncv].color, cf[i], ps->clear[i]); ncv++; }
     if (p->has_depth) { cv[ncv].depthStencil.depth = ps->clear_depth; cv[ncv].depthStencil.stencil = ps->clear_stencil; ncv++; }
-    void *rpUse = rpShape ? rpShape : nvmtl_rp_variant(p, ps->load, was);
-    if (!rpUse) rpUse = p->rp;
     VkRenderPassBeginInfo rbi = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, NULL, (VkRenderPass)rpUse, c->fb,
         { { 0, 0 }, { ps->w, ps->h } }, ncv, cv };
     c->sample_pattern = pattern;
@@ -5028,6 +5042,12 @@ int nvmtl_vk_cmd_begin_pass(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
     VkViewport vp = { 0, (float)ps->h, (float)ps->w, -(float)ps->h, 0, 1 }; VkRect2D sc = { { 0, 0 }, { ps->w, ps->h } };
     pvkCmdSetViewport(c->cb, 0, 1, &vp); pvkCmdSetScissor(c->cb, 0, 1, &sc);
     return 0;
+}
+int nvmtl_vk_cmd_begin_pass(nvk_cmdbuf *c, const nvk_pass *ps, nvk_pipeline *p)
+{
+    int result = nvmtl_vk_cmd_begin_pass_impl(c, ps, p);
+    if (result) c->encoding_error = 1;
+    return result;
 }
 int nvmtl_vk_cmd_begin_render_ms(nvk_cmdbuf *c, nvk_image *img, nvk_pipeline *p, const float clear[4], uint32_t load, nvk_image *resolve)
 {
@@ -5786,7 +5806,7 @@ int nvmtl_vk_submit_begin_at(nvk_cmdbuf *c, nvmtl_inflight *f, const char *who)
     memset(f, 0, sizeof *f); f->c = c;
     uint64_t *const pt = f->pt;
     if (g_state != 1 || !c || !c->cb) return -2;
-    if (c->counter_error || nvmtl_counter_flush(c)) { nvmtl_cmd_retire(c); return -1; }
+    if (c->encoding_error || nvmtl_counter_flush(c)) { nvmtl_cmd_retire(c); return -1; }
     VkCommandBuffer counter_reset = VK_NULL_HANDLE;
     if (nvmtl_counter_reset_finish(c, &counter_reset)) { nvmtl_cmd_retire(c); return -1; }
     c->timing.clock = nvmtl_clock_snapshot();
@@ -7087,7 +7107,7 @@ typedef struct {
     unsigned reset_ended;
 } nvmtl_counter_recording;
 
-static int nvmtl_counter_fail(nvk_cmdbuf *c) { if (c) c->counter_error = 1; return -1; }
+static int nvmtl_counter_fail(nvk_cmdbuf *c) { if (c) c->encoding_error = 1; return -1; }
 static void nvmtl_counter_memory_barrier(nvk_cmdbuf *c)
 {
     VkMemoryBarrier mb = { VK_STRUCTURE_TYPE_MEMORY_BARRIER, NULL,
@@ -7098,7 +7118,7 @@ static void nvmtl_counter_memory_barrier(nvk_cmdbuf *c)
 }
 static int nvmtl_counter_flush(nvk_cmdbuf *c)
 {
-    if (!c || c->counter_error) return -1;
+    if (!c || c->encoding_error) return -1;
     nvmtl_counter_recording *r = c->counter_recording;
     if (!r || !r->count) return 0;
     if (c->in_rp) return nvmtl_counter_fail(c);
@@ -7157,7 +7177,7 @@ void nvmtl_vk_ts_pool_destroy(void *pool)
 int nvmtl_vk_cmd_ts_write(nvk_cmdbuf *c, void *pool, uint32_t idx, int barrier)
 {
     nvmtl_counter_state *s = pool;
-    if (!c || !c->cb || !s || idx >= s->count || c->counter_error) return nvmtl_counter_fail(c);
+    if (!c || !c->cb || !s || idx >= s->count || c->encoding_error) return nvmtl_counter_fail(c);
     nvmtl_counter_recording *r = c->counter_recording;
     if (!r) {
         r = calloc(1, sizeof *r);

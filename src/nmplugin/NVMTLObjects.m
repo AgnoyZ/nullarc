@@ -2702,7 +2702,7 @@ id<MTLCounterSet> nvmtl_timestamp_counter_set(void)
 @end
 static void nvmtl_counter_recording_failed(NVMTLCommandBuffer *cb)
 {
-    cb->_c.counter_error = 1;
+    cb->_c.encoding_error = 1;
     [cb nvmtlRecordEncodingError:[NSError errorWithDomain:MTLCommandBufferErrorDomain
         code:MTLCommandBufferErrorInternal userInfo:@{NSLocalizedDescriptionKey:@"Counter recording failed"}]];
 }
@@ -2909,7 +2909,7 @@ static BOOL nvmtl_pixel_sampler_update(NSMutableDictionary *states, NSString *in
             [cb->_resources addObject:t];
             NVMTLTexture *sr = t->_parent ? t->_parent : t;
             if (sr->_surf) {
-                // A render clear may cover only a view or the pass's smaller render area.
+                // A cleared attachment does not prove the whole root backing was overwritten.
                 nvmtl_surface_in_for_cb(cb, sr);
                 nvmtl_surf_dirty(cb, sr); }
             else if (sr->_bufCopy) { nvmtl_surface_in_for_cb(cb, sr); nvmtl_surf_dirty(cb, sr); }
@@ -5068,7 +5068,7 @@ destinationBytesPerImage:(NSUInteger)img options:(MTLBlitOption)opt {
             (unsigned long)d.colorAttachments[0].storeAction, d.colorAttachments[0].clearColor.red, d.colorAttachments[0].clearColor.green,
             d.colorAttachments[0].clearColor.blue, d.colorAttachments[0].clearColor.alpha, d.depthAttachment.texture != nil);
         if (sr->_surf) {
-            // A render clear may cover only a view or the pass's smaller render area.
+            // A cleared attachment does not prove the whole root backing was overwritten.
             nvmtl_surface_in_for_cb(self, sr);
             nvmtl_surf_dirty(self, sr); }
         else if (sr->_bufCopy) { nvmtl_surface_in_for_cb(self, sr); nvmtl_surf_dirty(self, sr); } }
