@@ -23,6 +23,8 @@ static inline int nvmtl_log_failure(const char *text)
                     nvmtl_log_fault_word(text, "FAULT") || strstr(text, "-> -") ||
                     strstr(text, "missing") || strstr(text, "cannot") ||
                     strstr(text, "unsupported") || strstr(text, "refused") ||
+                    /* A PR28 timeout leaves publication unconfirmed, but its message has no generic error keyword. */
+                    strstr(text, "surface commit wait: deadline expired") ||
                     /* a draw the plugin dropped leaves the window blank or garbled with nothing else in the log
                      * (GTX 16 Terminal text on 2.2.0 was framebuffer fetch draws dropped this way) */
                     strstr(text, "draw is skipped") || strstr(text, "draw skipped") ||

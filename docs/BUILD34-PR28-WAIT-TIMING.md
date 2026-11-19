@@ -339,3 +339,55 @@ also requires reopening affected applications. Exact private backups, loader
 output and receipts remain local; no binary or raw diagnostic is published.
 The sanitized result is
 [`validation/build34-pr28-daily-config-20261118.json`](validation/build34-pr28-daily-config-20261118.json).
+
+## 2026-11-19 Weather investigation: release timeout logging
+
+The owner reported trails after opening Weather while the accepted
+build34/VBL/AML/render-clear/startup-order runtime was active. A new finite
+Weather observation added no entries to the filtered release log. That result
+cannot exclude a PR28 publication deadline: the installed release logger's
+failure classifier omitted the actual timeout message.
+
+`nvmtl_surface_commit_wait` formats a message beginning
+`surface commit wait: deadline expired` and explicitly leaves publication
+unconfirmed and pending work retained. The release `nvlog` implementation
+only sends messages accepted by `nvmtl_log_failure` to syslog. This message
+contains none of that classifier's existing failure keywords, so even a
+genuine deadline message is discarded. The four checked kernel error counters
+also are not a count of this userspace publication deadline.
+
+The source-only correction adds that specific message fragment to the
+existing failure classifier. No wait budget, caller policy, WindowServer
+exclusion, command status, completion, resource lifetime, publication ordering
+or rate limiter changes. It does not enable general tracing, add a monitor or
+log successful waits. It does not establish that Weather actually timed out
+or that a timeout caused the reported trails.
+
+The new CPU regression compiles the actual release `nvlog`, its rate limiter
+and failure classifier, using the timeout format extracted from the
+production wait helper. Only syslog is replaced with an in-process collector;
+no synthetic driver failure is emitted into the system log. The baseline
+fails because the timeout is dropped. The correction passes four ASan/UBSan
+methods: the actual timeout and its pending-publication qualification reach
+the collector at error severity; 13 existing failure examples remain visible;
+successful waits and unrelated deadlines remain quiet; and the original
+eight-message/4,096-call rate limit remains in force. The unchanged ten-method
+production wait suite and `make test` also pass. These are CPU checks, not GPU
+execution or visual acceptance.
+
+```sh
+make test-nmplugin-release-logging
+make test
+```
+
+**The logging correction is not installed.** No complete candidate plugin
+bundle was built or deployed for this follow-up. The accepted installed
+plugin and its admission/recovery pins are unchanged and still have the old
+filter. Absence of its release messages must not be described as excluding
+publication deadlines. An actual trial of the corrected logger requires a
+fresh compatible plugin scope and installation authorization; do not reuse
+consumed deployment or restart scopes. Source rollback can revert this
+isolated classifier/test change and does not affect the running plugin.
+
+The separate Weather observation and its limitations are recorded in
+[`validation/build34-weather-trails-20261119.json`](validation/build34-weather-trails-20261119.json).

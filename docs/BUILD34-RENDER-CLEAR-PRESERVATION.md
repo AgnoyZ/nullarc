@@ -227,6 +227,51 @@ seed. Existing seed/pending-write checks still avoid unnecessary imports;
 no FPS or long-term stability improvement is claimed. Restoring the skipped
 import optimization would require proof of successful whole-root coverage.
 
+## Subsequent Weather trails report, November 19
+
+The owner subsequently reported trails after opening Weather. This is a
+concrete application trigger, but the report does not yet distinguish stale
+content inside Weather from a trail left on the desktop after moving or
+closing its window. It does not establish that this symptom and opaque
+Liquid Glass have the same cause. The existing clear-preservation backport
+must not be described as having visually repaired these trails.
+
+A fresh scope first passed complete runtime/cache/loaded-AML/EFI/recovery
+readback. Weather's main process was absent at the initial check. It was
+launched once through Launch Services without activation, observed for
+18 seconds, and only that exact launched process was terminated afterward.
+Three metadata observations found no on-screen main window at two seconds
+and an on-screen window at eight and 16 seconds, with normal nice priority
+and the application inactive. These are sparse metadata observations, not
+launch-latency, visibility-through-other-windows or FPS measurements. In
+particular, a window's alpha metadata does not establish material transparency.
+
+One one-second process sample confirmed that Weather mapped the current
+installed plugin image; its image UUID matched the installed executable.
+The sample is not a simultaneous compositor/scanout capture and does not rule
+out an intermittent wait. Screen-capture preflight was false; no capture was
+attempted or requested, no raw VRAM was read, and no visual reproduction or
+pixel correctness is claimed. The inactive test also does not reproduce
+every aspect of the owner's active Weather use.
+
+Both independent full readbacks passed with the same boot and WindowServer,
+zero in all four checked driver error counters, no new matching reports,
+preserved accepted runtime and recovery, and unchanged daily wait/monitoring
+policy. The release log remained at 49 entries. Source review then identified
+a specific diagnostic gap: the installed release filter drops PR28's
+publication-deadline message. A narrow source-only correction and CPU
+regression are documented in
+[the PR28 timing investigation](BUILD34-PR28-WAIT-TIMING.md#2026-11-19-weather-investigation-release-timeout-logging).
+It has not been installed and is not a demonstrated trail repair.
+
+**Weather trails remain unresolved.** First distinguish an internal animation
+or content trail from desktop damage surviving a window move/close. Do not
+replay this consumed observation or infer success from clean counters/logs.
+No installed driver binary, cache, EFI, startup or security setting was
+changed, and no WindowServer restart or power action ran. All finite observers exited. The
+[sanitized record](validation/build34-weather-trails-20261119.json) keeps the
+owner's report, observation and logging regression separate.
+
 ## License and rollback
 
 The changed production file keeps its
