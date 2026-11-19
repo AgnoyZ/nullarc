@@ -1,5 +1,11 @@
 # Build34 smoothness comparison with NullMoth
 
+The owner's subsequent step-by-step execution request begins with
+[R1a elapsed-time accounting](BUILD34-WAIT-DEADLINE.md). Its source/CPU/native
+checks pass, but it is not installed or hardware-accepted. The existing
+on-disk Weather plugin needs an isolated baseline boot before a kernel
+treatment; later optimization items have not been started.
+
 ## Scope and conclusion
 
 This November 19, 2026 review compares default build34 source

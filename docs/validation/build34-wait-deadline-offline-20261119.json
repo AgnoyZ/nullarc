@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "status": "R1a-source-CPU-native-pass-not-installed-hardware-pending",
+  "owner_requested_stepwise_execution_and_testing": true,
+  "source_parent_commit": "4e9000e54447c7df2bc9482fa9863d3ef31df24c",
+  "baseline_driver_sha256": "fffd2bdfea25ca87312679e194949f2538807b43610d157f06c9dde0d33a70d0",
+  "candidate_driver_sha256": "b4174f7f2498f8b3e1e7204059ef9c06041f30a808435cda703a34e0f9439267",
+  "production_change": {
+    "only_doWaitSeq_method_changed": true,
+    "outside_wait_method_byte_identical_to_parent": true,
+    "counts_actual_monotonic_elapsed_time": true,
+    "initial_poll_and_oversleep_counted": true,
+    "hard_scheduler_return_deadline_claimed": false,
+    "global_retirement_queue_locks_submission_and_native_ABI_changed": false,
+    "two_second_request_cap_zero_poll_and_actual_late_completion_preserved": true,
+    "pending_fence_and_BO_publication_semantics_preserved": true,
+    "accepted_ACQUIRE_prefix_and_build34_identity_preserved": true
+  },
+  "CPU_validation": {
+    "production_wait_method_compiled_with_fake_clocks_fences_and_locks": true,
+    "ASan_UBSan_enabled": true,
+    "IOKit_or_Metal_device_framework_linked": false,
+    "baseline_cases": 29,
+    "baseline_semantic_passes": 22,
+    "baseline_semantic_failures": 7,
+    "baseline_fixture_errors_in_final_comparison": 0,
+    "candidate_cases_passed": 29,
+    "source_admission_test_methods_passed": 10,
+    "historical_admission_files_and_pins_unchanged": true,
+    "historical_admission_refuses_new_candidate": true,
+    "separate_gate_refuses_build41_build42_and_protected_input_drift": true,
+    "default_make_test_passed": true,
+    "firmware_file_fixtures_missing_and_skipped": true,
+    "tests_run_at_lower_CPU_priority": true,
+    "log_sha256": {
+      "baseline-CPU-semantic.log": "ab292179ef77437e6590bfd873dedc6ca6b910a0b5a46a26efaf38e4929a2bec",
+      "candidate-prewrite-CPU.log": "528b52b1cc12539281a64b63f2e56d476dc1a30fec886508bd79e7736de09492",
+      "source-gate-CPU.log": "ea0198bf0d24436aa7268498f37815bf95ad76468283af4abaa776fa9558c5d4",
+      "current-default-CPU.log": "56481f3ae09b7673fa8f83d24f10ec60ba495319ebf2e4cd22a3c3523c280093"
+    }
+  },
+  "native_build": {
+    "separate_exact_source_gate": "tools/build34_wait_deadline.py",
+    "SDK_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+    "both_baseline_and_candidate_built_and_signed": true,
+    "x86_64_kext_type_and_strict_signatures_passed": true,
+    "warning_multisets_equal": true,
+    "warnings_per_role": 3,
+    "warning_multiset": {
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]": 3
+    },
+    "baseline_signed_binary_sha256": "7c2f8d4d68b63f32fba120f60fec0877e1e58607e70253c94d7394883f7cf8e1",
+    "candidate_signed_binary_sha256": "fab1c35b3be1485bb60aa2e03731f971db922ac56508029057c02d4e40bc16fe",
+    "packaged_Info_plist_sha256": "aaeef27a947e0a2a70b358628ff21216a5edaf0a5d65f32651f8654cef654af7",
+    "packaged_metadata_matches_actual_EFI_kernel": true,
+    "native_control_binary_byte_identical_to_current_EFI_kernel": true,
+    "source_and_SDK_unchanged_during_build": true,
+    "library_lookup": {
+      "candidate_imports_resolved_by_local_library_search": true,
+      "import_count": 375,
+      "new_imports": {
+        "_absolutetime_to_nanoseconds": "com.apple.kpi.mach"
+      },
+      "new_private_KPI_imports": [],
+      "metadata_and_declared_dependencies_unchanged": true,
+      "AuxKC_built_or_replaced": false,
+      "kernel_injected_from_EFI_not_Library_Extensions": true,
+      "library_search_is_not_actual_kernel_load_or_AuxKC_link": true,
+      "candidate_libraries_stdout_sha256": "8f6cb580df15387169e090311b7d2a3f11924c06f8fef701032f2e7a0ed4c63c"
+    }
+  },
+  "excluded_early_attempts": {
+    "first_CPU_fixture_libc_bcopy_declaration_conflict": {
+      "cases_executed": 0,
+      "counted_as_baseline_regression": false,
+      "retained_privately": true
+    },
+    "first_native_gate_compared_signature_dependent_binary_hash_across_signing": {
+      "rejected_before_candidate_installation": true,
+      "retained_privately": true,
+      "gate_corrected_to_check_architecture_type_and_image_identity_and_record_signed_hash": true,
+      "fresh_two_role_build_after_correction_passed": true,
+      "driver_candidate_changed_by_gate_correction": false
+    }
+  },
+  "current_runtime_readback": {
+    "OS_product_version": "26.7.2",
+    "OS_build": "25G332",
+    "actual_current_owner_check_passed": true,
+    "action_was_check_only": true,
+    "startup_guardian_installer_or_GPU_scope_replayed": false,
+    "exact_current_EFI_kernel_backup_files": 3,
+    "full_EFI_manifest_files": 358,
+    "startup_job_backups": 2,
+    "complete_EFI_and_startup_job_bytes_unchanged": true,
+    "candidate_installed": false,
+    "candidate_loaded": false
+  },
+  "hardware_prerequisite": {
+    "existing_disk_Weather_plugin_has_not_passed_next_boot": true,
+    "surviving_WindowServer_still_uses_pretrial_plugin": true,
+    "required_next_trial": "ordinary-existing-disk-plugin-baseline-boot-with-unchanged-accepted-kernel",
+    "new_kernel_must_not_be_combined_with_plugin_first_boot": true,
+    "fresh_current_boot_receipts_mapped_plugin_and_full_runtime_acceptance_required": true,
+    "new_reboot_authorization_consumed": false,
+    "power_actions": 0,
+    "new_next_boot_observer_or_job_staged": false,
+    "R1a_hardware_acceptance": false,
+    "R1b_or_later_items_started": false
+  },
+  "final_source_review": {
+    "candidate_29_CPU_cases_and_10_source_gate_methods_rechecked": true,
+    "stored_native_artifacts_recipe_warning_multisets_and_CPU_logs_match_record": true,
+    "changed_file_allowance": 10,
+    "relative_document_links_and_JSON_valid": true,
+    "new_private_paths_UUID_literals_or_credentials_detected": false,
+    "private_build_outputs_ignored": true
+  },
+  "boundaries": {
+    "kernel_or_plugin_installed_or_loaded": false,
+    "live_AuxKC_or_EFI_ACPI_changed": false,
+    "NVRAM_BIOS_disk_layout_security_or_accessibility_changed": false,
+    "live_startup_jobs_changed": false,
+    "daily_PR28_250ms_and_WindowServer_exclusion_preserved": true,
+    "resident_monitor_enabled": false,
+    "application_launched_or_explicit_GPU_workload_submitted": false,
+    "ordinary_running_desktop_and_applications_continued": true,
+    "WindowServer_restart_requests": 0,
+    "power_actions": 0,
+    "stutter_fix_visual_repair_FPS_or_long_term_acceptance_claimed": false,
+    "binaries_raw_logs_or_private_manifests_published": false
+  }
+}

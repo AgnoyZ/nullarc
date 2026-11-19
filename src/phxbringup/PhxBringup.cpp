@@ -2175,16 +2175,20 @@ IOReturn IOAccelPhxNativeClient::doWaitSeq(IOExternalMethodArguments *a) {
         uint64_t timeout = a->scalarInput[1];
         if (timeout > PHXN_WAIT_CAP_NS)
             timeout = PHXN_WAIT_CAP_NS;
+        const uint64_t start = mach_absolute_time();
         uint64_t retired = owner->gpuRetired();
-        for (uint64_t waited = 0; retired < target && waited < timeout; ) {
-            if (waited < 1000000ull) {
+        while (retired < target) {
+            // Count real elapsed time, including polling and delayed wakeups, against the caller's budget.
+            uint64_t elapsed;
+            absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsed);
+            if (elapsed >= timeout)
+                break;
+            if (elapsed < 1000000ull) {
                 // Short wait (< 1 ms): fast poll with 50 us delay for low latency
                 IODelay(50);
-                waited += 50000ull;
             } else {
                 // Extended wait (>= 1 ms): yield CPU to scheduler to avoid starving WindowServer & system threads
                 IOSleep(1);
-                waited += 1000000ull;
             }
             retired = owner->gpuRetired();
         }

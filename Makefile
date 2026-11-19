@@ -38,6 +38,7 @@ test: $(TESTS)
 	python3 -B tests/test_render_surface_clear.py
 	python3 -B tests/test_nmplugin_render_pass_integrity.py
 	python3 -B tests/test_nmplugin_release_logging.py
+	python3 -B tests/test_build34_wait_deadline.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \
@@ -113,6 +114,11 @@ test-nmplugin-surface-commit-wait:
 .PHONY: test-nmplugin-release-logging
 test-nmplugin-release-logging:
 	python3 -B tests/test_nmplugin_release_logging.py
+
+# Extracted production wait method with CPU-only clocks/fences; no IOKit backend.
+.PHONY: test-build34-wait-deadline
+test-build34-wait-deadline:
+	python3 -B tests/test_build34_wait_deadline.py
 
 .PHONY: test-nmplugin-render-surface-clear
 test-nmplugin-render-surface-clear:
