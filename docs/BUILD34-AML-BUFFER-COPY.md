@@ -1,11 +1,15 @@
 # Build34 AML log-buffer copy candidate
 
-The residual GUI stutter now has a specific AML hot method to evaluate. A fresh
-finite native observation found 395 of 406 query on-CPU samples in the firmware
-log-buffer `MOVE` method. A narrow local batch-copy candidate passes offline
-AML equivalence checks and is now **installed on disk, pending restart and
-hardware acceptance**. The active
-build34 VBL candidate and the accepted owner baseline remain distinct.
+The local AML batch-copy candidate is now loaded and has passed exact ACPI,
+build34 accelerated-startup and independent full-cache/EFI readback. Fresh
+normal-priority GUI observations found no intervals over 100 ms in either
+sample; the same Mach-timer program found no delivery lateness over 80 ms.
+These finite cross-boot results show a substantial improvement from the
+original-ACPI controls recorded below.
+The first postboot GUI diagnostic failed because its new output parent had
+incorrect permissions; that failed scope is preserved, and only the separately
+prepared, permission-checked scope supplies timing results. The active build34
+VBL candidate and the accepted owner baseline remain distinct.
 
 This follows the [direct HIGH queue-delay measurement](BUILD34-VBL-SCHEDULING.md#pending-to-dispatch-delay-measured-directly).
 That earlier trace measured 105 callbacks queued for more than 80 ms, including
@@ -146,7 +150,7 @@ contains USB/MSI community workarounds, without demonstrating a repair of this
 machine's independently measured system-timer backlog. No such EFI change was
 made here.
 
-## Current state and next admission
+## Pre-installation state and next admission
 
 Final independent readback passed the active VBL image/cache, full metadata and
 all 416 records/29 codeless entries with 415 unrelated images preserved, exact
@@ -166,15 +170,17 @@ replayed. No general stutter repair, physical FPS or long-term stability is
 accepted yet. See the [sanitized record](validation/build34-aml-buffer-copy-20261119.json).
 
 
-## Authorized installation, restart pending
+## Authorized installation checkpoint
 
 The owner explicitly authorized this candidate's installation and ordinary
-restart test on November 19, 2026. The new private ACPI scope has now installed
-only the previewed configuration change and the 172-byte SSDT. Independent
+restart test on November 19, 2026. At that checkpoint, the new private ACPI
+scope had installed only the previewed configuration change and the 172-byte
+SSDT. Independent
 readback passed the real 358-file EFI, exact original configuration/recovery,
 two new bounded-startup entrypoints, the unchanged active VBL driver/cache and
 all 416 cache records/29 codeless entries with 415 unrelated images preserved.
-The candidate is **on disk only**: original ACPI remains loaded until restart.
+At the installation checkpoint, the candidate was on disk only and original
+ACPI remained loaded until the subsequently authorized restart.
 No GPU test or power action was performed by installation/readback.
 
 Forty-five CPU tests passed before installation. They cover interrupted writes,
@@ -184,7 +190,7 @@ A failed first control assertion and two initial fixture/parser failures are
 retained privately; none is counted as a pass. The first control wrapper
 incorrectly required a fixed process priority of 37. A fresh Launch Services
 control passed normal scheduling checks with nice 0 and a dynamic priority of
-46, again showing 19 GUI intervals over 100 ms in about 12 seconds (maximum
+46, again showing 19 GUI intervals over 100 ms in 16.200 seconds (maximum
 512.552 ms), while the independent worker's maximum was 16.175 ms.
 
 The next-boot observer requires the exact declaration-only DSDT and candidate
@@ -209,3 +215,66 @@ It does not restore the older accelerator, reinstall the withdrawn S5 table,
 unload a desktop driver or enable post-startup automatic monitoring/rollback.
 Hardware stutter repair, physical FPS and long-term stability remain pending.
 See the [installation record](validation/build34-aml-buffer-installation-20261119.json).
+
+
+## Loaded candidate and finite comparison
+
+The authorized ordinary restart on November 19, 2026 completed on macOS 26.7.2
+build 25G332. Exact loaded DSDT/SSDT checks passed, including the preserved
+original method body/call site, unrelated table bytes, FADT semantics and XSDT
+structure. Both bounded accelerated-startup tasks exited. The read-only
+observer removed its own job. Independent postboot and final readbacks passed
+the real EFI/recovery, unchanged active VBL/cache and complete metadata with
+416 records/29 codeless entries and 415 unrelated images preserved. No driver
+error counter or matching diagnostic report increased; the same current-boot
+WindowServer remained alive.
+
+The first finite GUI job could not collect output: private umask had made its
+new root-owned output parent mode 0700, preventing GUI uid 501 from traversing
+it. Its 38-second GUI deadline failed and the finite job removed itself. This
+is retained as a diagnostic failure, without a latency result or claim that
+the ACPI candidate failed. It did not trigger rollback. A fresh scope uses
+explicit traversable parent permissions, private user-owned results, and four
+actual-user permission checks that reproduce the old refusal and verify new
+create/read/delete operations. Consumed jobs and output paths were not reused.
+
+The fresh Launch Services GUI samples use the unchanged executable, normal
+scheduling/nice 0, visibility checks and the same finite observation method.
+The first valid sample happened after ten minutes uptime because the initial
+diagnostic had failed; it is not an immediate-postboot measurement.
+
+| GUI comparison | Uptime before validation/sample | Elapsed | p99 interval | Maximum interval | Intervals >100 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original ACPI control, previous boot | already delayed/stuttering | 16.200 s | 296.977 ms | 512.552 ms | 19 |
+| Batch-copy candidate, early scope label | 620.904 s | 16.011 s | 18.512 ms | 21.895 ms | 0 |
+| Batch-copy candidate, delayed scope label | 914.918 s | 16.038 s | 18.730 ms | 33.099 ms | 0 |
+
+The independent direct-wait worker and sampled VBL plateaus are recorded with
+each GUI sample. Both candidate samples have zero intervals over 33.34 ms;
+the inherited JSON key `over33ms` uses that exact 33.34 ms threshold. These
+intervals are application scheduling observations, not physical scanout FPS
+or direct mouse-input latency.
+
+| Same Mach-timer program | Duration | p99 delivery lateness | Maximum lateness | Deliveries >80 ms |
+| --- | ---: | ---: | ---: | ---: |
+| Original ACPI control, earlier boot | 20.057 s | 291.284 ms | 521.591 ms | 31 |
+| Batch-copy candidate | 20.010 s | 0.718 ms | 11.458 ms | 0 |
+
+Both timer observations launch the same program through Launch Services, use
+a process-local critical Mach timer with zero leeway and a 10 ms request, and
+retain a separate direct-wait worker. The candidate timer reports zero errors
+and successful destruction. This comparison supplements the GUI result; it
+does not repeat a driver/GPU benchmark or directly measure query acknowledgments.
+
+All finite diagnostic processes exited; no new launchd job was needed for the
+fresh scope, and the failed first scope's job is removed. Resident monitoring
+and post-startup automatic rollback remain off. Acceleration, desktop takeover,
+the current VBL image and daily PR28 waiting remain active, with the unchanged
+250 ms budget and WindowServer exclusion. Exact current-VBL/original-ACPI
+recovery is retained. Keep the running treatment for observation rather than
+silently reverting after successful startup and finite latency measurements.
+
+This is a cross-boot comparison in one candidate boot. It does not establish
+first-buffer-fill timing, an isolated same-boot A/B/A effect, all GUI causes,
+long-term stability or physical FPS. The owner-accepted source baseline remains
+unchanged. See the [sanitized boot and timing record](validation/build34-aml-buffer-boot-20261119.json).
