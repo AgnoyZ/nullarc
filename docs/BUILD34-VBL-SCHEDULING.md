@@ -1094,3 +1094,23 @@ WindowServer. Error counters and matching reports did not increase. PR28 daily
 waiting remains enabled, its 250 ms budget and WindowServer exclusion remain
 unchanged, and resident monitors remain disabled. See the sanitized
 [direct queue-delay record](validation/build34-high-callout-queue-delay-20261119.json).
+
+
+## Runnable AML copying isolated to the firmware log buffer
+
+A fresh November 19 native observation identifies the AML method behind most
+sampled runnable query work: 395 of 406 on-CPU samples (97.291%) are in the
+serialized log-buffer `MOVE` routine, from both `_Q47` and `_Q48`. Every sample
+passes current-thread, interpreter-state and method-type guards. One query open
+at the finite cutoff is censored. This gives the queue-delay investigation a
+specific target while preserving the earlier blocked-worker compensation result.
+
+The existing full-buffer path performs 4,080 interpreted byte moves per 16-byte
+scroll. A narrow private batch-copy wrapper retains all bytes, the existing buffer
+object, serialization and the unchanged original implementation as fallback.
+Twenty-eight actual-AML equivalence cases, two return modes, 13 exact-table guard
+cases and the official configuration validator pass offline. The candidate is
+not installed; original loaded ACPI/EFI, the active VBL candidate and the daily
+settings remain verified. There is no hardware repair or FPS acceptance. See
+[the candidate and rollback review](BUILD34-AML-BUFFER-COPY.md) before considering
+a separately authorized fresh ACPI trial.
