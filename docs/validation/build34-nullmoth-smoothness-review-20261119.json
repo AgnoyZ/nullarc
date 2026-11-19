@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "status": "source-comparison-and-readonly-snapshot-not-performance-acceptance",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "reviewed_local_source_commit": "c575324bc1fdd3df87ed3994a4b0a3144cd50a85",
+  "reference": {
+    "repository": "nullmoth/nvidia-macos-driver",
+    "branch": "main",
+    "independently_queried_remote_commit": "87e524ab36f12d17c04626d6cf7fc3bde1cc63e4",
+    "same_commit_as_previous_VBL_reference": true,
+    "reference_source_files_downloaded": 29,
+    "reference_README_and_LICENSE_downloaded_separately": true,
+    "reference_tree_truncated": false,
+    "key_file_sha256": {
+      "README.md": "cf31427448f703007958005bd320e3b4672ee86986b37d96d1f015666802eeb3",
+      "LICENSE": "1b5c7a92697863d38fd2779af76732acfb8f521b758781eab057ad966701b0b7",
+      "plugin/NVMTLEventSync.m": "713e66528548727a3aa796c5e30bbbabd55dd340e7e0bdc9d182b7d35bcf4f84",
+      "plugin/nvmtl_schedule_policy.h": "ff2c8af54be1166a68bdbe0f5aec450c2a041bbc2e62dda6ca847f0702271ce4",
+      "plugin/nvmtl_hazard.h": "f1af29ab7e748a31d2532877f65bfe9570106a4a19f653dc3edab9ea78aba8d8",
+      "plugin/nvmtl_vk.c": "3dda35e857cf7a02c91f6cc4bec75975c9be67c70ae347dbc226173bc8bfc2da",
+      "plugin/nvmtl_import_cache.h": "d64b884abd90894dca94f83a67c2383e888ab2c5456c1e22d1c729cbfa7a9ea2",
+      "plugin/nvmtl_shared_wc.h": "36d4d9285d7c7047564f443366b7d863fc853b16337170e662309cb5f816a59a",
+      "kexts/NVRM/accel/nvrm-accel.cpp": "70a8ea9a42f796908bd4fd8ef201ff1ea8250498ee4fe07fd41e404671879325",
+      "nvk/nvk-macos.patch": "d8c6b112c1f6b86a89035fbc484da128aa86191fadd21a81f63badb25035984b"
+    },
+    "reference_README_primary_development_GPU": "NVIDIA RTX 5060",
+    "same_hardware_same_scene_comparison_performed": false,
+    "third_party_source_or_binary_incorporated": false
+  },
+  "OS_readback": {
+    "product_version": "26.7.2",
+    "build": "25G332"
+  },
+  "existing_runtime_context_from_previous_authorized_trial": {
+    "record": "build34-weather-internal-trial-20261119.json",
+    "Weather_plugin_source_commit": "87859b323267030afdfdcd9f4e52dc7168697686",
+    "surviving_WindowServer_plugin_source_commit": "9f838846f6a8eeab80890014eace3a5de1b16067",
+    "all_processes_claimed_to_run_current_default_source": false,
+    "full_runtime_admission_repeated_by_this_review": false,
+    "daily_PR28_wait_enabled": true,
+    "PR28_budget_ms": 250,
+    "WindowServer_PR28_exclusion_preserved": true,
+    "resident_monitors_remain_disabled": true,
+    "Weather_visual_repair_accepted": false,
+    "Liquid_Glass_visual_repair_accepted": false
+  },
+  "readonly_snapshot": {
+    "collection_kind": "single-existing-sysctl-read-no-induced-workload",
+    "counters": {
+      "debug.phxbos_flush": 0,
+      "debug.phxbos_flush_bytes": 0,
+      "debug.nvaccel_iop": 1,
+      "debug.nvaccel_iop_ok": 35061,
+      "debug.nvaccel_iop_copy_us": 1318,
+      "debug.nvaccel_iop_copy_us_max": 14495,
+      "debug.nvaccel_iop_copy_us_sum": 56327172,
+      "debug.nvaccel_iop_flips": 0,
+      "debug.nvaccel_iop_sse": 1,
+      "debug.nvaccel_iop_vsync": 1,
+      "debug.nvaccel_surface_gpu_waits": 25539,
+      "debug.nvaccel_surface_gpu_wait_max_us": 55497,
+      "debug.nvaccel_surface_gpu_timeouts": 0,
+      "debug.nvaccel_iop_fail": 0,
+      "debug.nvaccel_iop_copy_skip": 0,
+      "debug.phx_hang_kills": 0,
+      "debug.phxfb_vbl_late_us_max": 148099
+    },
+    "cumulative_counters_and_maxima_not_interval_distribution": true,
+    "last_copy_excludes_preceding_surface_wait": true,
+    "copy_and_wait_maxima_proved_to_be_same_frame": false,
+    "zero_failures_prove_smoothness": false,
+    "physical_scanout_FPS_measured": false
+  },
+  "ranked_findings": [
+    {
+      "id": "R1",
+      "priority": "high",
+      "area": "native-wait-deadlines-and-submission-backpressure",
+      "evidence": "static-source-not-controlled-lock-or-oversleep-measurement",
+      "local_anchors": [
+        "src/phxbringup/PhxBringup.cpp:852",
+        "src/phxbringup/PhxBringup.cpp:2160"
+      ],
+      "first_isolated_candidate": "real-monotonic-wait-deadline-preserving-pending-work",
+      "separate_later_candidate": "bounded-ring-pressure-wait-without-device-wide-lock-monopoly"
+    },
+    {
+      "id": "R2",
+      "priority": "high",
+      "area": "AMD-present-surface-wait-and-CPU-scanout-copy",
+      "evidence": "static-path-and-readonly-runtime-counters",
+      "local_anchors": [
+        "src/phxaccel/accel/nvrm-accel.cpp:1110",
+        "src/phxaccel/accel/nvrm-accel.cpp:2111",
+        "src/phxaccel/accel/phxfb.cpp:225"
+      ],
+      "reference_anchors": [
+        "kexts/NVRM/accel/nvrm-accel.cpp:2547"
+      ],
+      "directions": [
+        "owned-bounded-asynchronous-present-investigation",
+        "AMD-specific-scanout-flip-longer-term"
+      ],
+      "worker_alone_claimed_to_save_bandwidth_or_prevent_tearing": false
+    },
+    {
+      "id": "R3",
+      "priority": "high",
+      "area": "exact-fence-waiting-and-completion-events",
+      "evidence": "static-source-and-pinned-reference-not-load-reproduction",
+      "local_anchors": [
+        "src/phxbringup/PhxBringup.cpp:834",
+        "src/phxbringup/PhxBringup.cpp:908",
+        "src/phxbringup/PhxBringup.cpp:2160"
+      ],
+      "reference_anchors": [
+        "nvk/nvk-macos.patch:9708",
+        "nvk/nvk-macos.patch:9748"
+      ],
+      "global_safe_reclamation_watermark_must_be_preserved": true,
+      "NullMoth_all_waits_claimed_interrupt_only": false,
+      "AMD_event_support_implemented_or_validated": false
+    },
+    {
+      "id": "R4",
+      "priority": "medium",
+      "area": "selective-surface-publication",
+      "evidence": "static-policy-difference-current-cost-unmeasured",
+      "local_anchors": [
+        "src/nmplugin/NVMTLEventSync.m:312",
+        "src/nmplugin/NVMTLEventSync.m:380"
+      ],
+      "reference_anchors": [
+        "plugin/NVMTLEventSync.m:392",
+        "plugin/nvmtl_schedule_policy.h"
+      ],
+      "daily_PR28_policy_changed": false,
+      "250ms_claimed_fixed_per_frame_delay": false
+    },
+    {
+      "id": "R5",
+      "priority": "medium",
+      "area": "barrier-and-render-pass-dependency-scope",
+      "evidence": "static-source-not-RADV-GPU-time-measurement",
+      "local_anchors": [
+        "src/nmplugin/nvmtl_vk.c:3615",
+        "src/nmplugin/nvmtl_vk.c:5230",
+        "src/nmplugin/nvmtl_vk.c:6675"
+      ],
+      "reference_anchors": [
+        "plugin/nvmtl_hazard.h:135"
+      ],
+      "reference_acting_hazard_policy_default_on": false,
+      "local_RP_LIGHT_policy_opt_in_and_WindowServer_only": true,
+      "correctness_guards_must_be_preserved": [
+        "full-view-CLEAR",
+        "required-LOAD-refusal",
+        "sticky-encoding-error",
+        "cross-process-publication"
+      ]
+    },
+    {
+      "id": "R6",
+      "priority": "later",
+      "area": "import-backing-and-PSO-cache-measurement",
+      "evidence": "static-cost-candidates-no-import-or-compile-profile",
+      "local_anchors": [
+        "src/nmplugin/NVMTLDevice.m:915",
+        "src/nmplugin/NVMTLDevice.m:985",
+        "src/nmplugin/NVMTLDevice.m:997"
+      ],
+      "reference_anchors": [
+        "plugin/nvmtl_vk.c:9112",
+        "plugin/nvmtl_shared_wc.h"
+      ],
+      "existing_A1_keys_and_backing_cache_recognized": true,
+      "reference_cross_wrapper_host_page_sharing_opt_in": true,
+      "reference_shared_buffer_VRAM_working_copy_opt_in": true,
+      "discrete_PCIe_optimization_claimed_automatically_suitable_for_UMA": false
+    }
+  ],
+  "preserved_prior_evidence": {
+    "record_document": "BUILD34-AML-BUFFER-COPY.md",
+    "GUI_control_max_ms": 512.552,
+    "GUI_candidate_max_ms": [
+      21.895,
+      33.099
+    ],
+    "Mach_timer_control_max_ms": 521.591,
+    "Mach_timer_candidate_max_ms": 11.458,
+    "bounded_cross_boot_observations_not_FPS_or_long_term_acceptance": true,
+    "older_delayed_VBL_only_sample_claimed_current_reproduction": false
+  },
+  "already_present_not_new_recommendations": [
+    "A1-corrected-surface-keys",
+    "IOSurface-host-import-and-backing-reuse",
+    "default-async-commit",
+    "G-SUB-submit-ahead-default-cap-16",
+    "event-folding",
+    "enabled-SSE-copy",
+    "enabled-transaction-vsync",
+    "accepted-VBL-AML-startup-fixes"
+  ],
+  "boundaries": {
+    "driver_source_changed": false,
+    "driver_or_runtime_library_compiled": false,
+    "driver_installed_or_loaded": false,
+    "configuration_changed": false,
+    "EFI_ACPI_NVRAM_BIOS_disk_layout_or_security_changed": false,
+    "application_launched": false,
+    "explicit_GPU_or_benchmark_workload_submitted": false,
+    "existing_ordinary_applications_and_desktop_continued_running": true,
+    "resident_monitor_enabled": false,
+    "consumed_action_scope_replayed": false,
+    "WindowServer_restart_requests": 0,
+    "power_actions": 0,
+    "same_scene_frame_time_AB_comparison_performed": false,
+    "optimization_speedup_or_root_cause_claimed_proven": false,
+    "private_reference_downloads_or_raw_logs_published": false
+  },
+  "repository_validation": {
+    "default_make_test_passed": true,
+    "test_execution_kind": "host-CPU-unit-tests-no-driver-or-GPU-workload",
+    "unit_tests_run_at_lower_CPU_priority": true,
+    "firmware_file_fixture_tests_skipped_because_fixtures_absent": true,
+    "local_source_line_anchors_checked": 19,
+    "key_reference_sha256_readbacks_checked": 10,
+    "runtime_snapshot_cross_checked_against_private_saved_read": true,
+    "relative_document_links_checked": true,
+    "privacy_pattern_review_passed": true,
+    "git_diff_check_passed": true,
+    "staged_diff_and_privacy_review_passed": true,
+    "only_expected_report_and_sanitized_record_staged": true
+  }
+}
