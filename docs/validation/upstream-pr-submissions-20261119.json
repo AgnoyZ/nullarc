@@ -1,0 +1,225 @@
+{
+  "date": "2026-11-19",
+  "official_repository": "luuumi-dev/nullarc",
+  "official_base": "main",
+  "official_base_sha": "3497d87b229e4839d8d2a03ebe9127f2a30f332b",
+  "default_branch": "upstream34/vram-layout-fix",
+  "default_source_before_record": "b9b1ed5dd7b86f1bbffeadab832515ca6564332d",
+  "runtime_source_changed": false,
+  "installation_or_gpu_test_performed": false,
+  "license_files_changed": false,
+  "source_only_prs": [
+    {
+      "number": 32,
+      "url": "https://github.com/luuumi-dev/nullarc/pull/32",
+      "title": "PhxBringup: acquire compute memory before indirect buffers",
+      "draft": true,
+      "head": "upstream/compute-acquire-prefix-20261119",
+      "sha": "c4c15436cb1ba220d5e8a268cc2e571e24680fa4",
+      "files": [
+        "src/phxbringup/PhxBringup.cpp",
+        "tests/test_compute_acquire.py",
+        "docs/compute-acquire-prefix.md"
+      ],
+      "remote_sha_verified": true,
+      "pr_base_head_and_files_verified": true
+    },
+    {
+      "number": 33,
+      "url": "https://github.com/luuumi-dev/nullarc/pull/33",
+      "title": "phxctl: preserve ordinary-user Metal bundle lookup",
+      "draft": false,
+      "head": "upstream/metal-link-mode-20261119",
+      "sha": "0d4267203954a0cbb125abe7d4c70c1f8d610c2a",
+      "files": [
+        "tools/phxctl/relocate_gpubundle.sh",
+        "tests/test_gpubundle_link_mode.py",
+        "docs/metal-link-mode.md"
+      ],
+      "remote_sha_verified": true,
+      "pr_base_head_and_files_verified": true
+    },
+    {
+      "number": 34,
+      "url": "https://github.com/luuumi-dev/nullarc/pull/34",
+      "title": "phxfb: validate pool releases and retry unpublished scanout aliases",
+      "draft": false,
+      "head": "upstream/framebuffer-pool-alias-20261119",
+      "sha": "329b6682e291e44e218e26c472cba20c0bff58ca",
+      "files": [
+        "src/phxaccel/accel/phxfb.cpp",
+        "src/phxaccel/PhxHardwarePolicy.hpp",
+        "tests/test_upstream34_alias_policy.cpp",
+        "tests/test_upstream34_framebuffer.py",
+        "tests/upstream34_framebuffer_cases.cpp",
+        "docs/framebuffer-pool-alias.md",
+        "Makefile"
+      ],
+      "remote_sha_verified": true,
+      "pr_base_head_and_files_verified": true
+    },
+    {
+      "number": 35,
+      "url": "https://github.com/luuumi-dev/nullarc/pull/35",
+      "title": "phxfb: publish validated panel timings with bounded refresh sampling",
+      "draft": true,
+      "head": "upstream/panel-timing-corrected-20261119",
+      "sha": "1e3b9e6f193d399739cfafc85a63c817a2307056",
+      "files": [
+        "src/phxaccel/accel/phxfb.cpp",
+        "src/phxaccel/accel/phx_panel_timing.h",
+        "tests/test_upstream34_panel_timing.cpp",
+        "tests/test_upstream34_panel_callbacks.py",
+        "tests/upstream34_panel_callbacks.cpp",
+        "docs/panel-timing-corrected.md",
+        "tests/source_methods.py",
+        "Makefile"
+      ],
+      "remote_sha_verified": true,
+      "pr_base_head_and_files_verified": true
+    },
+    {
+      "number": 36,
+      "url": "https://github.com/luuumi-dev/nullarc/pull/36",
+      "title": "phxfb: isolate VBL delivery using public IOKit timers",
+      "draft": true,
+      "head": "upstream/vbl-public-iokit-20261119",
+      "sha": "2888e06d373231c75e1bdd7943d3bed1f2301e99",
+      "files": [
+        "src/phxaccel/accel/phxfb.cpp",
+        "tests/build34_vbl_scheduling.cpp",
+        "tests/test_build34_vbl_scheduling.py",
+        "docs/vbl-public-iokit.md",
+        "tests/source_methods.py"
+      ],
+      "remote_sha_verified": true,
+      "pr_base_head_and_files_verified": true
+    },
+    {
+      "number": 37,
+      "url": "https://github.com/luuumi-dev/nullarc/pull/37",
+      "title": "nmplugin: exclude framebuffer-fetch bindings from descriptor masks",
+      "draft": false,
+      "head": "upstream/descriptor-fetch-masks-20261119",
+      "sha": "7cfbb30d984a6bc8d411ea329f35685c91e76925",
+      "files": [
+        "src/nmplugin/nvmtl_vk.c",
+        "src/nmplugin/nvmtl_vk.h",
+        "tests/test_nmplugin_descriptor_mask.py",
+        "tests/descriptor_mask/cpu_cases.h",
+        "tests/descriptor_mask/cpu_stubs.h",
+        "tests/README-nmplugin-descriptor-mask.md",
+        "docs/descriptor-fetch-masks.md",
+        "Makefile"
+      ],
+      "remote_sha_verified": true,
+      "pr_base_head_and_files_verified": true
+    },
+    {
+      "number": 38,
+      "url": "https://github.com/luuumi-dev/nullarc/pull/38",
+      "title": "nmplugin: share compact IOSurface keys with synchronization monitors",
+      "draft": false,
+      "head": "upstream/surface-key-sharing-20261119",
+      "sha": "0eebc59eb7f4500d9f7c699f2d6a2ec670cbb2be",
+      "files": [
+        "src/nmplugin/NVMTLEventSync.m",
+        "src/nmplugin/NVMTLObjects.m",
+        "src/nmplugin/nvmtl_surface_key.h",
+        "tests/test_nmplugin_surface_key.py",
+        "tests/surface_key_cases.m",
+        "tests/surface_key_fixtures.m",
+        "tests/README-nmplugin-surface-key.md",
+        "docs/surface-key-sharing.md",
+        "Makefile"
+      ],
+      "remote_sha_verified": true,
+      "pr_base_head_and_files_verified": true
+    },
+    {
+      "number": 39,
+      "url": "https://github.com/luuumi-dev/nullarc/pull/39",
+      "title": "nmplugin: bound opt-in IOSurface publication waits",
+      "draft": true,
+      "head": "upstream/bounded-publication-wait-20261119",
+      "sha": "41bf4ea2bc9568283331f060d62760a0663f6260",
+      "files": [
+        "src/nmplugin/NVMTLEventSync.m",
+        "src/nmplugin/NVMTLObjects.m",
+        "src/nmplugin/NVMTLObjects.h",
+        "tests/test_nmplugin_surface_commit_wait.py",
+        "tests/surface_commit_wait/cases.m",
+        "tests/surface_commit_wait/fixtures.m",
+        "docs/bounded-publication-wait.md",
+        "Makefile"
+      ],
+      "remote_sha_verified": true,
+      "pr_base_head_and_files_verified": true
+    }
+  ],
+  "earlier_acpi_pr": {
+    "number": 31,
+    "url": "https://github.com/luuumi-dev/nullarc/pull/31",
+    "head_sha": "bc658b2a84336d77c776a8731240f7d7aa928958"
+  },
+  "validation": {
+    "all_eight_focused_cpu_checks": "passed",
+    "compute_actual_submit_cpu_scenarios": 20,
+    "vbl_actual_method_cpu_assertions": 66,
+    "descriptor_mask_synthetic_cases_per_mode": 321,
+    "descriptor_mask_modes": [
+      "unset",
+      "0",
+      "1"
+    ],
+    "wait_cpu_test_methods": 10,
+    "metal_link_fixture_test_methods": 4,
+    "vulkan_headers_commit": "6802bb4733b63ed5efd3adb308a6c885ef180ea1",
+    "vulkan_headers_worktree_clean": true,
+    "full_make_test": "failed at unchanged upstream scheduler-sensitive test_wait_seq; not reported green",
+    "clean_main_wait_seq_control": "also aborted; byte-identical test source verified",
+    "python_suites_before_wait_seq": "all 16 passed",
+    "remaining_queue_pending_fence_hdmi_binaries": "passed separately",
+    "firmware_file_fixture_tests": "skipped; fixtures absent; synthetic parsing passed",
+    "current_main_native_build_or_gpu_validation": false
+  },
+  "already_covered": [
+    {
+      "change": "A1 sampler decimal keys",
+      "disposition": "present in official main; old PR6 not duplicated"
+    },
+    {
+      "change": "unknown-usage surface textures",
+      "pr": 15,
+      "disposition": "existing open PR; credited integration retained locally"
+    },
+    {
+      "change": "hashable surface texture cache key",
+      "pr": 16,
+      "disposition": "existing open PR; not duplicated"
+    },
+    {
+      "change": "atomic shader cache store",
+      "pr": 19,
+      "disposition": "existing open PR; not duplicated"
+    },
+    {
+      "change": "texture isDrawable",
+      "pr": 22,
+      "disposition": "existing open PR; not duplicated"
+    },
+    {
+      "change": "surface publication wait",
+      "pr": 28,
+      "disposition": "new PR is explicitly a bounded opt-in alternative, not a second layer"
+    }
+  ],
+  "not_proposed_as_runtime_changes": [
+    "deliberately deferred official changes are not downstream fixes and are not proposed for reverse application",
+    "build34-specific geometry admission and pinned source recipes remain local compatibility tooling; do not narrow current main multi-device support or weaken local admission",
+    "failed or diagnostic-only MEC, ring-padding and RADV-tail experiments are retained as evidence, not proposed production fixes",
+    "machine-specific installation/recovery/startup policies and private ACPI/EFI configurations remain local",
+    "historical validation, comparison and branch-governance records remain in the fork"
+  ],
+  "privacy": "source/tests/reviewed docs only; no binaries, raw diagnostics, personal EFI/firmware tables, credentials or machine identifiers"
+}
