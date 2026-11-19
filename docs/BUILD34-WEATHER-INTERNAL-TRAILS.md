@@ -1,4 +1,4 @@
-# Build34 Weather internal trails: render-pass candidate
+# Build34 Weather internal trails: render-pass candidate and local trial
 
 ## Symptom and evidence boundary
 
@@ -8,12 +8,13 @@ leaving damage on the desktop. The previous inactive application observation
 did not capture pixels or identify Weather's render-pass descriptors; it
 cannot prove which rendering path causes this symptom.
 
-This source-only change starts at default-branch checkpoint
+The source investigation started at default-branch checkpoint
 `12dff42be81a796e2ded987ed9684388690c40ec`. The accepted installed build34,
 VBL, AML, render-clear plugin and startup-order baseline are retained.
 The OS was read again as macOS 26.7.2 build 25G332. No application was
 launched, GPU workload submitted, driver installed/loaded, WindowServer
-restarted or power action requested during this source investigation.
+restarted or power action requested during that source investigation. The
+subsequently authorized local trial is recorded separately below.
 
 ## Audited upstream changes, in application/test order
 
@@ -82,18 +83,79 @@ their final results are recorded in
 `docs/validation/build34-weather-internal-clear-20261119.json`.
 These checks do not install or load the artifacts.
 
+## Authorized same-boot local trial
+
+After the owner authorized installation, a fresh private scope admitted
+source `87859b323267030afdfdcd9f4e52dc7168697686`. A complete current-runtime
+readback passed before preparation. The full installed bundle was copied;
+only its `NVMTLDriver` executable was replaced, with its metadata retained,
+and the bundle was signed and verified. The exact before/after manifest
+comparison found no other changed path. Runtime libraries, resources,
+kernel images, the complete cache and EFI/ACPI were retained.
+
+Twenty-four CPU tests covered exact contract derivation, rejection of
+unexpected bundle/library/metadata changes, one-shot installation, partial
+transition readback, exact rollback and refusal of power requests. They
+passed before the one installation. An actual invocation of the new owner
+`check` entrypoint and independent installed-state readback then passed.
+The new two startup jobs retain the accepted startup-order implementation,
+serial checks, timing support and 45/150/300-second limits. Their exact
+plugin expectation now matches the candidate on disk; a future boot with
+this candidate has not been tested. No startup job was replayed or
+bootstrapped in the current boot.
+
+Weather was launched once through Launch Services in the foreground. A
+one-second sample of the exact new process confirmed the candidate plugin
+UUID was mapped. The original WindowServer continued using its previously
+accepted plugin, and its process identity was preserved. This is a
+Weather-only process-loading result, not candidate compositor acceptance.
+
+The finite observation sampled Weather at 2, 10, 30 and 60 seconds. It was
+active, unhidden and normal priority at all four samples. There was no
+Weather window in the 2-second startup sample; the same on-screen main
+window was present at 10, 30 and 60 seconds. The strict collector therefore
+refused its all-four-samples visibility condition. That refusal is retained
+unchanged. A separate qualification records only the three settled visible
+samples spanning 50 seconds; it does not retroactively pass the original
+collector or prove continuous rendering between samples.
+
+Four driver error counters remained zero, the same WindowServer survived,
+and desktop counters progressed. The bounded Weather log interval contained
+no `NullMoth:` records for the exact new process, including no publication
+deadline messages. The candidate includes `12dff42`'s release-time timeout
+logging correction, but zero observed messages do not prove that Weather
+exercised the corrected path or that every publication succeeded.
+
+Screen-capture permission preflight was false. No permission was requested,
+capture attempted or pixel output measured. Weather remains open for owner
+visual inspection. These results and the preserved initial collector
+refusal are recorded in
+`docs/validation/build34-weather-internal-trial-20261119.json`.
+
+A fresh full runtime readback after Weather observation also passed. The
+repository's `make test` passed again; unavailable firmware-file fixtures
+were skipped under the existing test policy. These CPU checks and runtime
+identity checks do not replace visual acceptance.
+
 ## Acceptance and rollback
 
-This fixes reproducible source defects, not an accepted Weather visual
-repair. The installed plugin still predates these corrections and the
-publication-timeout logging correction at `12dff42`. Liquid Glass opacity,
-the shared cause of either symptom, real FPS and long-term stability remain
-unproved.
+The candidate is installed and loaded in Weather, but its clouds/text
+trails remain pending visual acceptance. Its actual render-pass descriptors
+have not been captured. Liquid Glass opacity, a shared cause of both
+symptoms, real FPS and long-term stability remain unproved.
 
-There is no live rollback to perform because deployment has not occurred.
-Source rollback must use a new reverting commit, never reset or rewrite
-history. A prospective hardware trial needs a new compatible plugin scope,
-complete current-runtime admission and exact accepted-bundle/startup
-recovery before installation authorization is exercised. Old installers,
-observers and restart authorizations are consumed. Keep the daily PR28
-250 ms setting, WindowServer exclusion and disabled resident monitors.
+The new scope preserves an exact complete pretrial plugin bundle, an atomic
+rollback bundle and both original startup jobs. Scoped rollback restores
+only the recognized plugin and those two jobs. It has no reboot path and
+refuses power requests; an unknown live state must be inspected rather than
+overwritten. Existing processes do not change their mapped plugin merely
+because the disk bundle changes. Do not run an old exact-plugin readback or
+installer against this new candidate and interpret its expected identity
+mismatch as a GPU failure.
+
+The trial requested no system/WindowServer restart or power action. Keep
+daily PR28 waiting at 250 ms, the WindowServer exclusion and disabled
+resident monitors. Earlier installers, observers and restart scopes remain
+consumed. Source rollback must use a new reverting commit, never reset or
+rewrite history. Do not call this trial an accepted repair until the owner
+verifies the internal Weather animation and text visually.
