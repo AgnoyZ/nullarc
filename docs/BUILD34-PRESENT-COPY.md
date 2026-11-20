@@ -1,9 +1,11 @@
 # Build34 R2 display wait and CPU scanout copy
 
-Current checkpoint: the packed-copy accelerator/cache candidate is installed
-on disk and independently checked; the accepted accelerator is still loaded.
-One new-boot trial and its display comparison remain pending. The earlier
-offline/preparation statuses below describe their original checkpoints.
+Current checkpoint: the packed-copy accelerator is loaded and its bounded
+startup/display correctness trial and independent readback passed. The
+comparison does **not** establish a performance improvement. The installation
+remains active with R1b/VBL/optimized AML/accepted plugin. The earlier
+offline/preparation statuses below describe their original checkpoints; the
+latest new-boot result is recorded at the end of this document.
 
 ## Accepted baseline measurement, November 20
 
@@ -206,3 +208,66 @@ the wait/copy to a worker still requires bounded ownership, cancellation,
 stop/sleep handling and correct completion; removing the wait or NVIDIA vendor
 check is not a safe optimization. R2 optimization acceptance and R3–R6 remain
 pending. No FPS or long-term stability improvement has been demonstrated.
+
+## Loaded trial and independent comparison, November 20
+
+The single persisted ordinary restart completed at **20:45:23 Asia/Shanghai**
+on macOS 26.7.2 build 25G332. The bounded watcher accepted the new boot,
+closed its power recovery and retired its own job. No recovery restart was
+requested. Independent readback passed fresh startup/desktop receipts, the
+exact loaded R2a accelerator, retained R1b kernel/optimized AML/mapped accepted
+plugin, all 358 EFI files, full 416-record/29-codeless cache metadata, exact
+recovery/jobs, desktop progress, four zero error counters and no new report.
+
+The first independent reader failed an additional accelerator assertion
+because the legacy `support.loaded()` helper queries **only PhxBringup**.
+The separate accelerator check already present in `live_identity` passed.
+Preserving that failed reader and evidence, a new reader explicitly queried
+`com.luuumi.PhxAccel`, required the exact candidate UUID and excluded the old
+UUID. That reader passed without any driver/job/configuration change or
+second restart. This does not relax loaded-image admission.
+
+The fresh display profile used the exact baseline profiler and signed
+Launch Services panel. Candidate executable `e5e91485...` was checked against
+its full recorded hash; disassembly again verified final-pop FBT offsets
+`0x7a3`, `0x162`, `0x405`, passed explicitly to the unchanged strict parser.
+There were 398 kernel-context entries and **397 complete transactions**.
+One entry at the trace-end boundary has no observed completion and is
+excluded from all distributions. It is neither a failed transaction nor
+accepted as a completed frame.
+
+| Traced stage | Baseline median / P95 | R2a median / P95 | R2a maximum |
+|---|---:|---:|---:|
+| Entire display transaction | 3.457 / 5.932 ms | 3.471 / 6.308 ms | 21.029 ms |
+| Nested GPU surface wait | 0.123 / 1.295 ms | 0.132 / 0.797 ms | 15.933 ms |
+| Copy-readiness preparation | 0.004 / 0.009 ms | 0.004 / 0.008 ms | 0.024 ms |
+| Remaining transaction work, including copy | 3.285 / 5.231 ms | 3.311 / 6.027 ms | 9.021 ms |
+
+The wider complete-panel counter interval recorded 743 successful
+surface-sourced copies and 1,811,762 added copy microseconds: **2,438.44 us
+per copy**, versus baseline 2,399.90 us (**+1.61% observed**). These are
+different-boot, single-run observations with different interval transaction
+counts and unisolated desktop work; they neither establish a causal
+regression nor prove an improvement. The largest observed transaction
+includes a 15.933 ms surface wait. Stage percentiles cannot be added, and
+the residual remains more than a pure copy timer. Packed-branch execution
+was not directly counted. Saving per-row XMM operations alone is not an
+established solution to the measured copy cost.
+
+The panel ran for 12.001 seconds, with 719 timer/draw callbacks and 23/23
+onscreen checks. SSE/vsync stayed enabled. There were zero flips, copy
+failures/skips or surface timeouts. Independent replay checked the frozen
+trace/parser and raw counter deltas, then repeated full disk/cache/EFI/AML,
+exact loaded/mapped images, receipts, recovery/jobs and desktop-progress
+checks. The same WindowServer survived, all four checked errors stayed zero
+and no matching report appeared. No panel, trace, probe, scope worker or
+power process remains.
+
+This accepts **R2a's bounded functional trial only**, not optimization
+efficacy, physical FPS, visual-artifact absence or long-term stability.
+Keep the passed installation active and preserve consumed scopes. R2's
+asynchronous wait/copy and DCN lifecycle work remain unresolved; do not
+remove readiness/completion protection to make timings appear faster.
+R3 source/measurement work can now proceed with the safe global reclamation
+watermark retained. R3–R6 have no hardware acceptance. See
+[sanitized loaded-trial evidence](validation/build34-r2-packed-copy-boot-20261120.json).
