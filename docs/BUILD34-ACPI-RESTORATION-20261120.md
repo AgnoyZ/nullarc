@@ -123,3 +123,29 @@ No new GPU test, startup bootstrap or power action occurred. This is successful
 installation verification, not new-boot loading, FPS or long-term acceptance.
 
 See the [sanitized installation evidence](validation/build34-acpi-restoration-installation-20261120.json).
+
+## Follow-up: one ordinary loading restart prepared
+
+The owner's subsequent “continue” advances this completed installation to
+one ordinary restart and read-only new-boot verification. This is a fresh
+single-use continuation, not reuse of an old consumed restart dispatcher.
+No repeat performance benchmark, new GPU probe or later optimization is added.
+
+Actual preflight again passed the complete 358-file EFI, 416/29 selected-cache
+metadata, signatures/security, exact installed startup/recovery files and the
+original live accelerator/ACPI with R1a. The watcher remains unloaded and both
+recovery journals are unconsumed. The same WindowServer and advancing VBL were
+observed, with the existing one surface timeout unchanged and other checked
+errors zero. Preparation created only a new private request/readback packet;
+it did not alter the installed combined scope or any launch job.
+
+The new dispatcher must verify and commit the existing supported panel flag,
+persist one restart intent, then request power once. An uncertain result cannot
+be retried. The installed finite watcher supplies its existing bounded startup
+admission and exact recovery; no extra observer or resident monitor is installed.
+After new-boot acceptance, a separate finite readback must reopen actual files,
+confirm exact loaded R1a/VBL/AML and mapped accepted plugin, validate fresh
+startup/completion/desktop receipts and independently check unchanged recovery.
+At this preparation checkpoint no power request has yet been sent.
+
+See the [sanitized restart preparation](validation/build34-acpi-restoration-reboot-preparation-20261120.json).
