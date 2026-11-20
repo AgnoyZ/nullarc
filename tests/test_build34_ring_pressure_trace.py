@@ -62,8 +62,16 @@ class TraceTests(unittest.TestCase):
         return json.loads((self.root / name).read_text())
 
     def test_delayed_ready_dispatches_once_and_records_clean_retirement(self):
-        trace = "import time;time.sleep(.15);print('READY',flush=True);time.sleep(.15);print('END',flush=True)"
-        self.assertEqual(self.run_capture(trace), (0, 0))
+        # An arbitrary short post-READY sleep can expire while the parent is
+        # descheduled. End this CPU double only after the fake probe sees G.
+        ack = repr(str(self.root / 'CPU-release-received'))
+        trace = ("import pathlib,time;time.sleep(.15);print('READY',flush=True);"
+                 f"p=pathlib.Path({ack});end=time.monotonic()+3\n"
+                 "while not p.exists() and time.monotonic()<end:time.sleep(.01)\n"
+                 "assert p.exists();print('END',flush=True)")
+        probe = ("import pathlib,sys;assert sys.stdin.buffer.read(1)==b'G';"
+                 f"pathlib.Path({ack}).write_text('G')")
+        self.assertEqual(self.run_capture(trace, probe=probe, arm=1.5, trace_retire=4), (0, 0))
         self.assertGreater(self.read('pressure-trace-ready-private.json')['elapsed_seconds'], .1)
         life = self.read('pressure-trace-lifecycle-private.json')
         self.assertEqual(life, {'trace_ready': True, 'G_dispatch_may_have_occurred': True,
