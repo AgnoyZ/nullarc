@@ -111,6 +111,12 @@ test-build34-exact-multitarget:
 	@test -n "$(EXACT_MULTITARGET_OUT)" || (echo "Set EXACT_MULTITARGET_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_multitarget.py --mesa-source "$(MESA_SOURCE)" --out "$(EXACT_MULTITARGET_OUT)"
 
+.PHONY: test-build34-exact-cs-dependencies
+test-build34-exact-cs-dependencies:
+	@test -n "$(MESA_SOURCE)" || (echo "Set MESA_SOURCE to the verified matching Mesa source"; exit 2)
+	@test -n "$(EXACT_CS_OUT)" || (echo "Set EXACT_CS_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_cs_dependencies.py --mesa-source "$(MESA_SOURCE)" --out "$(EXACT_CS_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \

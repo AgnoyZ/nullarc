@@ -1,0 +1,91 @@
+diff --git a/src/amd/common/darwin/ac_darwin_drm.c b/src/amd/common/darwin/ac_darwin_drm.c
+--- a/src/amd/common/darwin/ac_darwin_drm.c
++++ b/src/amd/common/darwin/ac_darwin_drm.c
+@@ -31,7 +31,7 @@
+ #define ACD_MARKETING_NAME "AMD Radeon RX 9070 XT"
+
+ #define ACD_METADATA_MAX 256
+-/* How long a submit blocks on a dependency that was never submitted (WAIT_FOR_SUBMIT). */
++/* Per-dependency budget: legacy waits for attachment; exact mode for completion. */
+ #define ACD_CS_DEP_TIMEOUT_NS (60ull * 1000000000ull)
+
+ /* A BO is a kext handle plus what only Mesa keeps: the create args, a cached CPU map
+@@ -642,8 +642,23 @@
+    if (r)
+       return r;
+
+-   /* SYNCOBJ_IN / TIMELINE_WAIT: a point backed by a seqno of this client is already ordered on
+-    * the one ring; a CPU-signalled one is done; one not yet submitted is waited for on the CPU. */
++   if (acd_sync_has_exact_completion(dev->sync)) {
++      /* The parser historically ignores legacy context/sequence dependency
++       * chunks under a one-ring assumption. Do not silently discard nonempty
++       * dependencies in exact mode; their ownership/queue translation is not
++       * implemented. Refuse before any wait, submit or signal side effect. */
++      for (uint32_t i = 0; i < num_chunks; i++) {
++         const struct drm_amdgpu_cs_chunk *c = (const void *)(uintptr_t)chunks[i];
++         if (c->length_dw && (c->chunk_id == AMDGPU_CHUNK_ID_DEPENDENCIES ||
++                              c->chunk_id == AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES)) {
++            acd_cs_plan_fini(&plan);
++            return -EOPNOTSUPP;
++         }
++      }
++   }
++
++   /* SYNCOBJ_IN / TIMELINE_WAIT: exact mode waits for completion before any
++    * consumer submit; legacy retains its historical wait-for-attachment path. */
+    for (uint32_t i = 0; i < plan.n_waits && !r; i++)
+       r = acd_sync_cs_wait_ready(dev->sync, plan.waits[i].handle, plan.waits[i].point, ACD_CS_DEP_TIMEOUT_NS);
+
+diff --git a/src/amd/common/darwin/ac_darwin_drm.h b/src/amd/common/darwin/ac_darwin_drm.h
+--- a/src/amd/common/darwin/ac_darwin_drm.h
++++ b/src/amd/common/darwin/ac_darwin_drm.h
+@@ -80,9 +80,12 @@
+    bool exact_completion;
+ };
+ struct util_sync_provider *acd_sync_provider_create(const struct acd_sync_backend *be);
+-/* CS path: blocks until (handle, point) is CPU-signalled or attached to a seqno
+- * (WAIT_FOR_SUBMIT semantics); a point backed by a seqno of this client is already
+- * ordered before the next submit and needs no wait. */
++/* Internal immutable capability, shared by provider clones. */
++bool acd_sync_has_exact_completion(struct util_sync_provider *p);
++/* CS path: legacy mode waits for CPU signal or attachment (WAIT_FOR_SUBMIT).
++ * Exact mode conservatively waits for payload completion as one connection
++ * can use independent queues and no native queue dependency is encoded yet.
++ * Returns 0 or -errno; timeout_ns is a per-dependency relative budget. */
+ int acd_sync_cs_wait_ready(struct util_sync_provider *p, uint32_t handle, uint64_t point, uint64_t timeout_ns);
+ /* CS path: attaches the returned seqno to (handle, point); point 0 = binary payload. */
+ int acd_sync_cs_attach(struct util_sync_provider *p, uint32_t handle, uint64_t point, uint64_t seq);
+diff --git a/src/amd/common/darwin/ac_darwin_sync.c b/src/amd/common/darwin/ac_darwin_sync.c
+--- a/src/amd/common/darwin/ac_darwin_sync.c
++++ b/src/amd/common/darwin/ac_darwin_sync.c
+@@ -711,10 +711,30 @@
+
+ /* ---- called by the CS path (ac_darwin_drm.c) ---- */
+
++bool
++acd_sync_has_exact_completion(struct util_sync_provider *p)
++{
++   return to_sync(p)->be.exact_completion;
++}
++
+ int
+ acd_sync_cs_wait_ready(struct util_sync_provider *p, uint32_t handle, uint64_t point, uint64_t timeout_ns)
+ {
+    struct acd_sync *s = to_sync(p);
++   if (s->be.exact_completion) {
++      /* One connection can submit to both compute and GFX. Until native
++       * queue dependencies exist, require actual payload completion before
++       * submitting a consumer; attachment alone is not queue ordering. Keep
++       * this conservative CPU fallback separate from the legacy fast path.
++       * Reserve INT64_MAX for infinity: a large relative budget must not wrap
++       * into an expired deadline or accidentally request an infinite wait. */
++      const uint64_t now = now_mono_ns(), cap = (uint64_t)INT64_MAX - 1;
++      const int64_t deadline = now >= cap || timeout_ns > cap - now ? cap : now + timeout_ns;
++      if (wait_exact(s, &handle, &point, 1, deadline,
++                     DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL | DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT, NULL))
++         return -errno;
++      return 0;
++   }
+    const uint64_t deadline = now_mono_ns() + timeout_ns;
+
+    pthread_mutex_lock(&s->mtx);

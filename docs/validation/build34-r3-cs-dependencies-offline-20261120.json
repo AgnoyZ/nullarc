@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-20",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "status": "passed-CPU-only-exact-CS-dependency-guard",
+  "pinned_input_files": 30,
+  "actual_Mesa_ioctl_planner_sync_marshaller": true,
+  "two_direction_CS_overtake_and_two_ignored_dependency_chunk_counterexamples": true,
+  "ordering_cases": 64,
+  "multi_dependency_cases": 6,
+  "candidate_checks": 4552,
+  "asan_ubsan": true,
+  "refused_CS_outputs_proven_unattached_by_actual_transfer": true,
+  "regressions": {
+    "multitarget-regression": 3768,
+    "bookkeeping-regression": 4741
+  },
+  "deterministic_deadline_clock_fixture": true,
+  "CPU_signal_attach_and_reset_destroy_reuse_races": true,
+  "exact_mode_unsupported_nonempty_dependency_chunks_refused": true,
+  "relative_budget_saturation_and_device_loss_mapping_passed": true,
+  "legacy_dependency_behavior_preserved": true,
+  "production_capability_enabled": false,
+  "source_sha256": {
+    "src/amd/common/darwin/ac_darwin_sync.c": "f13b8faca6f0a3eef630992812a1e9ae20b749eeaf5b36dcf932da1968f13d5a",
+    "src/amd/common/darwin/ac_darwin_drm.h": "3cfddf00be2226609597da7efc5a4314d2c8abc5af8b33d55e4dd5570c276fa4",
+    "src/amd/common/darwin/ac_darwin_drm.c": "0bfa9204101e21fbc5399aefad52c6b0f878076528fd0383ec1e10a87434197b"
+  },
+  "patch_sha256": {
+    "0003-radv-exact-completion-bookkeeping.patch": "5f65def0db78e048fb64434d50061d80f551c92dc09dff872d0551acd28805e7",
+    "0004-radv-exact-multitarget-wait-query.patch": "266a22f7784a6823226333c9fbec5fb115fdf713812dedd9a57acf967b275806",
+    "0005-radv-exact-cs-dependency-guard.patch": "c5b403d4336bb517071838a76bbb03c47a85cc19337c90d2bb38f574472ac61d"
+  },
+  "fixture_sha256": "518aa90dcc1c0fa799b26a2c7780de8f0a78a9f53ac66acb415fa1e1b8f2c76c",
+  "runner_sha256": "0f3106a86bc1b1637be954b654deca44e80f80b662f09f4bc361f17396d2b396",
+  "production_driver_plugin_native_ABI_tool_unchanged": true,
+  "original_MIT_notices_preserved": true,
+  "installed": false,
+  "loaded": false,
+  "GPU_executed": false,
+  "kernel_exact_wait_implemented": false,
+  "native_GPU_queue_dependencies_implemented": false,
+  "native_submission_ownership_resolved": false,
+  "AMD_completion_events_implemented": false,
+  "R3_hardware_accepted": false,
+  "physical_FPS_measured": false,
+  "public_binary_upload": false,
+  "counterexamples_use_proposed_exact_backend_not_installed_backend": true,
+  "native_ABI_changed": false,
+  "legacy_runtime_recipe_changed": false,
+  "default_make_test_passed": true,
+  "optional_firmware_fixtures_present": false,
+  "per_dependency_timeout_not_total_CS_deadline": true,
+  "relative_budget_nanoseconds": 60000000000,
+  "conservative_CPU_wait_not_performance_optimization": true,
+  "R4_R6_started": false,
+  "long_term_stability_accepted": false,
+  "private_configuration_firmware_logs_or_UUIDs_published": false,
+  "live_readback": {
+    "status": "passed-separate-read-only-check",
+    "exact_loaded_R1b_R2a_mapped_plugin": true,
+    "EFI_files": 358,
+    "full_cache_ACPI_startup_jobs_verified": true,
+    "same_WindowServer_and_desktop_progress": true,
+    "four_checked_errors_each_snapshot": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "no_recovery_request": true,
+    "power_requested": false,
+    "GPU_probe_submitted": false
+  }
+}

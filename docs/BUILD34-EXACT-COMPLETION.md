@@ -2,8 +2,9 @@
 
 Current November 20 checkpoint: R1a/R1b and R2a's bounded functional trial
 have passed. R2a's installed combination remains active; no speedup is
-established. R3 has tested **source-only Mesa bookkeeping and multi-target
-wait/query prerequisites**, not an installed exact-wait implementation.
+established. R3 has tested **source-only Mesa bookkeeping, multi-target
+wait/query and conservative CS dependency prerequisites**, not an installed
+exact-wait implementation.
 R4–R6 have not started.
 
 ## Why a kernel-only change is unsafe
@@ -88,10 +89,10 @@ an exact kernel/backend response yet. Before a paired native candidate:
 2. Carry the separately tested multi-target prerequisite below into the future
    paired candidate only after capability negotiation and dependency work.
    Neither the installed runtime nor the old runtime recipes apply it.
-3. Audit cross-queue dependencies. `acd_sync_cs_wait_ready` currently treats
-   a sequence on the same connection as already ordered before a subsequent
-   submission. That assumption needs an explicit queue-order/dependency
-   solution before allowing independent queue completion to shorten waits.
+3. Carry the separately tested conservative CS dependency guard below into
+   the future paired candidate. It waits for completion on the CPU and refuses
+   unsupported legacy dependency chunks in exact mode; it does not encode
+   native GPU queue dependencies or resolve kernel submission ownership.
 4. Separately validate AMD completion-event/interrupt routing and lifetime,
    lost-wakeup rechecks, bounded fallback, cancellation and stop/sleep.
    Existing RELEASE_MEM packets still request no interrupt. Do not copy
@@ -195,3 +196,79 @@ failure. There was no recovery or power request. The accepted R2a installation
 remains active. R3 is still uninstalled and has no GPU/FPS/long-term acceptance;
 native ownership/generation, cross-queue dependencies and AMD events remain
 the next admission work before R4.
+
+## Conservative CS dependency prerequisite
+
+The pinned `acd_sync_cs_wait_ready` treats any attached sequence on the same
+connection as already ordered before the next submission. The build34 native
+submitter can select compute or GFX, including a readiness-dependent fallback,
+so connection identity alone is not proof of queue ordering. A proposed exact
+backend must not let a consumer overtake unfinished work on another queue.
+The pinned CS planner also ignores nonempty `DEPENDENCIES` and
+`SCHEDULED_DEPENDENCIES` chunks under its historical one-ring assumption.
+
+The [actual CS fixture](../tests/test_build34_exact_cs_dependencies.c) runs
+the real `acd_ioctl` → CS planner → sync provider → kext marshaller against
+CPU platform callbacks. With only 0003/0004 applied and the proposed exact
+capability injected, it reproduces compute-to-GFX and GFX-to-compute consumers
+submitting before their dependency completes, and both kinds of dependency
+chunk being ignored. These are contract-transition counterexamples, not an
+observed failure of the installed conservative native backend.
+
+[Patch 0005](../mesa-patches-build34/0005-radv-exact-cs-dependency-guard.patch)
+applies after 0003 and 0004 and changes only the provider, its internal header
+and CS wrapper. In exact mode it conservatively waits for actual payload
+completion before submitting the consumer. Higher completed points on the
+same timeline may satisfy lower requested points, while an unrelated pending
+sequence still holds back the safe global reclamation watermark. Backend
+errors and expired waits refuse the CS before submitting or attaching its
+outputs. Nonempty unsupported legacy dependency chunks return `EOPNOTSUPP`
+before any backend wait, consumer submission or output publication; empty
+chunks carry no dependency and remain accepted.
+
+The existing 60-second **per-dependency** relative budget is converted to a
+monotonic absolute deadline with saturation below the infinity sentinel. This
+does not bound total CS latency across multiple dependencies or scheduler
+delays. It is a conservative CPU fallback, not an asynchronous GPU dependency
+implementation or an FPS optimization. Legacy mode retains its existing
+wait-for-attachment behavior and chunk handling. The production capability
+still defaults false; no initializer, native ABI, driver, plugin or existing
+runtime/tail recipe enables or applies these prerequisites.
+
+Run the [separate CPU runner](../tools/test_build34_exact_cs_dependencies.py)
+against the same reviewed 30-file closure and a fresh ignored output:
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-cs-dependencies \
+  MESA_SOURCE="$MESA_SOURCE" \
+  EXACT_CS_OUT=build/build34-r3-cs-dependency-new-private
+```
+
+On November 20 the strengthened candidate passed **4,552 ASan/UBSan checks**:
+64 ordering cases cover both queue directions, same-engine use, binary and
+timeline payloads and shared provider clones. Six additional CS cases exercise
+multiple mixed/duplicate dependencies, higher-timeline implication, a later
+dependency's error, timeout and early unsupported-chunk refusal. Real provider
+transfers distinguish an unattached refused output from an attached pending
+output. Actual-thread cases cover CPU signal, producer attachment and
+reset/destroy/handle reuse while the backend callback is blocked. Zero/large
+relative budgets, device-loss/error mapping, submit failure and legacy call
+behavior also pass. The provider's deterministic CPU clock is not a measurement
+of native GPU wait time. The earlier 3,768-check multi-target and 4,741-check
+bookkeeping regressions pass on the combined sources, as does default
+`make -j1 test`; optional firmware fixtures remain absent.
+
+The runner preserves original MIT notices, freezes the source and test inputs,
+checks the compiler dependency closure and excludes device runtimes from the
+test linkage. It verifies all tracked driver/plugin/native-ABI/phxctl bytes
+remain unchanged. See
+[sanitized evidence](validation/build34-r3-cs-dependencies-offline-20261120.json).
+
+A new separate read-only check passed the currently accepted R1b/R2a/mapped
+plugin combination, all 358 EFI files, full cache/ACPI/startup-job checks, the
+same WindowServer, desktop progress and four zero error counters in both
+samples. No recovery, GPU probe or power request occurred. This check does
+not run the R3 code on hardware. Keep the accepted installation active;
+native exact-target negotiation, ownership/generation/history reuse, teardown,
+GPU queue dependency support and AMD completion events remain unresolved.
+R3 has no native acceptance, and R4–R6 have not started.
