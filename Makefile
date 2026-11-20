@@ -165,6 +165,12 @@ test-build34-exact-wait:
 	@test -n "$(EXACT_WAIT_OUT)" || (echo "Set EXACT_WAIT_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_wait.py --out "$(EXACT_WAIT_OUT)"
 
+# Original low-dword reconstruction arithmetic; no native or device reader.
+.PHONY: test-build34-exact-fence32
+test-build34-exact-fence32:
+	@test -n "$(EXACT_FENCE32_OUT)" || (echo "Set EXACT_FENCE32_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_fence32.py --out "$(EXACT_FENCE32_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-21",
+  "purpose": "Read-only R3 fence/mapping contract study; upstream source snapshots are not the installed kernel or GPU firmware",
+  "sources": [
+    {
+      "repository": "torvalds/linux",
+      "revision": "adc218676eef25575469234709c2d87185ca223a",
+      "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c",
+      "url": "https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c",
+      "sha256": "f89874730a9f8088c53d5222e2e1e29a944e8e00826564174b5e83d278804c2f",
+      "bytes": 27509,
+      "licence_header_review": "MIT-style permissive grant",
+      "implementation_copied_into_repository": false
+    },
+    {
+      "repository": "torvalds/linux",
+      "revision": "adc218676eef25575469234709c2d87185ca223a",
+      "path": "drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c",
+      "url": "https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c",
+      "sha256": "74dc38ba2d48b1e43db0bec0706a53385fb2f083b273a8f8f4ee2da5d3e06317",
+      "bytes": 222278,
+      "licence_header_review": "MIT-style permissive grant",
+      "implementation_copied_into_repository": false
+    },
+    {
+      "repository": "torvalds/linux",
+      "revision": "adc218676eef25575469234709c2d87185ca223a",
+      "path": "drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c",
+      "url": "https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ring.c",
+      "sha256": "73c28e48056b34d0f9ecbee0dfc41ef104a002848effa9163b3b2fff74b5a49f",
+      "bytes": 19991,
+      "licence_header_review": "MIT-style permissive grant",
+      "implementation_copied_into_repository": false
+    },
+    {
+      "repository": "apple-oss-distributions/xnu",
+      "revision": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+      "path": "iokit/IOKit/IOMemoryDescriptor.h",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/IOKit/IOMemoryDescriptor.h",
+      "sha256": "5762571cd6647925e4b2cae01b0ea39769a997a9108966672d5be1b53a5ce625",
+      "bytes": 63151,
+      "licence_header_review": "APSL-2.0",
+      "implementation_copied_into_repository": false
+    },
+    {
+      "repository": "apple-oss-distributions/xnu",
+      "revision": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+      "path": "iokit/Kernel/IOMemoryDescriptor.cpp",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp",
+      "sha256": "c28e43b9e5eb713f0e4edb1d36e6861c39dbc2f1975813bb1a3745fe2076d171",
+      "bytes": 170059,
+      "licence_header_review": "APSL-2.0",
+      "implementation_copied_into_repository": false
+    },
+    {
+      "repository": "apple-oss-distributions/IOPCIFamily",
+      "revision": "4822b27a36e2de70e231ecf2bf3021384fab6ec2",
+      "path": "IOPCIDevice.cpp",
+      "url": "https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIDevice.cpp",
+      "sha256": "1139124b264715a675154f0cee6d64fa81c72860f73286052205ac969fe2ffa5",
+      "bytes": 124368,
+      "licence_header_review": "APSL-1.1",
+      "implementation_copied_into_repository": false
+    }
+  ],
+  "upstream_raw_snapshots_publicly_uploaded": false,
+  "licence_files_and_existing_notices_unchanged": true
+}

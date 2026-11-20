@@ -970,3 +970,25 @@ remains deliberately unreclaimable. This is not a native SDK build, deployable
 candidate, GPU wait test, FPS or long-term acceptance. No installation, live
 runtime readback, GPU work or power action occurred. Continue with the
 [R3 completion ledger](BUILD34-R3-PLAN.md); R3 remains incomplete.
+
+## Device-read contract review and low-dword window (November 21)
+
+[BUILD34-FENCE-READER.md](BUILD34-FENCE-READER.md) records primary-source
+Linux GFX11/fence and Apple mapping-interface review with pinned revisions,
+licence checks and digests. No implementation was copied. Linux's 32-bit
+per-ring scheme does not automatically justify this project's global64 or
+BAR0 mapping. Neither the old two-dword read nor packet width alone establishes
+an atomic 64-bit device observation; actual effective cache attributes and
+old-generation writers remain native prerequisites.
+
+An original, unintegrated `FenceWindow32` primitive passes 189,198 ASan/UBSan
+arithmetic/state checks, exhaustive small-width intervals and 20,000 sustained
+steps across 32-bit wraps, with twelve defective versions detected. Its strict
+less-than-`2^32` interval counts global sequence gaps and refuses ambiguity;
+it never silently treats a modulo alias as completion. It has no device load
+or production/staged-driver caller. The explicit stale-whole-wrap counterexample
+shows why coherent non-regressing device samples remain an unproved input
+condition. C++14/no-exceptions/no-RTTI compilation and default tests pass;
+no thread-safety, native SDK, hardware coherency, installation, GPU or FPS
+claim follows. All 172 production inputs, previous transforms, ABI and runtime
+recipes remain unchanged. See [sanitized evidence](validation/build34-r3-fence32-offline-20261121.json).
