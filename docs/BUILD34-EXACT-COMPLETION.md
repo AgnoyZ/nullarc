@@ -5,7 +5,9 @@ have passed. R2a's installed combination remains active; no speedup is
 established. R3 has tested **source-only Mesa bookkeeping, multi-target
 wait/query and conservative CS dependency prerequisites**, not an installed
 exact-wait implementation.
-R4–R6 have not started.
+An additional allocation-free ownership/queue-generation **state prototype**
+has CPU evidence but no production caller or native integration. R4–R6 have
+not started.
 
 ## Why a kernel-only change is unsafe
 
@@ -272,3 +274,102 @@ not run the R3 code on hardware. Keep the accepted installation active;
 native exact-target negotiation, ownership/generation/history reuse, teardown,
 GPU queue dependency support and AMD completion events remain unresolved.
 R3 has no native acceptance, and R4–R6 have not started.
+
+## Ownership and generation state prototype
+
+Two legacy contracts constrain the next native implementation. `doWaitSeq`
+checks an upper bound against the client's newest global sequence, not a set
+of that client's successful submissions. Different clients' sequences can
+interleave below this bound. Separately, `adoptQueue` zeroes the selected
+queue's history and seeds its new fence with `gSeq`. An exact-target operation
+must distinguish the previous queue generation from that newly seeded value.
+
+The [native contract fixture](../tests/test_build34_exact_native_contract.cpp)
+extracts the **unchanged accepted** `queueFence`, `gpuRetired`, `adoptQueue`
+and `doWaitSeq` methods into CPU aperture/lock doubles. A constructed client
+with emitted sequence 20 accepts target 15, for which it has no submission
+record. A separate constructed pending compute-10/completed-GFX-20 case starts
+with safe prefix 9; applying the actual adoption method clears the old compute
+history, seeds its fence to 20 and changes the reported prefix to 20. These
+demonstrate legacy contract boundaries for a proposed exact operation. They
+are **not** GPU executions, live queue-adoption tests or evidence that the
+installed driver improperly readopted a busy queue.
+
+The new [ownership state prototype](../tools/build34_exact_ownership.h) is
+unreferenced by production code and does not modify a driver or ABI. Its
+bounded, allocation-free registry holds at most 64 receipts, independently of
+the native queue's 64 reusable history slots. Each receipt binds a sequence
+to the **actual** selected queue and its nonzero generation. Tickets bind a
+slot to an owner epoch and a monotonically increasing lease serial. Unknown,
+forgotten, foreign-owner and reused tickets cannot identify replacement work.
+Owner epochs and lease serials reserve zero and the LAST sentinel; the small
+counter refuses exhaustion instead of wrapping.
+
+Reservations must precede dispatch admission. Publication validates the
+receipt before a future doorbell; invalid receipt fields leave the reservation
+intact. Only an unpublished reservation can be cancelled. Pending or lost
+receipts cannot be evicted, cancelled or forgotten; a full registry refuses
+new admission. A valid exact completion permits explicit **metadata-only**
+forgetting. This never frees a BO, VMID, page table or any other GPU resource,
+and does not advance the global retirement watermark. Uncertain submissions
+and lost generations still require a separately proved native drain/teardown.
+
+Observations check ownership and lifecycle before interpreting the selected
+queue's fence. A changed generation, fault, unready queue or stopped service
+makes the receipt permanently lost. Closing the registry refuses all later
+operations while retaining its records. A fence beyond the queue's submitted
+sequence, a submission high-water mark below the receipt or a backward value
+after a proved completion is an invalid observation, not a new completion.
+Keeping the receipt separate from ring history allows a same-generation later
+fence to prove completion after history-slot reuse. Missing history alone
+never does so.
+
+These are conditional state rules, not native authentication or concurrency
+guarantees. A future caller must allocate unique owner epochs, mint receipts
+only inside the validated kernel submit path, supply coherent authenticated
+queue observations and serialize every registry operation. The prototype has
+no internal locks, hardware fence reader, capability negotiation, native
+selector, native ownership allocation, queue-generation lifecycle or resource
+drain. Its structs must not be trusted as userspace-supplied submission proof.
+The source intentionally remains outside production `src/` until those
+integration contracts and their actual call sites are separately tested.
+
+Run the [isolated CPU runner](../tools/test_build34_exact_ownership.py):
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-ownership \
+  EXACT_OWNERSHIP_OUT=build/build34-r3-ownership-new-private
+```
+
+On November 20 the strengthened prototype passed **321,712 ASan/UBSan checks**.
+Coverage includes 128 sequence-gap cases (also near UINT64_MAX), 128 fixed-seed
+reference rounds using independent owner maps and queue-prefix membership,
+full pending/lost registries, validation failures, cancellation, client/lease
+aliasing, counter exhaustion, generation/fault/close refusal and stale fence
+observations. Three actual-thread interleavings use an explicit caller mutex:
+a callback resumes after completed-receipt reuse, registry close or generation
+change, then revalidates its copied ticket. They do not test native locking or
+claim that ASan/UBSan detects data races. A separate C++14/no-exceptions/no-RTTI
+header compile passes; it is not a Kernel SDK build.
+
+The runner freezes the accepted build34 source, ABI, topology, new prototype,
+fixtures, runner and license inputs; checks the non-system compiler dependency
+closure; excludes IOKit/Metal/Vulkan runtimes; and verifies 172 tracked
+production files remain unchanged. Default `make -j1 test` also passes, with
+optional firmware fixtures still absent. See
+[sanitized evidence](validation/build34-r3-ownership-offline-20261120.json).
+A fresh independent read-only check again passed exact loaded R1b/R2a/mapped
+plugin, all 358 EFI files, full cache/ACPI/startup-job checks, the same
+WindowServer, desktop progress and four zero errors in each sample. No recovery,
+GPU probe, installation or power request occurred; keep this accepted
+installation active.
+
+Next native work must pair capability negotiation with actual receipt/owner
+allocation, sequence-overflow refusal, actual-queue capture after R1b retry
+selection, queue-generation changes and an authenticated coherent fence read.
+Reserve only receipt metadata before admission; preserve R1b's unlocked queue
+backpressure and never publish GPU work before fallible ownership checks.
+Stop/sleep/client-close and uncertain dispatch must retain resources until a
+real drain, with exact completion still separate from global reclamation.
+These native integration/event/fallback and hardware acceptance requirements
+remain unresolved; this prototype does not admit an R3 installation or R4–R6.
