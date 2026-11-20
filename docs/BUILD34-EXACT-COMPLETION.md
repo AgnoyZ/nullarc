@@ -11,6 +11,9 @@ embedded client/provider identity-binding and owned-ticket wait fallback
 experiments have CPU evidence but no production caller. A further actual-Mesa
 transport experiment retains completion across ACK and serves late queries;
 its adapter is installed only by CPU fixtures, with no native wire binding.
+Staged native receipt wait/ACK now also validate complete tokens through a
+strict structure dispatcher, still with no mode/capability admission or
+paired runtime binding; see [the wire contract](BUILD34-RECEIPT-WIRE.md).
 The proposed observer
 has no admitted hardware fence reader and refuses completion without one.
 R4–R6 have not started.
@@ -1208,3 +1211,36 @@ configuration remain unchanged. No kernel SDK/full RADV build, IOKit open,
 installation, GPU work, reboot, physical FPS or long-term acceptance occurred.
 The accepted R1b/R2a/plugin/startup settings stay active; R3 remains incomplete
 until its native and hardware ledger closes, and R4–R6 remain pending.
+
+## Complete-token native receipt dispatch (November 21)
+
+The earlier internal wait/ACK authenticate the client but resolve a sequence
+to a ticket internally. The proposed Mesa adapter retains a full native
+receipt, so the native request also needs to bind owner, slot, serial,
+sequence, queue and generation rather than silently discarding those fields.
+The new staged transform adds complete-token methods and an exact-size
+64-byte wait/ACK structure route in the actual `externalMethod`, before its
+legacy client lock. It leaves the old internal methods, native ABI, reader
+binding, permanent quarantine and all protected production inputs unchanged.
+
+The [new contract](BUILD34-RECEIPT-WIRE.md) documents experimental selectors
+64/65, fixed C/C++ layout, strict format and synchronous-argument validation,
+unchanged error output, copied-input lifetime, pinned waits, completion-only
+ACK and terminal rechecks before reply. A pinned primary XNU interface review
+is distinct from actual SDK or installed-kernel validation. The hand-authored
+C peer is not a production Mesa adapter or IOKit/MIG execution test.
+
+The handler carries its original monotonic timestamp through parsing and the
+outer handshake lock into the typed wait; it must not restart that budget
+after queueing. Pending-after-expiry and completed-after-queueing cases pass.
+ASan/UBSan and TSan each pass **372,707 additional checks / 320 groups / five
+real-thread scenarios**, with the complete earlier binding/wait/ACK regression
+counts unchanged at **4,983 / 22,094 / 228,946**. Twenty deliberately faulty
+implementations are detected, including stale/mixed identity, unpinned waits,
+route-under-lock, input reread and 32-bit result truncation. See
+[sanitized evidence](validation/build34-r3-receipt-offline-20261121.json).
+Default tests also pass. No capability/mode request, exact-submit wire reply,
+global-prefix or visibility/CPU-fence operation, healthy resource drain, AMD
+event, Kernel SDK/full native compile, installation or GPU acceptance is
+added. This adds source-level strict marshalling; R3's native and hardware
+requirements remain open.

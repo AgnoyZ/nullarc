@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-21",
+  "scope": "R3 source-only receipt operation arguments, not current SDK/kernel validation",
+  "sources": [
+    {
+      "repository": "apple-oss-distributions/xnu",
+      "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+      "path": "iokit/IOKit/IOUserClient.h",
+      "sha256": "01c419c05d471eac01292153afb650dd6abfccd30e0cc3b48ad8ffe6e7793cf9",
+      "license_header": "APSL-2.0",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/IOKit/IOUserClient.h",
+      "review": "read-only interface/control-flow review; no upstream implementation copied"
+    },
+    {
+      "repository": "apple-oss-distributions/xnu",
+      "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+      "path": "iokit/Kernel/IOUserClient.cpp",
+      "sha256": "a09c525b144ecbf834bb2b69f0c78b93358601ee22045340609b30acc8e0a6e7",
+      "license_header": "APSL-2.0",
+      "url": "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOUserClient.cpp",
+      "review": "read-only interface/control-flow review; no upstream implementation copied"
+    }
+  ],
+  "reviewed_interface_version": 2,
+  "conclusions": [
+    "IOExternalMethodArguments declares selector/version, synchronous/asynchronous fields, inband buffers and descriptor/variable-output fields.",
+    "The reviewed synchronous io_connect_method populates selector/version and clears asynchronous/variable-output fields; out-of-line descriptors are separate from inband buffers.",
+    "The CPU fixture extends only its original hand-authored argument double; this is not a native struct-layout or IOKit/MIG execution test."
+  ],
+  "header_review_lines": [
+    122,
+    180
+  ],
+  "implementation_sync_review_lines": [
+    5148,
+    5210
+  ],
+  "implementation_async_review_lines": [
+    5258,
+    5308
+  ],
+  "current_installed_kernel_or_SDK_identity_claimed": false,
+  "upstream_implementation_copied": false,
+  "primary_source_files_published": false,
+  "hardware_or_runtime_action": false
+}
