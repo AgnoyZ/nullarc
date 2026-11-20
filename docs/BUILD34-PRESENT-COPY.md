@@ -77,17 +77,58 @@ race: its short post-READY sleep could expire before the parent ran. That
 success fixture now exits after an explicit fake-probe `G` acknowledgement;
 production readiness/retirement limits and all refusal tests are unchanged.
 
-## Next isolated candidate
+## Isolated packed-stride candidate
 
 `performTransaction` copies every row separately. Its inline SSE path saves
 and restores ten XMM registers for every row. A candidate can combine rows
 only when SSE is enabled, source/destination are aligned, both strides equal
 the copied row length, and that length is a nonzero multiple of 64 bytes.
-Otherwise keep the existing row/tail path. Preserve l10r narrowing, surface
-readiness/mapping ownership, the final store fence and transaction completion.
-First compare actual extracted production code against full-byte reference
-images, including padding/guards and all fallback paths. Native build/cache
-admission and a separate real loaded-image comparison are still required.
+The source candidate implements just this selection and keeps the existing
+row/tail path otherwise. It preserves l10r narrowing, surface readiness and
+mapping ownership, the final store fence and transaction completion. A
+2560-by-1600 packed frame can save/restore XMM state once rather than once
+per row; that reduction is a code-path property, not a measured FPS gain.
+
+[The production-code fixture](../tests/test_build34_present_copy.py) extracts
+the actual copy block and SSE assembly. All 2,086 ASan/UBSan cases pass full
+byte comparison against a scalar reference, including both formats, source
+immutability, entire guard/padding regions, zero/short/full-size frames,
+unequal pitches, alignment, scalar/SSE controls, tails and same-address copy.
+The default suite, 25 complete-cache methods and 60 unchanged VBL CPU
+assertions pass. One VBL test initially could not overwrite an older
+root-owned ignored test binary; running that same CPU fixture with the
+necessary file permissions passed. This was not a production/compiler or
+hardware failure.
+
+[The offline native recipe](../tools/build34_present_copy.py) freezes every
+accepted accelerator source and licence input at `439f8a5`, requires the
+exact complete old/new copy-source hashes, and uses audited MacKernelSDK
+`3f750085caa17ec3a7880f11c11bf4f48cd6a164`. The unchanged baseline build
+reproduces the installed executable exactly. The signed x86_64 candidate
+passes architecture/signature checks with the same imports. Source, recipe
+and frozen SDK readback pass. No kernel, plugin or native ABI change is made.
+
+A fresh finite offline-cache scope links through the normal approved bundle
+paths, with the same explicit-only bundle set and no authentication bypass.
+A separately bounded guard protects the temporary executable staging. The
+accepted disk executable was restored and its signature checked before the
+guard ended; the installed auxiliary cache and startup jobs never changed.
+The candidate cache's complete 416/29 metadata comparison admits only the
+PhxAccel image change. All matching policy, paths, dependencies and
+boot/system-collection links remain exact. Separate independent readback
+reparsed this metadata, checked candidate/source signatures and the full
+retained runtime/EFI/cache/AML/jobs, and observed desktop progress, zero
+checked errors and no new report. No cache worker, guard, panel, trace,
+native probe or power process remains. See
+[offline evidence](validation/build34-r2-packed-copy-offline-20261120.json).
+
+**This candidate is not installed or loaded.** A fresh R2a-compatible
+controller must retain the current accepted R1b/VBL/AML/plugin as exact
+recovery and preserve the 45/150/300-second startup bounds, daily PR28
+250 ms/WindowServer exclusion and monitor-off policy. Do not use an old
+controller that would roll the kernel, VBL or AML back further. A separate
+new-boot loaded-image check and controlled display comparison remain required
+before R2a hardware acceptance or R3.
 
 This does not implement AMD asynchronous presentation or a DCN flip. Moving
 the wait/copy to a worker still requires bounded ownership, cancellation,

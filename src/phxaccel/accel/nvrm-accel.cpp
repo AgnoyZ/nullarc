@@ -1208,7 +1208,12 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
     // DRAM under it, in stripes (2026-10-20). Through the BAR (uncached) they behave as plain stores.
     const bool wide = ((((uintptr_t)src | (uintptr_t)d) & 7) == 0) && !(spr & 1) && !(dpr & 1);
     const bool sse = gIopSse && ((((uintptr_t)src | (uintptr_t)d) & 15) == 0) && !(spr & 3) && !(dpr & 3);
-    for (unsigned y = 0; y < h; y++) {
+    // Equal packed strides are one continuous copy. Save/restore XMM state
+    // once for that frame, retaining the row path for padding, tails or
+    // unequal pitches. No source ownership or completion boundary changes.
+    if (h && sse && words >= 16 && !(words & 15u) && words == spr && words == dpr) {
+        nvIopRowSSE((const void *)src, (void *)(uintptr_t)d, (unsigned long)h * words * 4, l10r);
+    } else for (unsigned y = 0; y < h; y++) {
         const volatile unsigned int *sp = src + (unsigned long)y * spr;
         volatile unsigned int *dp = d + (unsigned long)y * dpr;
         unsigned x = 0;
