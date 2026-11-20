@@ -52,6 +52,36 @@ fixture pass. No power request or new GPU workload occurred at this checkpoint;
 one ordinary restart, new-boot admission and the actual pressure proof remain.
 See [independent installation evidence](validation/build34-r1b-retained-installation-20261120.json).
 
+### New-boot admission and pre-GPU trace refusal
+
+The sole ordinary request returned zero and produced the November 20
+19:04:28 Asia/Shanghai boot. The finite watcher accepted same-boot startup;
+independent readback passed exact loaded R1b/VBL/optimized AML/mapped accepted
+plugin, the complete 358-file EFI, 416/29 cache metadata, recovery/jobs and
+fresh startup/desktop/supervision-ended receipts. The same WindowServer,
+VBL/copy progress, four zero error counters and no new matching report were
+observed. Both finite job files are retired; no automatic recovery occurred.
+
+The observer's trace readiness gate failed before sending `G` to the probe.
+The exact frozen controller branch closed stdin without releasing it; the
+probe checks that byte before opening IOKit. No pressure work was submitted,
+no probe is retained and R1b pressure correctness remains unverified. The
+observer's earlier `GPU_probe_started` field records its conservative intent,
+not a proved GPU submission. Do not replay that observer or its restart.
+
+A separate finite DTrace run with no GPU client became ready in about 0.57 s
+and exited cleanly after its 12-second window. It does not reproduce or explain
+the earlier four-second refusal. The revised controller waits for actual READY
+with a finite 20-second arming cap; it leaves GPU work and the 12-second trace
+window unchanged. Durable process/readiness/release/lifecycle records separate
+EOF refusal from possible dispatch, including write/flush uncertainty. It
+retains a possibly active probe after tracing or retirement failure and never
+terminates it. Seven CPU child-process tests cover delayed readiness, timeout,
+diagnostics, early exit, ready-then-exit and both post-release uncertainty paths.
+The next real test uses a fresh pressure-only scope on the current exact boot,
+without another driver installation or power request. See
+[boot and trace-refusal evidence](validation/build34-r1b-retained-boot-trace-refusal-20261120.json).
+
 ## Earlier source and first trial
 
 R1b starts from the running, hardware-checked R1a kernel at

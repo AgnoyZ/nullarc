@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 """Capture only the authorized native probe's exact queue-backpressure sleep."""
+import json
+import os
 import subprocess
 import time
 
@@ -10,6 +12,18 @@ CALL_RETURN_OFFSET = 0x27BF
 RETURN_BYTES = (0x45, 0x31, 0xff, 0x49, 0x89, 0xdd, 0xe9, 0x76, 0xfe, 0xff, 0xff)
 CALL_BYTES = (0xbf, 1, 0, 0, 0, 0xe8)
 TRACE_SECONDS = 12
+ARM_SECONDS = 20
+PROBE_RETIRE_SECONDS = 5
+TRACE_RETIRE_SECONDS = TRACE_SECONDS + 3
+
+
+def record(root, name, value):
+    with (root / name).open('x') as handle:
+        os.fchmod(handle.fileno(), 0o600)
+        json.dump(value, handle)
+        handle.write('\n')
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def trace_program(pid):
@@ -52,20 +66,31 @@ def capture(root):
     trace_out, trace_err = root / 'pressure-trace.stdout', root / 'pressure-trace.stderr'
     q = None
     released = False
+    ready = False
     with trace_out.open('xb') as out, trace_err.open('xb') as err:
         try:
             q = subprocess.Popen(['/usr/sbin/dtrace', '-s', str(trace_source)], stdin=subprocess.DEVNULL,
                                  stdout=out, stderr=err, start_new_session=True)
+            record(root, 'pressure-processes-private.json', {'probe_pid': p.pid, 'trace_pid': q.pid})
             start = time.monotonic()
             while trace_out.read_bytes().splitlines()[:1] != [b'READY']:
-                if q.poll() is not None or time.monotonic() - start >= 4 or trace_err.stat().st_size:
+                if q.poll() is not None or time.monotonic() - start >= ARM_SECONDS or trace_err.stat().st_size:
                     raise RuntimeError('trace did not arm; no GPU requests made')
                 time.sleep(0.05)
-            p.stdin.write(b'G'); p.stdin.flush(); released = True
+            if q.poll() is not None or trace_err.stat().st_size:
+                raise RuntimeError('trace retired or diagnosed before release; no GPU requests made')
+            ready = True
+            record(root, 'pressure-trace-ready-private.json', {'elapsed_seconds': time.monotonic() - start})
+            record(root, 'pressure-G-release.intent', {'probe_pid': p.pid, 'automatic_retry': False})
+            # Once dispatch may have happened, never treat it as a pre-GPU
+            # refusal, even if write/flush raises or tracing exits unexpectedly.
+            released = True
+            p.stdin.write(b'G'); p.stdin.flush()
+            record(root, 'pressure-G-released-private.json', {'probe_pid': p.pid})
             p.stdin.close()
-            qcode = q.wait(timeout=TRACE_SECONDS + 3)
+            qcode = q.wait(timeout=TRACE_RETIRE_SECONDS)
             try:
-                code = p.wait(timeout=5)
+                code = p.wait(timeout=PROBE_RETIRE_SECONDS)
             except subprocess.TimeoutExpired:
                 (root / 'pressure-probe-held-private.txt').write_text(f'{p.pid}\n')
                 raise RuntimeError('pressure probe did not retire; keep GPU ownership') from None
@@ -81,3 +106,9 @@ def capture(root):
                 except subprocess.TimeoutExpired:
                     q.kill()
                     q.wait(timeout=2)
+            if released and p.poll() is None and not (root / 'pressure-probe-held-private.txt').exists():
+                (root / 'pressure-probe-held-private.txt').write_text(f'{p.pid}\n')
+            record(root, 'pressure-trace-lifecycle-private.json', {
+                'trace_ready': ready, 'G_dispatch_may_have_occurred': released,
+                'probe_exit': p.poll(), 'trace_exit': q.poll() if q is not None else None,
+                'probe_terminated_by_controller': False})
