@@ -1,5 +1,34 @@
 # Build34 R1b ring and submission-history wait
 
+## Renewed trial on the retained VBL/AML baseline
+
+The owner's November 20 continuation resumes R1–R6 sequentially. R1b remains
+unaccepted; R2 starts only after R1b's real pressure evidence passes. The
+baseline is now the independently checked 18:19:02 R1a/VBL/optimized-AML boot,
+with the accepted plugin, daily PR28 250 ms/WindowServer exclusion and disabled
+resident monitors. The older failed R1b scope below must not be replayed.
+
+The [new kernel-only adapter](../tools/build34_r1b_resume_host.py) derives only
+the exact reviewed R1b executable and image identity. It preserves the full
+358-file EFI manifest except that executable, every VBL/cache/configuration
+file, optimized loaded AML and accepted plugin. Its separate source-validation
+hook leaves the original R1a/VBL/AML hosts rejecting R1b. Recovery restores
+only R1a's executable and the current combined startup jobs; it cannot silently
+roll VBL/AML back to an older baseline. It retains 45/150/300-second startup
+gates, at most one persisted first-trial recovery restart and disk-only daily
+failure recovery. Startup acceptance closes power recovery before the separate
+one-use pressure probe. A retained probe blocks worker termination/recovery.
+
+Eleven CPU fixture methods cover the exact manifest/source/image delta, old
+host refusal, immutable derivation, retained-AML admission, unknown-input
+refusal before writes, and kernel-only recovery. The existing 19 AML, 18 VBL,
+10 original-host and 15 journal methods also pass. The 11 extracted gpuSubmit
+cases pass ASan/UBSan and the trace parser's fixture passes. These are CPU
+checks, not a new boot or GPU pressure result. Existing native artifacts are
+reused only after exact source/recipe/signature/hash verification.
+
+## Earlier source and first trial
+
 R1b starts from the running, hardware-checked R1a kernel at
 `568e80b205c10b00cba4f21c6d324d239d725bfd`. This candidate handles exhaustion of
 ring space or submission-history slots in `PhxBringup::gpuSubmit`. The default

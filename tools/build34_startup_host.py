@@ -79,7 +79,7 @@ class Host:
         secure(self.scope / "contract-private.json")
         value = json.loads((self.scope / "contract-private.json").read_text())
         assert value["scope_kind"] == self.SCOPE_KIND
-        assert value["kernel_source_checkpoint"] == R1A_SOURCE
+        self.validate_kernel_contract(value)
         assert value["startup_limits_seconds"] == [45, 150, 300]
         assert value["automatic_recovery_reboots"] == 1
         assert value["owner_authorized_startup_auto_recovery"] is True
@@ -92,6 +92,9 @@ class Host:
             secure(self.scope / path)
             assert sha(self.scope / path) == digest
         return value
+
+    def validate_kernel_contract(self, value):
+        assert value["kernel_source_checkpoint"] == R1A_SOURCE
 
     def validate_efi_contract(self, value):
         assert value["EFI_after_private"] == value["EFI_accepted_private"]
