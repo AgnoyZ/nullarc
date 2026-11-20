@@ -551,3 +551,81 @@ Full resource/service lifetime coordination remains mandatory before enabling
 the exact branch. There is no new actual-thread/TSan, GPU, FPS or long-term
 acceptance. Keep the accepted R1b/R2a/plugin installation active; R3 remains
 source-only and R4–R6 remain pending.
+
+## Selected callback admission and resource quarantine experiment
+
+The [next isolated transform](../tools/build34_exact_callbacks.py) adds an
+[embedded atomic admission gate](../tools/build34_exact_callbacks.h) to seven
+actual entrypoints: submit, adoption, power, global-retirement observation,
+wave recovery, watchdog inspection and its timer callback. The gate uses a
+single lock-free 32-bit word, refuses count overflow and cannot reopen. A
+noncopyable stack lease covers the whole selected method, including unlocked
+queue-space sleeps and accesses after saving a lock or aperture pointer.
+Closing admission does not require the GPU lock that stop might otherwise
+free. The next submit retry checks closure before selecting a queue or
+dispatching; adoption, power and recovery also recheck after taking that lock.
+
+This experiment **replaces the previous staged stop body**, rather than
+certifying its old releases. Stop atomically closes admission and takes one
+service self-reference. A busy stop returns without waiting, taking `gpuLock`
+or modifying metadata protected by that lock; this also supports reentry from
+a callback already holding the lock. If already drained, stop performs the
+earlier terminal metadata invalidation under the still-retained lock. Either
+way, **all resources and the self-reference remain deliberately retained**.
+There is no last-exit release, deferred cleanup, repeated stop retry, PM/base
+stop call or GPU-drain shortcut. A busy stop does not later finish the
+metadata invalidation; the closed gate itself stays authoritative. Any future
+exact observer must check service admission/lifetime as well as queue epochs.
+
+This deliberate leak/quarantine makes the staged stop unsuitable for
+deployment. CPU callback drain cannot authorize release of pending or lost GPU
+work, and no authenticated GPU drain or safe unload/teardown has been added.
+The enclosing service must already be alive when any callback first touches
+its embedded gate; IOKit callback ownership and all other entrypoints still
+need a native lifetime audit. Client close/free and VMID release remain
+byte-identical and are **not accepted as safe**. In particular, their old
+bounded waits and BO/page-table release behavior are not repaired here.
+
+The [new CPU runner](../tools/test_build34_exact_callbacks.py) freezes the
+accepted build34 source and earlier transforms, extracts ten actual methods
+into a [two-thread fixture](../tests/test_build34_exact_callbacks.cpp), and
+excludes device runtimes from linkage. The earlier experiments are unchanged.
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-callbacks \
+  EXACT_CALLBACKS_OUT=build/build34-r3-callbacks-new-private
+```
+
+On November 20 the strengthened suite passed **92 scenario groups, including
+76 real-thread scenarios**, under both **ASan/UBSan and TSan**. Its assertion
+count can vary with the scheduling of the close/admission race. It pauses the
+actual callbacks before entry, after saving a lock/aperture pointer, while
+holding the GPU lock and after receipt publication at the first packet write.
+It also covers closure during an unlocked submit sleep even when space becomes
+available, reentrant/concurrent stops, 64 close-versus-power races, early
+returns, count-capacity refusal and permanently closed admission. A submit
+past publication may finish after stop; its receipt and resources stay
+retained, and loss cannot become successful exact completion.
+
+Eleven deliberately defective staged versions are detected: removing any of
+the seven entry leases, ignoring closure on a submit retry, omitting the
+service pin, releasing an aperture during a busy stop, and treating CPU drain
+as permission to release GPU resources. A timer closing after its last
+closure check may still enqueue **one** tick; that tick refuses admission and
+cannot rearm itself. The handle remains retained throughout. No claim of
+atomic timer cancellation is made. The header also compiles as C++14 without
+exceptions or RTTI; its object imports no allocated lock or atomic helper.
+This is not a Kernel SDK/KPI build or an IOKit scheduling/lifetime proof.
+
+The initial narrower 77-group/75-thread-scenario passing run is retained
+privately. The existing lifecycle, submit, ownership and default regressions
+are run separately; see the
+[sanitized evidence](validation/build34-r3-callbacks-offline-20261120.json)
+for their final results. All **172 tracked production inputs**, native ABI,
+earlier experiments and runtime build/install recipes remain unchanged.
+No kernel image, installation, GPU workload, runtime reconfiguration or power
+action is authorized or performed by these tests. The accepted R1b/R2a/plugin
+installation is retained. Owner/capability negotiation, coherent native fence
+observation, receipt acknowledgement, full client/service lifetime and GPU
+drain, broader watchdog selection/adoption races and AMD completion events
+remain unresolved; R3 hardware/FPS/long-term acceptance and R4–R6 are pending.
