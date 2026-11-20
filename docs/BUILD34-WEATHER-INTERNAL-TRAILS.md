@@ -1,5 +1,35 @@
 # Build34 Weather internal trails: render-pass candidate and local trial
 
+## November 20 rollback and hold
+
+The owner reported repeated restarts after the authorized baseline boot and
+requested rollback on November 20, 2026. The boot trial is not accepted.
+Readback found existing recovery markers in six successive installed scopes,
+and disk plugin/jobs had already fallen back past the Weather trial's exact
+before state to the older owner baseline. The first inspected Weather failure
+is a framebuffer startup-admission assertion; the specific panic/restart
+cause is not proved, and the markers are not a measured reboot count.
+
+Under the rollback request, both exact older-owner startup jobs were archived
+with verified recovery copies and removed from the launch directory. Both
+services were already unloaded. The new baseline observer job was absent;
+final readback found no startup, guardian, observer, shutdown or reboot
+process. Seven older-owner policy files match with no mismatches; only the
+two deliberately archived jobs are missing. The live plugin matches that
+older fallback. The loaded PhxBringup matches the pre-R1a control image;
+R1a was never installed or loaded. PhxAccel is not listed loaded and its
+debug counters are unavailable, so no accelerated-desktop success is claimed.
+
+Containment did not change driver images, kernel/cache, EFI/ACPI, security or
+PR28 configuration, launch a GPU test, restart WindowServer or request power.
+The boot stayed unchanged through the final checks on macOS 26.7.2 build
+25G332. This confirms containment readback, not a successful fresh recovery
+boot or proof that every restart cause is fixed. Keep automatic startup and
+desktop takeover disabled, preserve all failed evidence and backups, and do
+not reinstall this candidate, resume optimizations or replay consumed scopes
+without new explicit owner authorization. See the
+[sanitized rollback record](validation/build34-weather-boot-rollback-20261120.json).
+
 ## Symptom and evidence boundary
 
 On November 19, 2026 the owner clarified that clouds and text accumulate

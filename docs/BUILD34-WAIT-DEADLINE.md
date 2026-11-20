@@ -1,5 +1,24 @@
 # Build34 R1a: real elapsed-time accounting for native waits
 
+## November 20 hold after the failed prerequisite boot
+
+The owner reported repeated restarts and requested rollback. The plugin
+baseline boot did not pass; installed recovery had already cascaded to the
+older owner profile. Both exact fallback startup jobs are now archived and
+removed, the baseline observer job is absent, and final readback found no
+active startup/guardian/observer/power process. The loaded PhxBringup is the
+pre-R1a control; the R1a kernel was never installed or loaded. PhxAccel is not
+listed loaded. No new GPU work, WindowServer restart or power request was
+made during containment.
+
+R1a hardware validation and all later optimizations are on hold. Do not use
+earlier restart/install permissions or the offline test results to resume
+automatic startup or desktop takeover. A new boot has not been tested after
+containment and no complete restart-cause repair is claimed. Details are in
+[the Weather rollback](BUILD34-WEATHER-INTERNAL-TRAILS.md#november-20-rollback-and-hold)
+and its [sanitized record](validation/build34-weather-boot-rollback-20261120.json).
+The following sections retain the earlier source/preparation history.
+
 ## State and scope
 
 On November 19, 2026 the owner requested executing and testing the
