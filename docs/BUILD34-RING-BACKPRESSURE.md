@@ -62,3 +62,31 @@ wait leaves R1b unverified. Keep the 45/150/300-second startup limits, daily
 PR28 configuration and existing monitor policy. On failure restore the exact
 R1a disk and job state under the new test scope and report the loaded state
 separately. R2–R6 follow successful hardware validation of R1b.
+
+## Authorized pressure trial preparation
+
+The owner authorized one isolated installation, ordinary restart and bounded
+pressure test on November 20. The signed native fixture and evidence parser
+passed host checks. The existing R1a executable and both startup jobs were
+backed up in a separate sealed scope; an inactive atomic rename and rollback
+on the target EFI preserved its complete manifest. No Weather work or change
+to PhxAccel, the plugin, kernel collections or ACPI is part of this trial.
+
+The pressure fixture uses separate compute and GFX clients. Up to four bursts
+submit four 64-IB compute frames per burst. Each outer frame consumes 272
+dwords, so a 1024-dword compute ring with the existing 16-dword reserve can
+hold only three of them until a fence retires work. The fixture submits a
+bounded number of GFX NOP frames concurrently, confirming their exact
+queue's fence independently of the global retirement watermark. Every burst
+checks the entire 16 KiB arena of both clients, including command and guard
+bytes. The fixture drains submitted work and closes both clients on success.
+If retirement is uncertain, recovery retains their allocations.
+
+The finite trace matches the signed candidate's sleep callsite and the
+probe process, and pairs entry with the return from the kernel delay. It
+must show a GFX submission **and** its fence completion inside the same
+compute queue-space sleep. Elapsed time in `SUBMIT` alone is not evidence.
+The DTrace script compiled and completed an empty dry run on the current OS;
+this verifies the trace setup, not queue pressure. The proof is limited to
+this bounded run even if it passes. It does not measure FPS or establish
+long-term stability.
