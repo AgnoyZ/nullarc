@@ -153,6 +153,12 @@ test-build34-exact-observer:
 	@test -n "$(EXACT_OBSERVER_OUT)" || (echo "Set EXACT_OBSERVER_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_observer.py --out "$(EXACT_OBSERVER_OUT)"
 
+# Embedded registry/provider binding; CPU-only, no native request or kext build.
+.PHONY: test-build34-exact-binding
+test-build34-exact-binding:
+	@test -n "$(EXACT_BINDING_OUT)" || (echo "Set EXACT_BINDING_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_binding.py --out "$(EXACT_BINDING_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \

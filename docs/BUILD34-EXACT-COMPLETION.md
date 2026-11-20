@@ -6,7 +6,8 @@ established. R3 has tested **source-only Mesa bookkeeping, multi-target
 wait/query and conservative CS dependency prerequisites**, not an installed
 exact-wait implementation.
 An additional allocation-free ownership/queue-generation **state prototype**
-and staged submit/lifecycle, callback/client quarantine and target-observer
+and staged submit/lifecycle, callback/client quarantine, target-observer
+and embedded client/provider identity-binding
 experiments have CPU evidence but no production caller. The proposed observer
 has no admitted hardware fence reader and refuses completion without one.
 R4–R6 have not started.
@@ -820,3 +821,103 @@ reboot, physical FPS or long-term acceptance occurred. Keep the accepted
 R1b/R2a/plugin installation and existing startup/recovery settings active.
 Native reader/owner/capability/acknowledgement, safe reclamation, completion
 events and paired hardware acceptance remain prerequisites; R4–R6 are pending.
+
+## Embedded Registry and module-lifetime owner binding
+
+The [next separate source transform](../tools/build34_exact_binding.py) replaces
+the preceding experiment's externally supplied Registry pointer with storage
+embedded in the client. It changes only newly generated private source/header
+copies. Prior transforms, the original ownership header and production files
+remain unchanged. `exactRequested` defaults false with no native assignment,
+selector or negotiation; no real client can request this experiment.
+
+After the actual base `start` succeeds, the proposed service helper admits the
+embedded Registry under its callback lease and GPU lock. It checks the actual
+client type, storage address, provider, requested/start-attempt state, existing
+binding/pin and terminal gates. Closure is checked again after acquiring the
+GPU lock. It binds identity and retains client/provider before publishing the
+client's exact pointer. Failed exact start cannot retry or silently enter a
+legacy close path. Successful binding cannot repeat, including after receipt
+forget, close, queue adoption or all metadata becoming empty.
+
+One module-lifetime `OwnerEpochs` counter is shared across service instances;
+it is not a member reset by service start/stop or readoption. Its constant
+initializer requires no dynamic global constructor. Lock-free 64-bit CAS
+allocates nonzero IDs, reserves UINT64_MAX, refuses wrap and limits each call
+to **32 attempts**. Contention can conservatively refuse admission without
+changing the output; refusal is not a GPU fault or evidence of ID exhaustion.
+This is a bounded attempt count, not a scheduler latency guarantee.
+
+The client dispatcher, descriptor export, submit and query validate the exact
+pointer against their embedded storage and immutable provider/client labels.
+Service submit and observation independently check those labels, and the real
+staged submit passes its client identity. The owning ticket still validates
+owner/serial/slot within that Registry. Invalid query identity refuses before
+the client lock; invalid submit identity refuses before IB validation or GPU
+admission. Internal pointer labels are not a userspace credential or negotiated
+capability. There is no claim of protection against arbitrary kernel memory
+corruption or an untrusted native selector, which does not exist here.
+
+The [CPU runner](../tools/test_build34_exact_binding.py) extracts **12 actual or
+proposed staged methods** into a [new fixture](../tests/test_build34_exact_binding.cpp).
+Its independent allocator test forces controlled CAS failures in the actual
+generated header. The unchanged earlier ownership fixture is also compiled
+against that generated header to check its full state model. Frozen dependency
+and linkage checks exclude device runtimes. Framework casts, reference counts,
+base start, locks and aperture/reader bytes are explicit CPU doubles, not
+IOKit object destruction or device-coherency tests. The header separately
+compiles as C++14 without exceptions or RTTI; native casts are not covered by
+that header-only check.
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-binding \
+  EXACT_BINDING_OUT=build/build34-r3-binding-new-private
+```
+
+On November 21 the suite passed **4,983 checks in 22 groups, including five
+real-thread scenarios**, under both **ASan/UBSan and TSan**. Eight threads
+exercise the real owner CAS; distinct clients bind concurrently across two
+providers. Controlled threads also close client/service admission while start
+is waiting for the GPU lock, and close a client during target observation.
+Coverage includes cross-provider/client refusal, external/prebound storage,
+failed/repeated starts, legacy admission, identity-preserving receipt forget,
+slot reuse, readoption, stop and conservative global retirement. A separate
+**73-check** controlled-CAS fixture proves the 32-attempt refusal/final-attempt
+success and concurrent-exhaustion boundaries in that algorithm, without
+claiming real scheduler bounds. The unchanged Registry state suite passes
+**321,712 checks and 128 independent model rounds** against the new header.
+
+All **27 deliberately defective versions** are detected: 25 source/header
+identity, lifetime, pin, closure, locking, owner-exhaustion and callsite changes,
+plus two retry/output-policy defects. Preserve the initial CPU fixture compile
+failures (missing `mmio` double, uninitialized identity labels and an unused
+delay stub), the first mutation-coverage gap and the discarded mutant's own
+unused-variable compile error. The coverage gap occurred because the service
+still refused a request after its client check was removed; the strengthened
+fixture checks refusal before IB validation/query locking. These are CPU
+fixture/coverage corrections, not kernel-build or installed-driver failures.
+Expected assertion failures and all earlier logs remain private. See the
+[sanitized evidence](validation/build34-r3-binding-offline-20261121.json).
+
+Separate unchanged target-observer (**41,806 checks/162 groups/ten threaded
+scenarios**) and client-retention (**2,578 checks/17 groups/eight threaded
+scenarios**) regressions pass under ASan/UBSan and TSan. Default `make -j1 test`
+also passes; optional firmware fixtures remain absent and are skipped by its
+existing rule. All **172 tracked production inputs**, ABI, previous R3
+experiments and runtime recipes remain unchanged. No live runtime readback,
+installation, GPU work, reboot, physical FPS or long-term trial occurred.
+
+The native factory must still serialize one client's start and publish the
+client only after it succeeds. The CPU concurrent tests use distinct clients;
+they do not prove arbitrary simultaneous `start` calls on one native object.
+Module unload/reload, real OSObject/KPI behavior and a complete entrypoint/VM
+audit remain unproved. The existing permanent client/service quarantine pins
+the embedded Registry's containing object in this source protocol; it is not
+a native unload proof, GPU drain or usable resource-lifetime solution.
+
+No admitted hardware reader, exact selector/capability negotiation, blocking
+wait, receipt acknowledgement, BO/VMID reclamation, completion interrupt/event
+or installation recipe is added. The old fence reader, safe global retirement,
+WAITSEQ, VMID cleanup and permanent quarantine remain unchanged. This experiment
+**must not be built or deployed**. Keep accepted R1b/R2a/plugin/startup active;
+R3 GPU/FPS/long-term acceptance and R4–R6 remain pending.
