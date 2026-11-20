@@ -4,12 +4,15 @@ The owner's renewed November 20 step-by-step request excludes Weather and
 resumes with [R1a elapsed-time accounting](BUILD34-WAIT-DEADLINE.md) on the
 recovered owner-accepted build34 runtime. A fresh independent readback of the
 12:20:11 Asia/Shanghai boot passes. Source/CPU/native-artifact checks pass and
-new exact private kernel/job backups are prepared, but R1a is not installed
-or hardware-accepted. The former Weather prerequisite was withdrawn and must
-not be replayed. The prior reboot grant is consumed; candidate activation
-requires a fresh explicit installation/test-restart grant. R1b and R2–R6
-remain pending until R1a hardware acceptance. This supersedes the execution
-status only; the following November 19 comparison remains historical evidence.
+the owner has explicitly authorized R1a installation, one ordinary restart
+and bounded GPU validation. A fresh exact controller has installed only the
+R1a kernel executable and staged new startup/finite-observer jobs. The accepted
+kernel is still loaded pending that restart; no R1a GPU acceptance is claimed.
+The former Weather prerequisite was withdrawn and must not be replayed.
+R1b and R2–R6 remain pending until R1a hardware acceptance. See the
+[installation record](validation/build34-wait-installation-20261120.json).
+This supersedes the execution status only; the following November 19 comparison
+remains historical evidence.
 
 ## Scope and conclusion
 

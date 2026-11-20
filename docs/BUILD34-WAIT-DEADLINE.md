@@ -1,6 +1,53 @@
 # Build34 R1a: real elapsed-time accounting for native waits
 
-## November 20 resumption on the recovered accepted baseline
+## November 20 authorized isolated installation
+
+The owner subsequently explicitly authorized R1a installation, one ordinary
+restart and bounded GPU validation. This supersedes the authorization-pending
+status below. A fresh exact controller installs only the frozen candidate
+PhxBringup executable from source `568e80b205c10b00cba4f21c6d324d239d725bfd`;
+the accepted runtime source remains `1d4968fbc2ce988c77bdd85b2ec36f435b57f496`
+for the unchanged accelerator, plugin and other baseline components.
+
+Installation readback verifies all 357 EFI files with exactly one executable
+changed. The accepted kernel remains loaded until the authorized restart.
+The entire 416-record/29-codeless cache, PhxAccel, plugin, loaded original ACPI,
+configuration, driver flags and security settings are preserved. The three
+external Microsoft records remain individually pinned and unchanged.
+Both startup jobs and a fresh finite observer are staged without current-boot
+bootstrap. Exact accepted kernel/job recovery is retained.
+
+The new controller passes 31 CPU test methods, including receipt freshness,
+single-use probe enforcement, atomic file transitions/refusals and preserving
+a timed-out GPU client. An inactive FAT-file candidate/accepted round trip
+passed and restored the complete active EFI manifest. The existing MIT native
+fixture was frozen, compiled and signed without execution; `--run-single`
+allows exactly two dispatches with an intervening rewrite of the same IB and
+full 16 KiB arena verification. The new independent evidence parser passes
+12 CPU methods; the nine artifact-gate methods and default tests also pass.
+CPU tests and native compilation are not hardware acceptance.
+
+Preserve 45/150/300-second startup gates and the finite 360/420-second observer
+bounds. On successful new-boot admission the observer verifies exact loaded
+kernel/accelerator/mapped plugin, cache/EFI/ACPI/recovery and fresh receipts
+before running that one new probe. Failure restores only this scope's exact
+kernel/jobs without automatic power actions or old recovery calls. An
+uncertain probe remains alive with its client/BOs; do not kill or retry it.
+After success the observer removes its own job and exits. Daily PR28 remains
+250 ms with WindowServer excluded; resident monitoring remains disabled.
+
+**At this installation checkpoint no reboot request or new GPU submission
+has occurred. R1a is not loaded or hardware-accepted.** Independent installed
+readback and repository synchronization precede the single ordinary restart.
+After boot require separate independent readback and native-output reparse.
+Record whether positive-budget/pending waits actually occurred: immediate
+completion alone does not cover the pending-wait path. No hard wall-time
+return guarantee, FPS gain or long-term acceptance is claimed. R1b and R2–R6
+remain unstarted. Weather and build41/build42 remain excluded.
+
+See the [sanitized installation record](validation/build34-wait-installation-20261120.json).
+
+## Historical November 20 resumption on the recovered accepted baseline
 
 After the isolated [desktop re-enablement](BUILD34-REENABLE-20261120.md)
 passed, the owner requested resuming R1–R6 in order and explicitly excluding
