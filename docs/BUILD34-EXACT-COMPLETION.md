@@ -21,6 +21,11 @@ CPU user fences, preserves actual queue fallback and leaves uncertain work
 retained. It adds no native capability/session or Mesa wire admission.
 The proposed observer
 has no admitted hardware fence reader and refuses completion without one.
+A subsequent [staged dword-window integration](BUILD34-WINDOW-CALLSITES.md)
+connects the previously separate primitive to adoption, invalidation, shared
+legacy/exact submission, ring-space pruning and exact observation. Its raw
+reader stays null. CPU callsite checks do not establish mapping coherency,
+old-writer drain or the unchanged global-retirement/VM consumers' safety.
 R4–R6 have not started.
 
 ## Why a kernel-only change is unsafe

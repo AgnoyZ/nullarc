@@ -4,6 +4,10 @@ November 21, 2026: the exact observer's device reader is still **unbound**.
 The original build34 driver, legacy `queueFence()` and installed runtime have
 not changed. This document records primary-source review and one tested
 arithmetic primitive; neither admits a hardware reader or kernel candidate.
+A later [staged callsite integration](BUILD34-WINDOW-CALLSITES.md) connects
+that unchanged primitive to actual adoption, all `gpuSubmit` callers,
+ring-space history and exact observation. Its raw-dword reader is also null;
+it does not establish the hardware/coherency or drain requirements below.
 
 ## What the reviewed sources establish
 

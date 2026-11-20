@@ -22,7 +22,7 @@ independent remote SHA check.
 | Mesa exact bookkeeping, multi-target fairness, conservative CS ordering/shape | Five isolated reviewed patches with actual-source CPU tests, including single-native-batch preflight and a bounded completion/ACK cache | Carry into a paired negotiated backend, freeze dependencies, prove snapshot/visibility and caller backpressure/error behavior; an aggregate exact CS protocol is not implemented |
 | Native target ownership and queue generation | Staged submit, invalidation, observer and embedded binding pass CPU/TSan tests | Actual SDK/KPI integration plus authenticated native admission and queue lifecycle evidence |
 | Exact wait fallback | Original wait passes CPU/TSan; the later wait-pinned version re-runs all 28 groups/six threaded cases (22,094 checks) | Carry into the native negotiated path; real KPI/lifecycle and GPU timeout/wakeup evidence remain required |
-| Trusted device fence observation | Primary-source packet/mapping review and 189,198-check low-dword window primitive; no reader admitted | Integrate the bounded window with all shared-queue submissions, establish actual mapping/device coherency and ownership/drain, then obtain native/GPU evidence; see `BUILD34-FENCE-READER.md` |
+| Trusted device fence observation | Primary-source review, 189,198-check window primitive and 43,251-check staged adoption/shared-submit/ring-space/observer integration; raw-dword reader is null | Establish actual mapping/device coherency and queue ownership/drain, audit global-retirement/watchdog/VM consumers, prove wide-gap recovery and obtain native/GPU evidence; see `BUILD34-FENCE-READER.md` |
 | Native protocol and receipt lifetime | Internal wait-pinned ACK, actual-Mesa bounded completion cache, and staged complete-token structure submit/wait/ACK dispatch pass CPU sanitizers; experimental selectors 64/65/66 have no production mode/capability or Mesa wire binding | Complete native capability/session and production exact-submit admission, independent genuine global-prefix/visibility and CPU-fence protocol, paired binding and caller backpressure/error integration; caller-quiescent transport destroy is still required |
 | Resource and object teardown | Deliberate permanent retention only | Healthy completion can safely reclaim after CPU callbacks and actual GPU work drain; uncertain/lost work remains quarantined, never released by timeout alone |
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
@@ -41,6 +41,10 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
 2. Establish the reader contract from primary hardware/kernel sources and
    the real build34 mapping/packet path. If a required property is unproved,
    continue refusing native exact success rather than fabricating completion.
+   The [staged window integration](BUILD34-WINDOW-CALLSITES.md) now enforces
+   global-distance bounds for legacy and exact shared submissions and uses
+   decoded dwords for ring-space pruning. It binds no device reader and does
+   not validate old global-retirement/VM/watchdog or timeout-release paths.
 3. Implement the strict native protocol/acknowledgement and paired Mesa path.
    Receipt and provider identity must survive wait/ack/close and slot reuse.
    The current raw WaitCS, split-plan and late-attach consumers must be audited;

@@ -201,6 +201,12 @@ test-build34-exact-submit-receipt:
 	@test -n "$(EXACT_SUBMIT_RECEIPT_OUT)" || (echo 'Set EXACT_SUBMIT_RECEIPT_OUT to a fresh ignored -private build directory'; exit 2)
 	python3 -B tools/test_build34_exact_submit_receipt.py --out "$(EXACT_SUBMIT_RECEIPT_OUT)"
 
+# Staged raw-dword/window callsites with CPU bytes, never device or kernel code.
+.PHONY: test-build34-exact-window
+test-build34-exact-window:
+	@test -n "$(EXACT_WINDOW_OUT)" || (echo 'Set EXACT_WINDOW_OUT to a fresh ignored -private build directory'; exit 2)
+	python3 -B tools/test_build34_exact_window.py --out "$(EXACT_WINDOW_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \
