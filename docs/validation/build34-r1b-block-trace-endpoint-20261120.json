@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-20",
+  "status": "offline-validated-block-return-trace-awaiting-pressure-proof",
+  "kernel_build": 34,
+  "unchanged_kernel_and_24_dispatch_workload": true,
+  "prior_probe_and_trace_exit": [0, 0],
+  "prior_compute_burst_submissions": 16,
+  "prior_GFX_submissions_including_warmup": 4,
+  "prior_full_arenas_per_client": 4,
+  "arena_bytes": 16384,
+  "prior_helper_spans_ns": [5130, 5681, 4177, 4819],
+  "prior_strict_parser_accepted": false,
+  "probe_retained": false,
+  "four_checked_errors": [0, 0, 0, 0],
+  "natural_no_GPU_probe_IOSleep_return_sample": {
+    "calls": 2453,
+    "minimum_duration_ns": 621,
+    "maximum_duration_ns": 155982
+  },
+  "natural_no_GPU_probe_same_caller_block_return_sample": {
+    "calls": 2442,
+    "minimum_duration_ns": 1003292,
+    "maximum_duration_ns": 1592597
+  },
+  "initial_no_GPU_D_compile_refusal_preserved": true,
+  "final_no_GPU_full_D_script_execution": {
+    "returncode": 0,
+    "first_stdout_seconds": 1.2379262720000002,
+    "elapsed_seconds": 13.243699928,
+    "output": ["READY", "END"],
+    "diagnostics": false
+  },
+  "proof_requires_signed_IOSleep_and_same_block_caller": true,
+  "all_block_probe_clauses_restrict_target_PID": true,
+  "final_exact_source_D_compile_returncode": 0,
+  "final_trace_source_sha256": "0d46b0e4e7304ba734d85d1d9b1abb02b021970e793d8dad0e1003505bb00247",
+  "legacy_helper_records_accepted": false,
+  "minimum_accepted_block_ns": 500000,
+  "new_driver_or_job_changes": 0,
+  "new_GPU_probe_submissions": 0,
+  "power_actions": 0,
+  "R1b_hardware_accepted": false,
+  "physical_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "private_configuration_firmware_logs_or_UUIDs_published": false
+}

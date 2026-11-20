@@ -42,13 +42,22 @@ def trace_program(pid):
 dtrace:::BEGIN {{ printf("READY\\n"); }}
 fbt:mach_kernel:IOSleep:entry
 /pid == {pid} && arg0 == 1 && (caller & 0xfff) == 0x{CALL_RETURN_OFFSET & 0xfff:x} && {exact}/
-{{ self->start = timestamp; self->wall = walltimestamp; }}
-fbt:mach_kernel:delay_for_interval:return
-/self->start/
+{{ self->armed = timestamp; self->wall = walltimestamp; self->pc = caller; self->blocked = (uint64_t)0; self->depth = (uint64_t)0; }}
+fbt:mach_kernel:thread_block_reason:entry
+/pid == {pid} && self->blocked/
+{{ self->depth = self->depth + 1; }}
+fbt:mach_kernel:thread_block_reason:entry
+/pid == {pid} && self->armed && !self->blocked && caller == self->pc/
+{{ self->blocked = self->armed; self->armed = 0; self->depth = 1; }}
+fbt:mach_kernel:thread_block_reason:return
+/pid == {pid} && self->blocked && self->depth == 1/
 {{
-    printf("WAIT %d %llu %llu %llu %llu 1\\n", tid, (uint64_t)self->wall, (uint64_t)walltimestamp, (uint64_t)self->start, (uint64_t)timestamp);
-    self->start = 0; self->wall = 0;
+    printf("WAIT_BLOCK %d %llu %llu %llu %llu 2\\n", tid, (uint64_t)self->wall, (uint64_t)walltimestamp, (uint64_t)self->blocked, (uint64_t)timestamp);
+    self->blocked = 0; self->wall = 0; self->depth = 0;
 }}
+fbt:mach_kernel:thread_block_reason:return
+/pid == {pid} && self->blocked && self->depth > 1/
+{{ self->depth = self->depth - 1; }}
 dtrace:::ERROR {{ printf("ERROR\\n"); }}
 profile:::tick-{TRACE_SECONDS}sec {{ exit(0); }}
 dtrace:::END {{ printf("END\\n"); }}

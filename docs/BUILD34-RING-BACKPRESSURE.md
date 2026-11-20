@@ -108,6 +108,35 @@ The frozen native CPU self-test also passes ASan/UBSan, including repeated
 packet geometry, all output bytes and guard-corruption detection.
 See [the finite no-pressure record](validation/build34-r1b-finite-no-pressure-20261120.json).
 
+### Validate the actual blocking endpoint
+
+The 24-dispatch run completed all 16 compute submissions, three concurrent
+GFX submissions plus warmup, four full arena comparisons and clean retirement.
+Both processes exited zero, no probe is retained and checked errors remain
+zero. It entered the exact queue-space IOSleep callsite four times. However,
+the old helper-return endpoint recorded only 4,177–5,681 ns; the strict overlap
+parser refused acceptance. Keep that result rather than interpreting a long
+SUBMIT or GFX progress alone as the required proof.
+
+A no-GPU natural-call sample found IOSleep's own FBT return hook early as well:
+its 2,453 one-millisecond calls measured 621–155,982 ns at that hook. Pairing
+the same original caller at thread_block_reason entry with its return instead
+observed 2,442 blocks at 1,003,292–1,592,597 ns. The revised tracer requires
+both the exact signed IOSleep caller bytes and that same runtime caller at
+the blocking primitive; it tracks nesting before emitting WAIT_BLOCK/version
+2. This bounds proof inside the original unlocked call chain and avoids a
+stale marker matching an unrelated later block. The parser refuses old helper
+records and intervals under 0.5 ms, preserves clock and full-GFX-containment
+checks, and reports actual sleep-duration bounds.
+
+An initial D-script declaration-order error was rejected in a no-GPU dry run
+and is preserved. The corrected complete script compiled, became READY in
+about 1.24 s and completed its unchanged 12-second window with no diagnostics.
+Eight CPU process/program tests and strict parser cases cover the new path.
+The next real trial changes only this observation endpoint, retaining the
+exact kernel and signed 24-dispatch workload in a fresh pressure-only scope.
+See [endpoint validation](validation/build34-r1b-block-trace-endpoint-20261120.json).
+
 ## Earlier source and first trial
 
 R1b starts from the running, hardware-checked R1a kernel at

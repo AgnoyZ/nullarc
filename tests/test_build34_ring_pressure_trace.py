@@ -17,6 +17,18 @@ REAL_POPEN = subprocess.Popen
 
 
 class TraceTests(unittest.TestCase):
+    def test_program_pairs_exact_sleep_caller_with_actual_block_return(self):
+        text = m.trace_program(123)
+        self.assertIn('pid == 123 && arg0 == 1', text)
+        self.assertIn('caller == self->pc', text)
+        self.assertIn('fbt:mach_kernel:thread_block_reason:return', text)
+        self.assertIn('WAIT_BLOCK', text)
+        self.assertLess(text.index('self->blocked = (uint64_t)0'), text.index('/pid == 123 && self->blocked/'))
+        self.assertNotIn('delay_for_interval:return', text)
+        self.assertNotIn('IOSleep:return', text)
+        with self.assertRaises(AssertionError):
+            m.trace_program(1)
+
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)

@@ -47,14 +47,16 @@ def parse(probe, trace, probe_exit, trace_exit, diagnostics):
     rows = trace.rstrip("\r\n").splitlines()
     if len(rows) < 2 or rows[0] != "READY" or rows[-1] != "END":
         raise ValueError("incomplete trace")
-    sleep_threads, waits, overlaps = set(), 0, 0
+    sleep_threads, waits, overlaps, durations = set(), 0, 0, []
     for row in rows[1:-1]:
         label, *fields = row.split()
-        if label != "WAIT" or len(fields) != 6:
+        if label != "WAIT_BLOCK" or len(fields) != 6:
             raise ValueError("unrecognized trace record")
         thread, w0, w1, t0, t1, identity = map(int, fields)
-        if identity != 1 or thread <= 0 or not 0 < w0 < w1 or not 0 < t0 < t1 or abs((w1-w0)-(t1-t0)) > 100_000:
+        if identity != 2 or thread <= 0 or not 0 < w0 < w1 or not 0 < t0 < t1 or abs((w1-w0)-(t1-t0)) > 100_000:
             raise ValueError("unverified callsite or inconsistent trace clocks")
+        if t1 - t0 < 500_000:
+            raise ValueError("truncated or nonblocking sleep interval")
         matches = [(b, i) for (b, i), (start, end, _) in cmp.items() if start < w0 < w1 < end]
         if not matches:
             continue  # The short trace can also capture the setup/teardown period.
@@ -62,6 +64,7 @@ def parse(probe, trace, probe_exit, trace_exit, diagnostics):
             raise ValueError("ambiguous compute call")
         sleep_threads.add(thread)
         waits += 1
+        durations.append(t1 - t0)
         burst, _ = matches[0]
         overlaps += sum(w0 + 100_000 <= begin < end <= w1 - 100_000
                         for (b, _), (begin, end, _) in gfx.items() if b == burst)
@@ -69,4 +72,5 @@ def parse(probe, trace, probe_exit, trace_exit, diagnostics):
         raise ValueError("no GFX completion wholly inside a verified compute queue-space sleep")
     return {"compute_burst_submissions": len(cmp), "gfx_submissions_including_warmup": len(gfx),
             "full_arenas_per_queue": len(arena), "arena_bytes": 16384, "paired_pressure_sleeps": waits,
-            "gfx_completions_inside_pressure_sleep": overlaps, "both_clients_closed": True}
+            "gfx_completions_inside_pressure_sleep": overlaps, "both_clients_closed": True,
+            "minimum_pressure_sleep_ns": min(durations), "maximum_pressure_sleep_ns": max(durations)}
