@@ -1,5 +1,11 @@
 # Build34 bounded startup recovery
 
+Later November 20 update: the owner's renewed VBL/ACPI restoration request has
+superseded this R1a-only scope's staged jobs. Its exact unloaded watcher file
+was retired while installing a new [VBL-compatible finite safeguard](BUILD34-VBL-RESTORATION-20261120.md).
+This scope's historical records remain intact; do not replay its preparation
+or installation. The new VBL image is on disk only and no new reboot occurred.
+
 On November 20, 2026 the owner authorized one R1a recovery restart and added
 automatic recovery for later startup tests. The recovery restart completed
 at 16:27:36 Asia/Shanghai on macOS 26.7.2 build 25G332. It loaded the accepted

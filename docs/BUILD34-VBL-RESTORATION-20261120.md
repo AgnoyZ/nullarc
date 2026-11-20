@@ -1,5 +1,10 @@
 # November 20 VBL and ACPI restoration on R1a
 
+Current status: VBL and its corrected cache are installed on disk and passed
+independent readback. The original accelerator is still loaded pending an
+authorized restart. R1a, the plugin and original ACPI remain active. ACPI
+restoration has passed offline checks but is not installed.
+
 The owner requested restoring the earlier VBL scheduling and ACPI/EC log-buffer
 batch-copy optimizations after confirming those treatments were no longer
 active. The owner identifies the Weather-plugin trial as the context for the
@@ -73,9 +78,9 @@ of the unchanged bundle, and candidate cache comparison allowing only PhxAccel's
 image. The prelink identity is decoded from its 16-byte plist value and checked
 against the original candidate identity. No cache is built or live file replaced
 by that preflight.
-At this source checkpoint no new VBL image or startup job has been installed.
-The earlier ordinary reboot grants are consumed; no new ordinary reboot is
-authorized or requested by this checkpoint.
+At that source checkpoint no VBL image or startup job had been installed.
+The subsequent installation is recorded below. The earlier ordinary reboot
+grants are consumed; this installation requested no new ordinary reboot.
 
 The existing R1a boot has one surface GPU timeout, with no increase in the later
 installation readback. Keep that observation visible; do not clear counters or
@@ -84,3 +89,30 @@ claim strict zero-error acceptance, physical FPS or long-term stability.
 Historical evidence: [VBL boot](validation/build34-vbl-corrected-cache-boot-20261118.json),
 [ACPI comparison](validation/build34-aml-buffer-boot-20261119.json),
 [rollback](validation/build34-weather-boot-rollback-20261120.json).
+
+## Installed-state checkpoint
+
+The fresh sealed scope uses implementation commit
+`e26ffb67527932a3dc4df865d6df99f1773b043f`. Installation replaced only the
+accelerator executable, selected AuxKC and two startup job files, added the new
+finite watcher and retired only the exact earlier unloaded R1a-only watcher
+file. It did not bootstrap a job, alter EFI/ACPI/plugin/kernel/security, submit
+a new GPU probe or request power.
+
+A separate process independently verified the actual installed candidate image
+and corrected cache hashes, all 357 EFI files, complete 416/29 cache metadata,
+exact sealed jobs and accepted image/job backups. The candidate is not loaded:
+live identity still matches R1a plus the original accelerator and accepted
+plugin. The same WindowServer survived, VBL advanced, GPU-copy completions were
+nonzero, and the existing one surface timeout did not increase; the three other
+checked errors stayed zero and no matching report appeared. Both trial and
+daily recovery journals remain unconsumed and the new watcher is unloaded.
+
+Offline ACPI reuse also passed: the current original configuration exactly
+matches the earlier tested input; the treatment changes only one ACPI Patch
+and adds one ACPI table, leaving NVRAM and all other configuration unchanged.
+Both AML table headers, lengths and checksums pass. No ACPI file/configuration
+has been staged. Fresh VBL loaded-image/startup acceptance must precede that
+next installation, and a new ordinary restart grant is still required.
+
+See the [sanitized installation record](validation/build34-vbl-restoration-installation-20261120.json).
