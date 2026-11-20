@@ -67,10 +67,18 @@ class StartupRecoveryTests(unittest.TestCase):
         self.arm(True)
         self.assertTrue(self.recovery.accept_startup("trial"))
         self.assertTrue(self.recovery.startup_accepted("trial"))
+        self.assertEqual(self.recovery.accepted_boot(), "trial")
         self.assertFalse(self.recovery.startup_accepted("next-day"))
         self.assertFalse(self.call())
         self.assertFalse(self.recovery.begin_trial("next-day"))
         self.assertEqual(self.events, [])
+
+    def test_only_exact_accepted_trial_exposes_a_daily_startup_identity(self):
+        self.assertIsNone(self.recovery.accepted_boot())
+        self.arm(False)
+        self.assertIsNone(self.recovery.accepted_boot())
+        self.assertTrue(self.call())
+        self.assertIsNone(self.recovery.accepted_boot())
 
     def test_watch_automatically_recovers_on_explicit_failure(self):
         self.recovery.prepare("preparation", permit_recovery_restart=True)

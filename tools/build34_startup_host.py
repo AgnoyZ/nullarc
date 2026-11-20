@@ -61,6 +61,8 @@ def process_matches(text, *, pid, script, role):
 
 
 class Host:
+    SCOPE_KIND = "accepted-R1a-startup-recovery"
+
     def __init__(self, directory):
         self.scope = Path(directory)
         self.config = self.contract()
@@ -76,7 +78,7 @@ class Host:
         secure(self.scope)
         secure(self.scope / "contract-private.json")
         value = json.loads((self.scope / "contract-private.json").read_text())
-        assert value["scope_kind"] == "accepted-R1a-startup-recovery"
+        assert value["scope_kind"] == self.SCOPE_KIND
         assert value["kernel_source_checkpoint"] == R1A_SOURCE
         assert value["startup_limits_seconds"] == [45, 150, 300]
         assert value["automatic_recovery_reboots"] == 1

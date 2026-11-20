@@ -1,5 +1,12 @@
 # Build34 AML log-buffer copy candidate
 
+November 20 current status: the historical treatment below was withdrawn during
+the owner's rollback. The owner has now requested restoration of VBL and this
+ACPI optimization, in that order. Original ACPI remains loaded while the fresh
+[R1a-compatible VBL restoration](BUILD34-VBL-RESTORATION-20261120.md) is prepared
+and validated. The historical loaded-candidate results below are not current
+installation status.
+
 The local AML batch-copy candidate is now loaded and has passed exact ACPI,
 build34 accelerated-startup and independent full-cache/EFI readback. Fresh
 normal-priority GUI observations found no intervals over 100 ms in either

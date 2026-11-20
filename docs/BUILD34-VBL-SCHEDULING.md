@@ -1,5 +1,11 @@
 # Build34 VBL scheduling candidate
 
+November 20 current status: the historical treatment below was withdrawn during
+the owner's rollback. The owner has now requested its restoration while keeping
+the current R1a kernel and excluding the Weather plugin. Follow the separate
+[R1a-compatible restoration record](BUILD34-VBL-RESTORATION-20261120.md);
+historical statements that the candidate remains active are not current status.
+
 Status on 2026-11-18: **the third, corrected-cache candidate boot passed exact
 loaded-image admission, bounded accelerated startup and independent readback.
 The initial finite GUI comparison improved, but a fresh same-boot check after

@@ -133,6 +133,17 @@ class StartupRecovery:
             return (self._read(directory, "trial.json") == {"boot": boot}
                     and self._read(directory, "outcome.json") == {"boot": boot, "decision": "accepted"})
 
+    def accepted_boot(self):
+        """Return a validated accepted trial identity for retained daily jobs."""
+        with self._locked() as directory:
+            trial = self._read(directory, "trial.json")
+            outcome = self._read(directory, "outcome.json")
+            if trial is None or outcome is None:
+                return None
+            boot = self._token(trial.get("boot"))
+            return boot if trial == {"boot": boot} and outcome == {
+                "boot": boot, "decision": "accepted"} else None
+
     def recover(self, current_boot, *, reason, quiesce, restore, verify,
                 prepare_restart, request_restart):
         """Return false if this failure cannot claim recovery for this boot.
