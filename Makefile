@@ -293,3 +293,8 @@ test-build34-exact-vm-lifetime:
 test-build34-exact-bo-lifetime:
 	@test -n "$(EXACT_BO_OUT)" || (echo "Set EXACT_BO_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_bo_lifetime.py --out "$(EXACT_BO_OUT)"
+
+.PHONY: test-build34-exact-legacy-close
+test-build34-exact-legacy-close:
+	@test -n "$(EXACT_CLOSE_OUT)" || (echo "Set EXACT_CLOSE_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_legacy_close.py --out "$(EXACT_CLOSE_OUT)"
