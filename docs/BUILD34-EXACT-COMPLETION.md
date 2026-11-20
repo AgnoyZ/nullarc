@@ -1,13 +1,15 @@
 # Build34 R3 exact completion and safe retirement
 
-Current November 20 checkpoint: R1a/R1b and R2a's bounded functional trial
+Current November 21 checkpoint: R1a/R1b and R2a's bounded functional trial
 have passed. R2a's installed combination remains active; no speedup is
 established. R3 has tested **source-only Mesa bookkeeping, multi-target
 wait/query and conservative CS dependency prerequisites**, not an installed
 exact-wait implementation.
 An additional allocation-free ownership/queue-generation **state prototype**
-has CPU evidence but no production caller or native integration. R4–R6 have
-not started.
+and staged submit/lifecycle, callback/client quarantine and target-observer
+experiments have CPU evidence but no production caller. The proposed observer
+has no admitted hardware fence reader and refuses completion without one.
+R4–R6 have not started.
 
 ## Why a kernel-only change is unsafe
 
@@ -714,3 +716,107 @@ All **172 tracked production inputs**, ABI, earlier experiments and runtime
 recipes remain unchanged. No installation, runtime reconfiguration, GPU work,
 reboot or FPS/long-term acceptance occurred. Keep accepted R1b/R2a/plugin and
 startup/recovery settings active. R3 remains source-only; R4–R6 have not begun.
+
+## Target observation with a deliberately unbound device reader
+
+The [next isolated transform](../tools/build34_exact_observer.py) adds two
+proposed internal helpers: the client's `queryExact` and the service's
+`observeExact`. Neither has a native selector or production caller. It also
+stages a small `Registry::inspect` accessor into a private copy of the earlier
+header; the original header and all earlier experiments remain unchanged.
+Inspect validates owner/lease/slot and copies a receipt, never an entry pointer;
+reserved, lost, closed, foreign and reused tickets refuse that copy.
+
+The client helper takes a lifetime lease, requires its start-time pin and holds
+the client lock across lookup, service observation and classification. The
+service helper takes its own lifetime lease and then the GPU lock, preserving
+submit's client-before-GPU lock order. The receipt chooses the actual queue;
+an empty or reused transport-history slot never supplies ownership. Snapshot
+metadata includes queue generation, readiness and a new per-queue submitted
+upper bound. Actual staged submission updates that bound for both exact and
+legacy work; adoption seeds it to the same `gSeq` written to its new fence.
+This bound is validation metadata, not a retirement watermark.
+
+Only the target queue is sampled. Cached and actual map bounds, pointer
+overflow and eight-byte alignment are checked first. A generation/readiness
+loss requires no fence read. The resulting sample cannot exceed that queue's
+submitted bound; a lower sample after an earlier completion is refused. The
+service classifies while both locks are still held and rechecks **both**
+terminal gates after reading. Thus a busy stop that never finalized queue
+metadata still prevents successful observation. Client/service closure during
+the controlled reader marks the receipt lost; a later callback cannot revive
+it. Sleep, wave recovery and readoption serialize on the GPU lock. An observer
+can finish before a concurrent invalidator acquires that lock; the subsequent
+query then reports loss. This is a serialized/linearized observation contract,
+not a guarantee that a result cannot return after an overlapping close.
+
+**No native hardware reader is implemented or admitted.** Its pointer defaults
+to null, has no production assignment and is bound only by the CPU fixture.
+Absent/failed sampling returns `InvalidObservation`, never a fallback to the
+old two-word `queueFence` read. The fixture samples controlled CPU bytes under
+its mutexes. It proves neither GPU write atomicity, CPU/device coherency,
+BAR caching/flush rules nor a real reader's bounded/nonblocking behavior.
+The source callback contract requires those properties before a future native
+binding; holding locks across an unbounded reader would be unacceptable.
+Registry allocation, lifetime and authentication to the provider also remain
+fixture assumptions, not a native owner allocator or security boundary.
+No new hardware fault detection or interrupt/event route is provided.
+
+The old `queueFence`, global `gpuRetired`, WAITSEQ and VMID cleanup methods
+are unchanged from the preceding source experiment. The legacy global prefix
+retains its conservative resource-reclamation meaning; exact target success
+does not advance it. This observer does not implement a blocking exact wait,
+flush completed BOs, publish CPU fences, acknowledge receipts, unpin the client
+or free any resource. The earlier permanent client/service quarantine remains
+deliberate and **must not be built or deployed**.
+
+The [runner](../tools/test_build34_exact_observer.py) freezes production and
+prior experiment inputs and extracts **eight existing staged methods plus
+the two new helpers** into the [CPU fixture](../tests/test_build34_exact_observer.cpp).
+The generated registry header is checked separately; non-system compilation
+dependencies and device-runtime linkage are verified. Only the new test target
+uses these transforms; no runtime build/install recipe applies them.
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-observer \
+  EXACT_OBSERVER_OUT=build/build34-r3-observer-new-private
+```
+
+On November 21 the strengthened suite passed **41,806 checks in 162 groups**,
+including **128 independent model rounds and ten real-thread scenarios**, under
+**ASan/UBSan and TSan**. In the CPU backend, GFX 101 completes while compute
+100 remains pending and the legacy prefix stays 99. Coverage includes fallback
+queue selection, legacy submissions, history reuse, metadata forget, unknown
+ownership, unavailable/rejecting readers, future/stale samples, map/address
+refusal, sleep/wave recovery/readoption, queued/overlapping close, and reader
+serialization against adoption, sleep and recovery. Controlled CPU sequence
+values cross the 32-bit boundary and approach 64-bit exhaustion; this is not a
+hardware rollover/coherency test. A prior narrower 160-group passing run is
+retained privately.
+
+Sixteen deliberately defective versions fail: missing either lease or the
+start pin, skipped client closure recheck, using global `gSeq` as the target's
+upper bound, forged generation, wrong queue, ignoring either post-reader gate,
+missing GPU lock, legacy-read fallback, omitted submit/adoption bound updates,
+invented readiness and ignored cached/mapped bounds. Expected assertion failures
+remain private. The staged inspect accessor also compiles as C++14 without
+exceptions or RTTI; this is not Kernel SDK/KPI compilation.
+
+Separate client-retention, callback, lifecycle, submit, ownership and
+default regressions are recorded in the
+[sanitized evidence](validation/build34-r3-observer-offline-20261121.json).
+The first default run failed in an existing **CPU-only** trace test: its fake
+trace exited after a fixed 0.2 seconds before the parent released its fake
+probe, so the test never reached the intended post-release uncertainty case.
+That one test now keeps the fake trace alive until the fake probe acknowledges
+`G`, and exits the fake probe on EOF rather than sleeping. The real trace
+controller, its admission/retention semantics and hardware scopes are unchanged.
+The original failure stays private; the corrected eight-case trace suite and
+full default suite are checked separately. No DTrace or GPU process ran.
+
+All **172 tracked production inputs**, ABI, earlier R3 experiments and runtime
+recipes remain unchanged. No installation, runtime configuration, GPU work,
+reboot, physical FPS or long-term acceptance occurred. Keep the accepted
+R1b/R2a/plugin installation and existing startup/recovery settings active.
+Native reader/owner/capability/acknowledgement, safe reclamation, completion
+events and paired hardware acceptance remain prerequisites; R4–R6 are pending.

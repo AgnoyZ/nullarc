@@ -106,10 +106,18 @@ class TraceTests(unittest.TestCase):
         self.assertEqual(self.read('pressure-trace-lifecycle-private.json')['probe_exit'], 64)
 
     def test_uncertain_CPU_probe_is_retained_after_release(self):
-        trace = "import time;print('READY',flush=True);time.sleep(.2);print('END',flush=True)"
-        probe = "import sys,time;sys.stdin.buffer.read(1);time.sleep(30)"
+        # Model post-release uncertainty, not parent scheduling speed. Keep the
+        # fake trace alive until this CPU-only child actually receives G.
+        ack = repr(str(self.root / 'CPU-uncertain-release-received'))
+        trace = ("import pathlib,time;print('READY',flush=True);"
+                 f"p=pathlib.Path({ack});end=time.monotonic()+3\n"
+                 "while not p.exists() and time.monotonic()<end:time.sleep(.01)\n"
+                 "assert p.exists();print('END',flush=True)")
+        probe = ("import pathlib,sys,time\n"
+                 "if sys.stdin.buffer.read(1)!=b'G':sys.exit(64)\n"
+                 f"pathlib.Path({ack}).write_text('G');time.sleep(30)")
         with self.assertRaisesRegex(RuntimeError, 'keep GPU ownership'):
-            self.run_capture(trace, probe=probe, retire=.05)
+            self.run_capture(trace, probe=probe, retire=.05, trace_retire=4)
         life = self.read('pressure-trace-lifecycle-private.json')
         self.assertTrue(life['G_dispatch_may_have_occurred'])
         self.assertIsNone(life['probe_exit'])
