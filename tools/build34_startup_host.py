@@ -85,13 +85,16 @@ class Host:
         assert value["owner_authorized_startup_auto_recovery"] is True
         assert value["resident_monitor_enabled"] is False
         assert value["pressure_probe_enabled"] is False
-        assert value["EFI_after_private"] == value["EFI_accepted_private"]
+        self.validate_efi_contract(value)
         for name, digest in value["sealed"].items():
             path = Path(name)
             assert not path.is_absolute() and ".." not in path.parts
             secure(self.scope / path)
             assert sha(self.scope / path) == digest
         return value
+
+    def validate_efi_contract(self, value):
+        assert value["EFI_after_private"] == value["EFI_accepted_private"]
 
     def put(self, name, value):
         with (self.scope / name).open("x") as handle:

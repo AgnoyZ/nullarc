@@ -1,5 +1,10 @@
 # Build34 bounded startup recovery
 
+Latest November 20 clarification also authorizes the previously tested ACPI
+optimization alongside staged VBL, without waiting for a separate VBL boot.
+The [combined adapter and exact recovery](BUILD34-ACPI-RESTORATION-20261120.md)
+supersede the VBL-only staged jobs when installed; preserve all old scopes.
+
 Later November 20 update: the owner's renewed VBL/ACPI restoration request has
 superseded this R1a-only scope's staged jobs. Its exact unloaded watcher file
 was retired while installing a new [VBL-compatible finite safeguard](BUILD34-VBL-RESTORATION-20261120.md).

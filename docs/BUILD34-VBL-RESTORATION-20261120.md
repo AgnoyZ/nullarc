@@ -1,5 +1,10 @@
 # November 20 VBL and ACPI restoration on R1a
 
+Latest owner clarification: install ACPI with the staged VBL restoration now;
+the earlier separate-VBL-boot prerequisite below is superseded. Follow the
+[combined restoration record](BUILD34-ACPI-RESTORATION-20261120.md). Earlier
+installed-state checkpoints below remain historical evidence.
+
 Current status: VBL and its corrected cache are installed on disk and passed
 independent readback. The original accelerator is still loaded pending an
 authorized restart. R1a, the plugin and original ACPI remain active. ACPI

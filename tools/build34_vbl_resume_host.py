@@ -94,7 +94,7 @@ class VBLHost(base.Host):
         assert value["owner_authorized_VBL_restoration"] is True
         assert value["VBL_source_checkpoint"] == VBL_SOURCE
         assert value["Weather_candidate_enabled"] is False
-        assert value["ACPI_candidate_enabled"] is False
+        self.validate_acpi_contract(value)
         assert set(value["VBL_changes"]) == set(EXPECTED_CANDIDATES)
         assert value["daily_recovery_restart_limit"] == 0
         for path, digest in EXPECTED_CANDIDATES.items():
@@ -103,6 +103,9 @@ class VBLHost(base.Host):
             for key, expected in (("candidate", digest), ("backup", change["before"])):
                 assert value["sealed"][change[key]] == expected
         return value
+
+    def validate_acpi_contract(self, value):
+        assert value["ACPI_candidate_enabled"] is False
 
     def __init__(self, directory):
         super().__init__(directory)
