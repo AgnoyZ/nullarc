@@ -8,7 +8,7 @@ a separate independent readback both passed exact R1a kernel loading,
 unchanged accelerator/mapped plugin, fresh startup/desktop/supervision-ended
 receipts, all 357 EFI files, complete 416-record/29-codeless cache metadata,
 original loaded ACPI, security and exact accepted recovery. The old accepted
-kernel is no longer loaded. R1a remains active; do not restore it after success.
+kernel was no longer loaded, and R1a was left active after this successful test.
 The restart command's 15-second wait timeout was not a reason to resend it:
 only one ordinary restart request was sent and no recovery power action occurred.
 
@@ -35,6 +35,13 @@ proceed separately, retaining this successful R1a installation while later
 candidate installation/reboot requires its own compatible authorization/scope.
 
 See the [sanitized hardware record](validation/build34-wait-boot-20261120.json).
+
+The later [R1b trial](BUILD34-RING-BACKPRESSURE.md#november-20-startup-failure-and-r1a-disk-recovery)
+did not reach its pressure probe. Independent readback matched the R1a EFI
+and startup jobs on disk; the R1b kernel remains loaded in the failed
+framebuffer-admission boot. R1a's earlier hardware acceptance stands, but
+recovery of the live accelerated desktop requires a separately authorized
+R1a boot with the existing one-use panel flag armed.
 
 ## Historical November 20 authorized isolated installation
 

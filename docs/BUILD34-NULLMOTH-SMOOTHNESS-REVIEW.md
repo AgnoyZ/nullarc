@@ -8,12 +8,14 @@ the owner has explicitly authorized R1a installation, one ordinary restart
 and bounded GPU validation. The single restart completed at 13:03:56
 Asia/Shanghai. The finite observer and separate independent new-boot readback
 verified exact R1a loading and two full-arena-verified native dispatches, both
-with real pending-to-completed 50 us-budget waits. R1a remains installed and
-active; its finite correctness acceptance does not establish timeout/oversleep
-behavior, FPS or long-term stability. The former Weather prerequisite was
+with real pending-to-completed 50 us-budget waits. Its finite correctness
+acceptance does not establish timeout or oversleep behavior, FPS or long-term
+stability. The former Weather prerequisite was
 withdrawn. The R1a restart and probe scope is consumed.
 The R1b ring-space change passes CPU regressions and the native build. Its
-hardware trial remains pending, with R2–R6 to follow in order.
+first boot failed framebuffer admission before the hardware pressure test.
+The disk and startup jobs are back at R1a, and accelerated operation still
+needs a verified R1a recovery boot. R2–R6 wait for R1b hardware acceptance.
 [R1a hardware record](validation/build34-wait-boot-20261120.json) ·
 [R1b candidate and validation](BUILD34-RING-BACKPRESSURE.md)
 This supersedes the execution status only; the following November 19 comparison

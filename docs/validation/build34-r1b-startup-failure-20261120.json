@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-20",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "status": "failed-R1b-framebuffer-admission-before-pressure-test",
+  "R1b_source": "194ce9098b34c9f48483ff0729a50b21c5ca0401",
+  "accepted_R1a_source": "568e80b205c10b00cba4f21c6d324d239d725bfd",
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "boot_local": "2026-11-20T15:25:39+08:00",
+  "restart": {
+    "owner_reported_stuck_during_startup": true,
+    "ordinary_restart_requests_sent": 1,
+    "command_wait_timed_out_after_seconds": 15,
+    "repeated_after_uncertain_result": false,
+    "actual_new_boot_verified": true,
+    "restart_authorization_consumed": true
+  },
+  "startup": {
+    "exact_R1b_kernel_loaded": true,
+    "guardian_identity_and_installed_state_checked": true,
+    "panel_arm_visible_before_restart_request": true,
+    "kernel_log_reported_panel_arm_absent": true,
+    "reason_panel_arm_was_absent_established": false,
+    "failed_framebuffer_admission": true,
+    "protected_startup_shell_launched": false,
+    "desktop_admitted": false,
+    "PhxAccel_loaded_at_readback": false,
+    "firmware_framebuffer_services_at_readback": 1,
+    "PhxAMDFB_services_at_readback": 0,
+    "NMXAccel_services_at_readback": 0,
+    "accelerator_error_counters_readable_at_readback": 0,
+    "login_session_and_WindowServer_present_at_readback": true,
+    "physical_display_recovery_verified": false
+  },
+  "recovery": {
+    "triggered": true,
+    "worker_identity_error_recorded": true,
+    "complete_R1a_EFI_independently_verified": true,
+    "EFI_files": 357,
+    "on_disk_kernel_signature_verified": true,
+    "both_R1a_startup_job_files_independently_verified": true,
+    "complete_cache_metadata_matches_baseline": true,
+    "original_loaded_ACPI_and_security_verified": true,
+    "R1b_observer_job_file_removed": true,
+    "R1b_workers_remaining": 0,
+    "pending_power_processes": 0,
+    "automatic_restart_requests": 0,
+    "R1a_loaded_at_readback": false,
+    "R1a_recovery_boot_completed": false,
+    "panel_arm_present_at_readback": false
+  },
+  "policy": {
+    "PR28_daily_wait_config_verified": true,
+    "PR28_wait_budget_ms": 250,
+    "WindowServer_excluded": true,
+    "resident_monitor_disabled": true
+  },
+  "acceptance": {
+    "GPU_pressure_probe_started": false,
+    "pressure_probe_retained": false,
+    "R1b_hardware_accepted": false,
+    "physical_FPS_measured": false,
+    "long_term_stability_accepted": false,
+    "R2_or_later_started": false
+  }
+}

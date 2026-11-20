@@ -3,9 +3,11 @@
 R1b starts from the running, hardware-checked R1a kernel at
 `568e80b205c10b00cba4f21c6d324d239d725bfd`. This candidate handles exhaustion of
 ring space or submission-history slots in `PhxBringup::gpuSubmit`. The default
-branch source contains the change. Hardware validation is pending, and the
-loaded PhxBringup still matches the accepted R1a executable on macOS 26.7.2
-build 25G332. [R1a hardware evidence](validation/build34-wait-boot-20261120.json)
+branch source contains the change. The first R1b boot loaded the candidate,
+but startup stopped at framebuffer admission before the pressure test.
+The EFI and startup jobs are back at the accepted R1a state on disk; the
+current boot still runs the R1b PhxBringup with the firmware framebuffer.
+[R1a hardware evidence](validation/build34-wait-boot-20261120.json)
 
 When a queue runs out of space, the old path polls every 50 µs while holding
 `gpuLock`. This also prevents submissions to the other queue and blocks other
@@ -50,7 +52,7 @@ imports. The Radeon 780M-only bundle differs from the accepted R1a bundle
 only in its executable. Native output and full validation logs are private.
 [Offline build recipe](../tools/build34_ring_backpressure.py)
 
-The hardware trial needs separate authorization to replace the boot-injected
+The hardware trial needed separate authorization to replace the boot-injected
 executable, restart once and run a finite test. Preserve the exact R1a
 executable and startup jobs for rollback. Confirm new-boot image identity,
 bounded desktop admission and unchanged accelerator, plugin, cache and ACPI.
@@ -90,3 +92,43 @@ The DTrace script compiled and completed an empty dry run on the current OS;
 this verifies the trace setup, not queue pressure. The proof is limited to
 this bounded run even if it passes. It does not measure FPS or establish
 long-term stability.
+
+## November 20 startup failure and R1a disk recovery
+
+The single authorized restart resulted in the 15:25:39 Asia/Shanghai boot on
+macOS 26.7.2 build 25G332. The restart command's 15-second wait timed out;
+the actual boot and loaded candidate were independently verified, and the
+request was not repeated. The owner reported that the machine got stuck
+during startup. The OS later responded to read-only checks with a login
+session and WindowServer, but physical display recovery was not verified.
+
+The startup controller passed guardian identity and installed-state checks,
+then rejected framebuffer admission before invoking the protected startup
+shell. The early boot log records that `PhxAMDFB` found the one-use
+`phxfb-boot` flag absent and left the firmware framebuffer in place. The flag
+had been visible before the restart request; why it was absent during boot
+is unverified. Later live readback found one `IONDRVFramebuffer`, no
+`PhxAMDFB` or `NMXAccel`, and no loaded PhxAccel. The observer stopped before
+creating its probe intent. This trial provides no evidence about compute
+queue pressure, GFX progress during a wait, or R1b's performance or stability.
+
+The recovery summary recorded a worker-identity error when checking which
+processes to stop. An independent read-only check nevertheless matched all
+357 EFI files to the accepted R1a manifest, verified the executable's
+signature and matched both startup job files to their sealed R1a copies. The
+complete cache metadata, original loaded ACPI and OS security also matched
+the accepted expectations. The
+observer job file is gone; no R1b worker, retained probe or pending power
+process was found. Recovery requested no restart. These are disk and process
+checks; they do not replace the R1b kernel already loaded in memory or turn
+hardware acceleration back on in this boot.
+
+For a recovery boot, first verify the exact R1a disk and jobs, explicitly
+arm and commit the existing one-use framebuffer flag under fresh owner
+authorization, read it back before requesting power, and use one ordinary
+restart into R1a only. Require current-boot
+accelerated desktop receipts before considering a new isolated R1b trial. Do
+not replay the consumed observer or probe, skip the framebuffer gate or
+start R2–R6. Daily PR28 configuration and the disabled resident monitor were
+verified unchanged. See the
+[sanitized failure and recovery record](validation/build34-r1b-startup-failure-20261120.json).
