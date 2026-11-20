@@ -29,6 +29,8 @@ AFTER = {
     ACCELERATOR: 'e5e9148513180eedec29f550c74a2ec132c797189edbe1edee08ef89e33bfc13',
     CACHE: '42277808a822db259de905fc50e3902f2e5cbcaff8ada302c7bdc7e527300593',
 }
+DISABLE_MARKER = '/Users/Shared/gpu/phxboot-off'
+EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
 
 def validate_delta(c):
@@ -80,6 +82,17 @@ def physical_baseline(c):
     return expected
 
 
+def require_protected_file(path, digest):
+    assert not Path(path).is_symlink()
+    if path == DISABLE_MARKER:
+        # The historical manifest has an empty-file hash for this disabled
+        # switch. The accepted accelerated installation intentionally has no
+        # such file. Require that exact absence; never create the switch.
+        assert digest == EMPTY_SHA256 and not Path(path).exists()
+    else:
+        assert base.sha(path) == digest
+
+
 class PresentCopyHost(r1b.R1bHost):
     SCOPE_KIND = 'R2a-packed-copy-retained-R1b-VBL-AML-startup-recovery'
 
@@ -120,7 +133,7 @@ class PresentCopyHost(r1b.R1bHost):
                 base.secure(path)
                 assert base.sha(path) in (BEFORE[path], AFTER[path])
             elif path not in c['jobs']:
-                assert not Path(path).is_symlink() and base.sha(path) == digest
+                require_protected_file(path, digest)
         for path, change in c['R2a_changes'].items():
             for kind, digest in [('backup', BEFORE[path]), ('candidate', AFTER[path])]:
                 base.secure(self.scope / change[kind])

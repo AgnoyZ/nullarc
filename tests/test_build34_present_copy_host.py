@@ -91,6 +91,23 @@ class ContractTests(unittest.TestCase):
 
 
 class RecoveryTests(unittest.TestCase):
+    def test_only_historical_disable_switch_requires_exact_absence(self):
+        path = Mock(); path.is_symlink.return_value = False; path.exists.return_value = False
+        with patch.object(m, 'Path', return_value=path):
+            m.require_protected_file(m.DISABLE_MARKER, m.EMPTY_SHA256)
+            with self.assertRaises(AssertionError): m.require_protected_file(m.DISABLE_MARKER, 'unknown')
+            path.exists.return_value = True
+            with self.assertRaises(AssertionError): m.require_protected_file(m.DISABLE_MARKER, m.EMPTY_SHA256)
+
+    def test_unknown_missing_protected_file_and_symlink_are_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            p = Path(folder) / 'required'
+            with self.assertRaises(FileNotFoundError): m.require_protected_file(str(p), m.EMPTY_SHA256)
+            p.write_bytes(b'')
+            m.require_protected_file(str(p), m.EMPTY_SHA256)
+            link = Path(folder) / 'link'; link.symlink_to(p)
+            with self.assertRaises(AssertionError): m.require_protected_file(str(link), m.EMPTY_SHA256)
+
     def test_unknown_input_prevents_all_restore_writes(self):
         h = m.PresentCopyHost.__new__(m.PresentCopyHost)
         h.check_restore_inputs = Mock(side_effect=AssertionError('unknown'))

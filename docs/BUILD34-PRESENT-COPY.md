@@ -149,6 +149,16 @@ recovery. The inherited bounded startup, finite watcher and no-daily-power
 policy remain. This adapter is source-tested only; no new live scope,
 candidate deployment or ordinary restart has occurred at this checkpoint.
 
+The first inactive preparation then refused before any live image/job write:
+the historical protected map gives `phxboot-off` an empty-file hash, while the
+accepted accelerated installation intentionally has that disabling marker
+absent. The new adapter originally tried to hash it as a required file. The
+correction requires exact absence for that single historical switch and the
+known empty-file hash; all other missing protected files and symlinks remain
+refused. It does not create the marker or loosen a driver/image gate. Two
+additional CPU methods cover that distinction. Keep the rejected private
+packet and use a fresh scope after this source fix.
+
 This does not implement AMD asynchronous presentation or a DCN flip. Moving
 the wait/copy to a worker still requires bounded ownership, cancellation,
 stop/sleep handling and correct completion; removing the wait or NVIDIA vendor
