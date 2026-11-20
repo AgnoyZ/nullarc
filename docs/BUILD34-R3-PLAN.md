@@ -19,7 +19,7 @@ independent remote SHA check.
 | Work | Evidence now | What must close it |
 | --- | --- | --- |
 | Preserve safe global retirement | Existing build34 path and CPU regressions | Keep legacy resource-reclamation/CPU-fence semantics while exact targets complete independently |
-| Mesa exact bookkeeping, multi-target fairness, conservative CS ordering | Three isolated reviewed patches with actual-provider CPU tests | Carry into a paired negotiated backend, freeze dependencies, test all error/fallback paths |
+| Mesa exact bookkeeping, multi-target fairness, conservative CS ordering/shape | Four isolated reviewed patches with actual-source CPU tests, including single-native-batch preflight | Carry into a paired negotiated backend, freeze dependencies, test all error/fallback paths; an aggregate exact CS protocol is not implemented |
 | Native target ownership and queue generation | Staged submit, invalidation, observer and embedded binding pass CPU/TSan tests | Actual SDK/KPI integration plus authenticated native admission and queue lifecycle evidence |
 | Exact wait fallback | Original wait passes CPU/TSan; the later wait-pinned version re-runs all 28 groups/six threaded cases (22,094 checks) | Carry into the native negotiated path; real KPI/lifecycle and GPU timeout/wakeup evidence remain required |
 | Trusted device fence observation | Primary-source packet/mapping review and 189,198-check low-dword window primitive; no reader admitted | Integrate the bounded window with all shared-queue submissions, establish actual mapping/device coherency and ownership/drain, then obtain native/GPU evidence; see `BUILD34-FENCE-READER.md` |
@@ -43,6 +43,10 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    continue refusing native exact success rather than fabricating completion.
 3. Implement the strict native protocol/acknowledgement and paired Mesa path.
    Receipt and provider identity must survive wait/ack/close and slot reuse.
+   The current raw WaitCS, split-plan and late-attach consumers must be audited;
+   completed native receipts cannot be discarded after the first positive wait
+   unless subsequent valid references can still resolve completion. Keep the
+   tested exact-CS shape guard until an aggregate protocol is proved.
 4. Replace permanent healthy-client/service retention with proved callback/GPU
    drain and reclamation. Keep fault/uncertain-work quarantine distinct from
    successful completion; audit every VM mutation and native entrypoint.

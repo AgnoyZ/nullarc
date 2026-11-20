@@ -1046,3 +1046,61 @@ All 172 production inputs, original ABI, legacy WAITSEQ/global retirement/VMID
 paths and runtime recipes remain unchanged. No native SDK build, installation,
 live runtime change/readback, GPU execution or reboot occurred. R3 remains
 active and incomplete; R4–R6 do not advance.
+
+## Exact CS representation preflight (November 21)
+
+Paired-ABI review found another boundary in the actual frozen Mesa transport.
+`acd_kext_submit` splits plans larger than `N48N_MAX_IBS` (64) and returns only
+the last native sequence. The planner also retains each IB's engine, while
+one build34 native submission selects a single actual queue from its first
+IB. Exact completion of only the final native call is not a proved aggregate
+completion for a mixed-queue plan. Existing 0005 input-dependency waiting
+does not order the internal fragments of one newly submitted plan.
+
+The new [actual-source CPU fixture](../tests/test_build34_exact_cs_shape.c)
+reproduces two **prospective exact-backend counterexamples** on 0003–0005:
+a 65-IB compute/GFX plan emits two native calls and its final exact sequence
+signals the output while the earlier sequence remains pending in the fake
+backend; a two-IB mixed plan reaches one native packet batch despite its
+different engine fields. This does not reproduce an installed legacy-kernel
+failure, execute IBs or establish real GPU instruction behavior.
+
+[Patch 0006](../mesa-patches-build34/0006-radv-exact-cs-shape-guard.patch)
+changes only the exact-mode preflight in `ac_darwin_drm.c`, after 0003–0005.
+It accepts a single native-size homogeneous GFX or compute batch, instance
+and ring zero. Larger plans, mixed engines and unsupported engine/instance/
+ring values refuse with `EOPNOTSUPP` **before** any dependency wait, native
+submission or output-payload attachment. This is conservative refusal, not
+an implemented aggregate fence, a GPU queue dependency or a performance
+optimization. Homogeneous plans over 64 IBs also refuse rather than relying
+on unproved fragmented receipt/lifecycle behavior. Legacy mode is unchanged.
+
+The [frozen CPU runner](../tools/test_build34_exact_cs_shape.py) applies all
+four patches to a fresh verified 30-file source closure and preserves the
+original MIT notice. ASan/UBSan passes **1,901 checks**, including **8 accepted
+and 80 refused shapes**, empty-plan rejection, provider clones, unchanged
+byte-exact unchanged ioctl request/output on error, transfer-proven unattached
+refused outputs and legacy splitting. Nine defective preflights are detected, including a
+uniformly unknown engine (so the mixed-engine check cannot hide a missing
+engine allow-list), an output write before refusal and a guard moved after
+dependency waits. All **4,552**
+previous actual-CS dependency checks pass on the changed wrapper. Default
+tests pass with the existing optional-firmware skip. See
+[sanitized evidence](validation/build34-r3-cs-shape-offline-20261121.json).
+
+Review also confirms that raw `DRM_AMDGPU_WAIT_CS` queries go directly through
+the transport, and the provider can attach a reference to an older sequence
+after an earlier wait completed. The internal native ACK experiment makes a
+forgotten receipt `Unknown`. Therefore, do **not** automatically wire ACK to
+each positive backend wait: a paired design still needs bounded completion
+ownership/cache or explicit payload lifetime that serves every later valid
+query, plus race/backpressure/uncertain-transport handling. Do not replace the
+safe global watermark with a target or confuse any future client-local
+completion summary with global BO/VMID retirement. Raw LAST/BO-idle semantics
+must continue to cover all relevant work rather than just the latest GFX
+receipt. These are outstanding native/paired-runtime admission requirements.
+
+Production exact capability remains false, all prior patches and the 172
+driver/plugin/ABI/tool inputs remain unchanged, and old runtime recipes do
+not apply 0006. No full RADV/native kernel build, installation, IOKit open,
+GPU work, power action, physical FPS or long-term acceptance occurred.

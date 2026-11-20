@@ -1,0 +1,26 @@
+diff --git a/src/amd/common/darwin/ac_darwin_drm.c b/src/amd/common/darwin/ac_darwin_drm.c
+--- a/src/amd/common/darwin/ac_darwin_drm.c
++++ b/src/amd/common/darwin/ac_darwin_drm.c
+@@ -645,4 +645,22 @@ acd_cmd_cs(struct acd_device *dev, union drm_amdgpu_cs *cs)
+    if (acd_sync_has_exact_completion(dev->sync)) {
++      /* One exact receipt represents one native submission on one queue.
++       * The legacy marshaller splits large plans and returns only the last
++       * seq; that is not an aggregate fence for independent queues. Likewise
++       * one native packet batch cannot select a different queue per IB.
++       * Refuse unsupported shapes before dependency waits or output attach.
++       * A future aggregate/batched protocol needs its own ownership proof. */
++      bool supported = plan.n_ibs <= N48N_MAX_IBS;
++      for (uint32_t i = 0; i < plan.n_ibs; i++) {
++         const struct n48n_cs_ib *ib = &plan.ibs[i];
++         if ((ib->ip_type != AMDGPU_HW_IP_GFX && ib->ip_type != AMDGPU_HW_IP_COMPUTE) ||
++             ib->ip_type != plan.ibs[0].ip_type || ib->ip_instance || ib->ring)
++            supported = false;
++      }
++      if (!supported) {
++         acd_cs_plan_fini(&plan);
++         return -EOPNOTSUPP;
++      }
++
+       /* The parser historically ignores legacy context/sequence dependency
+        * chunks under a one-ring assumption. Do not silently discard nonempty
+        * dependencies in exact mode; their ownership/queue translation is not

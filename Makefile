@@ -177,6 +177,12 @@ test-build34-exact-ack:
 	@test -n "$(EXACT_ACK_OUT)" || (echo "Set EXACT_ACK_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_ack.py --out "$(EXACT_ACK_OUT)"
 
+# Proposed exact-mode CS shapes; actual Mesa call chain with CPU ops only.
+.PHONY: test-build34-exact-cs-shape
+test-build34-exact-cs-shape:
+	@test -n "$(MESA_SOURCE)" -a -n "$(EXACT_CS_SHAPE_OUT)" || (echo "Set MESA_SOURCE and fresh EXACT_CS_SHAPE_OUT"; exit 2)
+	python3 -B tools/test_build34_exact_cs_shape.py --mesa-source "$(MESA_SOURCE)" --out "$(EXACT_CS_SHAPE_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \

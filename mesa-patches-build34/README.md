@@ -6,7 +6,8 @@ directory an apply list. It contains no kernel, firmware or runtime binary.
 
 `0003-radv-exact-completion-bookkeeping.patch`, the dependent
 `0004-radv-exact-multitarget-wait-query.patch` and then
-`0005-radv-exact-cs-dependency-guard.patch` are **separate R3 source-only
+`0005-radv-exact-cs-dependency-guard.patch` and
+`0006-radv-exact-cs-shape-guard.patch` are **separate R3 source-only
 prerequisites**, not patches automatically applied by the runtime/tail
 recipes below. The dedicated CPU runners test the pinned sync provider;
 0004 follows 0003 and also changes its internal userspace backend header.
@@ -14,6 +15,12 @@ The new capability defaults false and no production initializer enables it.
 0005 additionally changes the CS wrapper: exact mode waits for payload
 completion on the CPU before a consumer submit and refuses unsupported
 nonempty legacy dependency chunks. Legacy behavior remains unchanged. None
+of the earlier patches gives a fragmented or mixed-engine CS an aggregate
+exact fence. 0006 follows 0005 and accepts only one native-size homogeneous
+GFX/compute batch (1–64 IBs, instance/ring zero) in proposed exact mode; all
+other shapes refuse before dependency waits/submission/output attachment.
+Its actual-source CPU runner reproduces the 0005-only boundary and tests
+8 accepted/80 refused shapes plus legacy behavior. None
 of these patches implements or enables an exact native backend, native GPU
 queue dependencies or a deployment. See
 [R3 design, CPU evidence and remaining admission work](../docs/BUILD34-EXACT-COMPLETION.md).
