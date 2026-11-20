@@ -464,3 +464,90 @@ active. Next resolve native lifecycle/owner allocation, bounded receipt
 acknowledgement, capability negotiation, coherent fence observation and safe
 teardown before a paired native backend or hardware trial. AMD completion
 events/fallback, R3 hardware/FPS/long-term acceptance and R4–R6 remain pending.
+
+## Native lifecycle invalidation source experiment
+
+The [next isolated transform](../tools/build34_exact_lifecycle.py) extends the
+prior staged submit source without changing that experiment or any production
+input. It adds conservative metadata invalidation to the **actual** power,
+wave-kill and service-stop methods. The proposed exact pointer still has no
+production allocator, selector or negotiation; no runtime recipe applies this
+transform. Nothing here admits an R3 kernel build, deployment or GPU trial.
+
+Queue validity is distinct from legacy hardware `ready`. The first sleep edge,
+each forced wave recovery and service stop invalidate both exact queues and
+advance their generations under the existing GPU lock when allocated. The
+wave-kill method holds that lock across invalidation and the existing register
+sequence, so no new exact submission or adoption can pass between these two
+operations. A single-VMID kill conservatively invalidates both queues because
+there is no authenticated per-VMID recovery/outcome accounting yet. Killing
+waves can let a fence advance; that value must not be interpreted as successful
+completion of the invalidated exact receipt.
+
+Wake clears the existing sleep flag but does not reopen exact queues. Fresh
+adoption, while awake and not terminally stopped, advances the selected queue
+generation and publishes validity only after the existing fence seed/flush and
+hardware-ready publication. Queue generations saturate and permanently refuse
+adoption rather than wrap. Stop latches terminal state before the first old
+release callback; wake and reentrant adoption cannot clear it, even while the
+aperture and lock still exist.
+
+A separate invalidation epoch binds an in-progress exact submit to its first
+lock-held admission. Every queue-space retry checks that epoch as well as
+current queue validity. Thus an **old waiting request** refuses after a sleep
+or forced-recovery boundary even if wake and fresh adoption have already
+completed before it resumes. A new request may use the freshly adopted queue.
+Ordinary R1b queue reselection/adoption retries that have not crossed a sleep,
+fault or stop boundary retain the earlier source experiment's behavior.
+Invalidation-epoch exhaustion is terminal and cannot wrap back into a prior
+request's identity. Failed unpublished admissions cancel only their reserved
+metadata; already published pending/lost receipts remain retained.
+
+The [CPU runner](../tools/test_build34_exact_lifecycle.py) freezes the accepted
+driver/ABI/topology, earlier transform/fixture/header and all new inputs. It
+extracts nine actual staged methods, including complete power, wave-kill and
+stop bodies. The [additional fixture](../tests/test_build34_exact_lifecycle.cpp)
+extends the earlier submit fixture with CPU register, PM, cancellation and
+release callbacks; these are not real platform callbacks or hardware events.
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-lifecycle \
+  EXACT_LIFECYCLE_OUT=build/build34-r3-lifecycle-new-private
+```
+
+On November 20 the strengthened suite passed **1,968 additional ASan/UBSan
+checks in 18 lifecycle groups**, alongside all **80 inherited submit groups**
+(30,606 counted checks including the new wrapper assertion). It covers both
+queues, repeated sleep, wake without adoption, single/all-wave recovery,
+post-recovery fence advancement, sticky lost receipts, partial readoption,
+generation/epoch exhaustion, a stop-release reentry and six blocked-submit
+interleavings, including invalidation plus readoption before resumption.
+Seven deliberately defective actual callsite variants fail the suite:
+missing sleep invalidation, wake reopening queues, late fault invalidation,
+nonterminal stop, adoption after terminal stop, missing submission gate and
+allowing an old request across invalidation. Expected failed assertions stay
+private. Preserve the initial fixture compile errors (CPU type alias and mixed
+`auto` declarations) and the earlier narrower passing suite as prior evidence;
+neither was a kernel candidate or hardware attempt.
+
+The unchanged earlier submit suite again passes its **30,605 checks**, the
+ownership suite passes **321,712 checks**, and default `make -j1 test` passes;
+optional firmware fixtures remain absent. All **172 tracked production inputs**,
+native ABI and runtime recipes remain unchanged. Compilation dependency and
+device-linkage checks pass. See
+[sanitized evidence](validation/build34-r3-lifecycle-offline-20261120.json).
+
+This establishes only serialized CPU metadata classification and callsite
+ordering. `gpuRetired`, the old fence reader, WAITSEQ, client close/free and
+VMID release remain byte-identical; stop's old release operations also remain
+unchanged after the new metadata prefix. **Those old release paths are not
+certified as safe GPU drain.** No native exact observer, coherent fence
+snapshot, owner allocator, callback-lifetime fencing, resource quarantine,
+client-close drain, receipt acknowledgement or AMD completion event path has
+been added. In particular, a metadata latch does not prevent another callback
+from retaining a pointer to a lock/aperture that stop subsequently frees, and
+this fixture does not certify the watchdog's broader selection/adoption races.
+Full resource/service lifetime coordination remains mandatory before enabling
+the exact branch. There is no new actual-thread/TSan, GPU, FPS or long-term
+acceptance. Keep the accepted R1b/R2a/plugin installation active; R3 remains
+source-only and R4–R6 remain pending.
