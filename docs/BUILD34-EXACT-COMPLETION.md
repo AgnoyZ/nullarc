@@ -7,7 +7,7 @@ wait/query and conservative CS dependency prerequisites**, not an installed
 exact-wait implementation.
 An additional allocation-free ownership/queue-generation **state prototype**
 and staged submit/lifecycle, callback/client quarantine, target-observer
-and embedded client/provider identity-binding
+embedded client/provider identity-binding and owned-ticket wait fallback
 experiments have CPU evidence but no production caller. The proposed observer
 has no admitted hardware fence reader and refuses completion without one.
 R4–R6 have not started.
@@ -921,3 +921,52 @@ or installation recipe is added. The old fence reader, safe global retirement,
 WAITSEQ, VMID cleanup and permanent quarantine remain unchanged. This experiment
 **must not be built or deployed**. Keep accepted R1b/R2a/plugin/startup active;
 R3 GPU/FPS/long-term acceptance and R4–R6 remain pending.
+
+## Owned-ticket bounded polling fallback (November 21)
+
+The source-only [wait transform](../tools/build34_exact_wait.py) now adds an
+internal `waitExact(sequence, timeout)` after the embedded-binding experiment.
+It obtains one owner/slot/serial ticket under the client lock and retains that
+identity across every sleep. It never re-resolves a recycled sequence or slot.
+A client callback lease spans the whole operation; each observation retains
+the existing client-to-GPU lock order, and both locks are released before
+`IOSleep(1)`. Closure, stop, invalidation and queue readoption refuse completion.
+
+The budget starts at method entry, including lock contention, reader time and
+scheduler delays, using the real monotonic-clock conversion. It retains the
+existing two-second cap. Zero budget performs one observation. Every positive
+pending wait yields for one millisecond, even for a sub-millisecond remainder.
+An observation after wake may complete before the elapsed-time test, but an
+expired pending result never sleeps again. This rounding and scheduling policy
+is **not a hard return-time bound**, an AMD interrupt or an event wakeup path.
+
+The frozen-source [CPU runner](../tools/test_build34_exact_wait.py) extracts
+13 methods, retaining all twelve previous binding methods byte for byte.
+ASan/UBSan and TSan each pass **22,000 additional checks**, **28 additional
+groups** and **six additional real-thread scenarios**, plus the inherited
+4,983-check binding suite. Thirteen deliberately broken waits are detected,
+including no client lease, bad identity/pin, missing cap, late extra sleep,
+false completion, lock-held/zero-length sleeps, omitted clock conversion,
+budget reset after lock contention, ignored closure, global-prefix targeting
+and requested-sleep accounting. A pending compute 100 with complete GFX 101
+still leaves the safe global watermark at 99.
+
+Preserve both initial fixture failures privately. The first incorrectly
+expected the global watermark to remain 99 when the only queue's work had
+completed. The second confused an open idle callback gate with a closed,
+drained gate. The corrected fixture checks `active()==1` while sleeping and
+`active()==0` on return, checking `drained()` only after closure. These were
+CPU test expectations, not native-driver failures. The missing-lease broken
+version is detected with the strengthened active-count assertion.
+
+The separate unchanged binding suite also passes, including its 321,712
+ownership checks/128 reference rounds and 73 controlled-CAS checks. Default
+`make -j1 test` passes with the existing optional-firmware skip. See
+[sanitized evidence](validation/build34-r3-wait-offline-20261121.json).
+All 172 production inputs, prior transforms, old WAITSEQ/global retirement/
+VMID paths, ABI and runtime recipes remain unchanged. The hardware reader
+still defaults null, exact requests remain disabled, and permanent quarantine
+remains deliberately unreclaimable. This is not a native SDK build, deployable
+candidate, GPU wait test, FPS or long-term acceptance. No installation, live
+runtime readback, GPU work or power action occurred. Continue with the
+[R3 completion ledger](BUILD34-R3-PLAN.md); R3 remains incomplete.

@@ -159,6 +159,12 @@ test-build34-exact-binding:
 	@test -n "$(EXACT_BINDING_OUT)" || (echo "Set EXACT_BINDING_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_binding.py --out "$(EXACT_BINDING_OUT)"
 
+# Staged owned-ticket wait fallback; CPU-only, no native selector or hardware reader.
+.PHONY: test-build34-exact-wait
+test-build34-exact-wait:
+	@test -n "$(EXACT_WAIT_OUT)" || (echo "Set EXACT_WAIT_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_wait.py --out "$(EXACT_WAIT_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \
