@@ -1,0 +1,52 @@
+diff --git a/src/amd/common/darwin/ac_darwin_sync.c b/src/amd/common/darwin/ac_darwin_sync.c
+--- a/src/amd/common/darwin/ac_darwin_sync.c
++++ b/src/amd/common/darwin/ac_darwin_sync.c
+@@ -141,15 +141,46 @@
++/* Exact completion is not a contiguous retirement watermark. Fold only
++ * references to this sequence; another queue can still own a lower sequence.
++ * The backend callback runs without mtx, so recheck current payloads under it:
++ * reset/destroy/reuse must never signal a replacement payload. No unbounded
++ * completed-sequence set or new lifetime is introduced. */
++static void
++note_completed(struct acd_sync *s, uint64_t seq)
++{
++   pthread_mutex_lock(&s->mtx);
++   for (uint32_t i = 0; i < s->count; i++) {
++      struct acd_syncobj *o = &s->objs[i];
++      if (!o->in_use)
++         continue;
++      if (o->bin_seq && o->bin_seq == seq) {
++         o->bin_cpu = true;
++         o->bin_seq = 0;
++      }
++      for (uint32_t j = 0; j < o->tl_n;) {
++         if (o->tl[j].seq == seq) {
++            if (o->tl[j].point > o->point)
++               o->point = o->tl[j].point;
++            o->tl[j] = o->tl[--o->tl_n];
++         } else {
++            j++;
++         }
++      }
++   }
++   pthread_cond_broadcast(&s->cond);
++   pthread_mutex_unlock(&s->mtx);
++}
++
+ static int
+ backend_wait(struct acd_sync *s, uint64_t seq, uint64_t rel_ns)
+ {
+    bool busy = false;
+    uint64_t retired = 0;
+    int r = s->be.wait_seq(s->be.ctx, seq, rel_ns, &busy, &retired);
+    if (r == -ETIME)
+       r = -ECANCELED; /* the kernel's -ETIME is "device hung", not a wait timeout */
+    if (r)
+       return r;
+    note_retired(s, retired);
+-   if (!busy)
+-      note_retired(s, seq);
++   if (!busy && seq > retired)
++      note_completed(s, seq);
+    return 0;
+ }

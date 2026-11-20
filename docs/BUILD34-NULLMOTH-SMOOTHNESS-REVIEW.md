@@ -1,5 +1,16 @@
 # Build34 smoothness comparison with NullMoth
 
+Latest November 20 checkpoint: R2a is loaded and its finite startup/display
+functional trial plus independent readback passed. Its observed mean copy
+time is 2,438.44 us versus 2,399.90 us baseline; no speedup is established.
+Keep that passed installation active. R3's actual-source CPU tests now expose
+and fix a prerequisite bookkeeping hazard under a proposed exact backend,
+without changing the installed kernel/transport/runtime. Exact native waits,
+multi-target fairness, cross-queue dependencies and AMD events still require
+work before R3 acceptance; R4–R6 have not started. See
+[R2a loaded result](validation/build34-r2-packed-copy-boot-20261120.json) and
+[R3 source prerequisite](BUILD34-EXACT-COMPLETION.md).
+
 Current November 20 execution status: R1a's finite native validation and
 R1b's real pressure trial plus separate independent readback have passed.
 Four actual queue-space blocks were observed; three GFX submissions and
