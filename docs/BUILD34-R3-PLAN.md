@@ -19,11 +19,11 @@ independent remote SHA check.
 | Work | Evidence now | What must close it |
 | --- | --- | --- |
 | Preserve safe global retirement | Existing build34 path and CPU regressions | Keep legacy resource-reclamation/CPU-fence semantics while exact targets complete independently |
-| Mesa exact bookkeeping, multi-target fairness, conservative CS ordering/shape | Four isolated reviewed patches with actual-source CPU tests, including single-native-batch preflight | Carry into a paired negotiated backend, freeze dependencies, test all error/fallback paths; an aggregate exact CS protocol is not implemented |
+| Mesa exact bookkeeping, multi-target fairness, conservative CS ordering/shape | Five isolated reviewed patches with actual-source CPU tests, including single-native-batch preflight and a bounded completion/ACK cache | Carry into a paired negotiated backend, freeze dependencies, prove snapshot/visibility and caller backpressure/error behavior; an aggregate exact CS protocol is not implemented |
 | Native target ownership and queue generation | Staged submit, invalidation, observer and embedded binding pass CPU/TSan tests | Actual SDK/KPI integration plus authenticated native admission and queue lifecycle evidence |
 | Exact wait fallback | Original wait passes CPU/TSan; the later wait-pinned version re-runs all 28 groups/six threaded cases (22,094 checks) | Carry into the native negotiated path; real KPI/lifecycle and GPU timeout/wakeup evidence remain required |
 | Trusted device fence observation | Primary-source packet/mapping review and 189,198-check low-dword window primitive; no reader admitted | Integrate the bounded window with all shared-queue submissions, establish actual mapping/device coherency and ownership/drain, then obtain native/GPU evidence; see `BUILD34-FENCE-READER.md` |
-| Native protocol and receipt lifetime | Internal completion-only acknowledgement with wait pins passes 228,946 additional CPU/TSan checks, including 64-slot refusal and 2,000 reuse cycles; no selector or negotiation | Backward-compatible capability/session admission, strict marshalling, paired userspace payload ownership/acknowledgement and error/backpressure tests |
+| Native protocol and receipt lifetime | Internal wait-pinned ACK plus a source-only actual-Mesa 4096-record completion cache; late provider/raw queries, bounded ACK Busy retries, full-cache refusal and four real-thread scenarios pass CPU sanitizers; no native selector or negotiation | Backward-compatible capability/session admission, strict wire marshalling, genuine global-prefix snapshot, native visibility/publication and error/backpressure integration; caller-quiescent transport destroy is still required |
 | Resource and object teardown | Deliberate permanent retention only | Healthy completion can safely reclaim after CPU callbacks and actual GPU work drain; uncertain/lost work remains quarantined, never released by timeout alone |
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
 | Frozen native integration | No R3 native candidate | Complete entrypoint/VM audit, actual SDK compile, exact build34 provenance and paired runtime/ABI validation without weakening existing build34 admission |
@@ -47,6 +47,12 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    completed native receipts cannot be discarded after the first positive wait
    unless subsequent valid references can still resolve completion. Keep the
    tested exact-CS shape guard until an aggregate protocol is proved.
+   The 0007 transport cache now tests that late-query prerequisite with CPU
+   callbacks, preserving raw sequence numbers and the genuine global prefix.
+   Its callback table is not native negotiation: do not bind it to old WAITSEQ,
+   enable it in production, or assume RADV safely retries its EAGAIN admission
+   refusal without testing the real caller. The independent snapshot/visibility,
+   strict native error classification and SDK integration still have to exist.
 4. Replace permanent healthy-client/service retention with proved callback/GPU
    drain and reclamation. Keep fault/uncertain-work quarantine distinct from
    successful completion; audit every VM mutation and native entrypoint.

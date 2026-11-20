@@ -1,0 +1,468 @@
+diff --git a/src/amd/common/darwin/ac_darwin_kext.h b/src/amd/common/darwin/ac_darwin_kext.h
+--- a/src/amd/common/darwin/ac_darwin_kext.h
++++ b/src/amd/common/darwin/ac_darwin_kext.h
+@@ -99,6 +99,43 @@
+ struct acd_kext *acd_kext_create(const struct acd_kext_ops *ops, void *ctx);
+ void acd_kext_destroy(struct acd_kext *k);
+
++/* Source-only paired adapter contract, NOT a wire ABI or capability probe.
++ * No production transport installs it. Configuration is one-shot before any
++ * sequence traffic; destroy still requires caller quiescence. Callbacks must
++ * be bounded and operate on this retained session. They run outside the cache
++ * mutex. submit is serialized and must not recursively submit on this kext.
++ * Completion/prefix replies must include all required device/CPU visibility
++ * and user-fence publication; this cache cannot establish those properties.
++ * retired is the genuine safe GLOBAL prefix, never a client/queue watermark.
++ * wait_prefix(0,0) is an independently defined snapshot, NOT legacy WAITSEQ(0).
++ * ACK -EBUSY certifies retained ownership; all other ACK errors poison the
++ * session because a lost acknowledgement may already have removed a receipt.
++ * Only observation -EINTR/-EAGAIN are retryable; other observation errors
++ * poison the session. No callback may silently replace/reset its session.
++ * submit sets no_dispatch only on a proved rejection with no GPU publication
++ * and no native receipt. Any other error or malformed success is uncertain. */
++#define ACD_EXACT_RECORDS 4096u
++#define ACD_EXACT_ACK_BUDGET 64u
++struct acd_exact_receipt {
++   uint64_t sequence, owner, serial, generation;
++   uint32_t slot, queue;
++};
++struct acd_exact_snapshot {
++   uint64_t owner, retired;
++};
++struct acd_exact_backend {
++   uint64_t owner;
++   void *ctx;
++   int (*submit)(void *ctx, const void *packet, size_t size,
++                 struct acd_exact_receipt *out, bool *no_dispatch);
++   int (*wait)(void *ctx, const struct acd_exact_receipt *receipt, uint64_t rel_ns,
++               bool *busy, struct acd_exact_snapshot *out);
++   int (*ack)(void *ctx, const struct acd_exact_receipt *receipt);
++   int (*wait_prefix)(void *ctx, uint64_t target, uint64_t rel_ns,
++                      struct acd_exact_snapshot *out);
++};
++int acd_kext_set_exact_backend(struct acd_kext *k, const struct acd_exact_backend *backend);
++
+ /* Backend selection: RADV_DARWIN_MOCK=1 gives the in-process mock, otherwise the
+  * IOKit transport (IOServiceOpen of Navi48Bringup, type 'N48N'). Logs one clear
+  * stderr line and returns -errno on failure. */
+diff --git a/src/amd/common/darwin/ac_darwin_kext.c b/src/amd/common/darwin/ac_darwin_kext.c
+--- a/src/amd/common/darwin/ac_darwin_kext.c
++++ b/src/amd/common/darwin/ac_darwin_kext.c
+@@ -8,6 +8,7 @@
+ #include "ac_darwin_kext.h"
+
+ #include <errno.h>
++#include <pthread.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -69,9 +70,29 @@
+                N48N_GEM_ENCRYPTED == AMDGPU_GEM_CREATE_ENCRYPTED &&
+                N48N_GEM_PREEMPTIBLE == AMDGPU_GEM_CREATE_PREEMPTIBLE, "gem values");
+
++enum acd_exact_phase { ACD_EXACT_FREE, ACD_EXACT_RESERVED, ACD_EXACT_PENDING, ACD_EXACT_COMPLETE };
++struct acd_exact_record {
++   struct acd_exact_receipt receipt;
++   enum acd_exact_phase phase;
++   uint32_t waiters;
++   bool acked, acknowledging;
++};
++struct acd_exact_state {
++   struct acd_exact_backend be;
++   pthread_mutex_t submit_mtx;
++   struct acd_exact_record records[ACD_EXACT_RECORDS];
++   uint64_t emitted, retired, native_serial;
++   uint32_t ack_cursor;
++   bool poisoned, servicing;
++};
++
++
+ struct acd_kext {
+    struct acd_kext_ops ops;
+    void *ctx;
++   pthread_mutex_t mtx;
++   struct acd_exact_state *exact;
++   bool sequence_traffic;
+ };
+
+ /* G6: the service class of the N48N open. A pointer to one of the two string literals below (never to the caller's buffer). */
+@@ -101,6 +122,12 @@
+          ops->close(ctx);
+       return NULL;
+    }
++   if (pthread_mutex_init(&k->mtx, NULL)) {
++      if (ops->close)
++         ops->close(ctx);
++      free(k);
++      return NULL;
++   }
+    k->ops = *ops;
+    k->ctx = ctx;
+    return k;
+@@ -113,6 +140,11 @@
+       return;
+    if (k->ops.close)
+       k->ops.close(k->ctx);
++   if (k->exact) {
++      pthread_mutex_destroy(&k->exact->submit_mtx);
++      free(k->exact);
++   }
++   pthread_mutex_destroy(&k->mtx);
+    free(k);
+ }
+
+@@ -188,6 +220,308 @@
+ #endif
+ }
+
++int
++acd_kext_set_exact_backend(struct acd_kext *k, const struct acd_exact_backend *be)
++{
++   if (!be || !be->owner || be->owner == UINT64_MAX || !be->submit ||
++       !be->wait || !be->ack || !be->wait_prefix)
++      return -EINVAL;
++   struct acd_exact_state *e = calloc(1, sizeof(*e));
++   if (!e)
++      return -ENOMEM;
++   int r = pthread_mutex_init(&e->submit_mtx, NULL);
++   if (r) {
++      free(e);
++      return -r;
++   }
++   e->be = *be;
++   pthread_mutex_lock(&k->mtx);
++   if (k->sequence_traffic || k->exact) {
++      pthread_mutex_unlock(&k->mtx);
++      pthread_mutex_destroy(&e->submit_mtx);
++      free(e);
++      return -EBUSY;
++   }
++   k->exact = e;
++   pthread_mutex_unlock(&k->mtx);
++   return 0;
++}
++
++static struct acd_exact_state *
++acd_sequence_traffic(struct acd_kext *k)
++{
++   pthread_mutex_lock(&k->mtx);
++   k->sequence_traffic = true;
++   struct acd_exact_state *e = k->exact;
++   pthread_mutex_unlock(&k->mtx);
++   return e;
++}
++
++/* Called under mtx. A pin or in-flight ACK prevents reuse of its exact record;
++ * no completion observation, ACK result or safe-prefix update can evict it. */
++static void
++acd_exact_fold(struct acd_exact_state *e)
++{
++   for (uint32_t i = 0; i < ACD_EXACT_RECORDS; i++) {
++      struct acd_exact_record *r = &e->records[i];
++      if (r->phase == ACD_EXACT_PENDING && r->receipt.sequence <= e->retired)
++         r->phase = ACD_EXACT_COMPLETE;
++      if (r->phase == ACD_EXACT_COMPLETE && r->acked && !r->acknowledging &&
++          !r->waiters && r->receipt.sequence <= e->retired)
++         memset(r, 0, sizeof(*r));
++   }
++}
++
++static bool
++acd_exact_snapshot(struct acd_exact_state *e, const struct acd_exact_snapshot *s)
++{
++   if (s->owner != e->be.owner || s->retired == UINT64_MAX) {
++      e->poisoned = true;
++      return false;
++   }
++   /* Older concurrent replies cannot undo a newer safe global observation. */
++   if (s->retired > e->retired)
++      e->retired = s->retired;
++   acd_exact_fold(e);
++   return true;
++}
++
++/* One bounded, nonrecursive ACK service. Busy leaves a retryable record.
++ * Completed facts are already durable locally before any ACK can begin. */
++static int
++acd_exact_service(struct acd_kext *k, struct acd_exact_state *e)
++{
++   pthread_mutex_lock(&k->mtx);
++   if (e->servicing || e->poisoned) {
++      int r = e->poisoned ? -ECANCELED : 0;
++      pthread_mutex_unlock(&k->mtx);
++      return r;
++   }
++   e->servicing = true;
++   uint32_t scanned = 0, calls = 0;
++   while (scanned < ACD_EXACT_RECORDS && calls < ACD_EXACT_ACK_BUDGET && !e->poisoned) {
++      struct acd_exact_record *r = &e->records[e->ack_cursor];
++      e->ack_cursor = (e->ack_cursor + 1) % ACD_EXACT_RECORDS;
++      scanned++;
++      if (r->phase != ACD_EXACT_COMPLETE || r->acked || r->acknowledging || r->waiters)
++         continue;
++      r->acknowledging = true;
++      struct acd_exact_receipt receipt = r->receipt;
++      pthread_mutex_unlock(&k->mtx);
++      int result = e->be.ack(e->be.ctx, &receipt);
++      pthread_mutex_lock(&k->mtx);
++      calls++;
++      r->acknowledging = false;
++      if (!result)
++         r->acked = true;
++      else if (result != -EBUSY)
++         e->poisoned = true;
++      acd_exact_fold(e);
++   }
++   e->servicing = false;
++   int result = e->poisoned ? -ECANCELED : 0;
++   pthread_mutex_unlock(&k->mtx);
++   return result;
++}
++
++static int
++acd_exact_terminal_error(int result)
++{
++   return result && result != -EINTR && result != -EAGAIN;
++}
++
++static int
++acd_exact_prefix(struct acd_kext *k, struct acd_exact_state *e, uint64_t target,
++                 uint64_t rel_ns, bool *busy, struct acd_wait_status *st)
++{
++   pthread_mutex_lock(&k->mtx);
++   bool poisoned = e->poisoned;
++   pthread_mutex_unlock(&k->mtx);
++   if (poisoned)
++      return -ECANCELED;
++   struct acd_exact_snapshot s = {0};
++   int result = e->be.wait_prefix(e->be.ctx, target, target ? rel_ns : 0, &s);
++   if (result) {
++      if (acd_exact_terminal_error(result)) {
++         pthread_mutex_lock(&k->mtx);
++         e->poisoned = true;
++         pthread_mutex_unlock(&k->mtx);
++      }
++      return result;
++   }
++   pthread_mutex_lock(&k->mtx);
++   acd_exact_snapshot(e, &s);
++   pthread_mutex_unlock(&k->mtx);
++   result = acd_exact_service(k, e);
++   if (result)
++      return result;
++   pthread_mutex_lock(&k->mtx);
++   if (e->poisoned) {
++      pthread_mutex_unlock(&k->mtx);
++      return -ECANCELED;
++   }
++   *busy = e->retired < target;
++   if (st)
++      *st = (struct acd_wait_status){.retired = e->retired, .emitted = e->emitted};
++   pthread_mutex_unlock(&k->mtx);
++   return 0;
++}
++
++static int
++acd_exact_wait(struct acd_kext *k, struct acd_exact_state *e, uint64_t seq,
++               uint64_t rel_ns, bool *busy, struct acd_wait_status *st)
++{
++   if (!seq)
++      return acd_exact_prefix(k, e, 0, 0, busy, st);
++   pthread_mutex_lock(&k->mtx);
++   if (e->poisoned) {
++      pthread_mutex_unlock(&k->mtx);
++      return -ECANCELED;
++   }
++   /* Below the genuine safe prefix, preserve legacy raw-WaitCS readiness for
++    * any handle <= this client's emitted bound (including old raw holes).
++    * This is global completion, NOT proof that a native ticket was owned.
++    * Above the prefix only a retained, authenticated exact receipt may wait. */
++   struct acd_exact_record *r = NULL;
++   for (uint32_t i = 0; i < ACD_EXACT_RECORDS; i++) {
++      if (e->records[i].phase >= ACD_EXACT_PENDING && e->records[i].receipt.sequence == seq) {
++         r = &e->records[i];
++         break;
++      }
++   }
++   if (!r && !(seq <= e->retired && seq <= e->emitted)) {
++      pthread_mutex_unlock(&k->mtx);
++      return -ENOENT;
++   }
++   if (r && r->phase == ACD_EXACT_PENDING) {
++      if (r->waiters == UINT32_MAX) {
++         pthread_mutex_unlock(&k->mtx);
++         return -EBUSY;
++      }
++      r->waiters++;
++      struct acd_exact_receipt receipt = r->receipt;
++      pthread_mutex_unlock(&k->mtx);
++      struct acd_exact_snapshot s = {0};
++      bool pending = true;
++      int result = e->be.wait(e->be.ctx, &receipt, rel_ns, &pending, &s);
++      pthread_mutex_lock(&k->mtx);
++      if (!result && acd_exact_snapshot(e, &s) && !pending)
++         r->phase = ACD_EXACT_COMPLETE;
++      r->waiters--;
++      if (acd_exact_terminal_error(result))
++         e->poisoned = true;
++      if (result || e->poisoned) {
++         acd_exact_fold(e);
++         pthread_mutex_unlock(&k->mtx);
++         return result ? result : -ECANCELED;
++      }
++   }
++   /* Copy the result before a later fold/ACK can free or reuse this slot. */
++   bool pending = r && r->phase != ACD_EXACT_COMPLETE;
++   pthread_mutex_unlock(&k->mtx);
++   int result = acd_exact_service(k, e);
++   if (result)
++      return result;
++   pthread_mutex_lock(&k->mtx);
++   if (e->poisoned) {
++      pthread_mutex_unlock(&k->mtx);
++      return -ECANCELED;
++   }
++   *busy = pending;
++   if (st)
++      *st = (struct acd_wait_status){.retired = e->retired, .emitted = e->emitted};
++   pthread_mutex_unlock(&k->mtx);
++   return 0;
++}
++
++static int
++acd_exact_submit(struct acd_kext *k, struct acd_exact_state *e,
++                 const struct acd_cs_plan *plan, uint64_t *seq)
++{
++   if (!plan->n_ibs)
++      return -EINVAL;
++   if (!plan->ibs || plan->n_ibs > N48N_MAX_IBS)
++      return -EOPNOTSUPP;
++   for (uint32_t i = 0; i < plan->n_ibs; i++) {
++      const struct n48n_cs_ib *ib = &plan->ibs[i];
++      if ((ib->ip_type != AMDGPU_HW_IP_GFX && ib->ip_type != AMDGPU_HW_IP_COMPUTE) ||
++          ib->ip_type != plan->ibs[0].ip_type || ib->ip_instance || ib->ring)
++         return -EOPNOTSUPP;
++   }
++   /* Exact submission order is transport-local, never the cache/global lock.
++    * Queries and ACK progress remain possible while native admission blocks. */
++   pthread_mutex_lock(&e->submit_mtx);
++   int result = acd_exact_service(k, e);
++   struct acd_exact_record *r = NULL;
++   for (unsigned pass = 0; !result && pass < 2; pass++) {
++      pthread_mutex_lock(&k->mtx);
++      if (e->poisoned)
++         result = -ECANCELED;
++      else {
++         acd_exact_fold(e);
++         for (uint32_t i = 0; i < ACD_EXACT_RECORDS; i++) {
++            if (e->records[i].phase == ACD_EXACT_FREE) {
++               r = &e->records[i];
++               r->phase = ACD_EXACT_RESERVED;
++               break;
++            }
++         }
++      }
++      pthread_mutex_unlock(&k->mtx);
++      if (result || r)
++         break;
++      if (!pass) {
++         bool unused;
++         result = acd_exact_prefix(k, e, 0, 0, &unused, NULL);
++      }
++   }
++   if (!result && !r)
++      result = -EAGAIN;
++   if (!result) {
++      uint8_t buf[sizeof(struct n48n_cs_in) + N48N_MAX_IBS * sizeof(struct n48n_cs_ib)];
++      struct n48n_cs_in h = {.abi = N48N_ABI_VERSION, .ctx_id = plan->ctx_id, .num_ibs = plan->n_ibs};
++      if (plan->has_fence) {
++         h.flags = N48N_CS_HAS_FENCE;
++         h.fence_handle = plan->fence_handle;
++         h.fence_offset = plan->fence_offset;
++      }
++      memcpy(buf, &h, sizeof(h));
++      memcpy(buf + sizeof(h), plan->ibs, plan->n_ibs * sizeof(*plan->ibs));
++      struct acd_exact_receipt receipt = {0};
++      bool no_dispatch = false;
++      acd_sfence();
++      result = e->be.submit(e->be.ctx, buf, sizeof(h) + plan->n_ibs * sizeof(*plan->ibs),
++                            &receipt, &no_dispatch);
++      pthread_mutex_lock(&k->mtx);
++      if (result) {
++         if (no_dispatch)
++            memset(r, 0, sizeof(*r));
++         else
++            e->poisoned = true; /* uncertain dispatch keeps the reservation */
++         if (result == -ECANCELED || result == -ENODEV || result == -ETIME)
++            e->poisoned = true;
++      } else if (e->poisoned || no_dispatch || receipt.owner != e->be.owner || !receipt.serial ||
++                 receipt.serial <= e->native_serial ||
++                 receipt.serial == UINT64_MAX || !receipt.generation || receipt.generation == UINT64_MAX ||
++                 receipt.slot >= 64 || receipt.queue >= 2 || !receipt.sequence ||
++                 receipt.sequence == UINT64_MAX || receipt.sequence <= e->emitted) {
++         e->poisoned = true;
++         result = -EPROTO;
++      } else {
++         r->receipt = receipt;
++         r->phase = ACD_EXACT_PENDING;
++         e->emitted = receipt.sequence;
++         e->native_serial = receipt.serial;
++         acd_exact_fold(e);
++         *seq = receipt.sequence; /* raw native ABI, also the CPU fence value */
++      }
++      pthread_mutex_unlock(&k->mtx);
++   }
++   pthread_mutex_unlock(&e->submit_mtx);
++   return result;
++}
++
++
+ static bool
+ trace_enabled(void)
+ {
+@@ -517,6 +851,9 @@
+ int
+ acd_kext_submit(struct acd_kext *k, const struct acd_cs_plan *plan, uint64_t *last_seqno)
+ {
++   struct acd_exact_state *e = acd_sequence_traffic(k);
++   if (e)
++      return acd_exact_submit(k, e, plan, last_seqno);
+    uint8_t buf[sizeof(struct n48n_cs_in) + N48N_MAX_IBS * sizeof(struct n48n_cs_ib)];
+    uint64_t seq = 0;
+
+@@ -562,6 +899,16 @@
+ {
+    if (rel_ns > N48N_WAIT_CAP_NS)
+       rel_ns = N48N_WAIT_CAP_NS;
++   struct acd_exact_state *e = acd_sequence_traffic(k);
++   if (e) {
++      if (seq == N48N_SEQ_LAST) {
++         pthread_mutex_lock(&k->mtx);
++         uint64_t target = e->emitted;
++         pthread_mutex_unlock(&k->mtx);
++         return acd_exact_prefix(k, e, target, rel_ns, busy, st);
++      }
++      return acd_exact_wait(k, e, seq, rel_ns, busy, st);
++   }
+    const uint64_t sin[3] = {seq, rel_ns, 0};
+    uint64_t sout[3] = {0};
+    uint32_t nout = 3;
+@@ -581,9 +928,17 @@
+ int
+ acd_kext_wait_deadline(struct acd_kext *k, uint64_t seq, uint64_t abs_deadline_ns, bool *busy)
+ {
++   struct acd_exact_state *e = acd_sequence_traffic(k);
++   bool prefix = e && seq == N48N_SEQ_LAST;
++   if (prefix) {
++      pthread_mutex_lock(&k->mtx);
++      seq = e->emitted;
++      pthread_mutex_unlock(&k->mtx);
++   }
+    for (;;) {
+       const uint64_t slice = acd_wait_slice_ns(abs_deadline_ns, acd_kext_now_ns(k));
+-      int r = acd_kext_wait_seq(k, seq, slice, busy, NULL);
++      int r = prefix ? acd_exact_prefix(k, e, seq, slice, busy, NULL)
++                     : acd_kext_wait_seq(k, seq, slice, busy, NULL);
+       if (r)
+          return r;
+       if (!*busy)

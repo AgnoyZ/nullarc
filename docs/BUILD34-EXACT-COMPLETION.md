@@ -8,7 +8,10 @@ exact-wait implementation.
 An additional allocation-free ownership/queue-generation **state prototype**
 and staged submit/lifecycle, callback/client quarantine, target-observer
 embedded client/provider identity-binding and owned-ticket wait fallback
-experiments have CPU evidence but no production caller. The proposed observer
+experiments have CPU evidence but no production caller. A further actual-Mesa
+transport experiment retains completion across ACK and serves late queries;
+its adapter is installed only by CPU fixtures, with no native wire binding.
+The proposed observer
 has no admitted hardware fence reader and refuses completion without one.
 R4–R6 have not started.
 
@@ -1104,3 +1107,104 @@ Production exact capability remains false, all prior patches and the 172
 driver/plugin/ABI/tool inputs remain unchanged, and old runtime recipes do
 not apply 0006. No full RADV/native kernel build, installation, IOKit open,
 GPU work, power action, physical FPS or long-term acceptance occurred.
+
+## Paired Mesa completion and ACK lifetime (November 21)
+
+The previous internal ACK alone could not be wired after every positive wait:
+the actual provider permits late attachment, and raw WaitCS bypasses that
+provider. A naive adapter that forgets native sequence 20 after its first
+successful query leaves neither path able to answer a later valid reference.
+The new fixture reproduces this **prospective auto-ACK counterexample** on
+the actual 0003–0006 provider/transport with a controlled CPU backend. It is
+not an installed-driver failure or a GPU reproduction.
+
+[Patch 0007](../mesa-patches-build34/0007-radv-exact-receipt-lifetime.patch)
+follows 0003–0006 and changes only `ac_darwin_kext.c` and its header, retaining
+their MIT notices. A one-shot callback adapter can be configured only before
+sequence traffic. Only the CPU fixture configures it; the production provider
+capability stays false and existing runtime recipes apply none of this new
+experiment. The callback table is **not** a native wire ABI, capability probe,
+selector implementation or device reader.
+
+The actual transport now has the following tested source-only behavior:
+
+- Reserve one of **4096 bounded records before submission**. Exact mode
+  independently enforces one homogeneous 1–64-IB GFX/compute packet, with
+  instance/ring zero, including direct marshaller callers. A transport-local
+  submit mutex serializes admission; no callback runs under the cache mutex.
+  Configuration, callbacks and cached-query reentrance are exercised. This
+  does not prove IOKit lock order or native callback lifetime.
+- A successful receipt must have this immutable session owner, a new native
+  sequence and native ticket serial, a valid slot/queue, and a nonzero,
+  non-sentinel generation. Submission errors release their reservation only
+  when the adapter explicitly certifies **no dispatch and no native receipt**.
+  Uncertain errors or malformed successes poison the connection and retain
+  uncertain metadata. No reset/rebind API can silently reuse that session.
+- A pending query pins its record across the unlocked native callback.
+  A trusted nonbusy reply is saved as an exact completed fact **before ACK**.
+  Another pending/stale response cannot undo it. A pin prevents ACK/reuse;
+  in-flight ACK also prevents reuse. ACK Busy preserves retryable ownership,
+  with a nonrecursive service limited to 64 attempts per call. Other ACK
+  errors poison the session rather than assuming an acknowledgement arrived.
+- Completed/ACKed facts above the genuine safe global prefix remain available
+  to late syncobj attachments and raw WaitCS. A record can be cleared only
+  after that prefix covers it, ACK succeeded and all pins/callbacks left.
+  Below the prefix, raw handles within this client's emitted bound preserve
+  legacy completed-prefix readiness, including old raw sequence holes. This
+  is a globally proved completion result, **not** evidence that an exact
+  native receipt belonged to that client; no missing receipt above the prefix
+  can imply completion. Global retirement is never advanced to an exact GFX
+  target or to a client-local completion summary.
+- Zero/snapshot and LAST use an independently specified prefix callback.
+  **Legacy WAITSEQ(0,0) is not used as a pure snapshot:** the actual build34
+  handler flushes BOs and may publish the pending CPU fence. LAST/BO-idle
+  wait for the genuine global prefix through the captured client-emitted
+  target, not just the last exact GFX receipt. An absolute LAST wait captures
+  that target once rather than chasing concurrent new submissions.
+- Raw native sequence values remain unchanged, including the value associated
+  with a CPU user-fence request. The fixture checks marshalling/value identity;
+  it does **not** prove native CPU-fence publication or memory visibility.
+  Adapter observations must provide those real guarantees before integration.
+  Snapshot owner/values are checked, older concurrent prefixes merge without
+  regression, and observation errors poison the session except explicitly
+  retryable EINTR/EAGAIN. A known terminal error cannot be masked by a cache hit.
+
+When an earlier compute gap outlives all 4096 records, new submission returns
+EAGAIN before dispatch; it neither evicts the pending compute nor forgets later
+completed GFX. A fresh genuine prefix snapshot permits compaction/reuse after
+the gap closes. This is bounded safety/backpressure, **not demonstrated RADV
+retry behavior or long-running performance acceptance**. Real caller handling,
+the storage/scan cost and ACK/prefix syscall latency still require integration
+and measurement; the cache is not claimed to improve FPS.
+
+The [runner](../tools/test_build34_exact_transport.py) freezes the same 30-file
+reviewed Mesa closure, the earlier patches/tests and all 172 production inputs.
+ASan/UBSan passes **112,869 checks** and TSan **112,867 checks**, including full
+64-receipt refusal/recovery, all 4096 cache records with an earlier compute
+pending, safe compaction and late queries, ACK Busy, uncertain dispatch,
+twelve malformed receipts, session loss, direct shapes and raw sequence
+identity. Counts include checked condition waits and can differ with thread
+scheduling. Four real-thread scenarios cover two pinned readers, a late
+pending reply, an in-flight ACK with concurrent prefix/query/submit, and an
+older prefix reply arriving after a newer global snapshot. All **21 defective
+variants** are detected. Previous actual-CS suites still pass **1,901** shape
+checks and **4,552** dependency checks. See
+[sanitized evidence](validation/build34-r3-transport-offline-20261121.json).
+
+Run only with matching reviewed source and a fresh ignored output:
+
+```sh
+nice -n 15 taskpolicy -b make -j1 test-build34-exact-transport \
+  MESA_SOURCE="$MESA_SOURCE" \
+  EXACT_TRANSPORT_OUT=build/build34-r3-transport-new-private
+```
+
+Transport destruction still requires **caller quiescence**. This patch does
+not reclaim native BOs/VMIDs, establish a device/session drain, bind the reader,
+implement the independently required prefix/visibility protocol, add AMD
+completion events, or make permanent native quarantine deployable. All earlier
+transforms/patches, native ABI, protected production files and installed
+configuration remain unchanged. No kernel SDK/full RADV build, IOKit open,
+installation, GPU work, reboot, physical FPS or long-term acceptance occurred.
+The accepted R1b/R2a/plugin/startup settings stay active; R3 remains incomplete
+until its native and hardware ledger closes, and R4–R6 remain pending.
