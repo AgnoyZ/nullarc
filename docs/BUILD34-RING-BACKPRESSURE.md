@@ -41,6 +41,17 @@ acceptance has closed power recovery. It retires its exact job before probing;
 startup recovery retires that job without submitting GPU work. Two further CPU
 methods check exact-file retirement and unknown-replacement preservation.
 
+The fresh second scope subsequently installed the exact R1b executable and
+four next-boot job files without bootstrap. Separate independent readback
+passed the complete 358-file EFI, full 416/29 cache metadata, all sealed
+recovery/jobs and the still-loaded R1a/VBL/optimized-AML/accepted-plugin
+combination. The same WindowServer, VBL/copy progress, zero checked errors
+and no new matching report were observed. Both recovery journals are
+unconsumed. The pressure binary's CPU packet/arena self-test and parser
+fixture pass. No power request or new GPU workload occurred at this checkpoint;
+one ordinary restart, new-boot admission and the actual pressure proof remain.
+See [independent installation evidence](validation/build34-r1b-retained-installation-20261120.json).
+
 ## Earlier source and first trial
 
 R1b starts from the running, hardware-checked R1a kernel at
