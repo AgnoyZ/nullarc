@@ -195,6 +195,12 @@ test-build34-exact-receipt:
 	@test -n "$(EXACT_RECEIPT_OUT)" || (echo "Set EXACT_RECEIPT_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_receipt.py --out "$(EXACT_RECEIPT_OUT)"
 
+# Source-only complete-token submit/wait/ACK with CPU objects; never a kext.
+.PHONY: test-build34-exact-submit-receipt
+test-build34-exact-submit-receipt:
+	@test -n "$(EXACT_SUBMIT_RECEIPT_OUT)" || (echo 'Set EXACT_SUBMIT_RECEIPT_OUT to a fresh ignored -private build directory'; exit 2)
+	python3 -B tools/test_build34_exact_submit_receipt.py --out "$(EXACT_SUBMIT_RECEIPT_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \

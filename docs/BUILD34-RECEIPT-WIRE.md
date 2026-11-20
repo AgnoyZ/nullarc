@@ -5,9 +5,11 @@ the installed native ABI or a deployable kernel. It follows the internal
 wait-pinned ACK experiment, keeps all previous methods unchanged, and adds
 complete-token wait/ACK handlers plus their actual `externalMethod` route.
 The production native ABI and all 172 protected production inputs remain
-unchanged. There is still no native request assigning exact mode, capability
-negotiation, exact-submit reply or paired Mesa wire binding. Do not advertise
-or enable this interface until the complete R3 admission ledger closes.
+unchanged. This wait/ACK checkpoint has no native request assigning exact mode,
+capability negotiation, exact-submit reply or paired Mesa wire binding. The
+later [staged submit extension](BUILD34-SUBMIT-RECEIPT.md) adds only the submit
+receipt operation. Do not advertise or enable this interface until the complete
+R3 admission ledger closes.
 
 ## Request and reply
 
@@ -143,7 +145,7 @@ nice -n 15 taskpolicy -b make -j1 test-build34-exact-receipt \
   EXACT_RECEIPT_OUT=build/build34-r3-receipt-new-private
 ```
 
-Native mode/capability and submit negotiation, the independent prefix and
+Native mode/capability and production submit negotiation, the independent prefix and
 visibility/CPU-fence protocol, coherent hardware reader, healthy teardown,
 events, actual SDK integration and real GPU/FPS/stability acceptance remain
 required. Keep this transform unapplied to installed code; there is no new

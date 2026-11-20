@@ -23,7 +23,7 @@ independent remote SHA check.
 | Native target ownership and queue generation | Staged submit, invalidation, observer and embedded binding pass CPU/TSan tests | Actual SDK/KPI integration plus authenticated native admission and queue lifecycle evidence |
 | Exact wait fallback | Original wait passes CPU/TSan; the later wait-pinned version re-runs all 28 groups/six threaded cases (22,094 checks) | Carry into the native negotiated path; real KPI/lifecycle and GPU timeout/wakeup evidence remain required |
 | Trusted device fence observation | Primary-source packet/mapping review and 189,198-check low-dword window primitive; no reader admitted | Integrate the bounded window with all shared-queue submissions, establish actual mapping/device coherency and ownership/drain, then obtain native/GPU evidence; see `BUILD34-FENCE-READER.md` |
-| Native protocol and receipt lifetime | Internal wait-pinned ACK, actual-Mesa bounded completion cache, and staged complete-token structure wait/ACK dispatch now pass CPU sanitizers; experimental selectors 64/65 have no production mode/capability or Mesa wire binding | Complete native capability/session and exact-submit admission, independent genuine global-prefix/visibility protocol, paired binding and caller backpressure/error integration; caller-quiescent transport destroy is still required |
+| Native protocol and receipt lifetime | Internal wait-pinned ACK, actual-Mesa bounded completion cache, and staged complete-token structure submit/wait/ACK dispatch pass CPU sanitizers; experimental selectors 64/65/66 have no production mode/capability or Mesa wire binding | Complete native capability/session and production exact-submit admission, independent genuine global-prefix/visibility and CPU-fence protocol, paired binding and caller backpressure/error integration; caller-quiescent transport destroy is still required |
 | Resource and object teardown | Deliberate permanent retention only | Healthy completion can safely reclaim after CPU callbacks and actual GPU work drain; uncertain/lost work remains quarantined, never released by timeout alone |
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
 | Frozen native integration | No R3 native candidate | Complete entrypoint/VM audit, actual SDK compile, exact build34 provenance and paired runtime/ABI validation without weakening existing build34 admission |
@@ -56,8 +56,12 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    Staged receipt wait/ACK now validate complete owner/slot/serial/sequence/
    queue/generation requests at the actual pre-lock dispatch entry; see
    [the experimental wire contract](BUILD34-RECEIPT-WIRE.md). This is only
-   part of the native protocol: no exact mode request, capability negotiation,
-   submit reply, independent global prefix or Mesa wire binding is added.
+   part of the native protocol. A subsequent [staged submit extension](BUILD34-SUBMIT-RECEIPT.md)
+   returns that complete identity through a fixed envelope while refusing
+   mixed-engine batches and unimplemented CPU user fences. It preserves
+   actual queue fallback and retains published work on uncertain errors.
+   There is still no native exact mode request, capability negotiation,
+   independent global prefix/visibility or Mesa wire binding.
 4. Replace permanent healthy-client/service retention with proved callback/GPU
    drain and reclamation. Keep fault/uncertain-work quarantine distinct from
    successful completion; audit every VM mutation and native entrypoint.

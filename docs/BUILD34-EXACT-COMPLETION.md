@@ -14,6 +14,11 @@ its adapter is installed only by CPU fixtures, with no native wire binding.
 Staged native receipt wait/ACK now also validate complete tokens through a
 strict structure dispatcher, still with no mode/capability admission or
 paired runtime binding; see [the wire contract](BUILD34-RECEIPT-WIRE.md).
+The subsequent [staged submit receipt extension](BUILD34-SUBMIT-RECEIPT.md)
+returns complete identities from the actual submit path and tests their
+wait/ACK round trip with CPU objects. It refuses mixed-engine batches and
+CPU user fences, preserves actual queue fallback and leaves uncertain work
+retained. It adds no native capability/session or Mesa wire admission.
 The proposed observer
 has no admitted hardware fence reader and refuses completion without one.
 R4–R6 have not started.
