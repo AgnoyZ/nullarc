@@ -1,10 +1,15 @@
 # Build34 smoothness comparison with NullMoth
 
-The owner's subsequent step-by-step execution request begins with
-[R1a elapsed-time accounting](BUILD34-WAIT-DEADLINE.md). Its source/CPU/native
-checks pass, but it is not installed or hardware-accepted. The existing
-on-disk Weather plugin needs an isolated baseline boot before a kernel
-treatment; later optimization items have not been started.
+The owner's renewed November 20 step-by-step request excludes Weather and
+resumes with [R1a elapsed-time accounting](BUILD34-WAIT-DEADLINE.md) on the
+recovered owner-accepted build34 runtime. A fresh independent readback of the
+12:20:11 Asia/Shanghai boot passes. Source/CPU/native-artifact checks pass and
+new exact private kernel/job backups are prepared, but R1a is not installed
+or hardware-accepted. The former Weather prerequisite was withdrawn and must
+not be replayed. The prior reboot grant is consumed; candidate activation
+requires a fresh explicit installation/test-restart grant. R1b and R2–R6
+remain pending until R1a hardware acceptance. This supersedes the execution
+status only; the following November 19 comparison remains historical evidence.
 
 ## Scope and conclusion
 

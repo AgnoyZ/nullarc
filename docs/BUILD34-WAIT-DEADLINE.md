@@ -1,6 +1,69 @@
 # Build34 R1a: real elapsed-time accounting for native waits
 
-## November 20 hold after the failed prerequisite boot
+## November 20 resumption on the recovered accepted baseline
+
+After the isolated [desktop re-enablement](BUILD34-REENABLE-20261120.md)
+passed, the owner requested resuming R1–R6 in order and explicitly excluding
+Weather. R1a source preparation resumes on the recovered owner-accepted runtime
+`1d4968fbc2ce988c77bdd85b2ec36f435b57f496`. **The earlier Weather baseline
+boot is no longer a prerequisite and must not be replayed.** The later
+VBL/AML/render-clear/Weather experiments are not part of this runtime.
+
+A fresh read-only check found another boot, November 20 at **12:20:11
+Asia/Shanghai**, later than the already recorded 12:05:04 acceptance. This
+optimization task sent no power command and does not establish what caused
+that intervening boot. It independently checked the actual new boot's
+startup/desktop/supervision-ended receipts rather than reusing the earlier
+observer or acceptance. Exact loaded kernel/accelerator and mapped plugin,
+all 416 cache records including 29 codeless entries, original loaded ACPI,
+the complete 357-file EFI and original recovery passed. The same WindowServer
+survived the finite observation, completion/VBL counters progressed, all four
+checked error counters stayed zero and no new matching report was found.
+No startup controller or power process remained.
+
+The existing R1a driver patch is unchanged. Its 29 production-method CPU
+cases, ten source-admission methods, 25 complete-cache methods and default
+tests pass again. A new offline artifact gate,
+`tools/check_build34_wait_artifacts.py`, checks the exact frozen baseline and
+candidate bundle bytes, signatures, source snapshots, original recipe,
+pinned SDK snapshot and successful build-log digests. Nine new refusal-test
+methods cover wrong build/source/recipe/SDK, substituted or extra bundle
+members, missing/failed/duplicate checks, unsafe links and incomplete EFI.
+It derives the prospective EFI manifest from a separately verified full
+baseline: only the active kernel executable may differ. All three current
+Microsoft boot-state records remain pinned exactly, without an exclusion.
+Historical build34 admission and the original build recipe are unchanged.
+
+A fresh inactive private packet holds root-owned exact accepted/candidate
+kernel bundles, current OpenCore configuration, both current startup-job
+backups and complete before/candidate EFI manifests. Both bundle signatures
+and every packet input are rechecked. The native baseline remains byte-identical
+to the actual accepted EFI kernel. No packet entrypoint is staged or loaded;
+no live driver, plugin, cache, EFI, ACPI, job, driver flag or security setting
+is changed. The new checker is an offline artifact check, not a claim to
+have inspected the installed state or established GPU correctness.
+
+**R1a remains uninstalled and has no hardware wait/correctness/FPS acceptance.**
+The earlier restart authorization is consumed, and re-enablement explicitly
+excluded candidate installation. The renewed source/preparation request does
+not reuse those grants: obtain a fresh explicit R1a installation, one ordinary
+test-restart and bounded GPU-validation authorization before activation.
+Use a new exact candidate admission/recovery controller; the inactive packet
+is not a ready-to-run installer or an old scope to replay. Preserve the
+45/150/300-second startup gates, full cache/EFI checks, accepted kernel/job
+recovery, PR28 daily 250 ms with WindowServer exclusion and disabled resident
+monitoring. R1b and R2–R6 wait for actual R1a hardware acceptance.
+
+Additional offline commands:
+
+```sh
+python3 -B tests/test_build34_wait_artifacts.py -v
+python3 -B tools/check_build34_wait_artifacts.py --native "$R1A_NATIVE" --sdk "$MAC_KERNEL_SDK"
+```
+
+See the [sanitized resumption record](validation/build34-wait-resumption-20261120.json).
+
+## Historical November 20 hold after the failed prerequisite boot
 
 The owner reported repeated restarts and requested rollback. The plugin
 baseline boot did not pass; installed recovery had already cascaded to the
@@ -11,7 +74,8 @@ pre-R1a control; the R1a kernel was never installed or loaded. PhxAccel is not
 listed loaded. No new GPU work, WindowServer restart or power request was
 made during containment.
 
-R1a hardware validation and all later optimizations are on hold. Do not use
+At that containment checkpoint R1a hardware validation and all later
+optimizations were on hold. Do not use
 earlier restart/install permissions or the offline test results to resume
 automatic startup or desktop takeover. A new boot has not been tested after
 containment and no complete restart-cause repair is claimed. Details are in
@@ -130,7 +194,11 @@ Collection was built or installed. Library lookup is not an actual kernel
 load or a full AuxKC link test. Actual loadability remains part of the later
 isolated hardware trial.
 
-## Current runtime and a required baseline boot
+## Historical November 19 runtime and plugin-baseline preparation
+
+This section records the pre-rollback situation, not the recovered runtime.
+Its Weather prerequisite and installation path were withdrawn after failure;
+use the November 20 resumption above instead. Do not replay this path.
 
 A fresh read-only invocation of the currently installed owner `check`
 entrypoint passed on macOS 26.7.2 build 25G332. It was not a replay of a
@@ -216,7 +284,7 @@ checks do not establish visual repair, physical FPS or long-term stability.
 The sanitized checkpoint is recorded in
 [`validation/build34-wait-plugin-baseline-reboot-preparation-20261119.json`](validation/build34-wait-plugin-baseline-reboot-preparation-20261119.json).
 
-## Rollback and record
+## Historical preparation rollback and record
 
 No live candidate rollback is needed: the accepted kernel, cache, EFI,
 settings and startup jobs are still installed. Fresh exact kernel/job copies
