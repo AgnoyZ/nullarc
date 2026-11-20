@@ -288,3 +288,8 @@ test-build34-exact-global:
 test-build34-exact-vm-lifetime:
 	@test -n "$(EXACT_VM_OUT)" || (echo "Set EXACT_VM_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_vm_lifetime.py --out "$(EXACT_VM_OUT)"
+
+.PHONY: test-build34-exact-bo-lifetime
+test-build34-exact-bo-lifetime:
+	@test -n "$(EXACT_BO_OUT)" || (echo "Set EXACT_BO_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_bo_lifetime.py --out "$(EXACT_BO_OUT)"
