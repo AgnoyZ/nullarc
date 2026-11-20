@@ -141,6 +141,27 @@ class RecoveryTests(unittest.TestCase):
             self.h.restore()
         loader.assert_not_called()
 
+    def test_pressure_job_retirement_preserves_unknown_replacement(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "probe.plist"
+            path.write_bytes(b"unknown replacement")
+            self.h.config = {"R1b_pressure_observer_job": str(path),
+                             "R1b_pressure_observer_sha256": "expected"}
+            with patch.object(m.base, "secure"), self.assertRaises(AssertionError):
+                self.h.retire_pressure_observer()
+            self.assertEqual(path.read_bytes(), b"unknown replacement")
+
+    def test_pressure_job_retirement_removes_only_exact_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "probe.plist"
+            path.write_bytes(b"exact job")
+            self.h.config = {"R1b_pressure_observer_job": str(path),
+                             "R1b_pressure_observer_sha256": m.base.sha(path)}
+            with patch.object(m.base, "secure"):
+                self.h.retire_pressure_observer()
+                self.h.retire_pressure_observer()
+            self.assertFalse(path.exists())
+
     def test_restore_writes_only_kernel_and_restores_jobs(self):
         c = fixture()
         with tempfile.TemporaryDirectory() as folder:
@@ -161,6 +182,7 @@ class RecoveryTests(unittest.TestCase):
             self.h.readonly = SimpleNamespace(OLD=root, atomic_file=Mock(side_effect=atomic))
             self.h.restore_jobs = Mock()
             self.h.retire_watcher = Mock()
+            self.h.retire_pressure_observer = Mock()
             with patch.object(m, "load", return_value=route), \
                     patch.object(m.subprocess, "run"), \
                     patch.object(m.Path, "exists", return_value=False):
@@ -168,6 +190,7 @@ class RecoveryTests(unittest.TestCase):
             self.h.readonly.atomic_file.assert_called_once()
             self.h.restore_jobs.assert_called_once()
             self.h.retire_watcher.assert_called_once()
+            self.h.retire_pressure_observer.assert_called_once()
             self.assertEqual(current, c["R1b_baseline_EFI_private"])
 
 

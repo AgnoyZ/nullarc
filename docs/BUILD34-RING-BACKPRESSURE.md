@@ -19,7 +19,7 @@ gates, at most one persisted first-trial recovery restart and disk-only daily
 failure recovery. Startup acceptance closes power recovery before the separate
 one-use pressure probe. A retained probe blocks worker termination/recovery.
 
-Thirteen CPU fixture methods cover the exact manifest/source/image delta, old
+Fifteen CPU fixture methods cover the exact manifest/source/image delta, old
 host refusal, immutable derivation, retained-AML admission, unknown-input
 refusal before writes, and kernel-only recovery. The existing 19 AML, 18 VBL,
 10 original-host and 15 journal methods also pass. The 11 extracted gpuSubmit
@@ -36,6 +36,10 @@ request occurred. The consumed scope remains frozen. A dedicated pre-restart
 contract now selects only the known loaded R1a image identity for live checks;
 disk/signature checks still require exact R1b. Two regression methods cover
 that distinction and unknown-image refusal. Any retry uses a fresh scope.
+The separate finite pressure observer may start only after same-boot startup
+acceptance has closed power recovery. It retires its exact job before probing;
+startup recovery retires that job without submitting GPU work. Two further CPU
+methods check exact-file retirement and unknown-replacement preservation.
 
 ## Earlier source and first trial
 

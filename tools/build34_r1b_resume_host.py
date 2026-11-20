@@ -121,6 +121,10 @@ class R1bHost(acpi.ACPIHost):
         if watcher.exists():
             base.secure(watcher)
             assert base.sha(watcher) == c["watcher_job_sha256"]
+        observer = Path(c["R1b_pressure_observer_job"])
+        if observer.exists():
+            base.secure(observer)
+            assert base.sha(observer) == c["R1b_pressure_observer_sha256"]
         pending = Path("/var/db/phxboot.pending")
         if pending.exists():
             base.secure(pending)
@@ -137,6 +141,7 @@ class R1bHost(acpi.ACPIHost):
                                       [R1A_BINARY, R1B_BINARY])
             assert route.files(root) == before
         self.restore_jobs()
+        self.retire_pressure_observer()
         self.retire_watcher()
         pending = Path("/var/db/phxboot.pending")
         if pending.exists():
@@ -145,6 +150,13 @@ class R1bHost(acpi.ACPIHost):
             pending.unlink()
         subprocess.run(["/usr/sbin/sysctl", "-w", "debug.phxfb_hold=0"], capture_output=True, timeout=5)
         subprocess.run(["/bin/sync"], check=True, timeout=15)
+
+    def retire_pressure_observer(self):
+        path = Path(self.config["R1b_pressure_observer_job"])
+        if path.exists():
+            base.secure(path)
+            assert base.sha(path) == self.config["R1b_pressure_observer_sha256"]
+            path.unlink()
 
     def verify_restore(self):
         d, k, c = self.baseline.readonly.build()
@@ -161,6 +173,7 @@ class R1bHost(acpi.ACPIHost):
             base.secure(path)
             assert base.sha(path) == digest
         assert not Path(self.config["watcher_job"]).exists()
+        assert not Path(self.config["R1b_pressure_observer_job"]).exists()
         return True
 
     verify = verify_restore
