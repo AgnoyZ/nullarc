@@ -3,7 +3,9 @@
 Latest November 20 clarification also authorizes the previously tested ACPI
 optimization alongside staged VBL, without waiting for a separate VBL boot.
 The [combined adapter and exact recovery](BUILD34-ACPI-RESTORATION-20261120.md)
-supersede the VBL-only staged jobs when installed; preserve all old scopes.
+now supersede the VBL-only staged jobs after independent installed-state
+readback. Both restored treatments still await loading at the next boot;
+preserve all old scopes.
 
 Later November 20 update: the owner's renewed VBL/ACPI restoration request has
 superseded this R1a-only scope's staged jobs. Its exact unloaded watcher file

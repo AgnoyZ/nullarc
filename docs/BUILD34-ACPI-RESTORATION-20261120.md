@@ -1,14 +1,20 @@
 # November 20 ACPI restoration with R1a and VBL
 
+Current status: the exact tested ACPI optimization is installed and enabled
+in OpenCore configuration alongside staged VBL. Separate independent readback
+passed. Both restored treatments await loading at the next ordinary restart;
+this operation did not reboot or replace the currently loaded original ACPI
+and accelerator. R1a and the accepted plugin remain active.
+
 The owner's latest instruction is to install and enable the already tested
 ACPI optimization now, alongside the staged VBL restoration. It supersedes
 the earlier separate-VBL-boot prerequisite. There is no new performance-test
 waiting round before this installation.
 
-At this source checkpoint the VBL executable/corrected cache are installed
+At the earlier source checkpoint the VBL executable/corrected cache were installed
 on disk, while the original accelerator and original ACPI remain loaded.
-The new combined adapter is prepared in source; ACPI installation follows
-in a fresh private scope. No ordinary restart is requested by this change.
+The new combined adapter was prepared in source before ACPI installation
+in a fresh private scope. No ordinary restart was requested by that change.
 
 ## Exact treatment
 
@@ -80,3 +86,40 @@ The current R1a boot has one existing surface GPU timeout. Preserve the count
 and record whether it increases; do not claim zero-error acceptance, FPS or
 long-term stability from installation checks. Actual loaded VBL/ACPI status
 requires post-restart readback.
+
+## Installed-state and independent readback
+
+Implementation commit `15231ec917e75a8cb62e8d006afcafb37007a301` was pushed
+and independently matched against the default remote branch before the final
+installation readback. The full default suite and 25 complete-cache regression
+methods passed, alongside the 19 new adapter methods. The actual sealed
+EFI-transaction functions also passed a temporary synthetic-tree application,
+rollback and unknown-file refusal check. The old 28-case AML equivalence and
+official configuration-validator results are reused only for byte-identical
+historical files; they were not rerun or represented as new hardware tests.
+
+The fresh combined scope supersedes only the staged VBL-only startup files.
+Installation added the exact SSDT, replaced only the expected ACPI configuration,
+installed the two compatible bounded-startup job files and finite watcher, and
+retired the exact unloaded superseded watcher file. It did not reinstall VBL,
+modify R1a/plugin/security or execute a consumed controller. Exact original
+configuration, accelerator/cache and accepted R1a startup copies remain private
+for recovery. No preview DSDT was installed.
+
+A separate process reopened the actual EFI, selected cache and installed jobs.
+It passed all 358 EFI file records, the sole config/table delta, the enabled
+Patch/Add entries, all 416 cache records/29 codeless entries, signatures,
+unchanged plugin and security, and exact job/recovery hashes and permissions.
+The three pinned pre-existing Microsoft records are unchanged. The combined
+watcher is unloaded in this boot, the older watcher file is absent and both
+new recovery journals are unconsumed.
+
+Current loaded identity still matches R1a with the original accelerator/ACPI.
+The same WindowServer survived; VBL advanced and copy completions remained
+nonzero. The existing surface timeout stayed at one, the other three checked
+errors stayed zero and no matching diagnostic report appeared. Daily PR28
+250 ms/WindowServer exclusion and disabled resident monitors are preserved.
+No new GPU test, startup bootstrap or power action occurred. This is successful
+installation verification, not new-boot loading, FPS or long-term acceptance.
+
+See the [sanitized installation evidence](validation/build34-acpi-restoration-installation-20261120.json).

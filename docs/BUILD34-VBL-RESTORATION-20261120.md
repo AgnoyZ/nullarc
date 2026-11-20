@@ -5,7 +5,7 @@ the earlier separate-VBL-boot prerequisite below is superseded. Follow the
 [combined restoration record](BUILD34-ACPI-RESTORATION-20261120.md). Earlier
 installed-state checkpoints below remain historical evidence.
 
-Current status: VBL and its corrected cache are installed on disk and passed
+Historical VBL-only checkpoint: VBL and its corrected cache are installed on disk and passed
 independent readback. The original accelerator is still loaded pending an
 authorized restart. R1a, the plugin and original ACPI remain active. ACPI
 restoration has passed offline checks but is not installed.
@@ -23,7 +23,7 @@ and the accepted accelerator/plugin baseline at
 accelerator treatment. PR28 daily waiting remains 250 ms with WindowServer
 excluded; resident monitors remain disabled.
 
-## Restore one treatment at a time
+## Earlier sequencing (superseded by the latest owner instruction)
 
 1. Restore only the exact VBL accelerator from
    `439f8a5bc3e086770df7b576897fbb11d7ccc9f1` and its corrected AuxKC. Keep
