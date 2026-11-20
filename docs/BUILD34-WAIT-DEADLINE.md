@@ -41,7 +41,10 @@ did not reach its pressure probe. Independent readback matched the R1a EFI
 and startup jobs on disk; the R1b kernel remains loaded in the failed
 framebuffer-admission boot. R1a's earlier hardware acceptance stands, but
 recovery of the live accelerated desktop requires a separately authorized
-R1a boot with the existing one-use panel flag armed.
+R1a boot with the existing one-use panel flag armed. That subsequent
+[owner-authorized recovery boot](BUILD34-STARTUP-RECOVERY.md) restored the R1a
+accelerated desktop; a later surface timeout prevents strict zero-error
+acceptance of the recovery observation.
 
 ## Historical November 20 authorized isolated installation
 

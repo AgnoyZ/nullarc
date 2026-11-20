@@ -40,6 +40,8 @@ test: $(TESTS)
 	python3 -B tests/test_nmplugin_release_logging.py
 	python3 -B tests/test_build34_wait_deadline.py
 	python3 -B tests/test_build34_ring_backpressure.py
+	python3 -B tests/test_build34_startup_recovery.py
+	python3 -B tests/test_build34_startup_host.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \

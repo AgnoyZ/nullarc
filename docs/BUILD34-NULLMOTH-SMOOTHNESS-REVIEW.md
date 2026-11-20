@@ -14,8 +14,9 @@ stability. The former Weather prerequisite was
 withdrawn. The R1a restart and probe scope is consumed.
 The R1b ring-space change passes CPU regressions and the native build. Its
 first boot failed framebuffer admission before the hardware pressure test.
-The disk and startup jobs are back at R1a, and accelerated operation still
-needs a verified R1a recovery boot. R2–R6 wait for R1b hardware acceptance.
+The [authorized R1a recovery boot](BUILD34-STARTUP-RECOVERY.md) restored
+accelerated operation but later recorded one surface timeout. R1b and R2–R6
+remain on hold while startup recovery is isolated and validated.
 [R1a hardware record](validation/build34-wait-boot-20261120.json) ·
 [R1b candidate and validation](BUILD34-RING-BACKPRESSURE.md)
 This supersedes the execution status only; the following November 19 comparison

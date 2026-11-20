@@ -5,8 +5,10 @@ R1b starts from the running, hardware-checked R1a kernel at
 ring space or submission-history slots in `PhxBringup::gpuSubmit`. The default
 branch source contains the change. The first R1b boot loaded the candidate,
 but startup stopped at framebuffer admission before the pressure test.
-The EFI and startup jobs are back at the accepted R1a state on disk; the
-current boot still runs the R1b PhxBringup with the firmware framebuffer.
+The EFI and startup jobs were restored to R1a, and the later owner-authorized
+recovery boot restored the R1a accelerated desktop. Its later readback records
+one surface timeout; R1b remains unaccepted.
+[R1a recovery and finite automatic-recovery preparation](BUILD34-STARTUP-RECOVERY.md)
 [R1a hardware evidence](validation/build34-wait-boot-20261120.json)
 
 When a queue runs out of space, the old path polls every 50 µs while holding

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-20",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "status": "R1a-accelerated-desktop-restored-with-one-surface-timeout",
+  "kernel_source_checkpoint": "568e80b205c10b00cba4f21c6d324d239d725bfd",
+  "other_runtime_checkpoint": "1d4968fbc2ce988c77bdd85b2ec36f435b57f496",
+  "OS_version": "26.7.2",
+  "OS_build": "25G332",
+  "boot_local": "2026-11-20T16:27:36+08:00",
+  "restart": {
+    "owner_authorized": true,
+    "request_count": 1,
+    "command_returncode": 0,
+    "one_use_panel_flag_force_committed": true,
+    "NVRAM_and_IODeviceTree_readback_passed": true,
+    "authorization_consumed": true,
+    "automatic_recovery_restart_requests": 0
+  },
+  "readback": {
+    "exact_R1a_loaded": true,
+    "accepted_accelerator_and_mapped_plugin": true,
+    "fresh_startup_desktop_and_supervision_receipts": true,
+    "complete_EFI_files": 357,
+    "complete_cache_records": 416,
+    "codeless_cache_records": 29,
+    "original_loaded_ACPI_and_security": true,
+    "same_WindowServer_during_finite_observation": true,
+    "VBL_progress_observed": true,
+    "GPU_copy_count_nonzero": true,
+    "new_matching_reports": 0,
+    "errors": {
+      "debug.nvaccel_iop_fail": 0,
+      "debug.nvaccel_iop_copy_skip": 0,
+      "debug.nvaccel_surface_gpu_timeouts": 1,
+      "debug.phx_hang_kills": 0
+    },
+    "errors_increased_between_later_samples": false,
+    "panel_flag_rearmed_after_successful_startup": true,
+    "startup_workers_remaining": 0,
+    "resident_monitor_enabled": false
+  },
+  "acceptance": {
+    "R1a_accelerated_desktop_restored": true,
+    "strict_zero_error_gate_passed": false,
+    "R1b_pressure_probe_replayed": false,
+    "R2_or_later_started": false,
+    "physical_FPS_measured": false,
+    "long_term_stability_accepted": false
+  },
+  "new_startup_recovery_preparation": {
+    "scope_kind": "accepted-R1a-startup-recovery",
+    "CPU_journal_tests": 14,
+    "CPU_host_tests": 10,
+    "startup_limits_seconds": [45, 150, 300],
+    "automatic_recovery_restart_limit": 1,
+    "only_next_boot": true,
+    "prepared_and_sealed": true,
+    "live_staged_at_this_record": false,
+    "induced_failure_boot_tested": false,
+    "new_GPU_probe_submissions": 0,
+    "new_power_requests": 0
+  }
+}
