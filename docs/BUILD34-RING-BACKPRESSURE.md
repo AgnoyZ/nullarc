@@ -1,9 +1,43 @@
 # Build34 R1b ring and submission-history wait
 
+## Bounded hardware acceptance on November 20
+
+The fresh pressure-only trial and a separate independent post-run reader both
+passed on the already accepted 19:04:28 Asia/Shanghai boot. No kernel,
+accelerator, plugin, startup job or power-state change was needed. The signed
+24-dispatch workload is unchanged from the preceding rejected measurement;
+only the trace endpoint changed to the actual same-caller blocking interval.
+
+The strict version-2 parser paired four compute queue-space blocks lasting
+1,010,295–1,244,895 ns. Three GFX submissions **and their exact queue-fence
+completions** fit completely inside those blocks, including the parser's
+containment margins. The workload completed 16 compute burst submissions and
+five GFX submissions including warmup, checked all four full 16 KiB arenas
+for each queue, drained and closed both clients. Probe and tracer exited zero
+without diagnostics; no retained probe remains. The independent reader
+replayed the frozen parser and verified the exact lifecycle records.
+
+Independent post-run readback also passed exact loaded R1b/VBL/optimized AML
+and mapped accepted plugin, all 358 EFI files, full 416-record/29-codeless
+cache metadata, fresh startup/desktop receipts and unchanged recovery/jobs.
+The same WindowServer survived since startup, VBL/copy counts advanced,
+four checked errors stayed zero and no new matching report appeared.
+Startup power recovery had closed before GPU pressure dispatch. No probe,
+trace or pending power process remains. Keep all earlier rejected scopes
+and their original outcomes; none was retroactively accepted or replayed.
+
+This accepts **bounded R1b pressure-path correctness and cross-queue progress**
+for this workload. It does not establish physical FPS, long-term stability,
+all saturation cases, or the cause of the earlier boot's surface timeout.
+Keep the successful installation active and proceed to R2 measurement as
+the next isolated item. Daily PR28 250 ms/WindowServer exclusion, disabled
+resident monitors and the existing startup/recovery policy are preserved.
+See [independent acceptance evidence](validation/build34-r1b-pressure-boot-20261120.json).
+
 ## Renewed trial on the retained VBL/AML baseline
 
-The owner's November 20 continuation resumes R1–R6 sequentially. R1b remains
-unaccepted; R2 starts only after R1b's real pressure evidence passes. The
+The following preparation and refusals preceded the successful trial above.
+The owner's November 20 continuation resumes R1–R6 sequentially. The
 baseline is now the independently checked 18:19:02 R1a/VBL/optimized-AML boot,
 with the accepted plugin, daily PR28 250 ms/WindowServer exclusion and disabled
 resident monitors. The older failed R1b scope below must not be replayed.

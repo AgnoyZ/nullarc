@@ -1,5 +1,16 @@
 # Build34 smoothness comparison with NullMoth
 
+Current November 20 execution status: R1a's finite native validation and
+R1b's real pressure trial plus separate independent readback have passed.
+Four actual queue-space blocks were observed; three GFX submissions and
+exact fence completions occurred wholly within them. Both clients passed
+full-arena checks and closed cleanly, desktop progress continued, four
+checked errors were zero and no new matching report appeared. The accepted
+R1b/VBL/optimized-AML/plugin combination remains active. R2 measurement is
+next; FPS and long-term stability remain unaccepted. See
+[R1b acceptance](validation/build34-r1b-pressure-boot-20261120.json).
+The earlier execution checkpoints below remain historical.
+
 The owner's renewed November 20 step-by-step request excludes Weather and
 resumes with [R1a elapsed-time accounting](BUILD34-WAIT-DEADLINE.md) on the
 recovered owner-accepted build34 runtime. A fresh independent readback of the
