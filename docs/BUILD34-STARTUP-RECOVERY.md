@@ -67,12 +67,24 @@ termination of a retained GPU probe, successful watcher retirement and
 preservation of a replaced watcher job. All power callbacks in these CPU
 tests are inert. The default unit suite includes both test files.
 
-A fresh root-owned inactive R1a scope was prepared and sealed after actual
-runtime/EFI/cache/ACPI checks. Preparation changed no live job, driver,
-initialization state or power setting. The recovery module is not yet
-hardware-validated by an induced failed boot. Record live installation and
-independent readback separately; source tests and scope preparation alone do
-not establish that the watcher has been installed or executed at boot.
+A fresh root-owned R1a scope was prepared and sealed after actual
+runtime/EFI/cache/ACPI checks. On November 20, its two startup job files and
+finite watcher job file were installed for the next boot. Separate independent
+readback passed the exact sealed files and permissions, full 357-file EFI,
+complete 416-record/29-codeless cache metadata, original ACPI/security and
+unchanged R1a accelerated desktop. The watcher remains unloaded in the current
+boot; no startup job was bootstrapped, no new GPU probe was submitted and no
+additional restart was requested. The one-use trial and recovery-restart
+journals remain unconsumed.
+
+The same WindowServer survived the installation/readback observation, VBL
+advanced, and the existing surface-timeout count stayed at one; the other
+three checked error counters stayed zero and no new matching report appeared.
+This is installed-state verification, not strict zero-error acceptance or a
+hardware validation of automatic recovery. Neither a successful nor an induced
+failed boot has exercised the new watcher. The earlier ordinary recovery
+restart authorization is consumed; installation does not grant another test
+restart. See the [sanitized installation record](validation/build34-startup-recovery-installation-20261120.json).
 
 The watcher needs a functioning kernel and launchd. It cannot execute before
 launchd, recover a hard kernel deadlock or guarantee that a completely frozen

@@ -16,7 +16,10 @@ The R1b ring-space change passes CPU regressions and the native build. Its
 first boot failed framebuffer admission before the hardware pressure test.
 The [authorized R1a recovery boot](BUILD34-STARTUP-RECOVERY.md) restored
 accelerated operation but later recorded one surface timeout. R1b and R2–R6
-remain on hold while startup recovery is isolated and validated.
+remain on hold. An R1a-only one-use startup recovery scope is now installed
+for the next boot and has passed independent installed-state readback; it is
+unloaded in the current boot and has no failed-boot hardware validation. No
+additional test restart or pressure probe was run.
 [R1a hardware record](validation/build34-wait-boot-20261120.json) ·
 [R1b candidate and validation](BUILD34-RING-BACKPRESSURE.md)
 This supersedes the execution status only; the following November 19 comparison

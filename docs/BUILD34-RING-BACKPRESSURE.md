@@ -8,7 +8,7 @@ but startup stopped at framebuffer admission before the pressure test.
 The EFI and startup jobs were restored to R1a, and the later owner-authorized
 recovery boot restored the R1a accelerated desktop. Its later readback records
 one surface timeout; R1b remains unaccepted.
-[R1a recovery and finite automatic-recovery preparation](BUILD34-STARTUP-RECOVERY.md)
+[R1a recovery and installed next-boot safeguard](BUILD34-STARTUP-RECOVERY.md)
 [R1a hardware evidence](validation/build34-wait-boot-20261120.json)
 
 When a queue runs out of space, the old path polls every 50 µs while holding
