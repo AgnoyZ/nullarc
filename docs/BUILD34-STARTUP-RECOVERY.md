@@ -1,5 +1,15 @@
 # Build34 bounded startup recovery
 
+Current loaded checkpoint: the combined ACPI/VBL first-trial watcher accepted,
+and a separately scoped independent readback passed the later 18:19:02 boot.
+Exact R1a/VBL/AML/plugin and fresh current-boot bounded-desktop receipts passed;
+the finite watcher is retired and no recovery restart was requested. Preserve
+the strict first-trial reader's refusal of that later boot and the unattributed
+intervening restart. Historical R1a-only restrictions below do not authorize
+replaying consumed scopes. The owner's renewed R1–R6 request requires a fresh
+R1b scope recovering to the now-loaded combination, with unchanged admission
+gates. See [retained-boot evidence](validation/build34-acpi-restoration-retained-boot-20261120.json).
+
 Latest November 20 clarification also authorizes the previously tested ACPI
 optimization alongside staged VBL, without waiting for a separate VBL boot.
 The [combined adapter and exact recovery](BUILD34-ACPI-RESTORATION-20261120.md)

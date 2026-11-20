@@ -1,5 +1,15 @@
 # Build34 AML log-buffer copy candidate
 
+November 20 retained-boot update: the exact 172-byte treatment is again loaded
+alongside R1a and the restored VBL image. A separate independent current-boot
+readback passed on the 18:19:02 boot, including the original method body,
+complete EFI/cache metadata and fresh bounded accelerated-desktop receipts.
+The first trial watcher accepted its earlier boot; the first-trial-only reader
+refused the later boot and its refusal remains preserved. The intervening
+restart is unattributed and no automatic recovery restart was requested.
+Historical GUI measurements below are not new measurements of this restored
+combination. See [current retained-boot evidence](validation/build34-acpi-restoration-retained-boot-20261120.json).
+
 November 20 current status: this exact previously tested ACPI optimization is
 now installed and enabled in configuration together with staged R1a/VBL, after
 the owner explicitly waived the separate VBL-boot prerequisite. Independent

@@ -1,5 +1,12 @@
 # November 20 VBL and ACPI restoration on R1a
 
+Loaded checkpoint: the first combined trial watcher accepted, and a separate
+independent reader passed the later 18:19:02 retained boot with exact R1a/VBL,
+optimized AML, mapped accepted plugin and fresh bounded-desktop receipts.
+The intervening restart is unattributed; the strict first-trial reader's
+later-boot refusal is preserved. Earlier disk-only checkpoints below are
+historical. See the [combined loading evidence](validation/build34-acpi-restoration-retained-boot-20261120.json).
+
 Latest owner clarification: install ACPI with the staged VBL restoration now;
 the earlier separate-VBL-boot prerequisite below is superseded. Follow the
 [combined restoration record](BUILD34-ACPI-RESTORATION-20261120.md). Earlier

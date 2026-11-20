@@ -1,10 +1,9 @@
 # November 20 ACPI restoration with R1a and VBL
 
-Current status: the exact tested ACPI optimization is installed and enabled
-in OpenCore configuration alongside staged VBL. Separate independent readback
-passed. Both restored treatments await loading at the next ordinary restart;
-this operation did not reboot or replace the currently loaded original ACPI
-and accelerator. R1a and the accepted plugin remain active.
+Current status: the exact tested VBL and ACPI treatments are loaded with R1a
+and the accepted plugin. Separate independent current-boot readback passed
+after the loading restart. The installation and preparation checkpoints below
+remain historical records; their pending-loading status is superseded.
 
 The owner's latest instruction is to install and enable the already tested
 ACPI optimization now, alongside the staged VBL restoration. It supersedes
@@ -149,3 +148,35 @@ startup/completion/desktop receipts and independently check unchanged recovery.
 At this preparation checkpoint no power request has yet been sent.
 
 See the [sanitized restart preparation](validation/build34-acpi-restoration-reboot-preparation-20261120.json).
+
+## Loading restart and separate retained-boot acceptance
+
+The sole ordinary request was persisted at 18:13:53 Asia/Shanghai on November
+20, 2026; shutdown returned zero at 18:13:54. The first trial boot's startup
+journal began at 18:14:25 and its finite watcher accepted at 18:16:43. A later
+shutdown around 18:18 preceded the current 18:19:02 boot. That intervening
+restart is not attributed: no automatic recovery-restart intent exists, and
+the first trial had already been accepted. The interrupted request tool was
+not retried.
+
+The original independent reader was explicitly bound to the accepted first
+trial. It refused the later current boot before mutation. Its refusal remains
+intact. A new, separately scoped current-retained-boot reader passed; this does
+not manufacture an independent first-trial result. It verified exact loaded
+R1a/VBL and mapped accepted plugin, the optimized AML and original method body,
+all 358 EFI files, complete 416/29 cache metadata, signatures/security, exact
+recovery and unchanged startup files. The current boot has its own successful
+startup, desktop and supervision-ended receipts. No startup/recovery/power or
+probe process remains; the finite watcher is retired.
+
+The same WindowServer survived the finite observation, with VBL and GPU-copy
+progress, all four checked errors zero, no increase and no new matching report.
+The previous boot's one surface timeout remains in its historical record;
+zero counters after reboot do not prove that issue fixed. Daily PR28 remains
+250 ms with WindowServer excluded and resident monitors disabled. No new GPU
+probe or FPS benchmark ran, and long-term stability remains unaccepted.
+
+The owner now requests sequential R1–R6 work. This loaded combination is the
+recovery baseline for a fresh kernel-only R1b trial; the original combined
+restoration and restart scopes must not be replayed. See the
+[separate retained-boot record](validation/build34-acpi-restoration-retained-boot-20261120.json).
