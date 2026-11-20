@@ -1,5 +1,10 @@
 # Build34 R2 display wait and CPU scanout copy
 
+Current checkpoint: the packed-copy accelerator/cache candidate is installed
+on disk and independently checked; the accepted accelerator is still loaded.
+One new-boot trial and its display comparison remain pending. The earlier
+offline/preparation statuses below describe their original checkpoints.
+
 ## Accepted baseline measurement, November 20
 
 [R1b's bounded pressure proof](BUILD34-RING-BACKPRESSURE.md) passed before
@@ -168,6 +173,33 @@ checks the manifest against the frozen runtime contract and pins the accepted
 executable hash. No plugin binary, mapping or configuration is replaced. The
 same delta fixtures also reject an unknown plugin manifest. Preserve this
 second rejected packet and create another fresh scope.
+
+## Fresh installation checkpoint
+
+The third preparation passed exact retained-runtime checks, both contract
+derivations and an inactive two-way native-file replacement test. Its sealed
+packet retains the current R1b kernel and full EFI manifest, accepted plugin,
+optimized AML, exact accelerator/cache recovery copies and the current
+startup job backups. Neither rejected preparation is replayed.
+
+The sole installer then replaced only the candidate accelerator/cache pair
+and staged two startup jobs plus one finite watcher, without bootstrapping
+any job. It exited successfully. Separate independent installed-state
+readback passed complete 416-record/29-codeless candidate cache metadata,
+all 358 unchanged EFI files, exact recovery and jobs, and the unchanged
+**loaded accepted accelerator** with R1b/AML/plugin. The same WindowServer,
+desktop progress, four zero error counters and no new matching report were
+observed. Both fresh journals remain unconsumed. No explicit GPU workload,
+ordinary restart or automatic recovery request occurred during installation.
+
+The sequential trial next uses one ordinary restart from this fresh scope;
+the existing panel flag must be force-synced and read back through both NVRAM
+and IODeviceTree before the persisted single-use request. Preserve the
+45/150/300-second limits, exact recovery, daily PR28 250 ms/WindowServer
+exclusion and disabled resident monitors. Same-boot startup acceptance must
+close automatic power recovery before any display measurement. Installed
+state is not loaded-image or hardware acceptance; R3–R6 remain pending. See
+[independent installation evidence](validation/build34-r2-packed-copy-installation-20261120.json).
 
 This does not implement AMD asynchronous presentation or a DCN flip. Moving
 the wait/copy to a worker still requires bounded ownership, cancellation,
