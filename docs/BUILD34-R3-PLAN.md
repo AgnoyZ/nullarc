@@ -9,8 +9,9 @@ until R3 has its required paired native and hardware acceptance.
 This goal does not turn earlier CPU experiments into deployable kernels or
 replay consumed installation/reboot scopes. Build and deployment admission must
 still prove the actual source, ABI, SDK, candidate and recovery identities.
-In particular, the current permanent client/service quarantine experiments
-must not be built as kernel candidates. A local commit is not synchronization;
+In particular, the current source-only experiments with no admitted native
+reader and permanent service quarantine must not become kernel candidates.
+A local commit is not synchronization;
 each coherent change requires checks, staged privacy review, push and an
 independent remote SHA check.
 
@@ -24,7 +25,7 @@ independent remote SHA check.
 | Exact wait fallback | Original wait passes CPU/TSan; the later wait-pinned version re-runs all 28 groups/six threaded cases (22,094 checks) | Carry into the native negotiated path; real KPI/lifecycle and GPU timeout/wakeup evidence remain required |
 | Trusted device fence observation | Primary-source review, 189,198-check window primitive and 43,251-check staged adoption/shared-submit/ring-space/observer integration; raw-dword reader is null | Establish actual mapping/device coherency and queue ownership/drain, audit global-retirement/watchdog/VM consumers, prove wide-gap recovery and obtain native/GPU evidence; see `BUILD34-FENCE-READER.md` |
 | Native protocol and receipt lifetime | Internal wait-pinned ACK, actual-Mesa bounded completion cache, and staged complete-token structure submit/wait/ACK dispatch pass CPU sanitizers; experimental selectors 64/65/66 have no production mode/capability or Mesa wire binding | Complete native capability/session and production exact-submit admission, independent genuine global-prefix/visibility and CPU-fence protocol, paired binding and caller backpressure/error integration; caller-quiescent transport destroy is still required |
-| Resource and object teardown | Permanent exact-client/service retention remains; source-only owned VM/BO cleanup plus conditional legacy close, pre-admission registration pins, checked VM-first release and a bounded actual-timer reaper pass CPU tests | Prove native BO/object/callback/thread-call lifetimes, page walk/ACK and stop/unload; finish multi-pending CPU fences and healthy exact-client/service drain; native reclamation still requires actual GPU evidence, while uncertain/lost work remains quarantined |
+| Resource and object teardown | Source-only owned VM/BO cleanup and conditional legacy/exact close pass CPU tests; exact historical publication bounds survive ACK, admission pins precede slot publication, checked VM release precedes BO cleanup, and the actual timer dispatch serves a bounded shared reaper; service permanent quarantine remains | Prove native BO/object/callback/thread-call lifetimes, page walk/ACK and stop/unload; finish multi-pending CPU fences and healthy service drain; conditional exact-client reclamation still needs native/GPU evidence, while uncertain/lost work remains quarantined |
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
 | Frozen native integration | No R3 native candidate | Complete entrypoint/VM audit, actual SDK compile, exact build34 provenance and paired runtime/ABI validation without weakening existing build34 admission |
 | Hardware acceptance | None for R3 | Fresh compatible finite recovery scope; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
@@ -99,6 +100,17 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    leave. This does not accept native object/thread-call/mapping lifetime or
    remove exact-client/service quarantine; native integration and actual GPU
    drain/latency/stability remain required.
+   The next [conditional exact-close stage](BUILD34-EXACT-CLOSE.md) now shares
+   the bounded registration/reaper and preserves publication history after ACK.
+   Only after CPU drain does it seal Registry, require reciprocal authoritative
+   VM ownership and both queues' generation-bound completion plus genuine
+   global-prefix coverage, and permit checked VM-first/BO-second cleanup.
+   An admitted submit may still publish after close and lose its reply without
+   losing its receipt; wait pins and reservations prevent early retirement.
+   Healthy exact clients can finalize in this CPU stage. Lost generations,
+   unmatched publication, VM/descriptor uncertainty and service stop retain
+   references/resources. Native SDK/object/reader/visibility/event validation,
+   service healthy teardown and actual GPU/performance/stability remain open.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete
