@@ -130,6 +130,25 @@ controller that would roll the kernel, VBL or AML back further. A separate
 new-boot loaded-image check and controlled display comparison remain required
 before R2a hardware acceptance or R3.
 
+The [separate R2a adapter](../tools/build34_present_copy_host.py) provides that
+source/preparation path without changing historical hosts. Its distinct
+sealed scope validates the exact two-image delta, retained EFI/kernel/AML
+manifest and baseline jobs. Its final contract overlay changes only the
+accelerator/cache hashes and accelerator image identity. Preparation uses
+the still-loaded accepted accelerator identity for live checks while disk
+and signature checks continue to require the candidate. Recovery checks
+all inputs before the first mutation, restores only the accelerator/cache
+pair and current retained jobs, and leaves EFI/kernel/plugin/AML untouched.
+It verifies disk restoration without requiring the failed accelerator to
+have started or treating a new diagnostic report as a failed disk restore.
+
+Nine CPU fixture methods cover exact/unknown deltas, immutable derivation,
+preserved kernel/ABI/EFI, daily configuration and current job accounting,
+pre-restart identity separation, refusal before writes and two-image-only
+recovery. The inherited bounded startup, finite watcher and no-daily-power
+policy remain. This adapter is source-tested only; no new live scope,
+candidate deployment or ordinary restart has occurred at this checkpoint.
+
 This does not implement AMD asynchronous presentation or a DCN flip. Moving
 the wait/copy to a worker still requires bounded ownership, cancellation,
 stop/sleep handling and correct completion; removing the wait or NVIDIA vendor
