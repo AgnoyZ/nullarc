@@ -1,6 +1,42 @@
 # Build34 R1a: real elapsed-time accounting for native waits
 
-## November 20 authorized isolated installation
+## November 20 loaded R1a and bounded hardware acceptance
+
+The authorized single ordinary restart completed at **13:03:56 Asia/Shanghai**
+on November 20, 2026, macOS 26.7.2 build 25G332. The new finite observer and
+a separate independent readback both passed exact R1a kernel loading,
+unchanged accelerator/mapped plugin, fresh startup/desktop/supervision-ended
+receipts, all 357 EFI files, complete 416-record/29-codeless cache metadata,
+original loaded ACPI, security and exact accepted recovery. The old accepted
+kernel is no longer loaded. R1a remains active; do not restore it after success.
+The restart command's 15-second wait timeout was not a reason to resend it:
+only one ordinary restart request was sent and no recovery power action occurred.
+
+The fresh pinned native fixture submitted exactly two compute dispatches,
+rewrote the same IB between them and passed both full 16 KiB arena checks,
+including code, IB, output and guard bytes. In each pass the zero-budget query
+returned pending; the subsequent 50,000 ns-budget call observed real completion,
+taking 20,248 ns and 13,185 ns respectively. Independent reparse agreed with the
+observer's output and the probe exited with clean client teardown. Thus the
+real pending-to-completed positive-budget path was exercised, rather than only
+an already-completed zero poll. These two short waits do **not** demonstrate
+timeout/oversleep behavior, a hard wall-time return bound, physical FPS or
+long-term stability; the delayed-clock cases remain CPU evidence.
+
+Independent finite readback retained the same WindowServer, advanced VBL by
+819 and display-completion count by 299, kept all four checked error counters
+at zero and found no new matching report. These counters are not physical FPS.
+No probe, startup, guardian or observer worker remains running; the observer
+removed its job and exited zero. Recovery was not triggered. Preserve daily
+PR28 250 ms/WindowServer exclusion, disabled resident monitoring and the original
+45/150/300-second startup policy. The one-restart authorization is consumed;
+do not replay the probe or restart dispatcher. R1b source preparation may now
+proceed separately, retaining this successful R1a installation while later
+candidate installation/reboot requires its own compatible authorization/scope.
+
+See the [sanitized hardware record](validation/build34-wait-boot-20261120.json).
+
+## Historical November 20 authorized isolated installation
 
 The owner subsequently explicitly authorized R1a installation, one ordinary
 restart and bounded GPU validation. This supersedes the authorization-pending

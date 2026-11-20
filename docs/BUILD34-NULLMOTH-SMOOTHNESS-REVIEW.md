@@ -5,12 +5,15 @@ resumes with [R1a elapsed-time accounting](BUILD34-WAIT-DEADLINE.md) on the
 recovered owner-accepted build34 runtime. A fresh independent readback of the
 12:20:11 Asia/Shanghai boot passes. Source/CPU/native-artifact checks pass and
 the owner has explicitly authorized R1a installation, one ordinary restart
-and bounded GPU validation. A fresh exact controller has installed only the
-R1a kernel executable and staged new startup/finite-observer jobs. The accepted
-kernel is still loaded pending that restart; no R1a GPU acceptance is claimed.
-The former Weather prerequisite was withdrawn and must not be replayed.
-R1b and R2–R6 remain pending until R1a hardware acceptance. See the
-[installation record](validation/build34-wait-installation-20261120.json).
+and bounded GPU validation. The single restart completed at 13:03:56
+Asia/Shanghai. The finite observer and separate independent new-boot readback
+verified exact R1a loading and two full-arena-verified native dispatches, both
+with real pending-to-completed 50 us-budget waits. R1a remains installed and
+active; its finite correctness acceptance does not establish timeout/oversleep
+behavior, FPS or long-term stability. The former Weather prerequisite was
+withdrawn and must not be replayed. R1b source preparation may now proceed;
+R2–R6 remain pending. The restart/probe scope is consumed and must not be
+replayed. See the [hardware record](validation/build34-wait-boot-20261120.json).
 This supersedes the execution status only; the following November 19 comparison
 remains historical evidence.
 
