@@ -141,6 +141,12 @@ test-build34-exact-callbacks:
 	@test -n "$(EXACT_CALLBACKS_OUT)" || (echo "Set EXACT_CALLBACKS_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_callbacks.py --out "$(EXACT_CALLBACKS_OUT)"
 
+# Staged exact client closure/BO retention; finite CPU doubles, no kext build.
+.PHONY: test-build34-exact-client-lifetime
+test-build34-exact-client-lifetime:
+	@test -n "$(EXACT_CLIENT_OUT)" || (echo "Set EXACT_CLIENT_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_client_lifetime.py --out "$(EXACT_CLIENT_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \

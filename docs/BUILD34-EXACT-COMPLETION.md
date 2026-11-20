@@ -629,3 +629,88 @@ installation is retained. Owner/capability negotiation, coherent native fence
 observation, receipt acknowledgement, full client/service lifetime and GPU
 drain, broader watchdog selection/adoption races and AMD completion events
 remain unresolved; R3 hardware/FPS/long-term acceptance and R4–R6 are pending.
+
+## Exact client admission and permanent retention experiment
+
+The [next isolated transform](../tools/build34_exact_client_lifetime.py)
+extends the callback experiment with a deliberately non-reclaiming exact
+client protocol. It does not modify production sources or a runtime recipe.
+The exact Registry is still bound only by the CPU fixture, before `start`,
+and must remain immutable. There is no native owner allocator, negotiation,
+selector, acknowledgement or exact wait implementation.
+
+An extracted-method CPU counterexample keeps its fake backend pending and
+shows the existing `clientClose` releasing BO descriptors before its VMID
+wait, and `vmidFree` clearing page tables after exhausting 2,000 sleeps.
+The existing `free` likewise releases BOs after that bounded wait. These
+are source/backend-model counterexamples, not observed failures of the
+installed driver. The legacy path and actual `vmidFree`/WAITSEQ/fence reader
+remain unchanged; this experiment does not repair or certify legacy cleanup.
+
+Only after base `start` succeeds does the proposed exact path pin both the
+client and its provider, before admitting exact operations. It refuses
+operations before that pin and refuses repeat start. This avoids attempting
+to resurrect an object from `free`; its later defensive guard is not an
+IOKit finalizer proof. The fixture counts retain/release calls with platform
+doubles; it does not execute OSObject destruction or establish native callback
+ownership. Registry allocation/lifetime is still a prerequisite.
+
+The actual dispatcher, descriptor-export method and private submit each take
+a whole-method client admission lease. This includes the WAITSEQ, topology
+and surface-mark fastpaths that bypass the dispatcher's client lock. The
+dispatcher and descriptor export recheck closure after acquiring that lock.
+Exact `clientClose` closes admission and returns without waiting, taking the
+client lock, terminating, freeing BOs, releasing the session/VMID, or dropping
+either start-time reference. Concurrent/repeated closes remain terminal.
+The Registry stays writable so a submit admitted before close can publish
+its receipt afterward. Closing the Registry immediately would lose that
+admitted-publication path.
+
+Before the fallible receipt reservation/backend admission, a sticky bit marks
+the client's resources as exposed. Once set, the actual BOFREE and UNMAP
+methods refuse before modifying maps/accounting, and a defensive `boRelease`
+guard refuses descriptor completion/release. The bit stays set after failed
+submission, receipt-table exhaustion, completed-metadata forget and a safe
+global completion prefix. That prefix is preserved for legacy reclamation;
+it is not a new unpin/drain protocol for this staged exact experiment.
+Before first exposure the existing BOFREE/UNMAP behavior remains available;
+MAP and other dispatcher leaves have not received a complete VM safety audit.
+
+All client/provider references, BOs, mappings, locks, session and VMID remain
+**permanently retained** after exact close, including idle close. There is
+no last-callback cleanup, unpin, deferred reclaimer, timeout release or native
+GPU drain. This intentional leak/quarantine **must not be built or deployed**.
+Complete native lifetime, coherent observation, resource ownership and safe
+reclamation still need implementation before a usable R3 candidate exists.
+
+The [CPU runner](../tools/test_build34_exact_client_lifetime.py) freezes the
+accepted build34 and prior experiments, extracts **14 actual methods** into
+the [fixture](../tests/test_build34_exact_client_lifetime.cpp), checks its
+non-system compilation dependencies and excludes device runtimes from linkage.
+Other dispatcher leaves and the service/GPU backend are explicit CPU doubles.
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-client-lifetime \
+  EXACT_CLIENT_OUT=build/build34-r3-client-new-private
+```
+
+On November 21 the suite passed **2,578 checks in 17 groups, including eight
+real-thread scenarios**, under both **ASan/UBSan and TSan**. It covers close
+during backend submission, unlocked wait, topology/surface fastpaths and
+saved-lock acquisition; descriptor export, queued callbacks, two simultaneous
+closes, an independent client, idle/repeated close, pre-exposure release and
+legacy behavior. Sixteen deliberately broken versions are detected: missing
+start-time client/provider pins; any of three entry leases; either lock-held
+closure recheck; fallthrough into legacy teardown; omitted free/freeAll/
+boRelease or BOFREE/UNMAP guards; missing sticky exposure; premature Registry
+close; and a global-prefix shortcut that violates this experiment's retention
+policy. Expected assertion failures remain private. Preserve the initial
+unused-fixture-counter compile failure as evidence; it was not a kernel build.
+
+The separate unchanged callback, lifecycle, submit, ownership and default
+regressions are recorded in the
+[sanitized evidence](validation/build34-r3-client-lifetime-offline-20261121.json).
+All **172 tracked production inputs**, ABI, earlier experiments and runtime
+recipes remain unchanged. No installation, runtime reconfiguration, GPU work,
+reboot or FPS/long-term acceptance occurred. Keep accepted R1b/R2a/plugin and
+startup/recovery settings active. R3 remains source-only; R4–R6 have not begun.
