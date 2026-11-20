@@ -2,8 +2,9 @@
 
 Current November 20 checkpoint: R1a/R1b and R2a's bounded functional trial
 have passed. R2a's installed combination remains active; no speedup is
-established. R3 has a tested **source-only Mesa bookkeeping prerequisite**,
-not an installed exact-wait implementation. R4–R6 have not started.
+established. R3 has tested **source-only Mesa bookkeeping and multi-target
+wait/query prerequisites**, not an installed exact-wait implementation.
+R4–R6 have not started.
 
 ## Why a kernel-only change is unsafe
 
@@ -77,17 +78,16 @@ EFI/cache/ACPI or power operation occurred. See
 
 ## Remaining admission work
 
-This patch is a prerequisite, not the complete R3 optimization. Do not enable
+These patches are prerequisites, not the complete R3 optimization. Do not enable
 an exact kernel/backend response yet. Before a paired native candidate:
 
 1. Add a separately negotiated exact-target operation while keeping legacy
    waits and the safe output/global reclamation watermark compatible. Bind
    targets to actual submission ownership, queue selection/generation and
    teardown; never infer completion from a missing/reused history slot.
-2. Correctly handle wait-any and query across multiple independently pending
-   sequences. The current provider polls the lowest pending sequence, and
-   query refreshes only the newest; global-prefix assumptions are unsuitable
-   for a fully exact backend. The prerequisite above changes neither path.
+2. Carry the separately tested multi-target prerequisite below into the future
+   paired candidate only after capability negotiation and dependency work.
+   Neither the installed runtime nor the old runtime recipes apply it.
 3. Audit cross-queue dependencies. `acd_sync_cs_wait_ready` currently treats
    a sequence on the same connection as already ordered before a subsequent
    submission. That assumption needs an explicit queue-order/dependency
@@ -100,8 +100,98 @@ an exact kernel/backend response yet. Before a paired native candidate:
    compatible recovery scope, exact loaded images and bounded dual-queue
    full-arena hardware evidence before R3 acceptance or advancing to R4.
 
-Current rollback is simply to leave this source patch unapplied to the
+Current rollback is simply to leave these source patches unapplied to the
 installed runtime; there is no deployed R3 state to undo. The accepted R2a
 installation, R1b kernel, optimized AML, accepted plugin, daily PR28 250 ms
 with WindowServer excluded, disabled resident monitors and 45/150/300-second
 startup bounds remain intact. Neither FPS nor long-term stability is claimed.
+
+## Multi-target wait and query prerequisite
+
+After 0003 alone, three independent global-prefix assumptions remain unsafe
+for the **proposed** exact backend:
+
+- A zero-timeout wait-any on pending sequence 10 and completed sequence 20
+  polls only 10, returning ETIME although the second payload is ready.
+- Query of a completed sequence-20 timeline and pending sequence-30 timeline
+  refreshes only 30, missing the completed timeline point.
+- Waiting for point 3 attached to pending sequence 10 misses completed point 8
+  attached to sequence 20 on the same timeline. Point 8 can satisfy point 3.
+
+The [new actual-source fixture](../tests/test_build34_exact_multitarget.c)
+reproduces all three with 0003 applied. This is a contract transition test,
+not a reproduction against the installed conservative native backend.
+
+[Patch 0004](../mesa-patches-build34/0004-radv-exact-multitarget-wait-query.patch)
+changes the sync provider and its internal userspace backend header. The new
+`exact_completion` capability defaults to false in the unchanged production
+initializer. It is neither a native ABI extension nor an environment switch;
+no production backend enables it. Legacy wait retains its single minimum
+poll and query its single newest poll, with the same call budgets.
+
+When the CPU fixture explicitly enables this capability, waits collect a
+finite snapshot of every candidate able to satisfy the requested payloads,
+including higher points on the same timeline. They sort/deduplicate sequence
+numbers and poll with zero budget, even for an expired/zero deadline. State
+is checked after each callback so wait-any can return without polling an
+unrelated failing target. Wait-all retains its all-payload requirement and
+`first_signaled` follows the input handle indices. Before a blocking callback,
+the real production code rechecks its monotonic deadline, caps the slice at
+20 ms and rotates the target. This is not a hard scheduler/return-time bound.
+
+Query snapshots all outstanding timeline candidates, not just the largest
+sequence. Exact-mode backend errors propagate with the existing device-loss
+mapping; legacy query retains its existing previous-state-on-error behavior.
+The safe global prefix is still folded separately from exact completion.
+
+Snapshots contain sequence values only. No object pointers survive unlocking
+the mutex, and current references are checked after callbacks. Reset,
+destroy/reuse, object-table growth and concurrent attachments cannot signal
+replacement payloads or enlarge an in-progress snapshot without bound.
+Attachments after the snapshot can be observed by a later sweep/call. Temporary
+allocation failures return ENOMEM before any callback and preserve payloads;
+there is no persistent completed-sequence set. CPU signal/attach condition
+checks and sleeps share the mutex. If an attach arrives after the initial
+empty snapshot unlock, a second lock-held snapshot prevents sleeping after
+its notification has already passed.
+
+Run the [separate offline runner](../tools/test_build34_exact_multitarget.py)
+against the same 30-file reviewed dependency closure and a fresh output:
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-multitarget \
+  MESA_SOURCE="$MESA_SOURCE" \
+  EXACT_MULTITARGET_OUT=build/build34-r3-multitarget-new-private
+```
+
+On November 20 the candidate passed **3,768 ASan/UBSan checks**, including
+128 sequence gaps/permutations (also near UINT64_MAX), wait-any/all, multi-query,
+timeline implication, alias deduplication, shared clones, transfers, deadline
+expiry/final polling, rotating blocking targets, CPU signal/attach, backend
+errors, initial/growing allocation failure and bounded snapshot mutation.
+Six actual-thread wait/query cases pause inside the backend while another
+thread resets/destroys/reuses a handle or expands the object table. The
+deadline fixture redirects only the provider's monotonic clock for
+deterministic passage during a callback; it does not measure native wait time.
+An additional deterministic unlock/attach interleaving reproduced an avoidable
+condition-wait delay in the pre-final source; its failed CPU assertion is
+preserved privately. The final lock-held recheck passes with one zero-budget
+backend poll and zero condition sleeps in this case.
+The prior **4,741-check** bookkeeping suite passes on the combined sources,
+and default `make -j1 test` passes (optional firmware fixtures remain absent).
+
+The runner verifies unchanged source inputs, MIT notices, dependency closure,
+production backend initializer and all tracked driver/plugin/native-ABI/tool
+bytes. Neither executable links IOKit, Metal or Vulkan device runtimes. The
+recipe is deliberately separate from the existing runtime/tail patch series.
+See [sanitized evidence](validation/build34-r3-multitarget-offline-20261120.json).
+
+A separate read-only check during this work again passed the same accepted
+R2a boot, exact loaded R1b/R2a/mapped plugin, 358 EFI files, complete cache/ACPI/job
+checks, advancing desktop and four zero error counters. Preserve its first
+reader's bytes-versus-string TypeError at accelerator comparison and the
+corrected successful readback; the first reader failure is not a driver-load
+failure. There was no recovery or power request. The accepted R2a installation
+remains active. R3 is still uninstalled and has no GPU/FPS/long-term acceptance;
+native ownership/generation, cross-queue dependencies and AMD events remain
+the next admission work before R4.

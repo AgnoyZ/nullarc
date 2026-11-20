@@ -1,0 +1,241 @@
+diff --git a/src/amd/common/darwin/ac_darwin_drm.h b/src/amd/common/darwin/ac_darwin_drm.h
+--- a/src/amd/common/darwin/ac_darwin_drm.h
++++ b/src/amd/common/darwin/ac_darwin_drm.h
+@@ -73,6 +73,11 @@
+     * retired seqno, or -errno (device lost: -ETIME / -ECANCELED). */
+    int (*wait_seq)(void *ctx, uint64_t seq, uint64_t rel_ns, bool *busy, uint64_t *retired);
+    void *ctx;
++   /* Internal userspace capability, not a kernel ABI or environment switch.
++    * A negotiated backend may report exact-target readiness while *retired
++    * remains a safe contiguous prefix. Legacy designated initializers leave
++    * this false. No production backend enables it yet. */
++   bool exact_completion;
+ };
+ struct util_sync_provider *acd_sync_provider_create(const struct acd_sync_backend *be);
+ /* CS path: blocks until (handle, point) is CPU-signalled or attached to a seqno
+diff --git a/src/amd/common/darwin/ac_darwin_sync.c b/src/amd/common/darwin/ac_darwin_sync.c
+--- a/src/amd/common/darwin/ac_darwin_sync.c
++++ b/src/amd/common/darwin/ac_darwin_sync.c
+@@ -248,11 +248,201 @@
+    return SYNC_FAIL(ENOSYS);
+ }
+
++/* A finite snapshot of sequence numbers, never pointers into mutable syncobjs.
++ * A callback can reset/destroy/reuse handles, grow objs or attach new points.
++ * Recheck current state under mtx after each callback; new submissions belong
++ * to the next sweep. No completed-sequence history is retained. */
++struct acd_targets {
++   uint64_t *seqs;
++   size_t count, capacity;
++};
++
++static int
++add_target(struct acd_targets *targets, uint64_t seq)
++{
++   if (targets->count == targets->capacity) {
++      size_t cap = targets->capacity ? targets->capacity * 2 : 16;
++      if (cap < targets->capacity || cap > SIZE_MAX / sizeof(*targets->seqs))
++         return -ENOMEM;
++      uint64_t *seqs = realloc(targets->seqs, cap * sizeof(*seqs));
++      if (!seqs)
++         return -ENOMEM;
++      targets->seqs = seqs;
++      targets->capacity = cap;
++   }
++   targets->seqs[targets->count++] = seq;
++   return 0;
++}
++
++static int
++compare_seq(const void *a, const void *b)
++{
++   uint64_t x = *(const uint64_t *)a, y = *(const uint64_t *)b;
++   return (x > y) - (x < y);
++}
++
++/* Called with mtx held. Query collects all outstanding timeline candidates;
++ * wait collects all candidates able to satisfy each requested payload. A
++ * higher timeline point can satisfy a lower point despite an earlier gap. */
++static int
++snapshot_targets(struct acd_sync *s, const uint32_t *handles, const uint64_t *points,
++                 unsigned n, bool query, struct acd_targets *targets)
++{
++   for (unsigned i = 0; i < n; i++) {
++      struct acd_syncobj *o = lookup(s, handles[i]);
++      if (!o)
++         return -EINVAL;
++      fold(s, o);
++      uint64_t point = points ? points[i] : 0;
++      if (!query && point == 0) {
++         if (!o->bin_cpu && o->bin_seq) {
++            int r = add_target(targets, o->bin_seq);
++            if (r)
++               return r;
++         }
++      } else if (query || o->point < point) {
++         for (uint32_t j = 0; j < o->tl_n; j++) {
++            if (o->tl[j].seq && o->tl[j].point > o->point &&
++                (query || o->tl[j].point >= point)) {
++               int r = add_target(targets, o->tl[j].seq);
++               if (r)
++                  return r;
++            }
++         }
++      }
++   }
++   if (targets->count > 1) {
++      qsort(targets->seqs, targets->count, sizeof(*targets->seqs), compare_seq);
++      size_t count = 1;
++      for (size_t i = 1; i < targets->count; i++)
++         if (targets->seqs[i] != targets->seqs[count - 1])
++            targets->seqs[count++] = targets->seqs[i];
++      targets->count = count;
++   }
++   return 0;
++}
++
++/* Called with mtx held. Return 1 if satisfied, 0 if pending, or -errno. */
++static int
++wait_state(struct acd_sync *s, const uint32_t *handles, const uint64_t *points,
++           unsigned n, unsigned flags, uint32_t *first_signaled)
++{
++   unsigned done = 0, first = 0;
++   for (unsigned i = 0; i < n; i++) {
++      struct acd_syncobj *o = lookup(s, handles[i]);
++      if (!o)
++         return -EINVAL;
++      uint64_t seq;
++      if (point_state(s, o, points ? points[i] : 0, &seq) == P_DONE) {
++         if (!done)
++            first = i;
++         done++;
++      }
++   }
++   if ((flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL) ? done == n : done > 0) {
++      if (first_signaled)
++         *first_signaled = first;
++      return 1;
++   }
++   return 0;
++}
++
++/* Exact backends cannot use minimum-sequence/global-prefix shortcuts. Sweep
++ * every distinct candidate with a zero-budget callback, including for an
++ * already expired deadline. Before blocking, recheck the monotonic deadline.
++ * Rotate the bounded blocking slice so one busy target cannot monopolize it.
++ * The callback contract is bounded, not a hard scheduler/return-time promise. */
++static int
++wait_exact(struct acd_sync *s, uint32_t *handles, const uint64_t *points, unsigned n,
++           int64_t timeout_nsec, unsigned flags, uint32_t *first_signaled)
++{
++   const bool infinite = timeout_nsec == INT64_MAX;
++   const uint64_t deadline = infinite ? UINT64_MAX : timeout_nsec < 0 ? 0 : (uint64_t)timeout_nsec;
++   uint64_t last_blocked = 0;
++
++   for (;;) {
++      struct acd_targets targets = {0};
++      pthread_mutex_lock(&s->mtx);
++      int state = wait_state(s, handles, points, n, flags, first_signaled);
++      int r = 0;
++      if (!state && s->be.wait_seq)
++         r = snapshot_targets(s, handles, points, n, false, &targets);
++      pthread_mutex_unlock(&s->mtx);
++      if (state || r) {
++         free(targets.seqs);
++         return state > 0 ? 0 : SYNC_FAIL(-(state ? state : r));
++      }
++
++      for (size_t i = 0; i < targets.count; i++) {
++         r = backend_wait(s, targets.seqs[i], 0);
++         if (r) {
++            free(targets.seqs);
++            return SYNC_FAIL(-r);
++         }
++         pthread_mutex_lock(&s->mtx);
++         state = wait_state(s, handles, points, n, flags, first_signaled);
++         pthread_mutex_unlock(&s->mtx);
++         if (state) {
++            free(targets.seqs);
++            return state > 0 ? 0 : SYNC_FAIL(-state);
++         }
++      }
++
++      pthread_mutex_lock(&s->mtx);
++      state = wait_state(s, handles, points, n, flags, first_signaled);
++      const uint64_t now = now_mono_ns();
++      if (state || (!infinite && now >= deadline)) {
++         pthread_mutex_unlock(&s->mtx);
++         free(targets.seqs);
++         return state > 0 ? 0 : SYNC_FAIL(state ? -state : ETIME);
++      }
++      uint64_t slice = infinite ? ACD_SYNC_POLL_NS : deadline - now;
++      if (slice > ACD_SYNC_POLL_NS)
++         slice = ACD_SYNC_POLL_NS;
++      if (!targets.count && s->be.wait_seq) {
++         /* An attach can arrive after the first empty snapshot was unlocked.
++          * Do not sleep on cond after its notification has already passed. */
++         r = snapshot_targets(s, handles, points, n, false, &targets);
++         if (r || targets.count) {
++            pthread_mutex_unlock(&s->mtx);
++            free(targets.seqs);
++            if (r)
++               return SYNC_FAIL(-r);
++            continue;
++         }
++      }
++      if (targets.count) {
++         size_t i = 0;
++         while (i < targets.count && targets.seqs[i] <= last_blocked)
++            i++;
++         last_blocked = targets.seqs[i < targets.count ? i : 0];
++         pthread_mutex_unlock(&s->mtx);
++         free(targets.seqs);
++         r = backend_wait(s, last_blocked, slice);
++         if (r)
++            return SYNC_FAIL(-r);
++      } else {
++         /* The state check and cond wait share mtx: a CPU signal or attach
++          * cannot be lost between checking an unsubmitted payload and sleep. */
++         free(targets.seqs);
++         struct timespec dl;
++         clock_gettime(CLOCK_REALTIME, &dl);
++         uint64_t ns = (uint64_t)dl.tv_nsec + slice;
++         dl.tv_sec += ns / 1000000000ull;
++         dl.tv_nsec = ns % 1000000000ull;
++         pthread_cond_timedwait(&s->cond, &s->mtx, &dl);
++         pthread_mutex_unlock(&s->mtx);
++      }
++   }
++}
++
+ /* timeout_nsec is an absolute CLOCK_MONOTONIC time, as in the DRM ioctls (INT64_MAX = forever). */
+ static int
+ wait_generic(struct acd_sync *s, uint32_t *handles, const uint64_t *points, unsigned n, int64_t timeout_nsec,
+              unsigned flags, uint32_t *first_signaled)
+ {
++   if (s->be.exact_completion)
++      return wait_exact(s, handles, points, n, timeout_nsec, flags, first_signaled);
+    const bool infinite = timeout_nsec == INT64_MAX;
+    const uint64_t deadline = infinite ? UINT64_MAX : timeout_nsec < 0 ? 0 : (uint64_t)timeout_nsec;
+    bool final_poll = false;
+@@ -400,8 +590,18 @@
+ {
+    struct acd_sync *s = to_sync(p);
+
+-   /* Refresh the retired seqno once (zero-timeout WaitSeq on the newest pending one). */
+-   if (s->be.wait_seq) {
++   if (s->be.exact_completion && s->be.wait_seq) {
++      struct acd_targets targets = {0};
++      pthread_mutex_lock(&s->mtx);
++      int r = snapshot_targets(s, handles, NULL, handle_count, true, &targets);
++      pthread_mutex_unlock(&s->mtx);
++      for (size_t i = 0; !r && i < targets.count; i++)
++         r = backend_wait(s, targets.seqs[i], 0);
++      free(targets.seqs);
++      if (r)
++         return SYNC_FAIL(-r);
++   } else if (s->be.wait_seq) {
++      /* Legacy backend: retain the single newest/global-prefix refresh. */
+       uint64_t newest = 0;
+       pthread_mutex_lock(&s->mtx);
+       for (uint32_t i = 0; i < handle_count; i++) {

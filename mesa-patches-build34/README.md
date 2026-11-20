@@ -4,10 +4,13 @@ This is a separately scoped, active source recipe for default branch
 `upstream34/vram-layout-fix`. It does not make the historical `patches/`
 directory an apply list. It contains no kernel, firmware or runtime binary.
 
-`0003-radv-exact-completion-bookkeeping.patch` is a **separate R3 source-only
-prerequisite**, not another patch automatically applied by the runtime/tail
-recipes below. Its dedicated CPU runner tests only the pinned sync provider;
-it does not implement or enable an exact native backend. See
+`0003-radv-exact-completion-bookkeeping.patch` and the dependent
+`0004-radv-exact-multitarget-wait-query.patch` are **separate R3 source-only
+prerequisites**, not patches automatically applied by the runtime/tail
+recipes below. The dedicated CPU runners test the pinned sync provider;
+0004 follows 0003 and also changes its internal userspace backend header.
+Its new capability defaults false and no production initializer enables it.
+Neither patch implements or enables an exact native backend. See
 [R3 design, CPU evidence and remaining admission work](../docs/BUILD34-EXACT-COMPLETION.md).
 
 `0001-radv-original34-immutable-ib-tail.patch` modifies exactly three MIT Mesa
