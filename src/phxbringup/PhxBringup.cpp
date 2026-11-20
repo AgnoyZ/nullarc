@@ -850,30 +850,45 @@ uint64_t PhxBringup::gpuRetired() const {
 }
 
 IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seqOut) {
-    // graphics IBs go to the gfx queue and compute IBs to the compute queue; with one of them missing, the other runs both
-    GpuQueue *qp = gfx ? (gq[1].ready ? &gq[1] : &gq[0]) : (gq[0].ready ? &gq[0] : &gq[1]);
-    if (!qp->ready || !vmCtx(handle))
-        return kIOReturnNotReady;
-    GpuQueue &q = *qp;
-    const uint32_t need = n * 4 + 8 + (q.gfx ? 0u : 8u);
-    if (need + 16 > q.ringDw)
-        return kIOReturnBadArgument;
-    IOLockLock(gpuLock);
-    // Ring space and the 64-entry history: retire finished entries, wait for the oldest one if needed (bounded, ~2 s).
-    for (int spin = 0;; spin++) {
+    // doSubmit retains the client lock/BO ownership throughout this call.
+    // Do not reserve ring or history space while waiting with gpuLock released.
+    const uint64_t start = mach_absolute_time();
+    GpuQueue *qp = nullptr;
+    for (bool retried = false;; retried = true) {
+        IOLockLock(gpuLock);
+        // Re-select and validate under the lock after every sleep: adoption,
+        // queue geometry, retirement and other submitters may have changed.
+        qp = gfx ? (gq[1].ready ? &gq[1] : &gq[0]) : (gq[0].ready ? &gq[0] : &gq[1]);
+        if (!qp->ready || !vmCtx(handle)) {
+            IOLockUnlock(gpuLock);
+            return kIOReturnNotReady;
+        }
+        GpuQueue &q = *qp;
+        const uint32_t need = n * 4 + 8 + (q.gfx ? 0u : 8u);
+        if (need + 16 > q.ringDw) {
+            IOLockUnlock(gpuLock);
+            return kIOReturnBadArgument;
+        }
         const uint64_t done = queueFence(q);
         while (q.head != q.tail && q.fseq[q.head & 63] <= done) {
             q.doneEnd = q.fend[q.head & 63];
             q.head++;
         }
-        if (q.tail - q.head < 63 && q.wptr + need - q.doneEnd <= q.ringDw - 16)
-            break;
-        if (spin > 40000) {
-            IOLockUnlock(gpuLock);
-            return kIOReturnBusy;
+        const bool hasSpace = q.tail - q.head < 63 && q.wptr + need - q.doneEnd <= q.ringDw - 16;
+        if (retried || !hasSpace) {
+            uint64_t elapsed = 0;
+            absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsed);
+            if (elapsed >= 2000000000ull) {
+                IOLockUnlock(gpuLock);
+                return kIOReturnBusy;
+            }
         }
-        IODelay(50);
+        if (hasSpace)
+            break;  // Keep the lock through VM binding, packet emission and doorbell.
+        IOLockUnlock(gpuLock);
+        IOSleep(1);
     }
+    GpuQueue &q = *qp;
     const uint32_t vmid = vmBind(handle);
     if (!vmid) {
         IOLockUnlock(gpuLock);

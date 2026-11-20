@@ -11,9 +11,11 @@ verified exact R1a loading and two full-arena-verified native dispatches, both
 with real pending-to-completed 50 us-budget waits. R1a remains installed and
 active; its finite correctness acceptance does not establish timeout/oversleep
 behavior, FPS or long-term stability. The former Weather prerequisite was
-withdrawn and must not be replayed. R1b source preparation may now proceed;
-R2–R6 remain pending. The restart/probe scope is consumed and must not be
-replayed. See the [hardware record](validation/build34-wait-boot-20261120.json).
+withdrawn. The R1a restart and probe scope is consumed.
+The R1b ring-space change passes CPU regressions and the native build. Its
+hardware trial remains pending, with R2–R6 to follow in order.
+[R1a hardware record](validation/build34-wait-boot-20261120.json) ·
+[R1b candidate and validation](BUILD34-RING-BACKPRESSURE.md)
 This supersedes the execution status only; the following November 19 comparison
 remains historical evidence.
 

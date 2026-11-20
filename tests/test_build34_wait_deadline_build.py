@@ -19,7 +19,9 @@ class SourceGate(unittest.TestCase):
     def setUpClass(cls):
         cls.baseline = {name: subprocess.check_output(["git", "show", m.BASE + ":" + name], cwd=ROOT)
                         for name in m.INPUTS}
-        cls.current = {name: (ROOT / name).read_bytes() for name in m.INPUTS}
+        accepted = "568e80b205c10b00cba4f21c6d324d239d725bfd"
+        cls.current = {name: subprocess.check_output(["git", "show", accepted + ":" + name], cwd=ROOT)
+                       for name in m.INPUTS}
 
     def test_exact_candidate(self):
         self.assertEqual(m.verify_blobs(self.baseline, self.current)[m.DRIVER], m.CANDIDATE_SHA)
