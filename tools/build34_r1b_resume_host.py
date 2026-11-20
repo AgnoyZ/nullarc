@@ -63,6 +63,16 @@ def derive_kernel(original, c, kind):
     return result
 
 
+def pre_restart_live_contract(candidate, c):
+    """Check the still-loaded R1a image while R1b is only on disk."""
+    assert candidate["candidate_image_uuid"] == c["R1b_image_uuid_private"]
+    assert candidate["candidate_binary_sha256"] == R1B_BINARY
+    assert c["R1b_image_uuid_private"] != c["kernel_after_uuid_private"]
+    live = copy.deepcopy(candidate)
+    live["candidate_image_uuid"] = c["kernel_after_uuid_private"]
+    return live
+
+
 class R1bHost(acpi.ACPIHost):
     SCOPE_KIND = "R1b-kernel-only-retained-VBL-AML-startup-recovery"
 

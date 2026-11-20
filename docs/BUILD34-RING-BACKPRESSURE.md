@@ -19,13 +19,23 @@ gates, at most one persisted first-trial recovery restart and disk-only daily
 failure recovery. Startup acceptance closes power recovery before the separate
 one-use pressure probe. A retained probe blocks worker termination/recovery.
 
-Eleven CPU fixture methods cover the exact manifest/source/image delta, old
+Thirteen CPU fixture methods cover the exact manifest/source/image delta, old
 host refusal, immutable derivation, retained-AML admission, unknown-input
 refusal before writes, and kernel-only recovery. The existing 19 AML, 18 VBL,
 10 original-host and 15 journal methods also pass. The 11 extracted gpuSubmit
 cases pass ASan/UBSan and the trace parser's fixture passes. These are CPU
 checks, not a new boot or GPU pressure result. Existing native artifacts are
 reused only after exact source/recipe/signature/hash verification.
+
+The first renewed installer refused its post-write check before any restart:
+its desktop check incorrectly required the disk candidate to be loaded in the
+preparation boot. Exact kernel/jobs recovery and a separate full independent
+readback passed, preserving the running R1a/VBL/AML/plugin desktop, 358 EFI
+files, 416/29 cache metadata and zero checked errors. No GPU probe or power
+request occurred. The consumed scope remains frozen. A dedicated pre-restart
+contract now selects only the known loaded R1a image identity for live checks;
+disk/signature checks still require exact R1b. Two regression methods cover
+that distinction and unknown-image refusal. Any retry uses a fresh scope.
 
 ## Earlier source and first trial
 

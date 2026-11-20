@@ -91,6 +91,24 @@ class DeltaTests(unittest.TestCase):
             with self.subTest(host=cls.__name__), self.assertRaises(AssertionError):
                 h.validate_kernel_contract({"kernel_source_checkpoint": m.R1B_SOURCE})
 
+    def test_pre_restart_checks_use_loaded_identity_and_preserve_disk_contract(self):
+        c = fixture()
+        disk = {"candidate_image_uuid": "R1b-image", "candidate_binary_sha256": m.R1B_BINARY,
+                "candidate_files": c["R1b_kernel_files_private"], "VBL": "retained"}
+        frozen = copy.deepcopy(disk)
+        live = m.pre_restart_live_contract(disk, c)
+        self.assertEqual(live["candidate_image_uuid"], "R1a-image")
+        self.assertEqual(disk, frozen)
+        live["candidate_image_uuid"] = "R1b-image"
+        self.assertEqual(live, frozen)
+
+    def test_pre_restart_checks_refuse_unexpected_candidate(self):
+        c = fixture()
+        for identity, digest in [("unknown", m.R1B_BINARY), ("R1b-image", "unknown")]:
+            with self.subTest(identity=identity, digest=digest), self.assertRaises(AssertionError):
+                m.pre_restart_live_contract({"candidate_image_uuid": identity,
+                                            "candidate_binary_sha256": digest}, c)
+
     def test_new_contract_requires_R1b_source_and_R1a_baseline(self):
         h = m.R1bHost.__new__(m.R1bHost)
         good = {"kernel_source_checkpoint": m.R1B_SOURCE,
