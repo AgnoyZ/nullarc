@@ -373,3 +373,94 @@ Stop/sleep/client-close and uncertain dispatch must retain resources until a
 real drain, with exact completion still separate from global reclamation.
 These native integration/event/fallback and hardware acceptance requirements
 remain unresolved; this prototype does not admit an R3 installation or R4–R6.
+
+## Actual native-submit admission source experiment
+
+The next isolated step connects the existing ownership registry to the actual
+`doSubmit` → `gpuSubmit` path in an **offline staged copy** of the accepted R1b
+build34 source. The [source transform](../tools/build34_exact_submit.py) has
+unique, pinned-input anchors; it is used only by the
+[separate CPU runner](../tools/test_build34_exact_submit.py). No production
+source, ABI, runtime recipe, installed image or startup job changes. The staged
+client pointer remains null with no allocator or capability; only the CPU
+fixture supplies a registry. This is not an enableable R3 driver candidate.
+
+The staged actual client reserves a receipt before entering `gpuSubmit` and
+retains its existing client lock and BO ownership. R1b's queue-space retry
+continues releasing `gpuLock`; it reserves neither ring space nor a submission
+sequence during sleep. Once space is available, the lock-held code captures
+the **actual** selected queue after retry/fallback, checks exact sequence
+exhaustion and binds the VM. Receipt publication then precedes the first ring
+packet, writeback pointer and doorbell. Publication failure leaves these
+submission outputs untouched; `vmBind` may already have changed VM registers,
+and earlier client cache maintenance/VMID allocation can also have occurred.
+This is not side-effect-free admission.
+
+The global `gSeq` update stays at its existing packet-emission site; it is not
+moved ahead of IB emission. The legacy global retirement function, fence
+reader and WAITSEQ implementation remain byte-identical. Exact completion
+therefore does not replace the safe global resource-reclamation prefix. Only
+an unpublished reservation can cancel on an ordinary pre-dispatch error; no
+failure return is introduced after successful publication. A published receipt
+remains retained even if the caller never consumes the successful response.
+Transport uncertainty and resource teardown still require separate native
+work and are not validated by this CPU fixture.
+
+An adoption counter lives outside the resettable ring/history struct. The
+actual staged `adoptQueue` increments it under `gpuLock` before resetting
+history and refuses exhaustion before reset. This prevents a receipt for an
+old adoption from inheriting the newly seeded fence in the CPU contract. It
+does **not** cover service restart, sleep/wake, faults, watchdog wave kills,
+stop or client close; no trusted owner allocator or coherent hardware reader
+has been added. Those missing lifetime rules still prohibit enabling exact
+completion. The 64-record table also remains deliberately finite: the 65th
+submission refuses even if CPU-injected fences have advanced, until a caller
+explicitly observes completion and forgets metadata. There is no production
+acknowledgement/reclamation protocol, no automatic eviction and no Unknown-to-
+legacy-prefix fallback. No BO, VMID or page table is reclaimed by the registry.
+
+Run with a fresh ignored output:
+
+```sh
+nice -n 15 taskpolicy -b make test-build34-exact-submit \
+  EXACT_SUBMIT_OUT=build/build34-r3-native-submit-new-private
+```
+
+On November 20 the final [actual-method fixture](../tests/test_build34_exact_submit.cpp)
+passed **30,605 ASan/UBSan checks across 80 scenario groups**. Five methods are
+extracted directly from the staged source: submit client, GPU submit, queue
+adoption, fence read and global retirement. Coverage includes compute/GFX,
+preferred/fallback queues, one/two/64 IBs, client fences, full/closed registries,
+invalid leases and inputs, failed VM binding, sequence limits, queue-space
+sleep/reselection, adoption geometry changes, context/queue loss and real
+monotonic-budget control flow with an injected CPU clock. One deterministic
+two-client interleaving runs both actual submit paths: GFX submits while the
+other client is blocked for compute space, and each registry owns only its
+own sequence. This is not actual-thread/TSan or GPU concurrency evidence.
+Two 130-submit runs reuse native history slots while retaining an older exact
+receipt. The cross-queue case proves exact GFX completion can coexist with
+the unchanged lower global prefix, using CPU-injected queue values only.
+
+Five separate deliberately faulty callsite variants must fail the same suite:
+requested instead of actual queue, omitted receipt publication, omitted exact
+sequence guard, omitted adoption epoch and premature global-sequence update.
+Their expected failed assertions are retained privately. The first fixture
+compile's signedness error is also preserved and corrected to match the
+native `int kMaxMaps`. A preliminary passing source variant was revised during
+review to preserve the original global-sequence update site; it was never a
+kernel build or installed candidate. The strengthened final suite catches
+that premature-update variant.
+
+The earlier **321,712-check** ownership suite and default `make -j1 test` pass
+again; optional firmware fixtures remain absent. Compilation dependencies
+are frozen and checked; device runtimes are excluded. All **172 tracked
+production inputs** remain unchanged. No Kernel SDK build, service open,
+installation, GPU probe, reboot or public binary upload occurred. See
+[sanitized evidence](validation/build34-r3-native-submit-offline-20261120.json).
+A separate independent read-only check passed exact loaded R1b/R2a/mapped
+plugin, full EFI/cache/ACPI/startup jobs, the same WindowServer and advancing
+desktop, without recovery or power requests. Keep that accepted installation
+active. Next resolve native lifecycle/owner allocation, bounded receipt
+acknowledgement, capability negotiation, coherent fence observation and safe
+teardown before a paired native backend or hardware trial. AMD completion
+events/fallback, R3 hardware/FPS/long-term acceptance and R4–R6 remain pending.

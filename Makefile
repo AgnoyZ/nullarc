@@ -123,6 +123,12 @@ test-build34-exact-ownership:
 	@test -n "$(EXACT_OWNERSHIP_OUT)" || (echo "Set EXACT_OWNERSHIP_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_ownership.py --out "$(EXACT_OWNERSHIP_OUT)"
 
+# Staged real native callsites, CPU doubles only; never builds a kernel image.
+.PHONY: test-build34-exact-submit
+test-build34-exact-submit:
+	@test -n "$(EXACT_SUBMIT_OUT)" || (echo "Set EXACT_SUBMIT_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_submit.py --out "$(EXACT_SUBMIT_OUT)"
+
 # A1 CPU-only regressions. These targets never load the plugin or submit GPU work.
 $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src/nmplugin/nvmtl_sampler_key.h Makefile | $(TEST_BIN_DIR)
 	xcrun clang -O1 -g -Wall -Wextra -Werror -fobjc-arc -fblocks \
