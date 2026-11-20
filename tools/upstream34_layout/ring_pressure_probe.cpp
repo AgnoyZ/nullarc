@@ -15,6 +15,15 @@ constexpr uint64_t kGfxFence = 0x2580000ull;
 constexpr uint32_t kNop[] = {0xc0061000u, 0, 0, 0, 0, 0, 0, 0};
 constexpr uint32_t kGfxIbOffset = 0x1000;
 constexpr unsigned kComputeCount = 64;
+// Fixed repetition of the already checked dispatch, without shader loops,
+// waits, new opcodes or a larger arena. All four submissions reuse immutable
+// commands/output until retirement; one burst has one distinct pattern.
+constexpr unsigned kDispatchesPerIB = 24;
+constexpr unsigned kComputeIbOffset = 0x1000;
+constexpr unsigned kComputeIbBytes = kDispatchesPerIB * 320;
+constexpr unsigned kComputeOutput = 0x3010;
+static_assert(kComputeIbOffset + kComputeIbBytes <= 0x3000 &&
+              kComputeOutput + 1024 < bytes, "commands/output remain inside the guarded arena");
 constexpr unsigned kMaxExitWait = 4; // Each call is capped by WAITSEQ at 2 s.
 using Clock = std::chrono::steady_clock;
 
@@ -99,22 +108,17 @@ static bool sameBytes(const Session &s, const uint8_t (&expected)[bytes]) {
 }
 static bool prepareCompute(const Session &s, uint8_t (&expected)[bytes], unsigned burst) {
     memset(expected, 0xa5, bytes);
-    memset(expected, 0, 8192);
+    memset(expected, 0, 0x3000);
     memcpy(expected, phxGfx11ClearShader, sizeof(phxGfx11ClearShader));
-    for (unsigned i = 0; i < kComputePerBurst; ++i) {
-        const unsigned output = 0x2010 + 0x500 * i;
-        const uint32_t p[] = {0x7800c0deu ^ burst, 0x13579bdfu + i, 0x2468ace0u ^ (burst << 16), 0xc001d00du - i};
+    const uint32_t p[] = {0x7800c0deu ^ burst, 0x13579bdfu, 0x2468ace0u ^ (burst << 16), 0xc001d00du ^ burst};
+    for (unsigned i = 0; i < kDispatchesPerIB; ++i) {
         uint32_t packet[80]{};
-        if (phxGfx11DispatchCommands(packet, 80, s.gpuVA, s.gpuVA + output, p) != PHX_SHADER_DISPATCH_DWORDS) return false;
+        if (phxGfx11DispatchCommands(packet, 80, s.gpuVA, s.gpuVA + kComputeOutput, p) != PHX_SHADER_DISPATCH_DWORDS) return false;
         packet[78] = packet[79] = 0xffff1000u;
-        memcpy(expected + 0x1000 + i * 0x200, packet, sizeof(packet));
+        memcpy(expected + kComputeIbOffset + i * sizeof(packet), packet, sizeof(packet));
     }
     memcpy(reinterpret_cast<void *>(s.cpu), expected, bytes);
-    for (unsigned i = 0; i < kComputePerBurst; ++i) {
-        const unsigned output = 0x2010 + 0x500 * i;
-        const uint32_t p[] = {0x7800c0deu ^ burst, 0x13579bdfu + i, 0x2468ace0u ^ (burst << 16), 0xc001d00du - i};
-        for (unsigned j = 0; j < 256; ++j) memcpy(expected + output + 4 * j, &p[j & 3], 4);
-    }
+    for (unsigned j = 0; j < 256; ++j) memcpy(expected + kComputeOutput + 4 * j, &p[j & 3], 4);
     __sync_synchronize();
     return true;
 }
@@ -158,7 +162,7 @@ static int run(io_service_t service) {
     if (!gfxOne(gfx, gfxLast, 0, 0) || !retired(gfx, gfxLast)) return fail("GFX warmup");
     if (!prepareCompute(compute, expected, 0)) return fail("compute warmup arena");
     // Single IB warmup keeps the driver's first-submit debug logging out of the pressure burst.
-    const auto warm = request(compute, false, 1, 0x1000, 320);
+    const auto warm = request(compute, false, 1, kComputeIbOffset, kComputeIbBytes);
     if (!dispatch(compute, warm, cmpLast) || !retired(compute, cmpLast)) return fail("compute warmup");
     for (unsigned burst = 1; burst <= kBursts; ++burst) {
         if (!prepareCompute(compute, expected, burst)) return fail("compute arena");
@@ -174,7 +178,7 @@ static int run(io_service_t service) {
             }
         });
         for (unsigned i = 0; i < kComputePerBurst; ++i) {
-            const auto r = request(compute, false, kComputeCount, 0x1000 + 0x200 * i, 320);
+            const auto r = request(compute, false, kComputeCount, kComputeIbOffset, kComputeIbBytes);
             if (i == kComputePerBurst - 1) fourth.store(true);
             const uint64_t begin = wall();
             uint64_t seq = 0;
@@ -202,15 +206,19 @@ int main(int argc, char **argv) {
     if (argc == 2 && !strcmp(argv[1], "--self-test")) {
         Session s;
         s.gpuVA = 0x10000; s.context = 1;
-        const auto r = request(s, false, kComputeCount, 0x1000, 320);
+        const auto r = request(s, false, kComputeCount, kComputeIbOffset, kComputeIbBytes);
         static_assert(kComputeCount == PHXN_MAX_IBS && 3 * (kComputeCount * 4 + 16) <= 1008 &&
                       4 * (kComputeCount * 4 + 16) > 1008, "compute pressure requires a 1024-dword ring");
         for (const auto &ib : r.ib)
-            if (ib.va_start != 0x11000 || ib.ib_bytes != 320 || ib.ip_type != PHX_AMDGPU_HW_IP_COMPUTE) return 1;
+            if (ib.va_start != 0x11000 || ib.ib_bytes != kComputeIbBytes || ib.ip_type != PHX_AMDGPU_HW_IP_COMPUTE) return 1;
         alignas(4096) uint8_t mapping[bytes], expected[bytes];
         s.cpu = reinterpret_cast<uintptr_t>(mapping);
         if (!prepareCompute(s, expected, 1) || !memcmp(mapping, expected, bytes) || !wall()) return 1;
-        for (unsigned i = 0; i < kComputePerBurst; ++i) memcpy(mapping + 0x2010 + 0x500 * i, expected + 0x2010 + 0x500 * i, 1024);
+        // Every repeated packet is byte-identical, correctly bounded and ends
+        // in the same two checked type-2 NOPs. Only output bytes may change.
+        for (unsigned i = 0; i < kDispatchesPerIB; ++i)
+            if (memcmp(mapping + kComputeIbOffset, mapping + kComputeIbOffset + i * 320, 320)) return 1;
+        memcpy(mapping + kComputeOutput, expected + kComputeOutput, 1024);
         if (!sameBytes(s, expected)) return 1;
         mapping[bytes - 1] ^= 1;
         if (sameBytes(s, expected)) return 1;

@@ -82,6 +82,32 @@ The next real test uses a fresh pressure-only scope on the current exact boot,
 without another driver installation or power request. See
 [boot and trace-refusal evidence](validation/build34-r1b-retained-boot-trace-refusal-20261120.json).
 
+### Completed finite workload without queue pressure
+
+The first separate current-boot run armed tracing in about 1.25 s. The probe
+and tracer both exited zero with no diagnostics. All 16 compute burst
+submissions, the GFX warmup fence, four complete 16 KiB arena comparisons,
+drain and both client closures completed. There was no queue-space sleep and
+no concurrent GFX burst. The strict parser correctly refused acceptance; a
+clean finite workload alone does not prove R1b's unlocked pressure behavior.
+No probe is retained, no power action occurred and the four checked error
+counters remain zero. Preserve this consumed scope and its failure record.
+
+The [new offline build recipe](../tools/build34_ring_pressure_probe.py) freezes
+the exact source/license inputs, requires the reviewed R1b kernel source,
+compiles/signs x86_64 and runs only the CPU self-test. Its fixture repeats the
+same existing dispatch packet 24 times per IB, with unchanged shader/opcodes.
+All four submissions share immutable commands and one burst-specific output
+pattern until retirement. The 7,680-byte IB and 1,024-byte output fit inside
+the original guarded 16 KiB arena. The 17 compute/41 GFX submission caps, four
+bursts, ring geometry, fence checks, complete-arena comparison and HOLD policy
+remain unchanged. This increases bounded GPU work without introducing GPU
+loops, waits or a driver change. Offline success is not GPU acceptance; a
+fresh current-boot scope and the unchanged strict trace proof are still required.
+The frozen native CPU self-test also passes ASan/UBSan, including repeated
+packet geometry, all output bytes and guard-corruption detection.
+See [the finite no-pressure record](validation/build34-r1b-finite-no-pressure-20261120.json).
+
 ## Earlier source and first trial
 
 R1b starts from the running, hardware-checked R1a kernel at
