@@ -31,6 +31,9 @@ AFTER = {
 }
 DISABLE_MARKER = '/Users/Shared/gpu/phxboot-off'
 EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+PLUGIN = '/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/PhxGPU/NVMTLDriver.bundle'
+PLUGIN_BINARY = 'Contents/MacOS/NVMTLDriver'
+ACCEPTED_PLUGIN = 'c9dc00ce66ece5b4fba642b989a6f6bce7bfe91c81e297a9f98e688fafb1b170'
 
 
 def validate_delta(c):
@@ -44,6 +47,7 @@ def validate_delta(c):
         assert c['sealed'][change['backup']] == BEFORE[path]
         assert c['sealed'][change['candidate']] == AFTER[path]
     assert c['R2a_before_uuid_private'] != c['R2a_after_uuid_private']
+    assert c['R2a_accepted_plugin_files'][PLUGIN_BINARY]['sha256'] == ACCEPTED_PLUGIN
     assert set(c['R2a_retained_jobs']) == set(c['jobs']) == set(c['recovery_jobs'])
     for path, record in c['recovery_jobs'].items():
         assert record['sha256'] == c['R2a_retained_jobs'][path]
@@ -55,6 +59,7 @@ def derive_present(record, c, kind):
     assert kind in ('contract', 'stage')
     if kind == 'contract':
         assert result['protected'] == c['R2a_before_protected']
+        assert result['plugin_after'] == c['R2a_accepted_plugin_files']
         for path in AFTER:
             assert result['protected'][path] == BEFORE[path]
             result['protected'][path] = AFTER[path]
@@ -79,6 +84,13 @@ def physical_baseline(c):
     for path, digest in c['R2a_retained_jobs'].items():
         if path in expected:
             expected[path] = digest
+    # The accepted plugin_after manifest supersedes historical protected-map
+    # bytes. It is independently checked against the frozen runtime contract
+    # by derive_present; this trial never replaces or reinterprets the plugin.
+    for relative, record in c['R2a_accepted_plugin_files'].items():
+        path = str(Path(PLUGIN) / relative)
+        if path in expected:
+            expected[path] = record['sha256']
     return expected
 
 

@@ -159,6 +159,16 @@ refused. It does not create the marker or loosen a driver/image gate. Two
 additional CPU methods cover that distinction. Keep the rejected private
 packet and use a fresh scope after this source fix.
 
+The next inactive preparation exposed another historical-map distinction:
+the protected map still names an older plugin executable, while its
+authoritative `plugin_after` manifest and independent readback identify the
+accepted `c9dc00ce...` image. It refused before live writes. The adapter now
+derives physical plugin expectations from that exact accepted manifest,
+checks the manifest against the frozen runtime contract and pins the accepted
+executable hash. No plugin binary, mapping or configuration is replaced. The
+same delta fixtures also reject an unknown plugin manifest. Preserve this
+second rejected packet and create another fresh scope.
+
 This does not implement AMD asynchronous presentation or a DCN flip. Moving
 the wait/copy to a worker still requires bounded ownership, cancellation,
 stop/sleep handling and correct completion; removing the wait or NVIDIA vendor

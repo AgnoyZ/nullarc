@@ -24,7 +24,9 @@ def fixture():
                 R2a_parent_EFI_private={'kernel': 'R1b', 'AML': 'accepted'},
                 EFI_after_private={'kernel': 'R1b', 'AML': 'accepted'},
                 R2a_changes=changes, sealed=sealed,
-                R2a_before_protected={**m.BEFORE, 'config': 'original', 'firmware': 'unchanged', 'job': 'historical'},
+                R2a_before_protected={**m.BEFORE, 'config': 'original', 'firmware': 'unchanged', 'job': 'historical',
+                                     m.PLUGIN + '/' + m.PLUGIN_BINARY: 'historical-plugin'},
+                R2a_accepted_plugin_files={m.PLUGIN_BINARY: {'sha256': m.ACCEPTED_PLUGIN}},
                 R2a_before_uuid_private='old-VBL', R2a_after_uuid_private='R2a',
                 R2a_retained_jobs={'job': 'retained-job'}, jobs={'job': 'R2a-job'},
                 recovery_jobs={'job': dict(sha256='retained-job', backup='old-job')},
@@ -54,6 +56,7 @@ class ContractTests(unittest.TestCase):
     def record(self):
         c = fixture()
         return c, dict(protected=copy.deepcopy(c['R2a_before_protected']),
+                       plugin_after=copy.deepcopy(c['R2a_accepted_plugin_files']),
                        desktop_runtime=dict(accel_image_uuid='old-VBL'),
                        candidate_binary_sha256='R1b', candidate_image_uuid='R1b-image',
                        EFI='retained', ABI='build34')
@@ -69,10 +72,11 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(m.derive_present(record, c, 'stage'), record)
 
     def test_unknown_input_protected_file_or_image_is_not_reinterpreted(self):
-        for which in ['image', 'protected']:
+        for which in ['image', 'protected', 'plugin']:
             c, record = self.record()
             if which == 'image': record['desktop_runtime']['accel_image_uuid'] = 'unknown'
-            else: record['protected']['firmware'] = 'unknown'
+            elif which == 'protected': record['protected']['firmware'] = 'unknown'
+            else: record['plugin_after'][m.PLUGIN_BINARY]['sha256'] = 'unknown'
             with self.subTest(which=which), self.assertRaises(AssertionError): m.derive_present(record, c, 'contract')
 
     def test_pre_restart_live_identity_does_not_change_candidate_disk_checks(self):
@@ -86,8 +90,10 @@ class ContractTests(unittest.TestCase):
 
     def test_physical_baseline_accounts_for_daily_configuration_and_current_jobs(self):
         c = fixture(); expected = m.physical_baseline(c)
-        self.assertEqual(expected, {**m.BEFORE, 'config': 'daily', 'firmware': 'unchanged', 'job': 'retained-job'})
+        self.assertEqual(expected, {**m.BEFORE, 'config': 'daily', 'firmware': 'unchanged', 'job': 'retained-job',
+                                   m.PLUGIN + '/' + m.PLUGIN_BINARY: m.ACCEPTED_PLUGIN})
         self.assertEqual(c['R2a_before_protected']['config'], 'original')
+        self.assertEqual(c['R2a_before_protected'][m.PLUGIN + '/' + m.PLUGIN_BINARY], 'historical-plugin')
 
 
 class RecoveryTests(unittest.TestCase):
