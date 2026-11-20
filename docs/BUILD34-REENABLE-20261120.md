@@ -98,3 +98,42 @@ Physical FPS, visual repair and long-term stability remain unaccepted.
 
 See the [sanitized preparation record](validation/build34-reenable-preparation-20261120.json)
 and the earlier [rollback record](validation/build34-weather-boot-rollback-20261120.json).
+
+## Authorized restart and independent acceptance
+
+The machine completed the authorized restart on November 20, 2026 at 12:05:04
+Asia/Shanghai, on macOS 26.7.2 build 25G332. Only one restart request was sent.
+The dispatcher's command wait timed out after 15 seconds; its persisted intent
+was inspected instead of retrying. The later actual boot and fresh receipts
+establish that the restart occurred despite that command-wait error. Retain
+the timeout record; do not rewrite it as a successful command return or replay
+the dispatcher.
+
+The finite observer passed fresh bounded startup, desktop and supervision-ended
+receipts, followed by a separate independent new-boot readback. Both verified
+the exact accepted loaded PhxBringup and PhxAccel images and WindowServer's
+mapped plugin, all 416 cache records/29 codeless records, full 357-file EFI,
+original loaded ACPI, signatures and exact original recovery. The same
+WindowServer survived each observation, GPU copy completions and framebuffer
+VBL counts progressed, all four checked error counters remained zero and no
+new matching diagnostic report appeared. No recovery was triggered.
+
+A final separate status check confirmed acceleration/display controls all at
+one, display hold at zero, all four error counters still zero, no active new
+startup-controller process and no pending shutdown/reboot process. Both startup
+workers had ended. The finite observer removed its own exact job and exited
+with status zero. The two bounded startup job files remain configured for later
+boots; no continuous installation or hang monitor was enabled.
+
+**Hardware acceleration and desktop takeover are active and this bounded
+restart test passed.** Keep the recovered owner-accepted build34 runtime active
+under the new scope. Daily PR28 waiting remains enabled at 250 ms with
+WindowServer excluded. This supersedes the preparation record's pending-boot
+status; it does not install R1a, the Weather candidate or withdrawn builds.
+The test used startup initialization and normal desktop progress observations;
+it did not submit a dedicated GPU correctness/FPS benchmark. Weather trails,
+Liquid Glass appearance, the earlier restart-loop root cause, physical FPS,
+sleep/wake and long-term stability remain unaccepted. No additional restart or
+later optimization is implied by this acceptance.
+
+See the [sanitized new-boot acceptance record](validation/build34-reenable-boot-20261120.json).
