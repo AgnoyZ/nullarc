@@ -992,3 +992,57 @@ condition. C++14/no-exceptions/no-RTTI compilation and default tests pass;
 no thread-safety, native SDK, hardware coherency, installation, GPU or FPS
 claim follows. All 172 production inputs, previous transforms, ABI and runtime
 recipes remain unchanged. See [sanitized evidence](validation/build34-r3-fence32-offline-20261121.json).
+
+## Wait-pinned receipt acknowledgement (November 21)
+
+The next isolated [source transform](../tools/build34_exact_ack.py) adds an
+internal `ackExact(sequence)` and per-receipt waiter counts. This is receipt
+metadata lifetime, **not** a native ACK selector or BO/VMID reclamation.
+
+An admitted wait pins its captured owner/slot/serial under the client lock
+before releasing that lock. Every later result, including timeout, invalid
+observation, close and queue loss, releases that pin under the same lock.
+The fixed 16-bit count refuses saturation and underflow. A closed Registry
+can release a previously admitted pin but cannot accept a new one. An old
+ticket cannot decrement a reused slot's new serial. No dynamic allocation
+is added, and total Registry storage still satisfies its existing size bound.
+
+The new acknowledgement takes a whole-operation client lease, validates the
+actual embedded Registry/provider/client binding, and looks up and observes
+the target under the client-to-GPU lock order. Only proven completion can
+reach `forget`. `forget` returns the new internal `Busy` status while any
+admitted wait still pins that record. Pending, lost, unknown, unavailable
+reader and closed-client paths retain the receipt. Forgetting does not clear
+sticky GPU exposure or release any native resource/reference, and never
+publishes a CPU fence or promotes the safe global watermark.
+
+ASan/UBSan and TSan each pass **228,946 additional checks**, **19 additional
+groups** and **five additional real-thread scenarios**. They exercise full
+64-receipt admission refusal before packet writes, subsequent completed-slot
+recovery, 2,000 alternating-queue submit/complete/acknowledge cycles, invalid
+identity/readers, generation loss, stop/close and two independently paused
+waiters. Completion cannot evict their ticket until both have returned.
+The counter is tested to its actual 65,535-waiter saturation boundary and
+back down, including stale tickets and close-time pin release.
+
+All 28 earlier wait groups and six threaded cases also run on this **new**
+staged wait under both sanitizers (**22,094 checks**), plus the unchanged
+4,983-check binding suite. Only the earlier fixture's two deliberate forget
+attempts are adapted in its generated private copy: they must now return
+`Busy`, keep the ticket and let the wait complete, rather than evict the ticket
+and return `Unknown`. Its original frozen file and every prior transform
+remain unchanged. Twelve defective wait/pin/acknowledgement implementations
+are detected. Default `make -j1 test` passes; optional firmware keeps its
+existing skip. See [sanitized evidence](validation/build34-r3-ack-offline-20261121.json).
+
+The native wire protocol, client mode/capability negotiation and paired Mesa
+payload ownership remain absent. Userspace must eventually coordinate ACK
+with every current and late payload reference; a local metadata-forget helper
+does not solve that lifetime. Nor does a completed receipt or empty Registry
+prove that resources from forgotten submissions can be freed. Permanent
+client/service quarantine remains intact and undeployable, hardware reader
+binding remains null, and the low-dword primitive is still unintegrated.
+All 172 production inputs, original ABI, legacy WAITSEQ/global retirement/VMID
+paths and runtime recipes remain unchanged. No native SDK build, installation,
+live runtime change/readback, GPU execution or reboot occurred. R3 remains
+active and incomplete; R4–R6 do not advance.
