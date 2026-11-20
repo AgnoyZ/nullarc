@@ -282,3 +282,9 @@ test-build34-cache-metadata:
 test-build34-exact-global:
 	@test -n "$(EXACT_GLOBAL_OUT)" || (echo "Set EXACT_GLOBAL_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_global.py --out "$(EXACT_GLOBAL_OUT)"
+
+# Actual staged VM lifecycle methods with CPU IOKit/page-walker/register doubles.
+.PHONY: test-build34-exact-vm-lifetime
+test-build34-exact-vm-lifetime:
+	@test -n "$(EXACT_VM_OUT)" || (echo "Set EXACT_VM_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_vm_lifetime.py --out "$(EXACT_VM_OUT)"

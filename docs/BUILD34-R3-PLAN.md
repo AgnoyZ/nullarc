@@ -18,13 +18,13 @@ independent remote SHA check.
 
 | Work | Evidence now | What must close it |
 | --- | --- | --- |
-| Preserve safe global retirement | Build34 baseline plus source-only checked two-queue snapshot and actual one-pass VMID binding/unlocked submit retries; 87,821-check ASan/UBSan and TSan suites | Bind a trusted native reader and explicit prefix validity/visibility protocol; audit remaining watchdog, VM allocation/mutation and timeout-release consumers without promoting exact targets |
+| Preserve safe global retirement | Build34 baseline plus source-only checked two-queue snapshot/VMID retries and per-context dual-queue generation checks; the 87,821-check global and 100,411-check VM suites each pass ASan/UBSan and TSan | Bind a trusted native reader and explicit prefix validity/visibility protocol; audit watchdog, actual page walker and full client/resource consumers without promoting exact targets or accepting a new adoption seed as old-work drain |
 | Mesa exact bookkeeping, multi-target fairness, conservative CS ordering/shape | Five isolated reviewed patches with actual-source CPU tests, including single-native-batch preflight and a bounded completion/ACK cache | Carry into a paired negotiated backend, freeze dependencies, prove snapshot/visibility and caller backpressure/error behavior; an aggregate exact CS protocol is not implemented |
 | Native target ownership and queue generation | Staged submit, invalidation, observer and embedded binding pass CPU/TSan tests | Actual SDK/KPI integration plus authenticated native admission and queue lifecycle evidence |
 | Exact wait fallback | Original wait passes CPU/TSan; the later wait-pinned version re-runs all 28 groups/six threaded cases (22,094 checks) | Carry into the native negotiated path; real KPI/lifecycle and GPU timeout/wakeup evidence remain required |
 | Trusted device fence observation | Primary-source review, 189,198-check window primitive and 43,251-check staged adoption/shared-submit/ring-space/observer integration; raw-dword reader is null | Establish actual mapping/device coherency and queue ownership/drain, audit global-retirement/watchdog/VM consumers, prove wide-gap recovery and obtain native/GPU evidence; see `BUILD34-FENCE-READER.md` |
 | Native protocol and receipt lifetime | Internal wait-pinned ACK, actual-Mesa bounded completion cache, and staged complete-token structure submit/wait/ACK dispatch pass CPU sanitizers; experimental selectors 64/65/66 have no production mode/capability or Mesa wire binding | Complete native capability/session and production exact-submit admission, independent genuine global-prefix/visibility and CPU-fence protocol, paired binding and caller backpressure/error integration; caller-quiescent transport destroy is still required |
-| Resource and object teardown | Deliberate permanent retention only | Healthy completion can safely reclaim after CPU callbacks and actual GPU work drain; uncertain/lost work remains quarantined, never released by timeout alone |
+| Resource and object teardown | Permanent exact-client/service retention remains; source-only service VM ownership/closing, authoritative submission bounds, checked TLB failure propagation and timeout-preserving conditional cleanup pass CPU tests | Prove actual BO/object/callback lifetimes and native page walk/ACK behavior; repair legacy client cleanup ordering and ignored failure; healthy completion can reclaim after actual GPU drain, while uncertain/lost work remains quarantined |
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
 | Frozen native integration | No R3 native candidate | Complete entrypoint/VM audit, actual SDK compile, exact build34 provenance and paired runtime/ABI validation without weakening existing build34 admission |
 | Hardware acceptance | None for R3 | Fresh compatible finite recovery scope; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
@@ -74,6 +74,15 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
 4. Replace permanent healthy-client/service retention with proved callback/GPU
    drain and reclamation. Keep fault/uncertain-work quarantine distinct from
    successful completion; audit every VM mutation and native entrypoint.
+   The [context/service-VM stage](BUILD34-VM-LIFETIME.md) now carries owner and
+   allocation generation through the actual VM calls, records both queue work
+   generations, serializes lookup and rejects timeout/lost-work cleanup. Its
+   checked TLB failure closes a sticky VM gate before further dispatch/reuse.
+   Native ACK freshness/page walking, legacy BO cleanup ordering and a healthy
+   client/service reclaimer are still unproved; permanent retention stays.
+   The temporary idle-before-map gate is not accepted as the final mapping or
+   performance policy: prove safe concurrent additions/removals and actual
+   caller backpressure/progress before native admission.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete
