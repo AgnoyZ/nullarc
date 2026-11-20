@@ -276,3 +276,9 @@ test-build34-vbl-scheduling:
 .PHONY: test-build34-cache-metadata
 test-build34-cache-metadata:
 	python3 -B tests/test_build34_cache_metadata.py
+
+# Source-only R3 global snapshot and actual VMID methods; CPU doubles only.
+.PHONY: test-build34-exact-global
+test-build34-exact-global:
+	@test -n "$(EXACT_GLOBAL_OUT)" || (echo "Set EXACT_GLOBAL_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_global.py --out "$(EXACT_GLOBAL_OUT)"

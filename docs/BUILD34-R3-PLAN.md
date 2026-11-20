@@ -18,7 +18,7 @@ independent remote SHA check.
 
 | Work | Evidence now | What must close it |
 | --- | --- | --- |
-| Preserve safe global retirement | Existing build34 path and CPU regressions | Keep legacy resource-reclamation/CPU-fence semantics while exact targets complete independently |
+| Preserve safe global retirement | Build34 baseline plus source-only checked two-queue snapshot and actual one-pass VMID binding/unlocked submit retries; 87,821-check ASan/UBSan and TSan suites | Bind a trusted native reader and explicit prefix validity/visibility protocol; audit remaining watchdog, VM allocation/mutation and timeout-release consumers without promoting exact targets |
 | Mesa exact bookkeeping, multi-target fairness, conservative CS ordering/shape | Five isolated reviewed patches with actual-source CPU tests, including single-native-batch preflight and a bounded completion/ACK cache | Carry into a paired negotiated backend, freeze dependencies, prove snapshot/visibility and caller backpressure/error behavior; an aggregate exact CS protocol is not implemented |
 | Native target ownership and queue generation | Staged submit, invalidation, observer and embedded binding pass CPU/TSan tests | Actual SDK/KPI integration plus authenticated native admission and queue lifecycle evidence |
 | Exact wait fallback | Original wait passes CPU/TSan; the later wait-pinned version re-runs all 28 groups/six threaded cases (22,094 checks) | Carry into the native negotiated path; real KPI/lifecycle and GPU timeout/wakeup evidence remain required |
@@ -45,6 +45,11 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    global-distance bounds for legacy and exact shared submissions and uses
    decoded dwords for ring-space pruning. It binds no device reader and does
    not validate old global-retirement/VM/watchdog or timeout-release paths.
+   A subsequent [checked-global/VMID stage](BUILD34-GLOBAL-VMID.md) now uses
+   both queue histories, validates snapshot success explicitly and tests the
+   actual one-pass VMID selection with unlocked admission retries. Its reader
+   is still null, and old VMID timeout cleanup, TLB ACK failure propagation,
+   context allocation/reuse, watchdog and native visibility remain unresolved.
 3. Implement the strict native protocol/acknowledgement and paired Mesa path.
    Receipt and provider identity must survive wait/ack/close and slot reuse.
    The current raw WaitCS, split-plan and late-attach consumers must be audited;
