@@ -312,6 +312,44 @@ nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_claim_lifecycle.py 
   --out build/build34-r3-claim-lifecycle-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
 ```
 
+## Keeping previous MES writebacks out of a new command's status
+
+The checked bootstrap still used one command status address for all four MES
+requests. Each packet requested the same value (`1`). The source-level CPU
+fixture replayed a write to the preceding packet's status address while the
+current query fence advanced but its own command status was absent. At each of
+commands 2, 3 and 4, the preceding code accepted that combination and reached
+both queue adoptions. This models a writeback replay; it does not establish
+that the firmware or installed driver has exhibited one.
+
+`tools/build34_exact_mes_status.py` changes only the checked bootstrap's
+`mes_submit()`. The four command status slots are 16 bytes each, starting at
+writeback offsets `+64`, `+80`, `+96`, `+112`, below the scheduler context at
+`+128`. `sched_init()` already clears that region. The checked submit never
+clears or reuses a slot, tests its four words before writing the ring and again
+before publishing the write pointer, and refuses a fifth command before device
+access. Success requires the current query fence and an exact low-dword `1`
+in the current command's slot. The shared query fence and unchecked behavior
+are preserved. Startup uses this transform only in the offline staging recipe.
+
+The [offline result](validation/build34-r3-mes-status-offline-20261121.json)
+records 31 new ASan/UBSan checks, 14 inherited bootstrap checks, three inherited
+error exits, five rejected broken variants and complete before/after x86_64
+object compilation. The fake transport reads the actual packet status address
+from ring bytes. Omit the transform to roll it back; all 172 production inputs
+and the installed runtime are unchanged.
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_mes_status.py \
+  --out build/build34-r3-mes-status-new-private
+```
+
+The slots are unique within one checked bootstrap invocation. They cannot
+exclude an old writer from a previous invocation using the same addresses,
+prove the initial MES/CP/HQD state, or prove safe hardware queue teardown.
+The observed command marker is separate from cache visibility and from both
+the Compute and GFX fence domains. Exact native fence reads remain unbound.
+
 ## Checking deferred matches at accelerator start
 
 The previous producer's successful marker can outlive both queue generations.

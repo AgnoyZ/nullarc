@@ -1,0 +1,41 @@
+{
+  "status": "passed-staged-isolated-mes-command-status",
+  "kernel_build": 34,
+  "production_inputs_unchanged": 172,
+  "new_inputs_sha256": {
+    "docs/validation/build34-r3-bootstrap-progress-offline-20261121.json": "bcecff4df736e18c512c9e01c436b9cb9f807c76c8deda4ebd36ada3c2ab7ffd",
+    "tests/test_build34_exact_mes_status.c": "9ec469ce0b6b4c15504c34ea45954df356a455d873b52611e124b789ac0634ea",
+    "tools/build34_exact_mes_status.py": "bc435c7439b7081ddf29536c32a115676e6e057bc2be9a8fe58d4f600537ecb4",
+    "tools/test_build34_exact_mes_status.py": "7d58d920cd30cc6ae8ea4b2699600910447039187afc2ceeb583a3616497db5e"
+  },
+  "preceding_bootstrap_sha256": "6549cddf0b5cfc66a9ba945030059e953d670e3129e3b6ed5fa5d26f1e18faf3",
+  "staged_bootstrap_sha256": "274534cb39c4cf36dad0d04ecba4f56ea0460c554b61e11255b4a09e04df2596",
+  "reproduced_replays": [
+    2,
+    3,
+    4
+  ],
+  "ASan_UBSan_checks": {
+    "prior_slot_checks": 8,
+    "isolated_slot_checks": 31,
+    "inherited_checks_each": 14
+  },
+  "wrapper_exit_cases_each": 3,
+  "broken_variants_detected": [
+    "reuse_slot",
+    "ignore_exhaustion",
+    "skip_preflight",
+    "skip_prepublication",
+    "accept_any_nonzero"
+  ],
+  "x86_64_MH_OBJECT_sha256": {
+    "prior": "1c357345f94793adc9ed261d52f0d1c3b3366f79a219b22fb904ff3eefb9e606",
+    "isolated": "004c7e1dfb96e0f307fd86bd331e36fee923313ec3bf434e1a9355d30c109464"
+  },
+  "IOKit_opened": false,
+  "GPU_executed": false,
+  "hardware_writer_drain_proved": false,
+  "installed": false,
+  "native_reader_bound": false,
+  "R3_complete": false
+}
