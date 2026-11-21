@@ -50,10 +50,10 @@ nice -n 15 taskpolicy -b python3 -B tools/test_build34_pci_irq_config.py \
   --out build/build34-r3-pci-irq-config-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
 ```
 
-No kernel candidate was linked, admitted, installed or loaded. Before a live
-read, create a separate exact-image scope, verify the provider context and
-startup/rollback controls, and preserve the accepted mapping-only image as
-the restore target. The observer stage is reversible by omitting the transform;
-the previous trial's spent boot grant is not reused. A good startup sample
-would only close the first observation step in the
-[IRQ route trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md).
+The initial source-only verification did not link a kernel. The subsequent
+[private artifact build](BUILD34-PCI-IRQ-CANDIDATE.md) now reproduces the
+previously accepted mapping-only image and strictly verifies the new
+observation-only pair. Before a live read, prepare a distinct compatible
+startup/rollback scope for those exact images; the previous trial's spent
+boot grant is not reused. A good startup sample would only close the first
+observation step in the [IRQ route trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md).
