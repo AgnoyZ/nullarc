@@ -177,6 +177,43 @@ The staged gate excludes local raw calls, not external
 writers or a different hardware owner. A successful inactive sample is
 diagnostic; no queue, firmware writer or storage is declared safe on its basis.
 
+## Firmware-to-driver boundary
+
+On November 21, 2026, the running host reported an OpenCore 1.0.8 version
+marker. The public tag resolves to
+`6fe4d15cb66596d99d8cfedce69d8fc6dad71886`; the marker identifies a version
+for source review and does not attest the installed loader, configuration,
+vendor GOP, or callbacks provided by firmware and other drivers.
+
+- [UEFI 2.11, section 7.4.6](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-exitbootservices)
+  defines the end of boot services and the exit notifications. It does not
+  provide a Phoenix-specific completion or write-visibility acknowledgment.
+  [GOP, section 12.9](https://uefi.org/specs/UEFI/2.11/12_Protocols_Console_Support.html#graphics-output-protocol)
+  exposes the display mode and framebuffer for OS startup. A successor able
+  to use that framebuffer has no proof from GOP that other engines are idle.
+- The pinned OpenCore
+  [exit handler](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcMainLib/OpenCoreUefi.c#L348-L383)
+  can release USB ownership and insert a delay. Its
+  [boot-compatibility wrapper](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcAfterBootCompatLib/ServiceOverrides.c#L1380-L1457)
+  calls scheduled handlers, hands off runtime services and prepares the
+  kernel jump after successful firmware exit. Neither source path returns a
+  Radeon queue or IH drain acknowledgment. Do not use a longer exit delay
+  as a substitute for one.
+- The first five minutes of the current macOS `26.7.2 (25G332)` boot showed
+  the PhxFB boot-console marker followed by a successful UMA scanout alias
+  check. All 4,096 sampled words matched, with nonzero pixels present.
+  A same-boot registry read found `PhxAMDFB` and build34 `PhxBringup` on the
+  same `1002:1900` provider. PCI bus mastering and memory decoding were
+  already enabled in PhxBringup's pre-enable sample. The sample is taken
+  after power registration, so it cannot attribute those bits to UEFI.
+
+This is positive evidence for inheriting a display surface, not for inheriting
+exclusive ownership of GFX, Compute, PSP, SMU, MES, GART or IH. The scanout
+alias is not fence writeback memory; its pixel comparison cannot substitute
+for a native fence visibility test. No EFI, NVRAM, driver or power changes,
+new GPU submissions, or device operations were performed for this review.
+See the [sanitized record](validation/build34-r3-firmware-handoff-20261121.json).
+
 ## Evidence required before reusing storage
 
 1. Identify the current device, service, boot and first writer before *any*

@@ -1,0 +1,35 @@
+{
+  "status": "passive-display-handoff-observed-gpu-owner-unproved",
+  "date": "2026-11-21",
+  "branch": "upstream34/vram-layout-fix",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "pci": "1002:1900",
+  "PhxBringup_build": 34,
+  "source_review": {
+    "reported_opencore_version": "1.0.8",
+    "reference_tag_commit": "6fe4d15cb66596d99d8cfedce69d8fc6dad71886",
+    "installed_opencore_image_attested": false,
+    "vendor_gop_or_firmware_callback_identity_attested": false,
+    "verified_gpu_drain_ack_in_reviewed_exit_paths": false
+  },
+  "current_boot_observation": {
+    "log_window_seconds": 300,
+    "framebuffer_and_startup_observer_share_target_provider": true,
+    "boot_console_marker_precedes_uma_alias_marker": true,
+    "uma_scanout_bar_words_sampled": 4096,
+    "uma_scanout_bar_words_matched": 4096,
+    "nonzero_pixel_sample_present": true,
+    "pre_own_enable_bus_master_and_memory_decode_set": true,
+    "pci_enable_previous_owner_attributed": false
+  },
+  "scanout_alias_proves_fence_visibility": false,
+  "exclusive_first_writer_proved": false,
+  "old_writer_drain_proved": false,
+  "efi_nvram_or_driver_changed": false,
+  "new_mmio_or_irq_registration": false,
+  "gpu_work_submitted": false,
+  "new_restart": false,
+  "raw_logs_retained_in_repository": false,
+  "R3_complete": false
+}
