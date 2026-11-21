@@ -245,14 +245,16 @@ response for the full receipt, and four independently acquired snapshots:
 before the wait, during the wait, after it returns, and after both targets
 drain. Each snapshot must carry the same service epoch, the original queue
 generations, both submitted/completed bounds and the checked global prefix.
-All timestamps use one monotonic clock. GFX must be pending before the wait;
-an independent GFX fence read must cover the receipt before the wait
-returns. A GFX fence first seen complete only after the reply cannot exclude
-an early return. After the wait, Compute must still be pending and the
-prefix must be strictly below Compute. The prefix may make safe progress
-below that limit. A later sample must cover both targets and advance the
-prefix through them. A trial that misses this ordering has not measured the
-required overlap.
+Each snapshot carries `begin_ns` and `end_ns` on the same monotonic clock as
+the wait boundaries. The full sampling interval must fit inside its phase:
+for example, the post-wait sample must start after the wait returns. Using
+only the sample's end time could misclassify a Compute read made before the
+wait returned. GFX must be pending before the wait; an independent GFX fence
+read must cover the receipt before the wait returns. After the wait, Compute
+must still be pending and the prefix must be strictly below Compute. The
+prefix may make safe progress below that limit. A later sample must cover
+both targets and advance the prefix through them. A trial that misses this
+ordering has not measured the required overlap.
 
 The checker only validates the normalized records; it does not read fences,
 register interrupts or attest a trial. The collector must separately prove
@@ -263,4 +265,32 @@ after fault, reset, sleep, stop or readoption. Successful records do not
 establish EOP wakeup, payload/guard integrity, actual resource lifetime, FPS
 or stability. `make test` includes CPU fixtures for the positive ordering and
 refuses premature prefix advancement, stale identity, timing ambiguity and
-missing drain. No runtime source or installed configuration is changed.
+missing drain.
+
+The [source-only capture stage](../tools/build34_exact_overlap_snapshot.py)
+extends the frozen public IOKit wait stage with a private observation. Under
+one service callback lease and `gpuLock`, the existing global prefix scan
+records each decoded fence alongside its queue generation and submitted
+bound, without a second read of either fence or a second prefix calculation.
+This is a serialized CPU observation of two sequential device reads. The
+boot-local IORegistry entry ID identifies the retained service; it must stay
+tied to the same admitted boot and wait provider. A missing or invalid queue,
+failed read, bad clock interval or observed service closure discards the
+output. The decoder may still cache a successful earlier read. Existing
+prefix callers retain their prior handling of a never-adopted queue.
+
+The CPU runner fed the staged methods' four samples to the checker; the wait
+receipt and times were synthetic. With Compute 100 pending and GFX 101
+complete, the checked prefix remains 99, then reaches 101 after Compute
+completes. ASan/UBSan and TSan each passed 240 checks, including refusal of a
+failed second read, stale generation and closure after the final fence read.
+To reproduce with a fresh output path:
+
+```sh
+python3 -B tools/test_build34_exact_overlap_snapshot.py --out build/r3-overlap-snapshot-CPU-private
+```
+
+All 172 production inputs were unchanged. No runtime selector or collector
+endpoint is exposed, and the native reader and event backend remain unbound.
+Coherent device observation, exclusive queue ownership and old-writer drain
+are still required before this evidence can be collected on the GPU.

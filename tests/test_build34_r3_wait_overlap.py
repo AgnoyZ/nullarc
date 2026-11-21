@@ -12,7 +12,7 @@ def fixture():
     gfx = dict(owner=5, serial=2, slot=0, sequence=101, queue=1, generation=3)
 
     def sample(ns, cmp_done, gfx_done, retired):
-        return dict(service_epoch=7, ns=ns, retired=retired,
+        return dict(service_epoch=7, begin_ns=ns, end_ns=ns + 1, retired=retired,
                     compute=dict(generation=2, submitted=100, completed=cmp_done),
                     gfx=dict(generation=3, submitted=101, completed=gfx_done))
 
@@ -54,14 +54,27 @@ class OverlapEvidence(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "before wait return"):
             check(**records)
 
+    def test_rejects_samples_straddling_phase_boundaries(self):
+        for path, value in (("before.end_ns", 21), ("witness.begin_ns", 19), ("witness.end_ns", 31),
+                            ("after.begin_ns", 29), ("after.end_ns", 51), ("drained.end_ns", 49)):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                records = fixture()
+                replace(records, path, value)
+                check(**records)
+
+    def test_allows_same_clock_tick_within_one_sample(self):
+        records = fixture()
+        records["witness"]["end_ns"] = records["witness"]["begin_ns"]
+        self.assertEqual(check(**records)["status"], "consistent-r3-wait-overlap-records")
+
     def test_rejects_other_counterexamples(self):
         for path, value in (
             ("wait.status", 1), ("wait.status", False), ("wait.reply.owner", 4),
             ("wait.reply.slot", 1), ("wait.reply.serial", 3), ("wait.reply.generation", 2),
             ("wait.reply.sequence", 100), ("wait.reply.queue", 0),
             ("compute.sequence", 102), ("compute.queue", 1), ("compute.owner", U64_MAX),
-            ("after.service_epoch", 8), ("before.ns", 20), ("wait.begin_ns", 30),
-            ("after.ns", 29), ("drained.ns", 40), ("witness.ns", 30),
+            ("after.service_epoch", 8), ("before.end_ns", 20), ("wait.begin_ns", 30),
+            ("after.begin_ns", 30), ("drained.begin_ns", 41), ("witness.end_ns", 30),
             ("after.compute.generation", 3),
             ("after.gfx.generation", 4), ("before.gfx.completed", 101),
             ("after.gfx.completed", 100), ("after.gfx.submitted", 100),

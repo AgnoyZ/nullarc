@@ -2,8 +2,9 @@
 """Check the ordering of one controlled R3 pair from normalized observations.
 
 The caller supplies one admitted boot/service, one monotonic clock and
-serialized, independently read queue fences and retirement snapshots. This
-module cannot attest their origin, hardware visibility, scope or teardown.
+serialized, independently read queue fences and retirement snapshots. Each
+interval covers both device reads. This module cannot attest their origin,
+hardware visibility, scope or teardown.
 """
 
 U64_MAX = (1 << 64) - 1
@@ -49,8 +50,9 @@ def check(compute, gfx, wait, before, witness, after, drained):
 
     previous = None
     for sample in (before, witness, after, drained):
-        _fields(sample, "snapshot", "service_epoch ns compute gfx retired")
-        _number(sample["ns"], "snapshot time", 1)
+        _fields(sample, "snapshot", "service_epoch begin_ns end_ns compute gfx retired")
+        first = _number(sample["begin_ns"], "snapshot start", 1)
+        _number(sample["end_ns"], "snapshot end", first)
         if _number(sample["service_epoch"], "snapshot service epoch", 1) != epoch:
             raise ValueError("service changed during observation")
         floor = _number(sample["retired"], "global retirement prefix")
@@ -68,7 +70,8 @@ def check(compute, gfx, wait, before, witness, after, drained):
             raise ValueError("invalid global retirement prefix")
         previous = sample
 
-    if not before["ns"] < begin < witness["ns"] < end < after["ns"] < drained["ns"]:
+    if not (before["end_ns"] < begin < witness["begin_ns"] and
+            witness["end_ns"] < end < after["begin_ns"] and after["end_ns"] < drained["begin_ns"]):
         raise ValueError("snapshots do not bracket the exact wait and later drain")
     if before["gfx"]["completed"] >= g or witness["gfx"]["completed"] < g:
         raise ValueError("no independent GFX fence completion before wait return")
