@@ -85,10 +85,10 @@ records the scoped passive read and static checks. Keep the current BAR
 mapping and its display aliases unchanged. For BAR0 admission, require
 evidence for the effective memory type and an independent gfx1103 fence
 visibility test, including payload visibility and both queues. If these
-cannot be established for the existing mapping, evaluate isolated
-writeback storage separately and audit its CPU mapping, GPU address and
-ownership before proposing a trial. Neither route clears the earlier
-PSP/GART/IH/queue drain requirements.
+cannot be established for the existing mapping, evaluate
+[isolated system-memory writeback](BUILD34-SYSTEM-WRITEBACK.md) separately
+and audit its CPU mapping, GPU address and ownership before proposing a
+trial. Neither route clears the earlier PSP/GART/IH/queue drain requirements.
 
 ## Build34 facts and limits
 
