@@ -102,14 +102,17 @@ by replaying an older R1b/R2a controller or by merely copying the new executable
 
 ## Next admission step
 
-Prepare and test a distinct observer-compatible startup/recovery adapter. It
-must retain R2a/VBL/optimized ACPI/plugin, daily PR28 250 ms/WindowServer
-exclusion, 45/150/300-second startup gates, at most one fresh first-trial
-recovery restart and zero daily power recovery. Its exact recovery must restore
-the current R1b executable and the two current R2a-compatible startup jobs,
-not an older R1a or pre-R2 stack. Consumed scopes and their permissions remain
-historical. Establish the complete new scope before any still-required fresh
-installation/test authorization is requested.
+The subsequent [observer-compatible startup/recovery adapter](BUILD34-MAP-OBSERVER-SCOPE.md)
+now passes 23 CPU unit methods and independent readback of a final 66-file
+inactive scope. It preserves R2a/VBL/optimized ACPI/plugin, daily PR28 250 ms/
+WindowServer exclusion, 45/150/300-second gates, at most one first-trial
+recovery restart and zero daily power recovery. Recovery targets the current
+R1b executable and current R2a-compatible jobs. Runtime admission validates and
+adds only the three new map properties to the old strict geometry. Its explicit
+new-trial grant is false and actual runtime construction refuses it; no job or
+driver has been installed. Consumed scopes remain historical. Obtain the
+still-required fresh finite trial authorization before creating a distinct
+authorized scope; do not activate either inactive reference packet.
 
 After an admitted observer boot, filtered map options will be evidence of
 options only. Effective mapping/coherency, external-writer ownership, native

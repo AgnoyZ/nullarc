@@ -1,5 +1,23 @@
 # Project instructions
 
+- A separate R3 mapping-only startup/recovery adapter now passes 23 CPU unit
+  methods, default tests and independent readback of a final 66-file root-sealed
+  inactive scope. It preserves the accepted R1b/R2a/VBL/AML/plugin stack and
+  parent history, uses a distinct preparation-boot guard and explicit false
+  new-trial grant, binds native/historical UUIDs without changing identity, and
+  extends strict runtime geometry by only the three validated map properties.
+  Recovery restores current R1b/current-R2a jobs, never the old R1a/VBL-only
+  stack; it retains 45/150/300 gates, at most one first-trial recovery restart,
+  zero daily power and disabled resident monitoring. Actual unauthorized
+  runtime construction refuses. Two failed UUID preparations and a superseded
+  pre-geometry packet remain frozen; use none as an activation scope. All 172
+  production inputs and installed settings remain unchanged, with no driver/
+  job installation, new GPU submission or power action. Prepare a distinct
+  authorized scope only after the still-required fresh finite observer-trial
+  grant; do not flip an inactive packet or replay consumed grants. Map options
+  remain unobserved and cannot admit a reader/coherency or complete R3. See
+  `docs/BUILD34-MAP-OBSERVER-SCOPE.md` and the continuing R3 ledger.
+
 - A subsequent R3 mapping-only native candidate now privately reproduces the
   entire accepted R1b bundle byte-for-byte, then adds only the tested startup
   metadata insertion. Observer executable SHA256 is

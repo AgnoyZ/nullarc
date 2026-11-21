@@ -52,6 +52,7 @@ test: $(TESTS)
 	python3 -B tests/test_build34_present_copy_host.py
 	python3 -B tests/test_build34_map_observation.py
 	python3 -B tests/test_build34_map_candidate.py
+	python3 -B tests/test_build34_map_observer_host.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \

@@ -3,8 +3,10 @@
 The subsequent [minimal native candidate step](BUILD34-MAP-CANDIDATE.md)
 privately builds only this insertion on exact accepted R1b, reproduces the
 entire control bundle, confirms the existing boot loading route and seals
-inactive recovery references. That observer is not installed or loaded and
-has no compatible trial controller yet. The source-only results below remain
+inactive recovery references. A subsequent
+[compatible startup/recovery adapter](BUILD34-MAP-OBSERVER-SCOPE.md) now has a
+separately verified inactive scope with a false new-trial grant. The observer
+is still not installed or loaded. The source-only results below remain
 their original evidence level; the full R3 experiment is not a candidate.
 
 November 21, 2026: this is a small observation prerequisite for the
