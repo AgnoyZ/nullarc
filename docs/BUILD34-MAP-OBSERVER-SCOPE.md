@@ -1,11 +1,17 @@
 # Build34 R3 mapping-observer startup and recovery preparation
 
-November 21, 2026: a separate mapping-only startup adapter now preserves the
+November 21, 2026 preparation checkpoint: a separate mapping-only startup adapter preserves the
 accepted R1b/R2a/VBL/optimized-AML/plugin installation and prepares its exact
-recovery references. **The observer remains uninstalled and unloaded.** This
+recovery references. **At this historical checkpoint it was uninstalled and unloaded.** This
 is an inactive, explicitly unauthorized preparation, not R3 hardware acceptance.
 The [native candidate](BUILD34-MAP-CANDIDATE.md), earlier experiments and all
 172 production inputs remain unchanged. Only default build34 is in scope.
+
+Subsequently the owner provided the fresh finite authorization. A distinct
+authorized scope is now installed and independently checked, pending its sole
+ordinary restart; the inactive packet described below is unchanged. See
+[the current trial checkpoint](BUILD34-MAP-OBSERVER-TRIAL.md). Its preboot checks
+are not actual observer boot or reader/coherency acceptance.
 
 ## Exact scope and startup admission
 
@@ -96,12 +102,14 @@ inferred from those checks. See the
 ## Next finite trial
 
 The inactive scope and earlier artifact capsule must never be switched into
-authorization or activated through an old controller. After the still-required
-fresh authorization, create a distinct authorized scope for this exact observer,
+authorization or activated through an old controller. The subsequently received
+fresh authorization was used to create a distinct scope for this exact observer,
 one ordinary restart, bounded existing accelerated startup and metadata read,
 with at most one startup-failure recovery restart and zero daily recovery power.
-Preserve failed evidence and do not add a GPU pressure test to this metadata
-trial. Consumed installation/restart scopes remain consumed.
+The installation and independent preboot readback have passed. Preserve failed
+evidence and do not add a GPU pressure test to this metadata trial. Consumed
+installation/restart scopes remain consumed; inspect durable intent before any
+restart action.
 
 Even a successful observer boot closes only the mapping-options observation
 step. Effective cache/coherency and external-writer drain, native session and

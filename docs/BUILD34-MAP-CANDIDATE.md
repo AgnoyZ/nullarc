@@ -1,10 +1,12 @@
 # Build34 R3 minimal mapping-observer candidate
 
 November 21, 2026: the [mapping-only observation insertion](BUILD34-MAP-OBSERVATION.md)
-now has a privately built and strictly signed kernel candidate. **It is not
-installed or loaded.** It contains none of the full quarantining R3 transforms,
+now has a privately built and strictly signed kernel candidate. **At this
+historical build checkpoint it was not installed or loaded.** The later
+[authorized trial](BUILD34-MAP-OBSERVER-TRIAL.md) is now installed and independently
+checked, awaiting its single ordinary restart. It contains none of the full quarantining R3 transforms,
 exact receipt protocol or reader binding. All 172 production inputs and the
-accepted R1b/R2a/plugin/ACPI/startup installation remain unchanged. Build41/42
+accepted R1b/R2a/plugin/ACPI/startup installation remained unchanged at build time. Build41/42
 are not prepared or used.
 
 ## Source and byte-exact control

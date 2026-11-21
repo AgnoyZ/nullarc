@@ -5,14 +5,15 @@ privately builds only this insertion on exact accepted R1b, reproduces the
 entire control bundle, confirms the existing boot loading route and seals
 inactive recovery references. A subsequent
 [compatible startup/recovery adapter](BUILD34-MAP-OBSERVER-SCOPE.md) now has a
-separately verified inactive scope with a false new-trial grant. The observer
-is still not installed or loaded. The source-only results below remain
+separately verified inactive scope with a false new-trial grant. The later
+[fresh authorized trial](BUILD34-MAP-OBSERVER-TRIAL.md) is installed and
+independently checked, awaiting its single ordinary restart. The source-only results below remain
 their original evidence level; the full R3 experiment is not a candidate.
 
-November 21, 2026: this is a small observation prerequisite for the
+November 21, 2026 original source-only checkpoint: this is a small observation prerequisite for the
 [trusted fence reader](BUILD34-FENCE-READER.md), not an admitted reader or
-deployable R3 kernel. The installed driver/settings and all 172 production
-inputs remain unchanged. No kext is linked, packaged, signed, installed or
+deployable R3 kernel. At this checkpoint the installed driver/settings and all 172 production
+inputs remained unchanged. No kext was linked, packaged, signed, installed or
 loaded; no user client is opened, GPU work submitted or power action taken.
 
 ## Accepted source and actual passive observation

@@ -1,5 +1,23 @@
 # Project instructions
 
+- The owner has now explicitly authorized one exact mapping-only build34
+  observer installation, one ordinary restart, bounded existing accelerated
+  startup/desktop and passive metadata observation, with at most one startup-
+  failure recovery restart, zero daily power and no extra GPU pressure test.
+  A distinct 67-input root-sealed authorized scope was created; inactive scopes
+  remain false and unchanged. Installation and separate independent readback
+  pass: the complete 358-file EFI differs only in the observer executable,
+  exact accepted R1b is still loaded, and R2a/cache/optimized AML/plugin and all
+  172 production inputs are retained. New jobs are staged unloaded, recovery
+  journals unconsumed, same-desktop progress/errors pass and no power request
+  has yet occurred at this recorded checkpoint. Actual runtime new-boot and
+  metadata guards remain intact; a separate read-only preboot disk/control
+  view is not observer acceptance. Do not reinstall or replay an uncertain
+  restart; inspect the active scope's durable intent first. Complete the
+  authorized finite boot observation, then continue full R3 with no reader,
+  coherence, GPU/FPS/stability acceptance inferred from metadata alone. See
+  `docs/BUILD34-MAP-OBSERVER-TRIAL.md` and the continuing R3 ledger.
+
 - A separate R3 mapping-only startup/recovery adapter now passes 23 CPU unit
   methods, default tests and independent readback of a final 66-file root-sealed
   inactive scope. It preserves the accepted R1b/R2a/VBL/AML/plugin stack and
@@ -13,8 +31,8 @@
   pre-geometry packet remain frozen; use none as an activation scope. All 172
   production inputs and installed settings remain unchanged, with no driver/
   job installation, new GPU submission or power action. Prepare a distinct
-  authorized scope only after the still-required fresh finite observer-trial
-  grant; do not flip an inactive packet or replay consumed grants. Map options
+  authorized scope only after a fresh finite observer-trial grant (now received
+  in the later trial above); do not flip an inactive packet or replay grants. Map options
   remain unobserved and cannot admit a reader/coherency or complete R3. See
   `docs/BUILD34-MAP-OBSERVER-SCOPE.md` and the continuing R3 ledger.
 
