@@ -101,6 +101,15 @@ not prove that assumption. See [test evidence](validation/build34-r3-fence32-off
 
 ## Required native integration
 
+The later [mapping-observation preparation](BUILD34-MAP-OBSERVATION.md)
+verifies the exact accepted R1b source and privately retained artifact, stages
+three startup map-option metadata properties, and compiles both the original
+baseline and full R3 forms to nonloadable objects. Its filtered passive live
+collector currently reports missing metadata on macOS 26.7.2/25G332; neither
+mapping cache/coherence nor a native reader is admitted. The baseline's
+inherited private cancellation dependency remains explicitly reported. This
+observation stage changes no production/runtime input or mapping mode.
+
 1. Establish an aligned dword load with admitted effective mapping/cache
    attributes, correct endian/ordering semantics and the actual RELEASE_MEM
    visibility contract for gfx1103. Refuse unknown mapping modes; do not

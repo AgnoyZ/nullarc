@@ -50,6 +50,7 @@ test: $(TESTS)
 	python3 -B tests/test_build34_present_profile.py
 	python3 -B tests/test_build34_present_copy.py
 	python3 -B tests/test_build34_present_copy_host.py
+	python3 -B tests/test_build34_map_observation.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \
@@ -350,3 +351,11 @@ test-build34-exact-factory:
 	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
 	@test -n "$(EXACT_FACTORY_OUT)" || (echo "Set EXACT_FACTORY_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_factory.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_FACTORY_OUT)"
+
+# Passive mapping-metadata preparation only; never a kernel candidate/GPU test.
+.PHONY: test-build34-map-observation
+test-build34-map-observation:
+	@test -n "$(KERNEL_SDK)" || (echo "Set KERNEL_SDK to the reviewed SDK checkout"; exit 2)
+	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
+	@test -n "$(MAP_OBSERVATION_OUT)" || (echo "Set MAP_OBSERVATION_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_map_observation.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(MAP_OBSERVATION_OUT)"

@@ -1,5 +1,23 @@
 # Project instructions
 
+- R3 now has a separate source-only BAR0 map-option observation prerequisite.
+  Exact accepted R1b production source/recipe/licence inputs and its retained
+  reference artifact are checked. One startup insertion publishes raw mapping
+  options, the cache nibble and a conditional schema marker; it changes no
+  mapping, cache mode, BAR contents, ABI or fence. A filtered passive collector
+  on macOS 26.7.2/25G332 currently returns metadata-unavailable, never reader
+  acceptance. Thirteen Python tests and 4,897 actual-block ASan/UBSan checks in
+  385 scenarios pass; all four baseline/R3 complete source forms compile to
+  nonloadable objects with unchanged 375/376 import sets. The original R1b's
+  inherited private cancellation/provider gap remains explicit; no candidate
+  is linked, packaged or admitted and no private dependency is added. All 172
+  production/prior inputs, null reader/mode, service quarantine and installed
+  settings remain unchanged. Actual options still cannot prove effective
+  cache/coherence, old-writer drain or native/GPU acceptance. Continue the
+  minimal source/ABI/recovery-matched observer admission and R3 ledger; do not
+  deploy a quarantining full-R3 stage or replay old scopes. See
+  `docs/BUILD34-MAP-OBSERVATION.md`.
+
 - A further source-only R3 native-factory stage derives raw handoff. Whole
   construction is leased, output is cleared, observed closure refuses start/
   handler publication, and unexposed started clients use existing close before
