@@ -59,6 +59,8 @@ printf '%s\n' "$BOOT"
                          ("= '0:700'", f"= '{os.geteuid()}:700'"), ('/usr/sbin/sysctl', shlex.quote(str(sysctl))),
                          ('/usr/bin/id', shlex.quote(str(user)))]:
             full = once(full, old, new)
+        if sys.platform == 'linux':
+            full = once(full, "/usr/bin/stat -f '%u:%Lp' .", "/usr/bin/stat -c '%u:%a' .")
         self.full.write_text(full)
         self.script(self.gpu / 'bringup5.sh', '''printf 'bringup\n' >> "$TRACE"
 if [ -n "${REMOVE_ACK:-}" ]; then /bin/rm -- "$PHX34_WATCHDOG_ACK"; fi

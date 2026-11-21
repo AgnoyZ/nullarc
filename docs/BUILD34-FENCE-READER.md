@@ -120,6 +120,9 @@ observation stage changes no production/runtime input or mapping mode.
    arithmetic generation to adoption/fault/sleep/stop invalidation, with a
    trustworthy queue ownership/drain policy. Identity labels alone cannot
    prove an old queue stopped writing the same physical location.
+   The [initial queue ownership review](BUILD34-INITIAL-QUEUE-OWNERSHIP.md)
+   identifies earlier PSP/GART and ring writes that require the same proof
+   before reuse. The upstream indexed HQD dequeue does not supply it by itself.
 3. Enforce the window before all irreversible submissions sharing that
    fence. Use bounded observation/backpressure outside global locks where
    appropriate; preserve R1b and the safe global retirement contract.
