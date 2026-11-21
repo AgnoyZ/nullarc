@@ -39,7 +39,7 @@ independent remote SHA check.
 | Initial hardware ownership | Linux v6.12 separates queue removal, HQD dequeue and MES/CP shutdown. Build34 modifies PSP/GART and ring storage before the available HQD checks. Passive PCI/ACPI review found no admitted function-local reset; the UEFI/OpenCore review and live scanout evidence establish no fence, queue or IH handoff | Prove an exclusive first writer and a trustworthy old-writer boundary before reusing storage; neither boot-services exit, scanout progress nor a successful setup sentinel proves drain. See [initial queue ownership](BUILD34-INITIAL-QUEUE-OWNERSHIP.md) |
 | Indexed HQD observation | An offline internal transaction holds the service/raw leases and GPU lock from selector save through verified restore; modeled selector uncertainty closes raw writes and vetoes adoption | Prove and bind the real device power, mapping, selector and readback semantics within exclusive boot ownership. A successful sample does not prove old-writer drain. See [initial queue ownership](BUILD34-INITIAL-QUEUE-OWNERSHIP.md) |
 | Native claim admission | The latest paired source stage uses a separate matching key and one issued claim per PhxBringup instance. PhxAccel checks the exact PCI sibling, epoch and both queue generations before and after family start. The old stale-marker start is reproduced; 205 checks per sanitizer and complete nonloadable driver/accelerator objects pass | Prove native matching and family unwind, marker revocation, attached accelerator and proxy-client lifetime. Software readiness does not prove GPU drain or visibility; see `BUILD34-RAW-QUEUE-HANDOFF.md` |
-| Hardware acceptance | Mapping-only observer boot/desktop prerequisite passed; no native R3 exact work or pressure was dispatched | Fresh compatible finite scope for the paired R3 candidate; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
+| Hardware acceptance | Mapping-only observer boot/desktop prerequisite passed. The [offline overlap check](#controlled-dual-queue-evidence) rejects a CPU queue-space sleep as evidence of pending GPU work. No native R3 exact work was dispatched | Fresh compatible finite scope for the paired R3 candidate; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
 
 The ledger records evidence levels, not a count of tests as a substitute for
 hardware correctness. CPU concurrency is not IOKit lifetime, BAR coherency,
@@ -230,3 +230,37 @@ R3 is complete only when the ledger's native and hardware requirements are
 closed with evidence. Until then the continuing goal remains active. The
 detailed history, CPU runners and frozen-input evidence are in
 [BUILD34-EXACT-COMPLETION.md](BUILD34-EXACT-COMPLETION.md).
+
+## Controlled dual-queue evidence
+
+The accepted [R1b pressure test](BUILD34-RING-BACKPRESSURE.md#bounded-hardware-acceptance-on-november-20)
+placed GFX submission and completion inside a Compute submitter's CPU
+queue-space sleep. That thread can still be asleep after older GPU work has
+finished. Its record does not bracket an exact GFX wait with independent
+Compute and GFX fence observations and a checked global prefix.
+
+The offline [overlap check](../tools/build34_r3_wait_overlap.py) expects
+distinct native receipts (earlier Compute, later GFX), an exact GFX wait
+response for the full receipt, and four independently acquired snapshots:
+before the wait, during the wait, after it returns, and after both targets
+drain. Each snapshot must carry the same service epoch, the original queue
+generations, both submitted/completed bounds and the checked global prefix.
+All timestamps use one monotonic clock. GFX must be pending before the wait;
+an independent GFX fence read must cover the receipt before the wait
+returns. A GFX fence first seen complete only after the reply cannot exclude
+an early return. After the wait, Compute must still be pending and the
+prefix must be strictly below Compute. The prefix may make safe progress
+below that limit. A later sample must cover both targets and advance the
+prefix through them. A trial that misses this ordering has not measured the
+required overlap.
+
+The checker only validates the normalized records; it does not read fences,
+register interrupts or attest a trial. The collector must separately prove
+coherent, non-regressing same-generation samples, and obtain the prefix from
+the actual retirement path. It must not derive the fence sample from the wait
+reply, infer pending GPU work from thread state, or reuse invalid samples
+after fault, reset, sleep, stop or readoption. Successful records do not
+establish EOP wakeup, payload/guard integrity, actual resource lifetime, FPS
+or stability. `make test` includes CPU fixtures for the positive ordering and
+refuses premature prefix advancement, stale identity, timing ambiguity and
+missing drain. No runtime source or installed configuration is changed.

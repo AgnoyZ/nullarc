@@ -47,6 +47,7 @@ test: $(TESTS)
 	python3 -B tests/test_build34_r1b_resume_host.py
 	python3 -B tests/test_build34_ring_pressure_trace.py
 	python3 -B tests/test_build34_ring_pressure_evidence.py
+	python3 -B tests/test_build34_r3_wait_overlap.py
 	python3 -B tests/test_build34_present_profile.py
 	python3 -B tests/test_build34_present_copy.py
 	python3 -B tests/test_build34_present_copy_host.py
