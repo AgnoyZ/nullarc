@@ -8,7 +8,7 @@ completeness, old-writer drain, coherency, or permission to execute.
 
 PAGE_BYTES = 4096
 DWORD_BYTES = 4
-LIMITS = {"gpu_va": 1 << 47, "dma": 1 << 48, "host_pa": 1 << 64}
+LIMITS = {"gpu_va": 1 << 47, "dma": 1 << 44, "host_pa": 1 << 64}
 
 
 def _fields(record, fields):
@@ -35,9 +35,10 @@ def _overlap(a, b):
 def check(gart_window, compute, gfx, reserved):
     """Require two dedicated 4 KiB pages with a dword guard on either side.
 
-    GPU addresses are lower-half VMID0 VAs; DMA addresses must fit the
-    build34 PTE address field. Compare reservations within each space only.
-    Success returns no addresses and is never a runtime admission token.
+    GPU addresses are lower-half VMID0 VAs. Use Linux GMC11's 44-bit DMA
+    policy as an offline ceiling; the actual mapper may impose a lower limit.
+    Compare reservations within each space only. Success returns no addresses
+    and is never a runtime admission token.
     """
     window = _range(gart_window, LIMITS["gpu_va"])
     if any(edge % PAGE_BYTES for edge in window):

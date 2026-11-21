@@ -52,8 +52,17 @@ class WritebackLayout(unittest.TestCase):
         args["compute"]["dma"] = args["gfx"]["host_pa"]
         self.assertIs(check(**args)["hardware_attested"], False)
 
+    def test_device_dma_limit_is_narrower_than_pte_field(self):
+        args = fixture()
+        args["gfx"]["host_pa"] = (1 << 44) + PAGE_BYTES
+        args["gfx"]["dma"] = (1 << 44) - PAGE_BYTES
+        self.assertIs(check(**args)["hardware_attested"], False)
+        args["gfx"]["dma"] = 1 << 44
+        with self.assertRaisesRegex(ValueError, "invalid address extent"):
+            check(**args)
+
     def test_rejects_outside_window_and_malformed_page(self):
-        for field, value in (("gpu_va", 0xC000), ("gpu_va", 0xA004), ("dma", LIMITS["dma"]),
+        for field, value in (("gpu_va", 0xC000), ("gpu_va", 0xA004),
                              ("dma", True), ("host_pa", LIMITS["host_pa"] - 1), ("host_pa", 0),
                              ("fence_offset", 0), ("fence_offset", 5), ("fence_offset", 4092)):
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
