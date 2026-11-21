@@ -326,3 +326,11 @@ test-build34-exact-native-sdk:
 	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
 	@test -n "$(EXACT_NATIVE_SDK_OUT)" || (echo "Set EXACT_NATIVE_SDK_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_native_sdk.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_NATIVE_SDK_OUT)"
+
+# Public timer CPU/native-object prerequisite only, never a kernel candidate.
+.PHONY: test-build34-exact-public-timer
+test-build34-exact-public-timer:
+	@test -n "$(KERNEL_SDK)" || (echo "Set KERNEL_SDK to the reviewed matching SDK checkout"; exit 2)
+	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
+	@test -n "$(EXACT_PUBLIC_TIMER_OUT)" || (echo "Set EXACT_PUBLIC_TIMER_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_public_timer.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_PUBLIC_TIMER_OUT)"

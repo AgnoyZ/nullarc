@@ -6,6 +6,11 @@ or native deployment admission**. The timer import audit independently refuses
 admission because `_thread_call_cancel_wait` is only in the reviewed KDK's
 private KPI symbolset. No kernel bundle is linked, packaged or signed.
 
+A later [public service-timer stage](BUILD34-PUBLIC-SERVICE-TIMER.md) removes
+that direct private import and passes static provider resolution. The refusal
+below remains the evidence for this earlier checkpoint; neither stage is a
+native kernel candidate or R3 hardware acceptance.
+
 Only default `upstream34/vram-layout-fix`, PhxBringup build34 is in scope.
 Build41/build42 remain withdrawn. Installed drivers, acceleration, desktop,
 PR28 daily settings and recovery/monitoring policy are unchanged.

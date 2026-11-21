@@ -1,0 +1,39 @@
+{
+  "repository": "apple-oss-distributions/xnu",
+  "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+  "review_only_not_installed_kernel_match": true,
+  "implementation_copied": false,
+  "files": {
+    "iokit/Kernel/IOTimerEventSource.cpp": {
+      "sha256": "97ddf1e91351f4e034250412c81e8e6541c95a64435ef28a2529c316492b1141",
+      "license_header": "APSL-2.0",
+      "review": "API/lifecycle review only; no implementation copied",
+      "api_source": "https://api.github.com/repos/apple-oss-distributions/xnu/contents/iokit/Kernel/IOTimerEventSource.cpp?ref=f6217f891ac0bb64f3d375211650a4c1ff8ca1ea"
+    },
+    "iokit/Kernel/IOWorkLoop.cpp": {
+      "sha256": "10f6d04e18a5fb60fda7782b13c5b551d7e27bb191e798ad1011429c0ef66bc3",
+      "license_header": "APSL-2.0",
+      "review": "API/lifecycle review only; no implementation copied",
+      "api_source": "https://api.github.com/repos/apple-oss-distributions/xnu/contents/iokit/Kernel/IOWorkLoop.cpp?ref=f6217f891ac0bb64f3d375211650a4c1ff8ca1ea"
+    },
+    "iokit/Kernel/IOEventSource.cpp": {
+      "sha256": "933c053484e6c37a0c30c8655b0798def8d0f93dfda06934c1ee9d649747622f",
+      "license_header": "APSL-2.0",
+      "review": "Read-only owner/attachment API contract; no implementation copied",
+      "api_source": "https://api.github.com/repos/apple-oss-distributions/xnu/contents/iokit/Kernel/IOEventSource.cpp?ref=f6217f891ac0bb64f3d375211650a4c1ff8ca1ea"
+    }
+  },
+  "local_SDK_header_sha256": {
+    "IOWorkLoop.h": "4a14f3bbb23eacd1c51a82a8bbabc63951e9c036631ba47e7fef6dba1e6b5bb6",
+    "IOTimerEventSource.h": "2ce706a52543fa40a7a019d072dc02340b1ec7b61c95e568578ddf79156dcefc",
+    "IOEventSource.h": "97089afdc7a6080bef0d9a6ec15b1d37c1b14e68855030976c555690d7a36113"
+  },
+  "actual_native_execution": false,
+  "raw_sources_published": false,
+  "local_SDK_symbol_interface_header_sha256": {
+    "Headers/libkern/OSKextLib.h": "5b883e1c76ed43b4a22027f843d6201d3ab55ced3a6bd0b4d1ab51c7d2ed88a5",
+    "Headers/mach-o/fat.h": "c113bfb188e1309a138a90e4dd711339d84612742ded1dc52d9e137c8e942db5",
+    "Headers/mach-o/loader.h": "fb484d98179e277d342d67108f01db47ab359c826ea23b5112cb7a805531a4ba",
+    "Headers/mach-o/nlist.h": "bbeb6190df8ff67966ad69998508ac798e7a9b0f9aa5cf096c90f4e0fe1e30af"
+  }
+}

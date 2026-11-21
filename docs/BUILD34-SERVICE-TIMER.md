@@ -8,6 +8,11 @@ remain unchanged. No native reader or exact-mode binding exists. **Do not build
 this stage as a kernel candidate or deploy it.** GPU/service quarantine remains;
 CPU timer drain does not complete R3 or admit R4–R6.
 
+The later [public service-timer stage](BUILD34-PUBLIC-SERVICE-TIMER.md) replaces
+this stage's direct cancellation with public IOKit gated detachment after the
+native SDK audit exposed a private-only import. This earlier CPU stage remains
+frozen as prerequisite evidence, not the latest timer implementation.
+
 ## Reviewed native API contract
 
 The [source manifest](validation/build34-r3-service-timer-sources-20261121.json)
