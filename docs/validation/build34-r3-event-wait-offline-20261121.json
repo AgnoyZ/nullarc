@@ -1,0 +1,35 @@
+{
+  "status": "passed-staged-event-wait-offline",
+  "PhxBringup_build": 34,
+  "predecessor_commit": "0a784faf65bc8fe23946960c38deb126aade4c3e",
+  "reference_commit": "87e524ab36f12d17c04626d6cf7fc3bde1cc63e4",
+  "production_inputs_unchanged": 172,
+  "predecessor_sha256": "b92f57f2c22ce440692880f7b353fa8ed195f3d4e83ce0bd5c878ca2ae2b57af",
+  "staged_sha256": "de6a2d24ee3b6796f2ad79ad60ef47d1d6edb0ff4fe0c9cc8b28f83464be6898",
+  "ASan_UBSan_checks": 481,
+  "TSan_checks": 481,
+  "broken_variants_detected": [
+    "lost-wake",
+    "stale-generation",
+    "ignore-invalidation",
+    "no-spurious-backoff",
+    "ignore-earlier-wait-time"
+  ],
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "native_object_sha256": {
+    "previous": "8658c112c96852bcab701c02483f92b81fb349d3a7669ca20e9d5c40ee41fe75",
+    "proposed": "2be2402797b5edf0e8fe2f9032175b3d2d1dccfdbf4968ff0de6dfd39132faea"
+  },
+  "native_import_count": 377,
+  "compiler_warnings_unchanged": 4,
+  "all_native_imports_have_existing_declared_KDK_provider": true,
+  "native_import_set_unchanged": true,
+  "actual_complete_native_translation_units_compiled": true,
+  "native_object_only": true,
+  "native_event_backend_bound": false,
+  "GPU_executed": false,
+  "installed": false,
+  "R3_complete": false
+}
