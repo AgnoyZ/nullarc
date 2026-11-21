@@ -175,6 +175,41 @@ launcher-to-claim status propagation still require review. The reader remains
 unbound and no installed change was made. Roll back by ceasing to derive this
 isolated stage; do not clear the latch or retry the unknown firmware work.
 
+## SMU and direct mailbox access
+
+The follow-on `tools/build34_exact_smu_uncertainty.py` shares the PSP latch
+with the actual `smuMessage` method. A response timeout after publication closes
+raw writer admission before returning, preserves the timeout result and does
+not read a firmware output argument without an observed reply. A nonzero
+response is still returned to the caller to classify; it is not necessarily
+success. The pre-poll Busy path publishes nothing and is unchanged.
+
+The raw `writeReg` method now refuses the five PSP ring-control, pointer and
+setup registers used by the driver, plus the three SMU mailbox registers.
+Dedicated PSP and SMU paths retain access through their internal writer.
+The checked-in `bringup5.sh`, `full.sh` and `mesboot.c` paths do not require any
+of the eight via raw `writeReg`. This is a reservation of known direct writes,
+not a complete MMIO allowlist or a bound on what other engines may still write.
+
+The [sanitized result](validation/build34-r3-smu-uncertainty-offline-20261121.json)
+records the predecessor counterexamples, 51 SMU/mailbox and 61 PSP checks
+under each sanitizer configuration, three detected broken variants, and both
+complete x86_64 object compiles with the same 376 KDK-resolved imports.
+The race fixture pauses a published SMU call before returning a response or
+timing out. Adoption first returns Busy; after CPU drain, only the modeled
+response path permits adoption. No driver, ABI, runtime or boot script was
+changed. Omit this isolated transform for source rollback.
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_smu_uncertainty.py \
+  --out build/build34-r3-smu-uncertainty-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+Actual firmware response freshness remains unproved. Remaining writer paths
+include GPU work published through raw doorbells or queue-control registers.
+The staged bootstrap's result must also survive the launcher-to-claim path;
+the kernel guard and shell status are separate prerequisites.
+
 ## Validation and remaining audit
 
 The [sanitized result](validation/build34-r3-raw-handoff-offline-20261121.json)
