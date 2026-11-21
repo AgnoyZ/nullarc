@@ -334,3 +334,11 @@ test-build34-exact-public-timer:
 	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
 	@test -n "$(EXACT_PUBLIC_TIMER_OUT)" || (echo "Set EXACT_PUBLIC_TIMER_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_public_timer.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_PUBLIC_TIMER_OUT)"
+
+# Raw-debug/queue ownership CPU/native-object prerequisite, never a kernel candidate.
+.PHONY: test-build34-exact-raw-handoff
+test-build34-exact-raw-handoff:
+	@test -n "$(KERNEL_SDK)" || (echo "Set KERNEL_SDK to the reviewed SDK checkout"; exit 2)
+	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
+	@test -n "$(EXACT_RAW_HANDOFF_OUT)" || (echo "Set EXACT_RAW_HANDOFF_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_raw_handoff.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_RAW_HANDOFF_OUT)"

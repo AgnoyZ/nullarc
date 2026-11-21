@@ -1,5 +1,18 @@
 # Project instructions
 
+- The latest source-only R3 raw handoff derives the public-timer stage. Eleven
+  raw mutators hold exclusive service-wide transactions plus service callback
+  leases; two diagnostic readers hold service leases. Queue adoption closes
+  raw admission permanently, refuses busy writers without waiting under the
+  GPU lock, forbids re-adoption, and checks disjoint ring/writeback/fence ranges
+  and distinct doorbells. Its paired staged mesboot defers both existing
+  adoption calls until raw setup finishes; unchanged production mesboot is
+  incompatible with that staged handoff. Production/prior inputs, null native
+  reader/mode and permanent service/GPU quarantine stay unchanged. No candidate,
+  deployment, GPU/FPS/stability or complete lifecycle acceptance is granted.
+  Keep build34-only scope and installed settings; see
+  `docs/BUILD34-RAW-QUEUE-HANDOFF.md` and the R3 ledger.
+
 - R3 has a further source-only checked-watchdog stage. Actual old methods reproduce unlocked two-dword/history observation and SQ issuance after 1,000 not-ready RLC reads in a CPU backend. The latest stage records per-submission context/allocation identity, checks both queue histories and reciprocal VM ownership under gpuLock, and retains one targeted-then-global recovery episode. Sticky VM fault plus normal-queue invalidation precede recovery MMIO; adoption refuses faulted state. A separate old-generation bounded decoder only stops escalation, never clears the fault or supplies receipt/global/CPU-fence/resource success. RLC requires ready plus monotonic 1 ms/1,000-read bounds and paired safe exit on observed close or timeout; global escalation requires a second full threshold and current pending identity. New pending work starts its clock after the doorbell, excluding prior idle and pre-doorbell CPU scheduling time. Earlier experiments/all 172 production inputs, ABI/runtime, null native reader, absent exact mode, permanent service quarantine and installed settings remain unchanged. Do not kernel-build/deploy this stage. Native coherency, ACK freshness/recovery semantics, old-writer ownership, mapping/object/timer/service teardown, protocol/events/SDK/GPU/FPS/stability remain unaccepted. Keep accepted R1b/R2a/plugin/startup, PR28 daily 250 ms/WindowServer exclusion, disabled monitors and R4–R6 hold. See `docs/BUILD34-WATCHDOG.md` and the R3 ledger.
 
 - R3 has a further source-only multi-pending CPU-fence stage. Actual old submit/WAITSEQ methods reproduce two accepted requests losing the earlier CPU fence in a CPU backend. The latest staged legacy path records up to 128 immutable sequence/handle/offset/descriptor/KVA/size entries; the old triple is checked newest mirrors only. Full-ledger checked-prefix collection or Busy/error refusal precedes GPU dispatch, all pending/unused records are preflighted before any CPU store, and WAITSEQ may publish an older completed prefix while its newer target still waits. BO/close/reaper cleanup shares this publication before handle reuse; uncertain bookkeeping retains ownership behind sticky dispatch refusal. Scalar exact CPU fences are explicitly unsupported like the dedicated exact path; lost real work cannot fall into E1 mock success. Earlier experiments/172 production inputs, ABI/runtime, native reader/mode and installed settings stay unchanged. This is CPU/source evidence only, not native visibility, paired exact CPU protocol, watchdog, healthy service teardown/events/SDK/GPU/FPS/stability acceptance. Do not build/deploy the stage. Keep accepted R1b/R2a/plugin/startup and R4–R6 hold. See `docs/BUILD34-CPU-FENCES.md` and the R3 ledger.

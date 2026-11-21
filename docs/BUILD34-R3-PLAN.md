@@ -29,6 +29,7 @@ independent remote SHA check.
 | Watchdog and controlled recovery | Source-only actual watchdog/submit tests reproduce unlocked observation and SQ after RLC timeout in the preceding methods; the later checked stage binds pending context allocations, holds the GPU lock through recovery, invalidates normal completion, bounds ready-only RLC attempts and separates diagnostic old-generation observation | Prove native coherent reads, RLC ACK freshness/recovery semantics, external old-writer ownership and callback/mapping/timer/stop lifetimes; diagnostic completion cannot clear a fault, retire resources or turn a new adoption into old-work drain; see `BUILD34-WATCHDOG.md` |
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
 | Frozen native integration | The complete latest public-timer stage compiles to a nonloadable x86_64 object with the pinned SDK; all 376 imports resolve in the six existing declared KDK providers after kernel-resource interface/reference/alias validation, and the prior private cancellation import is removed; no R3 native candidate | Finish actual IOKit/platform/module lifecycle, entrypoint/VM audit, reader/protocol/drain integration, exact build34 provenance and paired runtime/ABI/collection inclusion without weakening admission; static compilation/provider resolution alone is insufficient; see `BUILD34-PUBLIC-SERVICE-TIMER.md` |
+| Raw-debug/queue handoff and paired bootstrap | Latest source stage gives eleven raw mutators exclusive transactions/service leases and two readers service leases, latches one-shot disjoint queue adoption, and defers both existing bootstrap adoption calls until raw setup ends; 1,063 ASan/UBSan and TSan driver checks, 28 bootstrap checks, 40 rejected broken variants and complete original/proposed driver/bootstrap object compiles pass, with the same 376 driver imports | Establish initial external queue/firmware writer ownership/drain, actual mapping/visibility and bootstrap progress/errors; finish platform/factory/claim/native lifetimes and healthy service cleanup; the gate is not GPU drain and unchanged production bootstrap is incompatible with this staged handoff; see `BUILD34-RAW-QUEUE-HANDOFF.md` |
 | Hardware acceptance | None for R3 | Fresh compatible finite recovery scope; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
 
 The ledger records evidence levels, not a count of tests as a substitute for
@@ -160,6 +161,19 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    private-only import. This closes the static private-import obstacle, not
    native callback/module lifetime, service/GPU drain, a completion event route
    or any R3 hardware requirement. Permanent service/GPU quarantine stays.
+   The subsequent [raw-debug/queue handoff stage](BUILD34-RAW-QUEUE-HANDOFF.md)
+   derives that public timer without changing its methods. Eleven public raw
+   mutators hold exclusive service-wide transactions plus service leases; two
+   diagnostic readers also hold service leases. One-way raw closure/drain
+   precedes adoption, queue latches prevent re-seeding known old work, and
+   bounded/disjoint ring/writeback/fence ranges plus distinct doorbells prevent
+   adoption aliasing. The paired staged bootstrap defers existing selectors
+   until raw setup ends; the original compute-first adoption/GFX-raw sequence
+   is incompatible and must not be paired with the new stage. This does not
+   establish initial external-writer drain, complete platform/factory/claim
+   lifecycle, native mapping/coherency, healthy service cleanup, protocol/events
+   or GPU/performance/stability acceptance. See its sanitized evidence for the
+   actual CPU, negative-variant and complete-object check results.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete
