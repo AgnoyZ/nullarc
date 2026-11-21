@@ -1,0 +1,58 @@
+{
+  "status": "passed-staged-claim-registry-revalidation",
+  "kernel_build": 34,
+  "preceding_driver_sha256": "829525c6a2f3b94f020363b4b3f87a5e0bd5e48da524315f1bd4143897512399",
+  "staged_driver_sha256": "42e7a16692b1a370123f504e1cc04ece632c2dd2908b230148326f59d54dd84e",
+  "frozen_input_count": 115,
+  "new_input_sha256": {
+    "docs/validation/build34-r3-claim-offline-20261121.json": "a25d0ea09ecf5d7da665a7a7d7d1907b414d016e7234ba536d042579f5c1f824",
+    "tests/test_build34_exact_claim_lifecycle.cpp": "48fbcb1ad8fa2b1dbf9d4fb0ab76c974a7bc4c0337cfcf7264afaf2a05e4171a",
+    "tools/build34_exact_claim_lifecycle.py": "2520c692c25b71d65d63751e65755e3ff8da8428fa338b4cb88fc030ead6b183",
+    "tools/test_build34_exact_claim_lifecycle.py": "2c67209ffe5ee844bc63d55f233c6fffbcf921d3ecb08ea88920615048007a14"
+  },
+  "old_inflight_claim_checks": 12,
+  "lifecycle_checks_each_sanitizer": 126,
+  "synchronized_lifecycle_scenarios": 6,
+  "SMU_regression_checks_each": 51,
+  "PSP_regression_checks_each": 61,
+  "claim_regression_checks_each": 103,
+  "broken_variants_detected": [
+    "stale_epoch_accepted",
+    "skip_prepublication_recheck",
+    "omit_stale_marker_removal"
+  ],
+  "production_inputs_unchanged": 172,
+  "native_async_matching_admission_proved": false,
+  "external_writer_drain_proved": false,
+  "IOKit_opened": false,
+  "GPU_executed": false,
+  "installed": false,
+  "native_reader_bound": false,
+  "R3_complete": false,
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "native_object_sha256": {
+    "previous": "aa92aba7a8a21b210ca02dd330a02d55585426f06f91622e77ec9ef82835dc09",
+    "proposed": "413d877920fac4a228dc9a92ff5501bbf301ae86bbf54bda7670fbc8b77209db"
+  },
+  "native_import_count": 376,
+  "compiler_warnings": {
+    "previous": [
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "private field 'exactFenceReader' is not used [-Wunused-private-field]"
+    ],
+    "proposed": [
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "private field 'exactFenceReader' is not used [-Wunused-private-field]"
+    ]
+  },
+  "all_native_imports_have_existing_declared_KDK_provider": true,
+  "native_import_set_unchanged": true,
+  "actual_complete_native_translation_units_compiled": true,
+  "native_object_only": true
+}

@@ -275,6 +275,43 @@ the readiness snapshot still needs a native publication/lifetime protocol.
 The snapshot is software readiness, not an old-writer drain or a device
 fence visibility proof. Roll back by omitting this isolated transform.
 
+## Rechecking claim across registry publication
+
+The prior stage can still return success and request matching if closure
+occurs while its registry write is in flight. The follow-on
+`tools/build34_exact_claim_lifecycle.py` changes only the staged claim method
+and adds an exclusive publisher lease and a request flag. Concurrent or
+reentrant claims return Busy. Claim compares the captured PCI identity and
+invalidation epoch with the two live queues before setting the property,
+after setting it, and after requesting matching. All registry operations stay
+outside `gpuLock`. A preexisting marker is refused; a successful request is
+idempotent while the marker and queue state remain current.
+
+If invalidation is observed after writing the marker, claim refuses success
+and removes the observed true marker from the initially empty slot. It leaves
+an observed different value in place. This retraction assumes this staged
+producer is the only writer of the slot during removal: IOKit property
+lookup and removal are separate, and the shared boolean cannot identify a
+writer. It also cannot undo an already queued asynchronous match. The
+current PhxAccel personality and `start()` consult only that boolean. Closing
+the remaining gap requires paired consumer-side admission against the same
+provider/lifecycle; an existing successful marker is not proactively revoked
+by this stage on later stop or fault. No cleanup of an attached accelerator,
+GPU drain, or fence visibility is established.
+
+The [sanitized result](validation/build34-r3-claim-lifecycle-offline-20261121.json)
+records the old in-flight failure and 126 checks in each sanitizer, including
+six synchronized interleavings, actual staged sleep/wake invalidation,
+prior claim and firmware regressions, and three rejected broken variants.
+Both complete driver sources compile as nonloadable x86_64 objects with the
+same 376 KDK-resolved imports. All 172 production inputs and the installed
+stack remain unchanged. Omit this transform to roll it back.
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_claim_lifecycle.py \
+  --out build/build34-r3-claim-lifecycle-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
 ## Validation and remaining audit
 
 The [sanitized result](validation/build34-r3-raw-handoff-offline-20261121.json)
