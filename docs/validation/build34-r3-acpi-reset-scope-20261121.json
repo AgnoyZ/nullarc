@@ -1,0 +1,48 @@
+{
+  "status": "exposed-acpi-reset-objects-attributed-drain-unproved",
+  "date": "2026-11-21",
+  "branch": "upstream34/vram-layout-fix",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "pci": "1002:1900",
+  "PhxBringup_build_scope": 34,
+  "table_observation": {
+    "method": "targeted-IOKit-platform-expert-ACPI-Tables-property",
+    "matching_samples": 2,
+    "exposed_aml_tables": {"DSDT": 1, "SSDT": 40, "PSDT": 0},
+    "all_aml_signatures_lengths_and_checksums_valid": true,
+    "unique_target_pci_provider": true,
+    "dsdt_graphics_and_parent_addresses_match_registry_path": true
+  },
+  "offline_disassembly": {
+    "maciasl_iasl_version": "20200925",
+    "acpica_iasl_version": "20260930",
+    "maciasl_individual_outputs": 41,
+    "joint_disassembly_succeeded": false,
+    "joint_duplicate_object_error_in_both_versions": "AE_ALREADY_EXISTS",
+    "targeted_acpica_outputs": 4,
+    "targeted_reset_scopes_match_individual_disassembly": true,
+    "targeted_dsdt_reports_unresolved_methods": true,
+    "runtime_namespace_attested": false
+  },
+  "scope_findings": {
+    "tables_containing_rst_bytes": 2,
+    "tables_containing_prr_bytes": 1,
+    "rst_definitions": {"power_resources_for_wlan_and_usb_port": 2, "usb4_host_interfaces": 2},
+    "conditional_prr_definitions": {"wlan": 1, "usb_hub_port": 1},
+    "alternate_usb_port_package_is_prr": false,
+    "rst_or_prr_definition_seen_for_graphics_or_directly_on_bridge": false,
+    "other_exposed_table_references_to_named_reset_resources_seen": false,
+    "graphics_reference_to_named_reset_resources_seen": false,
+    "graphics_and_bridge_power_transition_objects_present": true,
+    "vendor_reset_or_runtime_objects_excluded": false
+  },
+  "aml_evaluated": false,
+  "device_reset": false,
+  "new_mmio_or_irq_registration": false,
+  "driver_installed_or_reloaded": false,
+  "gpu_work_submitted": false,
+  "new_restart": false,
+  "old_writer_drain_proved": false,
+  "R3_complete": false
+}

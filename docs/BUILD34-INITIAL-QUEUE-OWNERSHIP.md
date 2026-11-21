@@ -97,16 +97,50 @@ properties. The result does not rule out a vendor-specific reset.
 | --- | --- |
 | Standard PCIe FLR | Do not plan around an unadvertised function reset. In the [reference Linux PCI code](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/pci/pci.c#L4541-L4580), `pcie_reset_flr()` rejects missing capability; `pcie_flr()` can proceed after a Transactions Pending timeout. Reset return or transaction status alone is not proof of old IH, queue or firmware write drain. |
 | Secondary-bus/hot reset | No display-safe or GPU-only scope established. The same reference's [function-level fallback](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/pci/pci.c#L4993-L5009), `pci_parent_bus_reset()`, refuses when another device shares the secondary bus. Do not issue a bridge reset on the current stack. |
-| ACPI device/power-resource reset | A historical DSDT inspection did not find `_RST` or `_PRR` within the matched graphics/bridge subtree. This was not a review of the complete loaded DSDT/SSDT namespace. The [ACPI Specification 6.6](https://uefi.org/sites/default/files/resources/ACPI_Spec_6.6.pdf), sections 7.3.25-26, distinguishes a device-local reset from a shared reset resource. Locate the actual method and its affected resources before drawing any conclusion about this path. Do not evaluate AML methods to discover whether they are safe. |
+| ACPI device/power-resource reset | The current table review below found no `_RST` or `_PRR` under the matching graphics device or directly on its bridge. The explicit reset objects found belong to other devices or their power resources. Full runtime namespace resolution is still unproved. Do not evaluate AML methods to discover whether they are safe. |
 | SMU Mode 2, power transition or normal restart | No verified coverage or completed-write boundary for PSP, MES, IH and outstanding memory writes. A mailbox response, PCI configuration readiness or new boot identity is insufficient. |
 | GFX11 engine soft reset | AMD's [November 5, 2026 UTC v4 patch](https://www.mail-archive.com/amd-gfx%40lists.freedesktop.org/msg154925.html) covers a GFX-only recovery with an owned MES and saved queue state. Its two CP memory-busy polls can exhaust their budgets without aborting recovery. Compute and MES are outside the reset pulse, and the patch does not reset IH or verify IH drain. This is a reference for later recovery review, not an inherited-writer drain protocol. No code was imported. |
 
-Continue offline by tracing the full loaded ACPI namespace or an authoritative
-platform/firmware handoff for the identified predecessor. For any candidate
-mechanism, identify which engines and storage it covers, when old writes can
-no longer arrive and what prevents firmware rearming before build34 takes
-ownership. Without that contract, leave reset and IH reprogramming out of the
-trial and keep the installed build34 baseline in use.
+### Current ACPI table review
+
+Two targeted IOKit reads of the running platform expert's `ACPI Tables`
+property matched. All 41 exposed AML tables (one DSDT and 40 SSDTs, no
+PSDTs) passed header-length and checksum validation. The DSDT's graphics
+device and parent `_ADR` matched the registry path for the sole `1002:1900`
+provider. The [sanitized record](validation/build34-r3-acpi-reset-scope-20261121.json)
+records the following offline disassembly results:
+
+- Four `_RST` definitions: two on power resources referenced by WLAN and
+  a USB hub port, and two on USB4 host interfaces. Both `_PRR` definitions
+  are conditional and locate those WLAN and USB-port resources, not a GPU
+  reset resource. The USB-port scope shares the GPU's upstream bridge but
+  is not the graphics function. An alternate hub-port package named `YPRR`
+  refers to the same USB-port resource; it is not `_PRR`.
+- No other exposed table contains either identified reset-resource name,
+  and no alias or reference was found that assigns either resource to the
+  graphics function. The GPU and bridge do have `_PR0`/`_PR3` packages
+  and `_PS0`/`_PS3` methods. Their power methods use conditional hooks;
+  the declarations establish neither a GPU-only electrical reset nor an
+  acknowledgment of completed writes. See the
+  [ACPI Specification 6.6](https://uefi.org/sites/default/files/resources/ACPI_Spec_6.6.pdf),
+  sections 7.3.25-26, for the separate `_RST` and `_PRR` contracts.
+
+[MaciASL iASL 20200925](https://github.com/acidanthera/MaciASL/blob/97ed950d2811b0b4cc802abc337316e16dd6aeeb/Dist/iasl-stable)
+produced all 41 tables individually. The reset definitions and scopes agree
+with [ACPICA iASL 20260930](https://github.com/open-acpica/acpica/releases/tag/20260930)
+targeted passes using the DSDT for external symbols. Both releases failed full joint
+disassembly on duplicate namespace objects (`AE_ALREADY_EXISTS`); the
+targeted DSDT pass also still reported unresolved methods. The registry
+property is an exposed table set, not an attested live namespace. Runtime
+definitions and vendor-specific power/reset paths are not excluded. No AML
+was executed, and no raw tables or disassemblies are in the repository.
+
+Continue from a documented platform/firmware handoff for the identified
+predecessor, or resolve a specific candidate reset path and its runtime
+scope before considering it. A usable mechanism must account for IH, queues,
+firmware, address translation and outstanding writes, and exclude firmware
+rearming before takeover. Until then, do not reset the running GPU, program
+IH, register a new ISR or admit exact completion on build34.
 
 ## Offline indexed observation transaction
 

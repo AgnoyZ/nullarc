@@ -107,7 +107,10 @@ later diagnostic read needs its own verified address, side-effect and
 power/mapping contract; a diagnostic idle sample cannot authorize a handoff.
 The [target reset review](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#reset-paths-on-the-target)
 found no advertised standard PCIe FLR in cached metadata and no verified
-GPU-only bridge reset or platform handoff. It does not change this gate.
+GPU-only bridge reset or platform handoff. The current exposed ACPI table
+review located explicit reset objects on other devices and resources; it
+did not establish a GPU reset or complete runtime namespace. The ownership
+and drain gate remains open.
 
 ## Stop, rollback and later acceptance
 
