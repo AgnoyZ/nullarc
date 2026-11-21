@@ -1,0 +1,53 @@
+{
+  "repository": "apple-oss-distributions/xnu",
+  "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+  "review_only_not_installed_kernel_match": true,
+  "implementation_copied": false,
+  "files": {
+    "osfmk/kern/thread_call.h": {
+      "sha256": "cf5ffaba639866b36a05ef333b612d000081163cecf811cc00357de934865629",
+      "license_header": "APSL-2.0",
+      "review": "Read-only API/implementation reference; no implementation text copied",
+      "api_source": "https://api.github.com/repos/apple-oss-distributions/xnu/contents/osfmk/kern/thread_call.h?ref=f6217f891ac0bb64f3d375211650a4c1ff8ca1ea"
+    },
+    "osfmk/kern/thread_call.c": {
+      "sha256": "c14d9956890389097874811695ce90d436da9a39957124be4a79b4d6a426c876",
+      "license_header": "APSL-2.0",
+      "review": "Read-only API/implementation reference; no implementation text copied",
+      "api_source": "https://api.github.com/repos/apple-oss-distributions/xnu/contents/osfmk/kern/thread_call.c?ref=f6217f891ac0bb64f3d375211650a4c1ff8ca1ea"
+    }
+  },
+  "local_SDK_header_sha256": "418e366dd97d39b3e899f00c488934b6c146cbd0d0c1b323233f403f6db88e43",
+  "local_SDK_header_is_installed_kernel_version": false,
+  "local_SDK_headers": [
+    {
+      "label": "prior-native-allocation-SDK",
+      "path": "Headers/kern/thread_call.h",
+      "sha256": "418e366dd97d39b3e899f00c488934b6c146cbd0d0c1b323233f403f6db88e43",
+      "license_header": "APSL-2.0",
+      "required_names_present": [
+        "thread_call_allocate_with_options",
+        "THREAD_CALL_PRIORITY_KERNEL",
+        "THREAD_CALL_OPTIONS_ONCE",
+        "thread_call_cancel_wait",
+        "thread_call_free"
+      ]
+    },
+    {
+      "label": "prior-local-validation-SDK",
+      "path": "Headers/kern/thread_call.h",
+      "sha256": "418e366dd97d39b3e899f00c488934b6c146cbd0d0c1b323233f403f6db88e43",
+      "license_header": "APSL-2.0",
+      "required_names_present": [
+        "thread_call_allocate_with_options",
+        "THREAD_CALL_PRIORITY_KERNEL",
+        "THREAD_CALL_OPTIONS_ONCE",
+        "thread_call_cancel_wait",
+        "thread_call_free"
+      ]
+    }
+  ],
+  "actual_native_KPI_link_or_execution": false,
+  "raw_sources_published": false,
+  "source_retrieval": "Official GitHub contents API at the pinned commit; raw-content download failed before this successful read"
+}

@@ -313,3 +313,8 @@ test-build34-exact-cpu-fences:
 test-build34-exact-watchdog:
 	@test -n "$(EXACT_WATCHDOG_OUT)" || (echo "Set EXACT_WATCHDOG_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_watchdog.py --out "$(EXACT_WATCHDOG_OUT)"
+
+.PHONY: test-build34-exact-service-timer
+test-build34-exact-service-timer:
+	@test -n "$(EXACT_SERVICE_TIMER_OUT)" || (echo "Set EXACT_SERVICE_TIMER_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_service_timer.py --out "$(EXACT_SERVICE_TIMER_OUT)"
