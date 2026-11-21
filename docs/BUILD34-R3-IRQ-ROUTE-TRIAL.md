@@ -1,11 +1,10 @@
 # Build34 R3 interrupt route trial design
 
-Status: startup observation has not passed. The [first authorized trial](BUILD34-PCI-IRQ-TRIAL.md)
-refused a mismatched PCI sample and recovered the mapping-only image. The
-collector is corrected and sealed in a distinct inactive scope; there is no
-unspent runtime grant. The [private pair](BUILD34-PCI-IRQ-CANDIDATE.md) is unchanged.
-The [registry observation](BUILD34-EXACT-EVENT-WAIT.md#passive-pci-descriptor-observation)
-did not identify an active PCI interrupt mode, an ISR, or an IH ring consumer.
+Status: startup observation passed in the
+[corrected authorized trial](BUILD34-PCI-IRQ-TRIAL.md#corrected-trial-passed-startup-observation).
+The exact build34 image produced `both-message-enables-clear`; this did not
+identify an active PCI interrupt mode, an ISR or an IH ring consumer. The
+ordinary restart grant is spent. Ownership and drain are the next gate.
 The build34 AMD framebuffer's VBL callback is driven by `vblFire` on a timer;
 it is not a CP end-of-pipe (EOP) interrupt source. The installed daily path
 continues to use its existing waits. No event backend is bound.
@@ -13,14 +12,14 @@ continues to use its existing waits. No event backend is bound.
 ## Admission gates, in order
 
 1. **Observe PCI configuration without registration.** The
-   [offline start observer](BUILD34-PCI-IRQ-CONFIG.md) is prepared. It uses
+   [start observer](BUILD34-PCI-IRQ-CONFIG.md) passed its passive trial. It uses
    the already retained `IOPCIDevice` on the existing start-time config-read
    path, before this driver's power registration and enable writes; it does
    not power up the device. It brackets the message-control reads with D0 and
    identity checks and publishes only an allowed start-time classification.
-   Before a meaningful live observation, establish the exact image, provider
-   power/config access semantics and sealed rollback scope. Startup enable,
-   mask state, later configuration and interrupt delivery are separate facts.
+   The exact loaded image and provider child matched the independent sample.
+   Startup enable, mask state, later configuration and interrupt delivery are
+   separate facts.
    Do not read a named interrupt property, call
    `getInterruptType`, or construct a provider-backed event source. Public XNU
    [registers the ISR during source initialization](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOInterruptEventSource.cpp#L72-L144);

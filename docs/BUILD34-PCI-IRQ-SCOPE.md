@@ -1,9 +1,10 @@
 # Build34 PCI startup observation scope
 
-The [first authorized trial](BUILD34-PCI-IRQ-TRIAL.md) later refused the
-PCI sample and restored the mapping-only control in one recovery restart.
-Its restart grants were spent. The corrected reader is in a distinct,
-uninstalled scope; the original offline evidence below remains historical.
+The [first authorized trial](BUILD34-PCI-IRQ-TRIAL.md) refused the PCI sample
+and restored the mapping-only control in one recovery restart. The distinct
+[corrected trial](BUILD34-PCI-IRQ-TRIAL.md#corrected-trial-passed-startup-observation)
+passed without a recovery restart. The original offline evidence below
+remains historical; neither trial grants another ordinary restart.
 
 On November 21, 2026, the [exact private observer pair](BUILD34-PCI-IRQ-CANDIDATE.md)
 was bound to an inactive boot and restore scope on macOS 26.7.2 (`25G332`).

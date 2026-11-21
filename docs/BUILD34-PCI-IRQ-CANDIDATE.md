@@ -38,8 +38,8 @@ unchanged and generic public-KPI/AuxKC admission is still refused. No binary,
 SDK, EFI data, raw collection data or UUID is published. See the
 [sanitized result](validation/build34-r3-pci-irq-candidate-20261121.json).
 
-The subsequent [inactive scope](BUILD34-PCI-IRQ-SCOPE.md) has passed independent
-preflight and restore readback. It retains the current mapping-only image and
-current recovery jobs. A distinct boot scope still requires a fresh grant.
-Passing either private stage supplies neither real MSI/MSI-X readings nor R3
-hardware acceptance.
+The subsequent [offline scope](BUILD34-PCI-IRQ-SCOPE.md) passed independent
+preflight and restore readback. See the
+[authorized trials](BUILD34-PCI-IRQ-TRIAL.md) for the later rollback and
+successful startup observation using the same pair. Neither the build nor
+that observation establishes R3 hardware acceptance.

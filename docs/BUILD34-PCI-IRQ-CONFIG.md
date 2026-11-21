@@ -55,7 +55,7 @@ nice -n 15 taskpolicy -b python3 -B tools/test_build34_pci_irq_config.py \
 The initial source-only verification did not link a kernel. The subsequent
 [private artifact build](BUILD34-PCI-IRQ-CANDIDATE.md) now reproduces the
 previously accepted mapping-only image and strictly verifies the new
-observation-only pair. The corrected collector is sealed in a distinct
-inactive scope for those exact images; the previous trial's spent boot grant
-is not reused. A good startup sample would only close the first observation
+observation-only pair. The corrected collector later
+[passed startup observation](BUILD34-PCI-IRQ-TRIAL.md#corrected-trial-passed-startup-observation)
+in a distinct boot scope using the same images. This closes only the first
 step in the [IRQ route trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md).
