@@ -131,10 +131,16 @@ properties. The result does not rule out a vendor-specific reset.
 | Path | Disposition for R3 |
 | --- | --- |
 | Standard PCIe FLR | Do not plan around an unadvertised function reset. In the [reference Linux PCI code](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/pci/pci.c#L4541-L4580), `pcie_reset_flr()` rejects missing capability; `pcie_flr()` can proceed after a Transactions Pending timeout. Reset return or transaction status alone is not proof of old IH, queue or firmware write drain. |
+| PCI PM D3hot to D0 | Linux's [`pci_pm_reset()`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/pci/pci.c#L4643-L4671) requires a PM capability and a clear `No_Soft_Reset` bit, checks D0, then waits for config-space readiness after the transition. This bit was not sampled on the build34 host; config readiness would not prove on-chip writer drain. The reviewed IOPCIFamily [`hasPCIPowerManagement()`](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIDevice.cpp#L1461-L1469) changes sleep-control bookkeeping and reads PCI config; it is not a passive substitute. |
 | Secondary-bus/hot reset | No display-safe or GPU-only scope established. The same reference's [function-level fallback](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/pci/pci.c#L4993-L5009), `pci_parent_bus_reset()`, refuses when another device shares the secondary bus. Do not issue a bridge reset on the current stack. |
 | ACPI device/power-resource reset | The current table review below found no `_RST` or `_PRR` under the matching graphics device or directly on its bridge. The explicit reset objects found belong to other devices or their power resources. Full runtime namespace resolution is still unproved. Do not evaluate AML methods to discover whether they are safe. |
 | SMU Mode 2, power transition or normal restart | No verified coverage or completed-write boundary for PSP, MES, IH and outstanding memory writes. A mailbox response, PCI configuration readiness or new boot identity is insufficient. |
 | GFX11 engine soft reset | AMD's [November 5, 2026 UTC v4 patch](https://www.mail-archive.com/amd-gfx%40lists.freedesktop.org/msg154925.html) covers a GFX-only recovery with an owned MES and saved queue state. Its two CP memory-busy polls can exhaust their budgets without aborting recovery. Compute and MES are outside the reset pulse, and the patch does not reset IH or verify IH drain. This is a reference for later recovery review, not an inherited-writer drain protocol. No code was imported. |
+
+Host-side DMA isolation is a separate question from device reset. The
+[IOMMU review](BUILD34-SYSTEM-WRITEBACK.md#host-iommu-and-the-release-boundary)
+found a valid exposed `IVRS` table, but no verified runtime mapper for
+this GPU and no evidence covering on-chip writers.
 
 ### Current ACPI table review
 

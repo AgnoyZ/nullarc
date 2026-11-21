@@ -1,0 +1,31 @@
+{
+  "status": "firmware-iommu-table-present-runtime-mapper-unattested",
+  "date": "2026-11-22",
+  "branch": "upstream34/vram-layout-fix",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "phxbringup_build": 34,
+  "pci": "1002:1900",
+  "acpi_observation": {
+    "method": "targeted-IOKit-platform-expert-ACPI-Tables-property",
+    "matching_samples": 2,
+    "IVRS": "present-valid-header-and-checksum",
+    "DMAR": "absent-from-exposed-property"
+  },
+  "provider_observation": {
+    "method": "targeted-IOKit-PhxBringup-parent-and-PCI-identity-properties",
+    "matching_samples": 2,
+    "iommu_parent_property": "no-value-returned"
+  },
+  "runtime_device_mapper_attested": false,
+  "identity_addressing_attested": false,
+  "pci_pm_control_status_read": false,
+  "direct_pci_config_or_mmio_access_issued": false,
+  "iommu_command_issued": false,
+  "dma_mapping_changed": false,
+  "old_writer_drain_proved": false,
+  "gpu_work_submitted": false,
+  "driver_installed_or_reloaded": false,
+  "new_restart": false,
+  "R3_complete": false
+}

@@ -62,6 +62,47 @@ backing or a verified no-copy path for the matching runtime. Do not use
 an unverified system-mapper fallback. The public XNU source is APSL 2.0
 and does not attest the installed kernel's mapping; no code was copied.
 
+### Host IOMMU and the release boundary
+
+On November 22, 2026, two targeted registry samples on macOS 26.7.2
+(25G332) found a valid `IVRS` table in the platform expert's exposed ACPI
+property. Two reads of the `1002:1900` PCI provider of the
+unique build34 service returned no value for `iommu-parent`. The table
+describes firmware topology. The unavailable property leaves this GPU's
+runtime mapper unresolved; it does not rule out a mapper or establish
+identity addressing. Only classifications are retained in the
+[sanitized record](validation/build34-r3-iommu-scope-20261122.json).
+
+- In [XNU's device mapper lookup](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMapper.cpp#L167-L207),
+  `copyMapperForDevice()` resolves `iommu-parent`; the implementation can
+  wait for a matching service. Do not call it under a GPU lock or infer
+  that an arbitrary system mapper routes this device.
+- In [Linux's AMD IOMMU reference](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/iommu/amd/iommu.c#L1219-L1263),
+  the completion wait enqueues a command and waits for its own semaphore
+  value, unlike a poll of an unqualified status bit. The outer domain flush
+  helper discards its return value, so this is not a checked release receipt
+  at every Linux call site. Neither source establishes macOS mapper behavior
+  or covers on-chip GPU writers that never cross the host IOMMU. A
+  destination restriction on one DMA path is not a handoff of PSP, IH,
+  queue state or the GPU's separate GART translations.
+- XNU's [`complete()`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IODMACommand.cpp#L1057-L1118)
+  can just drop a nested active reference. On the last reference it can
+  assign the unmap result over an earlier buffer-walk result and clears
+  local mapping bookkeeping even if the unmap fails.
+  [`dmaUnmap()`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L4627-L4667)
+  delegates to the concrete mapper. These calls do not furnish separate
+  proof of writer drain, successful synchronization and translation
+  invalidation. Do not use a successful return as that proof or retry a
+  failed `complete()` as if its original mapping were still tracked.
+
+Before handing the descriptor to an operation that can unmap it, prove
+the GPU-side stop and detach, and hold a separate backing reference.
+Require a checked boundary for the actual mapper to reuse the physical
+page or its DMA address. If that boundary is uncertain, keep the backing
+pinned and the scope closed to reuse; do not claim the old API mapping
+survived. No IOMMU commands, DMA operations or hardware state changes
+were performed for this review. No Linux or XNU code was imported.
+
 ## TLB acknowledgement is not translation proof
 
 Linux's [GART invalidation](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_gart.c#L397-L417)
@@ -126,9 +167,11 @@ space. Removing the checker and its test reverts this offline step.
 4. Once the backing is reachable from the GPU, stop new writers and prove
    already issued writes finished before removing the translation. Then
    prove the detach and TLB invalidation before completing and releasing
-   the DMA mapping and backing page. On uncertain publication, write drain,
-   or invalidation, quarantine and keep the page and its mapping pinned.
-   A completed fence or CPU callback alone cannot authorize that release.
+   the DMA mapping and backing page. Before DMA completion, quarantine and
+   keep the page and mapping pinned on uncertain publication, drain, or
+   GPU invalidation. After an uncertain mapper teardown keep a separate
+   backing pin and do not reuse the address. A completed fence or CPU
+   callback alone cannot authorize release.
 
 Private allocations may isolate old **addresses** after these checks. They
 do not remove the need to establish PSP, GART, IH and queue ownership or the
