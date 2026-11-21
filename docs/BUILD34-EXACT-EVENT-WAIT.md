@@ -130,3 +130,43 @@ availability, not live kernel enrollment or unload safety. The consumer's
 ownership, deferred IRQ delivery and teardown, fence visibility, native
 protocol, and GPU performance/stability acceptance remain open. No IRQ,
 device packet, installed artifact, or runtime setting was changed.
+
+## Passive PCI descriptor observation
+
+On November 21, 2026, macOS 26.7.2 (`25G332`), the
+[passive collector](../tools/build34_pci_irq_observation.py) matched the
+PhxBringup build34 registry service to the direct PCI provider `1002:1900`.
+Both provider snapshots contained two cached controller/specifier pairs,
+one naming the PCI messaged interrupt controller and one other. Matching
+entry identities and descriptor values were checked in memory around the
+service read; only counts and fixed classifications were retained. Build34
+here is the registry property, not loaded-image hash verification. The
+[sanitized record](validation/build34-r3-pci-irq-observation-20261121.json)
+retains the limits of this evidence.
+
+Use bounded `ioreg -a` property snapshots. Apple's public
+[`IOPCIDevice::getProperty`](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIDevice.cpp#L1834)
+calls the lazy interrupt resolver on named interrupt-property access. The
+collector does not request a named property or `getInterruptType`.
+Public XNU's
+[`IORegistryEntry::serializeProperties`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IORegistryEntry.cpp#L543)
+serializes a copy of the property table. The source references describe the
+API paths; they are not a claim that either source revision is the running
+kernel or driver image. No device user client was opened. No configuration,
+interrupt registration, packet, MMIO read/write, GPU or power operation was
+requested by the collector.
+
+```sh
+python3 -B tests/test_build34_pci_irq_observation.py
+python3 -B tools/build34_pci_irq_observation.py
+```
+
+The pairs show that descriptors are already published. They do not identify
+which mode is active, who registered an ISR, the actual EOP vector for either
+build34 queue, or whether a BAR0 read can see its fence after interrupt
+delivery. Do not infer `MSI` versus `MSI-X` from the controller name. A later
+finite route trial must correlate one protected GFX or Compute submission
+with its actual EOP source and independently verified fence data, account
+for overflow or dropped events, and prove exclusive IH ownership before
+touching the ring or enabling interrupt generation. Keep the event backend
+unbound until that evidence and its lifecycle checks are available.

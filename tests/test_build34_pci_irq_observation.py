@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+import json
+from pathlib import Path
+import plistlib
+import sys
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+import build34_pci_irq_observation as obs
+
+
+class PCIDescriptorTests(unittest.TestCase):
+    def setUp(self):
+        self.phx = {obs.CLASS: 'PhxBringup', obs.REGISTRY_ID: 75241, 'phx-build': 34}
+        self.pci = {obs.CLASS: 'IOPCIDevice', obs.REGISTRY_ID: 75240, 'vendor-id': b'\x02\x10\x00\x00',
+                    'device-id': b'\x00\x19\x00\x00', obs.CHILDREN: [self.phx.copy()],
+                    obs.CONTROLLERS: ['other-private-name', obs.MESSAGED],
+                    obs.SPECIFIERS: [b'private-specifier-a', b'private-specifier-b']}
+
+    def summarize(self, after=None, before=None):
+        return obs.summarize(plistlib.dumps([self.pci] if before is None else before), plistlib.dumps([self.phx]),
+                             plistlib.dumps([self.pci if after is None else after]), '26.7.2', '25G332')
+
+    def test_counters_only(self):
+        report = self.summarize()
+        self.assertEqual((report['descriptor_count'], report['messaged_controller_count'],
+                          report['other_controller_count']), (2, 1, 1))
+        self.assertFalse(any(report[k] for k in ('active_interrupt_mode_proved', 'eop_delivery_proved',
+                                               'ih_consumer_ownership_proved', 'fence_visibility_proved')))
+        rendered = json.dumps(report)
+        for private in ('75240', '75241', 'private', obs.MESSAGED):
+            self.assertNotIn(private, rendered)
+
+    def test_absent_is_not_inactive(self):
+        del self.pci[obs.CONTROLLERS], self.pci[obs.SPECIFIERS]
+        report = self.summarize()
+        self.assertEqual(report['status'], 'no-cached-descriptors-visible')
+        self.assertFalse(report['active_interrupt_mode_proved'])
+
+    def test_malformed_or_asymmetric_pair(self):
+        for specifiers in (None, [], [b'', b'nonempty'], [45, b'nonempty'], b'blob'):
+            with self.subTest(specifiers=specifiers), self.assertRaises(ValueError):
+                if specifiers is None:
+                    del self.pci[obs.SPECIFIERS]
+                else:
+                    self.pci[obs.SPECIFIERS] = specifiers
+                self.summarize()
+
+    def test_same_counts_with_changed_payload_are_refused(self):
+        with self.assertRaises(ValueError):
+            self.summarize(after={**self.pci, obs.SPECIFIERS: [b'different', b'value']})
+
+    def test_duplicate_identity_is_refused(self):
+        with self.assertRaises(ValueError):
+            self.summarize(before=[self.pci, self.pci])
+
+    def test_other_service_is_refused(self):
+        self.phx[obs.REGISTRY_ID] += 1
+        with self.assertRaises(ValueError):
+            self.summarize()
+
+    def test_other_build_is_refused(self):
+        for build in (41, 42, True, '34'):
+            with self.subTest(build=build), self.assertRaises(ValueError):
+                self.phx['phx-build'] = build
+                self.summarize()
+
+
+if __name__ == '__main__':
+    unittest.main()
