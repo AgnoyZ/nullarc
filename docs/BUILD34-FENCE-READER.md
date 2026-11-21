@@ -1,8 +1,9 @@
 # Build34 R3 device-fence observation contract
 
 November 21, 2026: the exact observer's device reader is still **unbound**.
-The original build34 driver, legacy `queueFence()` and installed runtime have
-not changed. This document records primary-source review and one tested
+The production build34 source and legacy `queueFence()` are unchanged; the
+loaded [mapping-only observer](BUILD34-MAP-OBSERVER-TRIAL.md) adds metadata only.
+This document records primary-source review and one tested
 arithmetic primitive; neither admits a hardware reader or kernel candidate.
 A later [staged callsite integration](BUILD34-WINDOW-CALLSITES.md) connects
 that unchanged primitive to actual adoption, all `gpuSubmit` callers,
@@ -104,8 +105,9 @@ not prove that assumption. See [test evidence](validation/build34-r3-fence32-off
 The later [mapping-observation preparation](BUILD34-MAP-OBSERVATION.md)
 verifies the exact accepted R1b source and privately retained artifact, stages
 three startup map-option metadata properties, and compiles both the original
-baseline and full R3 forms to nonloadable objects. Its filtered passive live
-collector currently reports missing metadata on macOS 26.7.2/25G332; neither
+baseline and full R3 forms to nonloadable objects. The original R1b readback
+reported missing metadata. The later authorized observer boot on macOS
+26.7.2/25G332 reported `0x1` with default cache field `0`. Neither effective
 mapping cache/coherence nor a native reader is admitted. The baseline's
 inherited private cancellation dependency remains explicitly reported. This
 observation stage changes no production/runtime input or mapping mode.
@@ -132,6 +134,7 @@ observation stage changes no production/runtime input or mapping mode.
    coherency, a physical frame rate or long-term stability.
 
 No reader has been assigned by this work. The earlier exact observer still
-fails closed without its CPU-fixture reader. No installation, kernel build,
-live mapping query, GPU execution or power action took place. Continue the
+fails closed without its CPU-fixture reader. The original fence primitive was
+tested offline; the later boot observed mapping options and desktop startup.
+Continue the
 [R3 ledger](BUILD34-R3-PLAN.md); this review does not complete R3.

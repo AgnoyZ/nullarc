@@ -8,14 +8,16 @@
   remain false and unchanged. Installation and separate independent readback
   pass: the complete 358-file EFI differs only in the observer executable,
   exact accepted R1b is still loaded, and R2a/cache/optimized AML/plugin and all
-  172 production inputs are retained. New jobs are staged unloaded, recovery
-  journals unconsumed, same-desktop progress/errors pass and no power request
-  has yet occurred at this recorded checkpoint. Actual runtime new-boot and
-  metadata guards remain intact; a separate read-only preboot disk/control
-  view is not observer acceptance. Do not reinstall or replay an uncertain
-  restart; inspect the active scope's durable intent first. Complete the
-  authorized finite boot observation, then continue full R3 with no reader,
-  coherence, GPU/FPS/stability acceptance inferred from metadata alone. See
+  172 production inputs are retained. The sole ordinary restart has since
+  passed independent postboot readback on macOS 26.7.2/25G332: the exact
+  observer is loaded in the boot collection, desktop takeover and finite
+  same-WindowServer VBL/copy progress pass, four error counters are zero, and
+  the finite watcher and startup workers ended. BAR0 is 256 MiB, map options
+  `0x1`, default cache option `0`. No recovery restart or extra GPU pressure
+  ran; daily recovery power and resident monitoring remain off. The ordinary
+  restart grant is consumed; do not replay it or activate inactive packets.
+  R3 remains open for effective cache/coherence, old-writer drain, native
+  protocol/events/lifetime and real GPU/FPS/stability acceptance. See
   `docs/BUILD34-MAP-OBSERVER-TRIAL.md` and the continuing R3 ledger.
 
 - A separate R3 mapping-only startup/recovery adapter now passes 23 CPU unit
@@ -31,9 +33,9 @@
   pre-geometry packet remain frozen; use none as an activation scope. All 172
   production inputs and installed settings remain unchanged, with no driver/
   job installation, new GPU submission or power action. Prepare a distinct
-  authorized scope only after a fresh finite observer-trial grant (now received
-  in the later trial above); do not flip an inactive packet or replay grants. Map options
-  remain unobserved and cannot admit a reader/coherency or complete R3. See
+  authorized scope only after a fresh finite observer-trial grant (used for
+  the later trial above); do not flip an inactive packet or replay grants.
+  Only the later trial observed map options. See
   `docs/BUILD34-MAP-OBSERVER-SCOPE.md` and the continuing R3 ledger.
 
 - A subsequent R3 mapping-only native candidate now privately reproduces the

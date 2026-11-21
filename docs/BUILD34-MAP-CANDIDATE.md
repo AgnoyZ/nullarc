@@ -3,8 +3,8 @@
 November 21, 2026: the [mapping-only observation insertion](BUILD34-MAP-OBSERVATION.md)
 now has a privately built and strictly signed kernel candidate. **At this
 historical build checkpoint it was not installed or loaded.** The later
-[authorized trial](BUILD34-MAP-OBSERVER-TRIAL.md) is now installed and independently
-checked, awaiting its single ordinary restart. It contains none of the full quarantining R3 transforms,
+[authorized trial](BUILD34-MAP-OBSERVER-TRIAL.md) passed independent boot and
+desktop readback after one ordinary restart. The image contains none of the full quarantining R3 transforms,
 exact receipt protocol or reader binding. All 172 production inputs and the
 accepted R1b/R2a/plugin/ACPI/startup installation remained unchanged at build time. Build41/42
 are not prepared or used.
@@ -67,9 +67,8 @@ identifier, private-provider declaration or collection replacement was tried.
 The inherited `_thread_call_cancel_wait` import remains absent from the six
 declared public KDK providers. This work does **not** waive or close that generic
 KPI/AuxKC admission gap. It establishes the actual existing control's boot
-route and preserves its whole import set. The observer still requires a fresh
-boot-path-specific trial and loaded-image admission; successful control loading
-does not prove the derived candidate can load. Do not move it into AuxKC or
+route and preserves its whole import set. The later trial independently proved
+the observer booted in that same collection. Do not move it into AuxKC or
 change identity/security/dependencies to avoid that requirement. The separate
 full R3 public-timer source removes the private import but remains an
 undeployable, quarantining experiment for its other unresolved requirements.
@@ -94,7 +93,8 @@ A new root-owned inactive artifact packet contains the exact control/observer
 bundle pair, native source/build evidence, the accepted parent's pinned
 contract, both current startup-job backups and a prospective full EFI
 manifest. Fourteen sealed files and both signatures passed a separate
-independent readback. The control is still loaded; the observer is not.
+independent readback. During that inactive artifact check the control was still
+loaded; the observer was not.
 
 **The packet is not a trial controller or an authorization.** It contains no
 installed launch job, startup adapter, prepared recovery journal, installer,
@@ -112,12 +112,12 @@ recovery restart and zero daily power recovery. Recovery targets the current
 R1b executable and current R2a-compatible jobs. Runtime admission validates and
 adds only the three new map properties to the old strict geometry. Its explicit
 new-trial grant is false and actual runtime construction refuses it; no job or
-driver has been installed. Consumed scopes remain historical. Obtain the
-still-required fresh finite trial authorization before creating a distinct
-authorized scope; do not activate either inactive reference packet.
+driver was installed by that preparation. A distinct owner-authorized scope
+later performed the sole ordinary restart and readback; do not activate either
+inactive reference packet or replay the consumed trial.
 
-After an admitted observer boot, filtered map options will be evidence of
-options only. Effective mapping/coherency, external-writer ownership, native
+The later observer boot found `map_options=0x1` and the default cache option
+`0`. Effective mapping/coherency, external-writer ownership, native
 receipt/session/visibility, completion events, healthy teardown and actual
 GPU/FPS/latency/stability acceptance remain open in the [R3 ledger](BUILD34-R3-PLAN.md).
 See the [sanitized result](validation/build34-r3-map-candidate-offline-20261121.json).

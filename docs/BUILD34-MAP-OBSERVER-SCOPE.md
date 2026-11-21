@@ -8,10 +8,10 @@ The [native candidate](BUILD34-MAP-CANDIDATE.md), earlier experiments and all
 172 production inputs remain unchanged. Only default build34 is in scope.
 
 Subsequently the owner provided the fresh finite authorization. A distinct
-authorized scope is now installed and independently checked, pending its sole
-ordinary restart; the inactive packet described below is unchanged. See
-[the current trial checkpoint](BUILD34-MAP-OBSERVER-TRIAL.md). Its preboot checks
-are not actual observer boot or reader/coherency acceptance.
+authorized scope passed its sole ordinary restart and independent postboot
+readback; the inactive packet described below is unchanged. See
+[the trial result](BUILD34-MAP-OBSERVER-TRIAL.md). The observed mapping options
+do not establish reader/coherency acceptance.
 
 ## Exact scope and startup admission
 
@@ -106,13 +106,12 @@ authorization or activated through an old controller. The subsequently received
 fresh authorization was used to create a distinct scope for this exact observer,
 one ordinary restart, bounded existing accelerated startup and metadata read,
 with at most one startup-failure recovery restart and zero daily recovery power.
-The installation and independent preboot readback have passed. Preserve failed
-evidence and do not add a GPU pressure test to this metadata trial. Consumed
-installation/restart scopes remain consumed; inspect durable intent before any
-restart action.
+Installation, preboot and postboot readback passed without an automatic
+recovery restart or added GPU pressure test. The ordinary restart grant is
+consumed. Preserve the inactive scopes and do not replay the request.
 
-Even a successful observer boot closes only the mapping-options observation
-step. Effective cache/coherency and external-writer drain, native session and
+The successful observer boot closes the mapping-options observation step.
+Effective cache/coherency and external-writer drain, native session and
 Mesa binding, exact CPU-fence visibility, completion notifications, healthy
 service/resource reclamation, dual-queue correctness and measured performance/
 stability remain open in the [R3 ledger](BUILD34-R3-PLAN.md).

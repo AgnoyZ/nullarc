@@ -6,9 +6,11 @@ entire control bundle, confirms the existing boot loading route and seals
 inactive recovery references. A subsequent
 [compatible startup/recovery adapter](BUILD34-MAP-OBSERVER-SCOPE.md) now has a
 separately verified inactive scope with a false new-trial grant. The later
-[fresh authorized trial](BUILD34-MAP-OBSERVER-TRIAL.md) is installed and
-independently checked, awaiting its single ordinary restart. The source-only results below remain
-their original evidence level; the full R3 experiment is not a candidate.
+[fresh authorized trial](BUILD34-MAP-OBSERVER-TRIAL.md) independently verified
+observer loading and desktop takeover after one restart. It observed
+`map_options=0x1` and the default cache option `0` on the 256 MiB BAR0 mapping.
+The source-only results below remain their original evidence level; the full
+R3 experiment is not a candidate.
 
 November 21, 2026 original source-only checkpoint: this is a small observation prerequisite for the
 [trusted fence reader](BUILD34-FENCE-READER.md), not an admitted reader or
@@ -134,10 +136,9 @@ test feeds actual oversized XML input to the decoder. This is test setup
 evidence, not an installed-driver/GPU failure. The complete native/CPU run
 passes in its first private output directory.
 
-Rollback is to stop deriving this insertion; there is no installed change
-to undo. To obtain real mapping observations, first admit a minimal native
-observation candidate through the actual build34 loading route with exact
-source/ABI/artifact and compatible recovery checks. Do not install the full
+For this original source-only checkpoint, rollback is to stop deriving the
+insertion. The later observer trial used the actual build34 loading route with
+exact source/ABI/artifact and compatible recovery checks. Do not install the full
 quarantining R3 experiment for this purpose, replay an old trial, change cache
 modes/add aliases, or convert observed options alone into fence correctness.
 Initial external-writer ownership, coherent dword visibility, native protocol,
