@@ -54,6 +54,7 @@ test: $(TESTS)
 	python3 -B tests/test_build34_map_candidate.py
 	python3 -B tests/test_build34_map_observer_host.py
 	python3 -B tests/test_build34_exact_bootstrap_launcher.py
+	python3 -B tests/test_build34_exact_bootstrap_once.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \

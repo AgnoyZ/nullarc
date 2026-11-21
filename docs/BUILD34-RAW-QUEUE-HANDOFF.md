@@ -350,6 +350,37 @@ prove the initial MES/CP/HQD state, or prove safe hardware queue teardown.
 The observed command marker is separate from cache visibility and from both
 the Compute and GFX fence domains. Exact native fence reads remain unbound.
 
+## Reserving the staged initializer before GPU access
+
+The raw-writer gate closes at adoption. Two launcher workers can otherwise
+reach `bringup5.sh`, GART or MES setup before either worker reaches that gate.
+`tools/build34_exact_bootstrap_once.py` derives the staged `full.sh` and
+`bringup5.sh`. The outer script requires root, the dual-queue `kiqsched` route
+with CSB enabled, and an external recovery acknowledgment file. It validates
+the `kern.bootsessionuuid` format and atomically creates a directory named
+for that boot under a preprovisioned root-owned, mode `0700` state directory.
+The reservation precedes `bringup5.sh`. A second worker, malformed boot ID,
+or missing/invalid state refuses before the first device command. The
+reservation stays consumed after success, failure, or interruption. The
+staged scripts leave both reboot scheduling and cancellation to the external
+supervisor and preserve the original build34 layout admission in `bringup5.sh`.
+
+The acknowledgment file is a prerequisite, not a supervisor liveness check.
+A future sealed controller must bind its receipt and state directory to the
+current scope, and it must route all initialization through this entrypoint;
+direct `bringup5.sh`, `mesboot`, and debug writes before adoption can bypass
+the reservation. A new boot identity allows a new reservation, but cannot
+prove that prior MES/CP/HQD, PSP, or SMU writers stopped touching reused
+addresses. Do not remove a reservation to retry a partial same-boot run.
+
+The CPU shell suite exercises the derived scripts with synthetic boot IDs,
+real temporary `mkdir` reservations, and command stubs. It covers competing
+workers, same-boot replay, a new boot ID, partial failure, interruption,
+missing supervision, and layout admission. It is part of `make test`. No
+live state directory was created and no production or installed script was
+changed. Roll back the offline stage by omitting the transform. A future
+live trial would require the scope's sealed rollback and recovery plan.
+
 ## Checking deferred matches at accelerator start
 
 The previous producer's successful marker can outlive both queue generations.
