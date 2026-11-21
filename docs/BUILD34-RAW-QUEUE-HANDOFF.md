@@ -312,6 +312,53 @@ nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_claim_lifecycle.py 
   --out build/build34-r3-claim-lifecycle-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
 ```
 
+## Checking deferred matches at accelerator start
+
+The previous producer's successful marker can outlive both queue generations.
+The CPU fixture runs the previous claim, the actual staged sleep/wake methods,
+and the previous PhxAccel start gate in that order. PhxAccel still reaches its
+family start with both native queues invalidated.
+
+The paired `tools/build34_exact_claim_consumer.py` transform uses a distinct
+marker in PhxBringup, PhxAccel and its matching personality. Neither staged
+side admits a mixed pairing using the old key. The producer issues one claim
+per service instance for a specific PCI device, epoch, and pair of queue
+generations. The property is a matching hint; it cannot admit start while the
+producer is still arming the claim or after the claim becomes stale. Claim
+requests asynchronous matching with no GPU lock held. A repeated explicit
+claim can retry matching on a still-current ticket, without publishing a new
+marker. The paired personality and executable must be used together.
+
+PhxAccel obtains a retained PhxBringup sibling by category from the exact PCI
+device and checks its class and provider. A kernel-only, nonwaiting platform
+call uses the service callback gate and tries the GPU lock once. It compares
+the device, lifecycle epoch and both live generations. PhxAccel checks before
+family start and again against the same retained sibling before its own
+publication. If the second check refuses after a successful family start, it
+calls family stop and returns false. No wait for firmware or a global service
+lookup is added to matching. The family stop behavior is modeled on the CPU;
+it is not a native teardown result.
+
+The [offline result](validation/build34-r3-claim-consumer-offline-20261121.json)
+records 205 checks under each sanitizer, five synchronized interleavings and
+five rejected broken variants. The complete preceding and proposed driver and
+accelerator sources compile as nonloadable x86_64 objects. PhxBringup adds
+`IOLockTryLock`; the two new accelerator imports and the new driver import
+resolve through already-declared KDK providers. The production personality,
+all 172 production inputs, and installed state remain unchanged. Omit the
+paired transform to roll it back.
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_claim_consumer.py \
+  --out build/build34-r3-claim-consumer-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+This refuses observed stale starts; a lifecycle transition can still follow
+the last check. It does not revoke the marker on every later state change,
+detach an already started accelerator, or bind the existing proxy-client
+lookup to the retained sibling. There is no native IOKit scheduling or family
+unwind acceptance, old-writer drain, fence visibility, or GPU validation.
+
 ## Validation and remaining audit
 
 The [sanitized result](validation/build34-r3-raw-handoff-offline-20261121.json)

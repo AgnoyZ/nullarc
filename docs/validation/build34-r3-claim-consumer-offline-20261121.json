@@ -1,0 +1,58 @@
+{
+  "status": "passed-staged-accelerator-claim-admission",
+  "kernel_build": 34,
+  "frozen_input_count": 283,
+  "new_input_sha256": {
+    "docs/validation/build34-r3-claim-lifecycle-offline-20261121.json": "e1ad59db5dea01d3f852ed106772e67c58eca52582d48567f741731a2344a63c",
+    "tests/test_build34_exact_claim_consumer.cpp": "aef666607fc5ca8b9e2810bcb3d900296ecd9ea1a13501946bd6647f726da7b4",
+    "tools/build34_exact_claim_consumer.py": "29884d0550c7c18991ff33fafbb9b6ded2752c61a1ae62fb23b4a4aeae465a92",
+    "tools/test_build34_exact_claim_consumer.py": "9fdd3b4f57c9b9dbc6f2b8f907c4376a2687ed0ef99a3209934aabb797cbc863"
+  },
+  "production_inputs_unchanged": 172,
+  "preceding_driver_sha256": "42e7a16692b1a370123f504e1cc04ece632c2dd2908b230148326f59d54dd84e",
+  "staged_driver_sha256": "3242cc8b6f61acc5c27dc8a0e2e50e5907ba8fd4ae48fb19b66e7bfaa8e30b0a",
+  "staged_accel_sha256": "3913cbbbed913a1f7267ebe0830e0f928d5cb375353afb7fcad745b7ded043a6",
+  "staged_personality_sha256": "7edfaabdfd677e12d2edf4a0fb0cd1a676f86f5c1fab74cede357a1e90ece307",
+  "old_delayed_match_checks": 12,
+  "paired_checks_each_sanitizer": 205,
+  "synchronized_scenarios": 5,
+  "broken_variants_detected": [
+    "wrong_pci",
+    "wrong_epoch",
+    "wrong_generation",
+    "skip_post_start",
+    "ignore_endpoint_refusal"
+  ],
+  "PhxBringup_imports": [
+    376,
+    377
+  ],
+  "added_PhxBringup_imports": [
+    "_IOLockTryLock"
+  ],
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "full_driver_object_sha256": [
+    "413d877920fac4a228dc9a92ff5501bbf301ae86bbf54bda7670fbc8b77209db",
+    "f6c784d295a5216321cc5392adc343c5cf703dc110ec7b303e641983f3c8c926"
+  ],
+  "accelerator_object_sha256": {
+    "prior": "1c85abd33e7421c03fb32f3c163b81c4b8c727770cf361e43553962b8b279c88",
+    "paired": "6f56727fb434088a124842686731eff6b2bdc3618eaaf2ca3c44d2495de0d30a"
+  },
+  "accelerator_added_imports": [
+    "__ZNK15OSMetaClassBase8metaCastEPK8OSSymbol",
+    "__ZNK9IOService10isInactiveEv"
+  ],
+  "accelerator_added_imports_have_existing_declared_KDK_provider": true,
+  "accelerator_compiler_warning_count": 0,
+  "native_object_only": true,
+  "IOKit_opened": false,
+  "GPU_executed": false,
+  "installed": false,
+  "attached_accelerator_lifetime_proved": false,
+  "external_writer_drain_proved": false,
+  "native_reader_bound": false,
+  "R3_complete": false
+}
