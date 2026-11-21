@@ -308,3 +308,8 @@ test-build34-exact-close:
 test-build34-exact-cpu-fences:
 	@test -n "$(EXACT_CPU_FENCES_OUT)" || (echo "Set EXACT_CPU_FENCES_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_cpu_fences.py --out "$(EXACT_CPU_FENCES_OUT)"
+
+.PHONY: test-build34-exact-watchdog
+test-build34-exact-watchdog:
+	@test -n "$(EXACT_WATCHDOG_OUT)" || (echo "Set EXACT_WATCHDOG_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_watchdog.py --out "$(EXACT_WATCHDOG_OUT)"

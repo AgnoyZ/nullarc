@@ -26,7 +26,7 @@ independent remote SHA check.
 | Trusted device fence observation | Primary-source review, 189,198-check window primitive and 43,251-check staged adoption/shared-submit/ring-space/observer integration; raw-dword reader is null | Establish actual mapping/device coherency and queue ownership/drain, audit global-retirement/watchdog/VM consumers, prove wide-gap recovery and obtain native/GPU evidence; see `BUILD34-FENCE-READER.md` |
 | Native protocol and receipt lifetime | Internal wait-pinned ACK, actual-Mesa bounded completion cache, and staged complete-token structure submit/wait/ACK dispatch pass CPU sanitizers; experimental selectors 64/65/66 have no production mode/capability or Mesa wire binding | Complete native capability/session and production exact-submit admission, independent genuine global-prefix/visibility and CPU-fence protocol, paired binding and caller backpressure/error integration; caller-quiescent transport destroy is still required |
 | Resource and object teardown | Source-only owned VM/BO cleanup and conditional legacy/exact close pass CPU tests; exact publication bounds survive ACK and a bounded multi-pending legacy CPU-fence ledger publishes checked prefixes before handle reuse; admission pins precede slot publication, checked VM release precedes BO cleanup, and the actual timer dispatch serves a bounded shared reaper; service permanent quarantine remains | Prove native BO/object/callback/thread-call lifetimes, cache/CPU visibility, page walk/ACK and stop/unload; finish healthy service drain and the paired exact CPU-fence protocol; conditional client reclamation still needs native/GPU evidence, while uncertain/lost work remains quarantined |
-| Watchdog and controlled recovery | Source audit finds the unchanged hangCheck reading raw two-dword fences/history outside gpuLock before later lock acquisition by recovery; no new native fault was observed | Use checked serialized observation and current target/VM generation, preserve recovery ownership and terminal invalidation, and audit actual timer/stop/unload before service reclamation; no blind release or new adoption may masquerade as old-work drain |
+| Watchdog and controlled recovery | Source-only actual watchdog/submit tests reproduce unlocked observation and SQ after RLC timeout in the preceding methods; the later checked stage binds pending context allocations, holds the GPU lock through recovery, invalidates normal completion, bounds ready-only RLC attempts and separates diagnostic old-generation observation | Prove native coherent reads, RLC ACK freshness/recovery semantics, external old-writer ownership and callback/mapping/timer/stop lifetimes; diagnostic completion cannot clear a fault, retire resources or turn a new adoption into old-work drain; see `BUILD34-WATCHDOG.md` |
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
 | Frozen native integration | No R3 native candidate | Complete entrypoint/VM audit, actual SDK compile, exact build34 provenance and paired runtime/ABI validation without weakening existing build34 admission |
 | Hardware acceptance | None for R3 | Fresh compatible finite recovery scope; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
@@ -121,6 +121,15 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    their native visibility protocol is unimplemented. This stage does not prove
    native cache visibility, actual caller retry progress or healthy service
    teardown; its audit also leaves checked watchdog/recovery integration open.
+   A later [checked watchdog stage](BUILD34-WATCHDOG.md) now records pending
+   allocation identity, serializes actual observation/selection/recovery and
+   retains one bounded targeted-then-global episode. Ordinary queues are
+   invalidated before recovery writes, adoption refuses sticky faults, and a
+   separate checked old-generation diagnostic can only stop escalation. RLC
+   timeout/observed close prevents SQ and every entered safe mode gets its
+   paired exit. Native ACK freshness, mapping/old-writer ownership, recovery
+   semantics and service/timer teardown still require independent evidence;
+   CPU recovery never promotes receipts or authorizes resource reclamation.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete
