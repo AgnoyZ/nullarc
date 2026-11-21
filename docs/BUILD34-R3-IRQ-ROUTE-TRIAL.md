@@ -37,7 +37,8 @@ continues to use its existing waits. No event backend is bound.
    enable bits, equal IH pointers, an empty queue or a successful bootstrap
    sentinel are insufficient. If an owner cannot provide a verified handoff
    or the existing display path cannot be preserved, stop before registration.
-   See [initial queue ownership](BUILD34-INITIAL-QUEUE-OWNERSHIP.md).
+   This gate remains open after the [ownership review](#ih-ownership-review).
+   See also [initial queue ownership](BUILD34-INITIAL-QUEUE-OWNERSHIP.md).
 3. **Correlate one queue at a time.** After both gates pass and an exact
    isolated build is authorized, use private allocations outside daily
    queue, fence and IH storage with a fresh queue epoch and writeback value
@@ -60,6 +61,50 @@ continues to use its existing waits. No event backend is bound.
    and handles [ring overwrite](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L407-L435).
    These are reference semantics. No Linux or Apple implementation code is
    copied. Visibility of IH entries does not imply visibility through BAR0.
+
+## IH ownership review
+
+On November 21, 2026, two passive registry snapshots of the running PCI
+observer boot agreed on the direct children of the Radeon `1002:1900`
+provider. `PhxBringup`, `PhxAMDFB` and `NMXAccel` each matched a direct
+service query; two other direct children remained unattributed. The queries
+did not identify all services, firmware or platform components that can
+program the IH or consume its entries. The software VBL timer and startup
+PCI message-enable result do not close that gap. No new MMIO, interrupt
+registration, power action or GPU submission was performed for this review.
+
+The pinned Linux v6.12 reference selects
+[IH v6 for OSSSYS 6.0.1](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c#L1879-L1910).
+Its [APU path allocates the primary hardware ring only](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L571-L614);
+the separately initialized software ring is not an alternate hardware ring.
+Do not presume an available private second hardware ring for EOP. The same
+driver registers [VM fault sources](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c#L773-L784).
+An EOP-only filter does not justify taking the primary ring or discarding
+other vectors. These are Linux reference paths; they do not establish
+routing on the running macOS stack.
+
+Linux's [ring disable clears the pointers](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L127-L189);
+the [IRQ shutdown](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L412-L421)
+uses a fixed delay. Its [IH idle and soft-reset callbacks](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L661-L677)
+are placeholders. None supplies a checked acknowledgment that old ring and
+writeback DMA can no longer land. The public
+[`IH_STATUS` field definitions](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/asic_reg/oss/osssys_6_0_0_sh_mask.h#L310-L350)
+name input, buffer and memory-write idle and cleanup-pending states. They
+do not specify read side effects, the required power/mapping state or when
+the fields prove that already issued writes have finished.
+
+An admitted handoff must account for the predecessor, every source that can
+still target the selected ring and every consumer that can acknowledge it.
+Bind the ring, pointer writeback storage, address translation and doorbell
+range to that same ownership interval. Require a documented way to stop new
+entries and confirm completion of old storage writes before clearing pointers,
+moving mappings or freeing memory. Separately drain CPU callbacks and preserve
+unrelated event delivery. If using a verified reset instead, establish its
+coverage and prevent the platform or firmware from rearming inherited state
+before the new owner takes control. Until either boundary is proven, keep IH
+reads out of the startup observer and leave the live IRQ path untouched. Any
+later diagnostic read needs its own verified address, side-effect and
+power/mapping contract; a diagnostic idle sample cannot authorize a handoff.
 
 ## Stop, rollback and later acceptance
 

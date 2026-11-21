@@ -45,6 +45,26 @@ the shell reservation covers only the paired `full.sh` entrypoint. Writing
 the selector to sample HQDs is itself a device write. Do not add that sequence
 to the accepted passive BAR observer or run it on the active desktop.
 
+## Interrupt ring ownership at startup
+
+The [corrected PCI observer](BUILD34-PCI-IRQ-TRIAL.md#corrected-trial-passed-startup-observation)
+samples before build34 enables PCI bus mastering and memory decoding, but it
+does not prove what ran before `PhxBringup::start()`. A later passive topology
+check still leaves the inherited IH owner and pending writes unknown. During
+bootstrap, `mesboot` also supplies an OSSSYS base and queue resource data to
+MES. That does not establish whether the firmware accesses IH and cannot
+exclude it from the ownership review. A gate added in the startup shell or
+at queue adoption is too late to establish an exclusive first device writer.
+
+The [IH review](BUILD34-R3-IRQ-ROUTE-TRIAL.md#ih-ownership-review) found no
+verified drain boundary for the primary ring. Include the IH ring, pointer
+writeback and read-pointer doorbell in the first-writer review alongside
+PSP, GART and the command queues. Prove either a handoff from the identified
+predecessor or a reset whose documented scope covers those writers and their
+outstanding writes. Fresh fence storage, a new boot ID or a masked PCI route
+cannot prove that inherited writes to ring storage have stopped. Keep the
+native reader and event backend unbound while these conditions remain open.
+
 ## Offline indexed observation transaction
 
 `tools/build34_exact_hqd_observation.py` derives an internal method from the
