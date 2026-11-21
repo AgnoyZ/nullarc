@@ -46,6 +46,50 @@ headers and the IOPCIFamily file an APSL 1.1 header. This was a read-only design
 review, not a conclusion that all upstream components have the same licence.
 The existing repository licence files and notices remain unchanged.
 
+## Default-cache path on the tested x86_64 build
+
+The current passive read on macOS `26.7.2 (25G332)` reproduced BAR0 size
+256 MiB, map options `0x1`, and cache field `0`. A local comparison matched
+the running kernel's reported UUID to the x86_64 25G332 KDK kernel; only
+the match result and the KDK file digest are recorded. The KDK analysis
+describes the implementation, not the state of a live mapping.
+
+- In the pinned XNU [physical descriptor path](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L530-L555),
+  `memoryReferenceCreate` can resolve a physical descriptor's default cache
+  through `IODefaultCacheBits` and store that selection in the descriptor's
+  flags. The [x86 pmap code](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/osfmk/i386/pmap_common.c#L67-L81)
+  distinguishes I/O, write-combining, and copyback using physical-page
+  attributes. This is policy for a physical page, not a readback of the
+  effective memory type of a particular virtual mapping.
+- After successful pager population on the default-option branch,
+  [`doMap`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L5117-L5129)
+  ORs the unshifted descriptor cache enum into the mapping's options. The
+  KDK object shows the same write, and `getMapOptions()` reads the stored
+  options. In [`IOMapTypes.h`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/IOKit/IOMapTypes.h#L37-L63),
+  `kIOInhibitCache` and `kIOMapAnywhere` each have value `1`, while the
+  explicit mapping cache field starts at bit 8. Thus `0x1` can be observed
+  both without a cache override and after that branch merged an inhibit
+  cache enum. The observer's zero cache field cannot distinguish those
+  cases or report effective PAT/MTRR state.
+- The five declared KDK kernel-resource interfaces plus IOPCIFamily do not
+  offer `IODefaultCacheBits`, `pmap_cache_attributes`,
+  `pmap_get_cache_attributes`, `IOMapPages`, or `IOProtectCacheMode`, even
+  though the KDK kernel defines those symbols. IOKit offers
+  `getMapOptions`, `getMemoryDescriptor`, and `getFlags`. The last returns
+  descriptor flags, which could clarify a policy decision but would still
+  not verify effective page attributes or GPU write visibility. No new
+  observer or reboot is justified just to read that field.
+
+The [sanitized review](validation/build34-r3-bar0-default-cache-20261121.json)
+records the scoped passive read and static checks. Keep the current BAR
+mapping and its display aliases unchanged. For BAR0 admission, require
+evidence for the effective memory type and an independent gfx1103 fence
+visibility test, including payload visibility and both queues. If these
+cannot be established for the existing mapping, evaluate isolated
+writeback storage separately and audit its CPU mapping, GPU address and
+ownership before proposing a trial. Neither route clears the earlier
+PSP/GART/IH/queue drain requirements.
+
 ## Build34 facts and limits
 
 The frozen production file `src/phxbringup/PhxBringup.cpp` has SHA256
