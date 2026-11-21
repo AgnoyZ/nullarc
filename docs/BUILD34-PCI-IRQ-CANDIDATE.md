@@ -38,10 +38,8 @@ unchanged and generic public-KPI/AuxKC admission is still refused. No binary,
 SDK, EFI data, raw collection data or UUID is published. See the
 [sanitized result](validation/build34-r3-pci-irq-candidate-20261121.json).
 
-Before requesting a trial grant, build and test an inactive controller for
-these exact image hashes. Its restore target is the current mapping-only
-bundle and current recovery jobs, not the older pre-mapping R1b executable.
-Verify the full preflight manifest and only one prospective executable change,
-bound startup and independent recovery, and use an unconsumed boot receipt.
-Do not replay the earlier mapping-observer scope. Passing this private build
-stage supplies neither real MSI/MSI-X readings nor R3 hardware acceptance.
+The subsequent [inactive scope](BUILD34-PCI-IRQ-SCOPE.md) has passed independent
+preflight and restore readback. It retains the current mapping-only image and
+current recovery jobs. A distinct boot scope still requires a fresh grant.
+Passing either private stage supplies neither real MSI/MSI-X readings nor R3
+hardware acceptance.

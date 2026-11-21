@@ -53,6 +53,7 @@ test: $(TESTS)
 	python3 -B tests/test_build34_map_observation.py
 	python3 -B tests/test_build34_pci_irq_observation.py
 	python3 -B tests/test_build34_pci_irq_candidate.py
+	python3 -B tests/test_build34_pci_irq_scope.py
 	python3 -B tests/test_build34_map_candidate.py
 	python3 -B tests/test_build34_map_observer_host.py
 	python3 -B tests/test_build34_exact_bootstrap_launcher.py
