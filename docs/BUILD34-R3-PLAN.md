@@ -30,6 +30,7 @@ independent remote SHA check.
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
 | Frozen native integration | The complete latest public-timer stage compiles to a nonloadable x86_64 object with the pinned SDK; all 376 imports resolve in the six existing declared KDK providers after kernel-resource interface/reference/alias validation, and the prior private cancellation import is removed; no R3 native candidate | Finish actual IOKit/platform/module lifecycle, entrypoint/VM audit, reader/protocol/drain integration, exact build34 provenance and paired runtime/ABI/collection inclusion without weakening admission; static compilation/provider resolution alone is insufficient; see `BUILD34-PUBLIC-SERVICE-TIMER.md` |
 | Raw-debug/queue handoff and paired bootstrap | Latest source stage gives eleven raw mutators exclusive transactions/service leases and two readers service leases, latches one-shot disjoint queue adoption, and defers both existing bootstrap adoption calls until raw setup ends; 1,063 ASan/UBSan and TSan driver checks, 28 bootstrap checks, 40 rejected broken variants and complete original/proposed driver/bootstrap object compiles pass, with the same 376 driver imports | Establish initial external queue/firmware writer ownership/drain, actual mapping/visibility and bootstrap progress/errors; finish platform/factory/claim/native lifetimes and healthy service cleanup; the gate is not GPU drain and unchanged production bootstrap is incompatible with this staged handoff; see `BUILD34-RAW-QUEUE-HANDOFF.md` |
+| Native factory and configured discovery | Latest composed stage leases construction, refuses observed closed starts without returning clients, retains uncertain pins, atomically publishes configured discovery and removes the sysctl flag's plain precheck; 238 ASan/UBSan and TSan checks/18 groups/nine threaded scenarios, 16 rejected broken variants, the preceding 1,063-check raw-handoff suite on new source and complete native object/provider checks pass | Finish native platform/factory final handoff, PCI claim/matching, sysctl/module teardown and healthy reclamation; configured discovery is not live health/drain, final check is not atomic with stop, and reader/protocol/event/hardware requirements remain; see `BUILD34-NATIVE-FACTORY.md` |
 | Hardware acceptance | None for R3 | Fresh compatible finite recovery scope; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
 
 The ledger records evidence levels, not a count of tests as a substitute for
@@ -174,6 +175,17 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    lifecycle, native mapping/coherency, healthy service cleanup, protocol/events
    or GPU/performance/stability acceptance. See its sanitized evidence for the
    actual CPU, negative-variant and complete-object check results.
+   The next [native factory/configured discovery stage](BUILD34-NATIVE-FACTORY.md)
+   gives construction a service lease, refuses an observed closed start without
+   returning its client and preserves uncertain registration/provider pins.
+   Actual old getter/adoption methods reproduce a CPU TSan race; the proposed
+   getter uses atomic configured-queue publication without clearing it on
+   invalidation or allowing lost real work into E1 mock fallback. The factory's
+   global sysctl-once precheck is also made atomic. All other native methods,
+   the owned header, paired bootstrap and production inputs remain unchanged.
+   CPU references, finalization and timer readiness are models. Final handler
+   publication versus stop, full platform/PCI matching and native module/healthy
+   reclamation remain unaccepted, alongside reader/protocol/event/GPU evidence.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete

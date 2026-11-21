@@ -1,5 +1,17 @@
 # Project instructions
 
+- A further source-only R3 native-factory stage derives raw handoff. Whole
+  construction is leased, output is cleared, observed closure refuses start/
+  handler publication, and unexposed started clients use existing close before
+  initial-reference release while uncertain registration/provider pins remain.
+  Configured-queue discovery uses a monotonic atomic mask, never live health or
+  GPU drain; do not clear it on faults/sleep/stop and reopen E1 mock fallback.
+  The global sysctl-once precheck is atomic. Native reader/mode, service/GPU
+  quarantine, prior methods/paired bootstrap and all production inputs/settings
+  stay unchanged. Complete platform/factory final publication, PCI matching,
+  native lifetimes and GPU/FPS/stability remain unaccepted; no kernel candidate
+  or deployment is authorized. See `docs/BUILD34-NATIVE-FACTORY.md` and R3 ledger.
+
 - The latest source-only R3 raw handoff derives the public-timer stage. Eleven
   raw mutators hold exclusive service-wide transactions plus service callback
   leases; two diagnostic readers hold service leases. Queue adoption closes

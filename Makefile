@@ -342,3 +342,11 @@ test-build34-exact-raw-handoff:
 	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
 	@test -n "$(EXACT_RAW_HANDOFF_OUT)" || (echo "Set EXACT_RAW_HANDOFF_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_raw_handoff.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_RAW_HANDOFF_OUT)"
+
+# Native-factory CPU/native-object prerequisite only; no deployment or GPU work.
+.PHONY: test-build34-exact-factory
+test-build34-exact-factory:
+	@test -n "$(KERNEL_SDK)" || (echo "Set KERNEL_SDK to the reviewed SDK checkout"; exit 2)
+	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
+	@test -n "$(EXACT_FACTORY_OUT)" || (echo "Set EXACT_FACTORY_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_factory.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_FACTORY_OUT)"
