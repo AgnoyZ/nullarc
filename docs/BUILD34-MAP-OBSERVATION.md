@@ -1,5 +1,12 @@
 # Build34 R3 BAR0 mapping-observation preparation
 
+The subsequent [minimal native candidate step](BUILD34-MAP-CANDIDATE.md)
+privately builds only this insertion on exact accepted R1b, reproduces the
+entire control bundle, confirms the existing boot loading route and seals
+inactive recovery references. That observer is not installed or loaded and
+has no compatible trial controller yet. The source-only results below remain
+their original evidence level; the full R3 experiment is not a candidate.
+
 November 21, 2026: this is a small observation prerequisite for the
 [trusted fence reader](BUILD34-FENCE-READER.md), not an admitted reader or
 deployable R3 kernel. The installed driver/settings and all 172 production

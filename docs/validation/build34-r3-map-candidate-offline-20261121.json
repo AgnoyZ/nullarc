@@ -1,0 +1,216 @@
+{
+  "status": "built-private-map-observer-not-installed-or-hardware-accepted",
+  "source_checkpoint": "3d26409b1b151992d0dcaeb7093ce104a5c034dd",
+  "accepted_R1b_source_checkpoint": "194ce9098b34c9f48483ff0729a50b21c5ca0401",
+  "kernel_build": 34,
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "baseline_driver_sha256": "81f45aa2e8166bc6ebed4106129bebebfd70f9b4bbea6dbe389be46263e3c699",
+  "observer_driver_sha256": "9826065e11adc6ec7363459210704b685d1fc5df29758271ca674163254cd0c3",
+  "observation_transform_sha256": "ba9c8f9ff566a99f74646eaac8b2d72866b97d2d796b59e73cb8eadbce35ef4f",
+  "recipe_sha256": "e673ded9e43669bcc602d991216a89a25a734f164d3d4561e8f6b91f4951c094",
+  "prerequisite_evidence_sha256": "2c05a199efa4d3b0372b4bdf32282151b4d683be90a879ff2011016609526f52",
+  "input_sha256": {
+    "src/phxbringup/PhxBringup.cpp": "81f45aa2e8166bc6ebed4106129bebebfd70f9b4bbea6dbe389be46263e3c699",
+    "src/phxbringup/PhxNativeABI.h": "cb37e93dcab4faf8c9e672ad04793f2e363ae1e815c9913251cebcff5cd42c90",
+    "src/phxbringup/kmod_info.c": "b2aba9a49ad7cfccdacb168bb0b08a4f5b4ee1cb45d23ca0dc8d11d8ec4748f0",
+    "src/phxbringup/Info.plist": "05d17cf6d755730497021298d4f57153066d4d64228fdcf28e358b61a82375a5",
+    "src/phxbringup/build.sh": "70773880841f08640a178d127b162e52dbd59a448c07716ee4716143ab278ba9",
+    "src/amd/phx_topology.h": "28445bee8fc0f13a08aa52f114e4570ab6d6b8c068421dd10cf16023c06014d5",
+    "LICENSE": "02d7fa970640345480430e246356c99c23436800ef541d57e7217b1337793bf0",
+    "THIRD_PARTY_NOTICES.md": "8a89a2766c5b8076afbbfa631c42953230e096477e04399324b075370b9431d4",
+    "LICENSES/MIT.txt": "381b0b3a8bb7e1aa28502928f75e820339c5878e2bd95d18c25391647bc3c1fd",
+    "LICENSES/GPL-2.0-only.txt": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3"
+  },
+  "checks": [
+    {
+      "name": "baseline-build",
+      "returncode": 0,
+      "stdout_sha256": "8196fe6119009d06e963aff7ab68af0ef49d2527f48bbe42762db4de18303e8e",
+      "stderr_sha256": "006167dcae25f27b03622fccba8f3edece419112317623a02805fd8d633875af"
+    },
+    {
+      "name": "baseline-sign",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "baseline-signature",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "baseline-architecture",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "baseline-imports",
+      "returncode": 0,
+      "stdout_sha256": "1ec5cd4287480e3c3a15141a4c0e96d595f38d8866a37b6bca022b2a32ccdb56",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "observer-build",
+      "returncode": 0,
+      "stdout_sha256": "e2ef2e69669bab0815a1229f39541302bfc3e5cbbaa404571c3c8325e1b612ed",
+      "stderr_sha256": "3aa019edacb5d9b10172780f9b94ad322d8c0ae5a67ccc12b0b48a44c2ef481f"
+    },
+    {
+      "name": "observer-sign",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "observer-signature",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "observer-architecture",
+      "returncode": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "observer-imports",
+      "returncode": 0,
+      "stdout_sha256": "1ec5cd4287480e3c3a15141a4c0e96d595f38d8866a37b6bca022b2a32ccdb56",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "full_R3_transforms_included": false,
+  "reader_or_exact_mode_bound": false,
+  "installed": false,
+  "loaded": false,
+  "GPU_executed": false,
+  "power_actions": 0,
+  "deployment_admitted": false,
+  "fresh_scope_and_authorization_required": true,
+  "accepted_bundle_reproduced_byte_exact": true,
+  "sole_bundle_delta": "Contents/MacOS/PhxBringup",
+  "native_import_count": 375,
+  "import_set_unchanged": true,
+  "inherited_private_cancellation_preserved_not_newly_admitted": true,
+  "generic_public_KPI_or_AuxKC_admission": false,
+  "original_production_file_count": 172,
+  "production_unchanged": true,
+  "schema_version": 1,
+  "date": "2026-11-21",
+  "roles": {
+    "baseline": {
+      "binary_sha256": "0414c22119bad9526a33ec97bb56b9e7a8fd26320976cf24e0cb541d0d882d10",
+      "warnings": {
+        "declaration shadows a field of 'PhxBringup' [-Wshadow]": 3
+      },
+      "bundle_files": {
+        "Contents/Info.plist": {
+          "sha256": "aaeef27a947e0a2a70b358628ff21216a5edaf0a5d65f32651f8654cef654af7",
+          "bytes": 1644
+        },
+        "Contents/MacOS/PhxBringup": {
+          "sha256": "0414c22119bad9526a33ec97bb56b9e7a8fd26320976cf24e0cb541d0d882d10",
+          "bytes": 92240
+        },
+        "Contents/_CodeSignature/CodeResources": {
+          "sha256": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b",
+          "bytes": 2200
+        }
+      }
+    },
+    "observer": {
+      "binary_sha256": "923182fab482d5c584f484520622283922f67a9caaa2d310e638cd71d1fb1dc7",
+      "warnings": {
+        "declaration shadows a field of 'PhxBringup' [-Wshadow]": 3
+      },
+      "bundle_files": {
+        "Contents/Info.plist": {
+          "sha256": "aaeef27a947e0a2a70b358628ff21216a5edaf0a5d65f32651f8654cef654af7",
+          "bytes": 1644
+        },
+        "Contents/MacOS/PhxBringup": {
+          "sha256": "923182fab482d5c584f484520622283922f67a9caaa2d310e638cd71d1fb1dc7",
+          "bytes": 92240
+        },
+        "Contents/_CodeSignature/CodeResources": {
+          "sha256": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b",
+          "bytes": 2200
+        }
+      }
+    }
+  },
+  "CPU_unit_methods_passed": 7,
+  "default_test_passed": true,
+  "existing_optional_missing_firmware_fixture_skip_preserved": true,
+  "current_accepted_baseline": {
+    "status": "passed-independent-current-R1b-R2a-map-observer-parent-preflight",
+    "OS_version": "26.7.2",
+    "OS_build": "25G332",
+    "exact_accepted_R1b_loaded": true,
+    "exact_accepted_R2a_loaded": true,
+    "PhxBringup_collection": "boot",
+    "PhxBringup_not_in_system_or_auxiliary": true,
+    "full_EFI_files": 358,
+    "complete_cache_comparison_passed": true,
+    "exact_accepted_plugin_and_ACPI": true,
+    "fresh_current_boot_receipts": true,
+    "exact_jobs_and_recovery_inputs": true,
+    "same_WindowServer": true,
+    "finite_VBL_and_copy_progress": true,
+    "four_checked_errors": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "resident_monitor_enabled": false,
+    "driver_or_job_changes": 0,
+    "GPU_submissions": 0,
+    "power_actions": 0,
+    "new_mapping_candidate_loaded": false,
+    "raw_configuration_or_UUIDs_published": false
+  },
+  "inactive_artifact_packet": {
+    "status": "sealed-inactive-map-observer-artifacts-only",
+    "source_checkpoint": "3d26409b1b151992d0dcaeb7093ce104a5c034dd",
+    "kernel_build": 34,
+    "baseline_binary_sha256": "0414c22119bad9526a33ec97bb56b9e7a8fd26320976cf24e0cb541d0d882d10",
+    "observer_binary_sha256": "923182fab482d5c584f484520622283922f67a9caaa2d310e638cd71d1fb1dc7",
+    "before_EFI_files": 358,
+    "prospective_EFI_files": 358,
+    "sole_prospective_EFI_delta": "OC/Kexts/PhxBringup.kext/Contents/MacOS/PhxBringup",
+    "installation_authorized": false,
+    "compatible_startup_recovery_adapter_prepared": false,
+    "activation_files_staged": 0,
+    "journals_created": 0,
+    "live_driver_or_job_changes": 0,
+    "GPU_submissions": 0,
+    "power_actions": 0,
+    "sealed_file_count": 14
+  },
+  "independent_packet_readback": {
+    "status": "passed-independent-inactive-observer-artifact-packet-readback",
+    "sealed_files": 14,
+    "complete_bundle_pair_and_signatures": true,
+    "exact_retained_jobs_and_parent_contract": true,
+    "same_preparation_boot": true,
+    "baseline_still_loaded_observer_not_loaded": true,
+    "sole_prospective_EFI_executable_delta": true,
+    "live_driver_or_job_changes": 0,
+    "GPU_submissions": 0,
+    "power_actions": 0,
+    "activation_files_staged": 0,
+    "installation_authorized": false,
+    "compatible_startup_recovery_adapter_prepared": false,
+    "private_configuration_or_UUIDs_published": false
+  },
+  "R3_complete": false,
+  "physical_FPS_measured": false,
+  "long_term_stability_accepted": false,
+  "private_configuration_or_raw_UUIDs_published": false,
+  "public_binary_uploads": 0
+}

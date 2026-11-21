@@ -51,6 +51,7 @@ test: $(TESTS)
 	python3 -B tests/test_build34_present_copy.py
 	python3 -B tests/test_build34_present_copy_host.py
 	python3 -B tests/test_build34_map_observation.py
+	python3 -B tests/test_build34_map_candidate.py
 	@echo "=== Running RDNA 3 Driver Unit Tests ==="
 	@for t in $(TESTS); do \
 		echo "Running $$t..."; \
@@ -359,3 +360,10 @@ test-build34-map-observation:
 	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
 	@test -n "$(MAP_OBSERVATION_OUT)" || (echo "Set MAP_OBSERVATION_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_map_observation.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(MAP_OBSERVATION_OUT)"
+
+# Mapping-only observer on accepted R1b; offline build, no installation/GPU work.
+.PHONY: build-build34-map-candidate
+build-build34-map-candidate:
+	@test -n "$(KERNEL_SDK)" || (echo "Set KERNEL_SDK to the reviewed SDK checkout"; exit 2)
+	@test -n "$(MAP_CANDIDATE_OUT)" || (echo "Set MAP_CANDIDATE_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/build34_map_candidate.py --sdk "$(KERNEL_SDK)" --out "$(MAP_CANDIDATE_OUT)"

@@ -1,5 +1,24 @@
 # Project instructions
 
+- A subsequent R3 mapping-only native candidate now privately reproduces the
+  entire accepted R1b bundle byte-for-byte, then adds only the tested startup
+  metadata insertion. Observer executable SHA256 is
+  `923182fab482d5c584f484520622283922f67a9caaa2d310e638cd71d1fb1dc7`;
+  strict signatures, three unchanged warnings/375 imports and seven source/
+  manifest CPU methods pass. Fresh independent current baseline readback
+  confirms exact R1b in boot (not system/AuxKC), exact R2a/plugin/AML, complete
+  EFI/cache/jobs/recovery and finite zero-error desktop progress. This is
+  boot-route provenance, not a waiver of the inherited private cancellation
+  provider gap or generic public-KPI/AuxKC admission. Fourteen root-sealed
+  inactive artifact/reference files and signatures pass independent readback;
+  they include current R1b/R2a-compatible job backups and no active controller,
+  journal, installer, launch job or power/GPU dispatcher. Candidate remains
+  uninstalled/unloaded; all production/prior inputs and installed settings
+  remain unchanged. Next prepare/test a distinct compatible startup/recovery
+  scope before requesting any still-required fresh trial authorization; do not
+  replay old controllers or install the full quarantining R3 stages. See
+  `docs/BUILD34-MAP-CANDIDATE.md` and the continuing R3 ledger.
+
 - R3 now has a separate source-only BAR0 map-option observation prerequisite.
   Exact accepted R1b production source/recipe/licence inputs and its retained
   reference artifact are checked. One startup insertion publishes raw mapping
