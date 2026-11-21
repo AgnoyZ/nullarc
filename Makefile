@@ -303,3 +303,8 @@ test-build34-exact-legacy-close:
 test-build34-exact-close:
 	@test -n "$(EXACT_CLIENT_CLOSE_OUT)" || (echo "Set EXACT_CLIENT_CLOSE_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_close.py --out "$(EXACT_CLIENT_CLOSE_OUT)"
+
+.PHONY: test-build34-exact-cpu-fences
+test-build34-exact-cpu-fences:
+	@test -n "$(EXACT_CPU_FENCES_OUT)" || (echo "Set EXACT_CPU_FENCES_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_cpu_fences.py --out "$(EXACT_CPU_FENCES_OUT)"
