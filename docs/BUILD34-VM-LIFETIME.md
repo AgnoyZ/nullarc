@@ -174,3 +174,41 @@ the cleared tables, actual page walk, external writer drain or native BO
 release safety. All 172 production inputs are unchanged. This is a separate
 source-only prerequisite, not an admitted kernel candidate. Rollback is to
 leave this transform unapplied; nothing was installed or loaded.
+
+## Follow-up: table-chunk allocation
+
+On November 22, 2026, a CPU fixture exercising the actual software-table
+methods found that `ptTablePhys` could zero an unusable CPU mapping or publish
+a chunk without checking the extent of its first physical segment. In the
+zero-base case a nonzero page offset could even produce a nonzero result.
+These are modeled bad allocation results, not failures observed from macOS.
+
+The [isolated transform](../tools/build34_exact_vm_chunk.py) derives the
+post-clear detach stage and changes only `ptTablePhys`. Before clearing or
+publishing a new 64 KiB chunk it requires a CPU mapping, descriptor length
+and a single returned segment covering the chunk. The base and last 4 KiB
+frame must fit the existing PTE mask. Failure releases only the unpublished
+descriptor. Accepted chunks are still zeroed and flushed before publication.
+The pinned public XNU [implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L5850-L5855)
+uses the same default `getPhysicalSegment` lookup for `getPhysicalAddress`;
+the staged call also requests the segment length. No XNU code was copied.
+
+The [CPU runner](../tools/test_build34_exact_vm_chunk.py) extracts the frozen
+staged context layout and actual `ptTable`, `ptTablePhys` and `vmPte` bodies.
+Seven old-path counterexamples cover absent CPU mapping, short descriptor
+or segment, zero or misaligned base, and base or extent outside the mask.
+Both sanitizers pass **2,143 checks each** in nine cases, including normal
+allocation failure, valid software walk and reuse, the last representable
+frame, and zero/flush before publication. See the
+[sanitized evidence](validation/build34-r3-vm-chunk-offline-20261122.json).
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_vm_chunk.py \
+  --out build/build34-r3-vm-chunk-new-private
+```
+
+The descriptor, address segment and cache operations are CPU doubles. This
+does not establish the live mapper address, GPU page walk or cache visibility,
+native ACK freshness, or old-writer drain. It does not build or admit a
+kernel candidate. All 172 production inputs are unchanged; rollback is to
+leave the transform unapplied.

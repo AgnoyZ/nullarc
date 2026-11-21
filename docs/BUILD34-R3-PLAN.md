@@ -222,6 +222,10 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    the busy context, hardware owner and BO backing behind the sticky VM gate.
    This closes one CPU ordering prerequisite only; fresh native ACK, page
    walk, writer drain and hardware-safe release remain unproved.
+   The [table-chunk allocation stage](BUILD34-VM-LIFETIME.md#follow-up-table-chunk-allocation)
+   next tests the actual software walker with CPU allocator doubles and
+   refuses invalid new chunk backing before clearing or publishing it.
+   It does not establish live mapper identity or GPU page-walk visibility.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete
