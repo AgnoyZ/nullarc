@@ -133,6 +133,48 @@ or drain of prior external GPU/firmware writers. The production bootstrap,
 driver and installed mapping observer are unaffected. Roll back the source-only
 stage by ceasing to derive it; no runtime rollback is needed.
 
+## Published PSP work without an acknowledgment
+
+In the later native factory stage, `pspRunCmd` can return a timeout in its
+output scalars after publishing a command. The raw callback lease then ends.
+`pspRing` also used to discard software ring state after an unacknowledged
+create or destroy. Neither callback return nor `clearRing()` cancels a
+published firmware request. The predecessor's actual methods allow adoption
+after all three failures in the CPU fixture.
+
+`tools/build34_exact_psp_uncertainty.py` derives the factory stage. An
+unacknowledged published create, destroy or command latches uncertainty and
+permanently closes raw writer admission for that service instance. An adoption
+that races the active raw callback still returns Busy without waiting under
+the GPU lock. After CPU drain, it checks the latch before setting either queue
+ready, advancing its generation or changing its fence bytes. Late readback
+does not clear the latch. The first command timeout still reports the existing
+sentinel in the scalar reply without reading unconfirmed PSP response fields;
+failed ring-control calls keep the ring address/metadata already recorded.
+An error status with a matching command fence remains distinct from a timeout.
+Failure of the readiness precheck before a create is not publication by that
+call and does not set the timeout latch.
+
+The [sanitized result](validation/build34-r3-psp-uncertainty-offline-20261121.json)
+records 10 predecessor checks, 61 checks each under ASan/UBSan and TSan,
+two synchronized adoption races and five detected deliberately broken
+variants. The entire old and new driver translation units compile to x86_64
+MH_OBJECT with the same 376 imports resolved against the existing KDK
+providers. All 172 production input files remain unchanged.
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_psp_uncertainty.py \
+  --out build/build34-r3-psp-uncertainty-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+This guard excludes one known uncertain path; a clear latch is not an
+affirmative hardware drain proof. The tested PSP response and MMIO behavior
+are CPU doubles. Actual response freshness/coherency, SMU and raw mailbox
+writers, queue-engine work, service lifetime and the checked bootstrap's
+launcher-to-claim status propagation still require review. The reader remains
+unbound and no installed change was made. Roll back by ceasing to derive this
+isolated stage; do not clear the latch or retry the unknown firmware work.
+
 ## Validation and remaining audit
 
 The [sanitized result](validation/build34-r3-raw-handoff-offline-20261121.json)

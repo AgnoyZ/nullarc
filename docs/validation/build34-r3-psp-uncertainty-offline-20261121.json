@@ -1,0 +1,58 @@
+{
+  "status": "passed-PSP-uncertainty-CPU-and-native-object",
+  "kernel_build": 34,
+  "frozen_predecessor": "ff3ec08c030055d678fcf524e60dd06bdaaa877f9f4a0e840f37ea530f0df6df",
+  "staged_driver_sha256": "a6e8ca70964aa3f4408e85d074eb345ccd157501821155336105d230ea1681bf",
+  "frozen_input_count": 103,
+  "frozen_new_input_sha256": {
+    "docs/validation/build34-r3-factory-offline-20261121.json": "578e708a9dcbf326321390b7c29e94fba4a05fd49937361de75bde44ba511f33",
+    "tests/test_build34_exact_psp_uncertainty.cpp": "8b121017339bee674b2d58795d5e55403345bc7a08852e30730dc691125d1d90",
+    "tools/build34_exact_psp_uncertainty.py": "5a2c5d32a36292eb28b2f200e12b185c668dec63547cc72de138e061daf86878",
+    "tools/test_build34_exact_psp_uncertainty.py": "ed80937c2bed176d0d141a6a17b5ae541a49a97bd338ba83102819fb7d353651"
+  },
+  "checks": {
+    "prior_control": 10,
+    "checked_ASan_UBSan": 61,
+    "checked_TSan": 61
+  },
+  "assertion_mutations_detected": [
+    "no_raw_closure",
+    "no_adoption_veto",
+    "no_command_quarantine",
+    "no_create_quarantine",
+    "clear_despite_destroy_timeout"
+  ],
+  "production_inputs_unchanged": 172,
+  "GPU_executed": false,
+  "IOKit_opened": false,
+  "installed": false,
+  "external_writer_drain_proved": false,
+  "native_reader_bound": false,
+  "R3_complete": false,
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "native_object_sha256": {
+    "previous": "98e51da50cc53477ab76cbbd20460872081c35d6bf3e33a58f42910f85cc714c",
+    "proposed": "aa99067051eda6750fb05827560a35ba45901201d933d55d06a8fc75773257bf"
+  },
+  "native_import_count": 376,
+  "compiler_warnings": {
+    "previous": [
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "private field 'exactFenceReader' is not used [-Wunused-private-field]"
+    ],
+    "proposed": [
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "declaration shadows a field of 'PhxBringup' [-Wshadow]",
+      "private field 'exactFenceReader' is not used [-Wunused-private-field]"
+    ]
+  },
+  "all_native_imports_have_existing_declared_KDK_provider": true,
+  "native_import_set_unchanged": true,
+  "actual_complete_native_translation_units_compiled": true,
+  "native_object_only": true
+}
