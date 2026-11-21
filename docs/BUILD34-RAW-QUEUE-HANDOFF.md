@@ -210,6 +210,34 @@ include GPU work published through raw doorbells or queue-control registers.
 The staged bootstrap's result must also survive the launcher-to-claim path;
 the kernel guard and shell status are separate prerequisites.
 
+## Propagating bootstrap and accelerator claim failures
+
+The installed mapping observer's startup controller runs a sealed copy of the
+same two launcher commands as `tools/phxctl/phxboot.sh`, without the resident
+watcher. The outer controller checks the shell's exit status. However, the
+shell ignores `full.sh` failure after filtering its output and then ignores
+the status from `mesboot claim`. In the staged bootstrap, second-adoption
+failure can leave one queue configured. That suffices for the existing
+native `gpuReady()` claim condition. The existing build34 scalar wrapper
+already returns process status 74 for a failed claim selector.
+
+`tools/build34_exact_bootstrap_launcher.py` derives the source-only companion
+to the checked bootstrap. It preserves `full.sh`'s status independently of
+whether `grep` finds a diagnostic line and does not call `mesboot claim` on
+initializer failure. A failed claim returns its status before any subsequent
+desktop configuration. The derived script leaves the recovery marker and
+controller policy intact and introduces no power action. Neither installed
+launchers nor production source under `src/` or `tools/phxctl/` are edited.
+
+Six CPU tests reproduce the old fall-through and exercise the actual replaced
+fragment with process stubs for initializer and claim. Cases include status
+74/75/127, absent or nonmatching diagnostic output, claim refusal and valid
+success. Both the complete shell and its watcher-free form pass Bash syntax
+checks. These tests join `make test`; omit the transform to roll it back.
+Direct/manual claim and its native readiness, publication and stop ordering
+still need a separate guard and native lifetime review. A successful shell
+exit does not prove hardware drain or coherent fence visibility.
+
 ## Validation and remaining audit
 
 The [sanitized result](validation/build34-r3-raw-handoff-offline-20261121.json)
