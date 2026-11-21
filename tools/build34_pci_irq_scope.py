@@ -44,11 +44,20 @@ def protected_inputs():
 
 def live_control(prior):
     accepted = host.mapping.MappingObserverHost(prior)
+    boot = accepted.boot()
     d, k, c = accepted.readonly.build()
-    assert accepted.policy.startup_accepted(accepted.boot()) and not accepted.daily_failed()
+    assert accepted.policy.accepted_boot() is not None and not accepted.daily_failed()
     assert not Path(c['watcher_job']).exists()
     d.live_identity(k, desktop=True)
+    d.deployment.installed_checks(d, k)
+    receipts = []
+    for name in accepted.readonly.RECEIPTS:
+        path = accepted.root() / name
+        host.base.secure(path)
+        receipts.append(json.loads(path.read_bytes()))
+    accepted.readonly.validate_receipts(receipts, boot)
     host.verify_disk(d, k, c['Map_after_EFI_private'])
+    assert accepted.boot() == boot
     return accepted, c
 
 

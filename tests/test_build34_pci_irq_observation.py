@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 import plistlib
 import sys
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import build34_pci_irq_observation as obs
@@ -98,6 +100,28 @@ class PCIDescriptorTests(unittest.TestCase):
         self.phx[obs.START_CONFIG] = child[obs.START_CONFIG] = 'private-or-unrecognized'
         with self.assertRaises(ValueError):
             self.summarize()
+
+    def test_collect_requests_properties_for_pci_children_at_the_depth_boundary(self):
+        self.phx[obs.START_CONFIG] = self.pci[obs.CHILDREN][0][obs.START_CONFIG] = 'msi-enable-set'
+
+        def read(args, **kwargs):
+            if args[0].endswith('/sw_vers'):
+                data = {'-productVersion': b'26.7.2', '-buildVersion': b'25G332'}[args[-1]]
+            elif args[-1] == 'PhxBringup':
+                data = plistlib.dumps([self.phx])
+            else:
+                self.assertEqual(args[args.index('-d') + 1], '2')
+                # ioreg without -l gives this child an identity but no properties.
+                child = self.pci[obs.CHILDREN][0] if '-l' in args else {
+                    obs.CLASS: self.phx[obs.CLASS], obs.REGISTRY_ID: self.phx[obs.REGISTRY_ID]}
+                data = plistlib.dumps([{**self.pci, obs.CHILDREN: [child]}])
+            return SimpleNamespace(stdout=data)
+
+        with patch.object(obs.platform, 'system', return_value='Darwin'), patch.object(obs.subprocess, 'run', side_effect=read):
+            self.assertEqual(obs.collect()['start_time_config_classification'], 'msi-enable-set')
+            with patch.object(obs, 'PCI_QUERY', [arg for arg in obs.PCI_QUERY if arg != '-l']):
+                with self.assertRaisesRegex(ValueError, 'classification changed'):
+                    obs.collect()
 
     def test_duplicate_identity_is_refused(self):
         with self.assertRaises(ValueError):

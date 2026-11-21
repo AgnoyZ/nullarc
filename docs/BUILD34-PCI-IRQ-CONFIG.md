@@ -25,7 +25,9 @@ No Linux code is included.
 
 One versioned registry property carries only a fixed classification. The
 collector requires the same classification on the exact PhxBringup child
-in both PCI snapshots and the intervening service snapshot. Failed reads
+in both PCI snapshots and the intervening service snapshot. The provider
+queries use `ioreg -l` so the depth-limited child includes its properties;
+see the [first trial and recovery](BUILD34-PCI-IRQ-TRIAL.md). Failed reads
 or publication leave the classification unavailable. Both enable bits clear
 does not prove legacy INTx delivery, and a clear MSI-X function mask does not
 prove that an individual vector is unmasked. This records what the provider
@@ -53,7 +55,7 @@ nice -n 15 taskpolicy -b python3 -B tools/test_build34_pci_irq_config.py \
 The initial source-only verification did not link a kernel. The subsequent
 [private artifact build](BUILD34-PCI-IRQ-CANDIDATE.md) now reproduces the
 previously accepted mapping-only image and strictly verifies the new
-observation-only pair. Before a live read, prepare a distinct compatible
-startup/rollback scope for those exact images; the previous trial's spent
-boot grant is not reused. A good startup sample would only close the first
-observation step in the [IRQ route trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md).
+observation-only pair. The corrected collector is sealed in a distinct
+inactive scope for those exact images; the previous trial's spent boot grant
+is not reused. A good startup sample would only close the first observation
+step in the [IRQ route trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md).

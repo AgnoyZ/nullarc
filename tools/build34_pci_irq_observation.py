@@ -20,7 +20,8 @@ IRQ_ACCOUNTING = 'Interrupt Statistics (by index)'
 START_CONFIG = 'phx-pci-irq-start-v1'
 START_CLASSES = {'both-message-enables-clear', 'msi-enable-set',
                  'msix-enable-set-function-mask-clear', 'msix-enable-set-function-mask-set'}
-PCI_QUERY = ['/usr/sbin/ioreg', '-a', '-r', '-d', '2', '-c', 'IOPCIDevice']
+# At depth two, ioreg omits child properties unless -l is set.
+PCI_QUERY = ['/usr/sbin/ioreg', '-a', '-l', '-r', '-d', '2', '-c', 'IOPCIDevice']
 PHX_QUERY = ['/usr/sbin/ioreg', '-a', '-r', '-d', '2', '-c', 'PhxBringup']
 
 

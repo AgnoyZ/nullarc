@@ -1,8 +1,9 @@
 # Build34 R3 interrupt route trial design
 
-Status: preparation only. The [private observer and restore pair](BUILD34-PCI-IRQ-CANDIDATE.md)
-and the [inactive startup and restore scope](BUILD34-PCI-IRQ-SCOPE.md) passed
-their respective offline checks. There is no admitted runtime scope or grant.
+Status: startup observation has not passed. The [first authorized trial](BUILD34-PCI-IRQ-TRIAL.md)
+refused a mismatched PCI sample and recovered the mapping-only image. The
+collector is corrected and sealed in a distinct inactive scope; there is no
+unspent runtime grant. The [private pair](BUILD34-PCI-IRQ-CANDIDATE.md) is unchanged.
 The [registry observation](BUILD34-EXACT-EVENT-WAIT.md#passive-pci-descriptor-observation)
 did not identify an active PCI interrupt mode, an ISR, or an IH ring consumer.
 The build34 AMD framebuffer's VBL callback is driven by `vblFire` on a timer;
