@@ -33,7 +33,8 @@ independent remote SHA check.
 | Raw-debug/queue handoff and paired bootstrap | The raw stage gives eleven mutators exclusive transactions/service leases and two readers service leases, latches one-shot disjoint adoption and defers both bootstrap calls; 1,063 driver and 28 bootstrap checks and full object compiles passed. The follow-on checked bootstrap gates the paired handoff on MES completion and both queue sentinels; 14 ASan/UBSan checks, preserved wrapper exits and complete bootstrap object compiles passed | Establish initial external queue/firmware ownership and drain, actual bootstrap progress and mapping/visibility; finish platform/factory/claim/native lifetimes and healthy service cleanup. The CPU gate is not GPU drain and the unchanged production bootstrap is incompatible with this staged handoff; see `BUILD34-RAW-QUEUE-HANDOFF.md` |
 | Native factory and configured discovery | Latest composed stage leases construction, refuses observed closed starts without returning clients, retains uncertain pins, atomically publishes configured discovery and removes the sysctl flag's plain precheck; 238 ASan/UBSan and TSan checks/18 groups/nine threaded scenarios, 16 rejected broken variants, the preceding 1,063-check raw-handoff suite on new source and complete native object/provider checks pass | Finish native platform/factory final handoff, PCI claim/matching, sysctl/module teardown and healthy reclamation; configured discovery is not live health/drain, final check is not atomic with stop, and reader/protocol/event/hardware requirements remain; see `BUILD34-NATIVE-FACTORY.md` |
 | Uncertain firmware work | The staged PSP and SMU paths close raw writes and veto adoption after an unacknowledged published operation; raw `writeReg` refuses eight known firmware mailbox registers. The follow-on passes 51 SMU/mailbox and 61 PSP checks under each sanitizer and both full object compiles retain the same 376 imports | Establish actual acknowledgment freshness, audit raw queue-engine writers, and prove hardware drain and fence visibility. A clear software latch does not grant either; see `BUILD34-RAW-QUEUE-HANDOFF.md` |
-| Startup failure propagation | Offline launcher derivation preserves checked bootstrap and claim failures; the old fall-through and the new refusal paths are covered by six shell tests with CPU process stubs | Bind the paired initializer, launcher and controller in a fresh scope; guard direct/native claim and resolve publication versus stop. No installed launcher changed; see `BUILD34-RAW-QUEUE-HANDOFF.md` |
+| Startup failure propagation | Offline launcher derivation preserves checked bootstrap and claim failures; the old fall-through and the new refusal paths are covered by six shell tests with CPU process stubs | Bind the paired initializer, launcher and controller in a fresh scope. No installed launcher changed; see `BUILD34-RAW-QUEUE-HANDOFF.md` |
+| Native claim admission | Source-only claim checks both live queues under the GPU lock, keeps a PCI reference across unlocked matching and returns property failures. 103 claim checks and both firmware regression suites pass each sanitizer; complete native objects keep the same 376 imports | Resolve publication versus stop, sleep and invalidation through the actual IOKit property/matching lifetime. Software readiness does not prove GPU drain or device visibility; see `BUILD34-RAW-QUEUE-HANDOFF.md` |
 | Hardware acceptance | Mapping-only observer boot/desktop prerequisite passed; no native R3 exact work or pressure was dispatched | Fresh compatible finite scope for the paired R3 candidate; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
 
 The ledger records evidence levels, not a count of tests as a substitute for
@@ -204,9 +205,11 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    The follow-on SMU stage shares that veto for a published message with no
    response and reserves the eight known PSP/SMU mailbox registers from raw
    writes. The offline launcher companion preserves checked-bootstrap failure
-   before claim and claim failure before desktop configuration. Actual
-   queue-engine drain, reply freshness, direct native claim and the pairing
-   with an authorized boot scope remain open.
+   before claim and claim failure before desktop configuration. The source-only
+   native claim companion also refuses a partial or invalidated queue pair and
+   a failed property write. Actual queue-engine drain, reply freshness,
+   native publication versus lifecycle and pairing with an authorized boot
+   scope remain open.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete

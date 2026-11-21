@@ -234,9 +234,46 @@ fragment with process stubs for initializer and claim. Cases include status
 74/75/127, absent or nonmatching diagnostic output, claim refusal and valid
 success. Both the complete shell and its watcher-free form pass Bash syntax
 checks. These tests join `make test`; omit the transform to roll it back.
-Direct/manual claim and its native readiness, publication and stop ordering
-still need a separate guard and native lifetime review. A successful shell
-exit does not prove hardware drain or coherent fence visibility.
+Direct/manual claim bypasses the launcher and needs the separate guard
+below. A successful shell exit does not prove hardware drain or coherent
+fence visibility.
+
+## Native admission for direct accelerator claim
+
+The follow-on `tools/build34_exact_claim.py` changes only the staged
+`PhxBringup::claimAccel()` body. Its predecessor uses the monotonic configured
+mask, so one successfully adopted queue is enough to publish the matching
+property even after the second adoption fails. The predecessor also returns
+success and requests matching when `setProperty` refuses the write.
+
+The new claim holds a service callback lease and snapshots both queues under
+`gpuLock`: both must be ready and live, with no observed closure, stop, sleep,
+or VM fault. The monotonic discovery flag remains unchanged for fallback
+decisions elsewhere. Claim retains the selected PCI device, unlocks, and
+checks for observed closure again before property publication. It requests
+matching without holding `gpuLock` and only when `setProperty` succeeds.
+All paths release the temporary reference and lease. The selector and its
+existing privilege and argument checks are unchanged.
+
+The [sanitized result](validation/build34-r3-claim-offline-20261121.json)
+records the predecessor counterexamples, 103 claim checks, two synchronized
+closure cases, and 51 SMU plus 61 PSP checks under each of ASan/UBSan and TSan.
+Three deliberately broken variants fail the checks. The runner confirms that
+only `claimAccel()` differs from the preceding full source, compiles both
+complete translation units as nonloadable objects, and checks their identical
+376 native imports. The PCI matching and reference behavior in the fixture
+are CPU models. No production file or installed image changes.
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_claim.py \
+  --out build/build34-r3-claim-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+The final closure check is not atomic with registry publication or matching.
+A stop, sleep, watchdog invalidation, or external property change after
+the readiness snapshot still needs a native publication/lifetime protocol.
+The snapshot is software readiness, not an old-writer drain or a device
+fence visibility proof. Roll back by omitting this isolated transform.
 
 ## Validation and remaining audit
 
