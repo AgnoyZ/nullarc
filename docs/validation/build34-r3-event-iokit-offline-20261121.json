@@ -1,0 +1,25 @@
+{
+  "status": "passed-staged-event-iokit-offline",
+  "build": 34,
+  "base_commit": "251b0c44f925beb652ca0898baabb41d34a85733",
+  "staged_sha256": "9d4f142037b95c98f9a15bee8585eb78e7570231926baac22fcfe2caacbe8a61",
+  "inherited_checks": 481,
+  "new_checks_per_sanitizer": 113,
+  "broken_variants_detected": [
+    "extend-budget-at-enrollment",
+    "sleep-at-expiry",
+    "one-waiter-only",
+    "miss-enrollment-limit"
+  ],
+  "production_inputs_unchanged": 172,
+  "native_import_count": [377, 380],
+  "added_KPIs": {
+    "IOKit": ["_IOLockSleepDeadline_darwin14", "_IOLockWakeup_darwin14"],
+    "Mach": ["_nanoseconds_to_absolutetime"]
+  },
+  "kdk_os_build": "25G332",
+  "native_object_only": true,
+  "native_event_backend_bound": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}

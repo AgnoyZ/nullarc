@@ -76,3 +76,57 @@ the source and all enrolled waiters. Prove BAR fence visibility and external
 writer drain independently, then measure real wait/latency and FPS along with
 dual-queue correctness and sustained desktop stability. No installation, GPU
 submission or restart was performed. Rollback is to omit the offline transform.
+
+## Follow-up: public IOKit sleep and AMD EOP routing
+
+Linux v6.12 (`adc218676eef25575469234709c2d87185ca223a`),
+[`gfx_v11_0_ring_emit_fence` and `gfx_v11_0_eop_irq`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L5685),
+separate the `RELEASE_MEM` writeback and interrupt controls. The handler
+identifies a tagged MES queue through `src_data[0]` and the MES queue-ID
+table; otherwise it decodes the IV ring ID and dispatches by CP engine and
+pipe (also checking the compute queue). Linux's
+[`amdgpu_ih_process`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.c#L208)
+orders the write pointer against the 32-byte interrupt vectors and advances
+the consumer pointer. The
+[`ih_v6_0` implementation](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L434)
+handles overwrite, so a vector stream is not assumed complete. No Linux code,
+register programming, or driver binaries are included in this MIT stage.
+
+Build34 maps two `map_legacy_kq` queues; the adoption record provides ring,
+writeback, doorbell and fence information, but no IH source or vector
+ownership. Its fence packet requests no interrupt and has no MES queue tag.
+The host has not established which CP EOP vectors are delivered for these
+queues, that an IH consumer owns the ring across transitions, or that the
+event orders the device's fence write to a CPU read through BAR0. A doorbell,
+software generation, boot marker, or guessed IV cannot establish those facts.
+
+The [separate offline transform](../tools/build34_exact_event_iokit.py) adds
+unbound `IOLockSleepDeadline` and wake-all helpers. The sleep uses the original
+monotonic sample plus the remaining slice, rejects expired, zero-tick or
+overflowing deadlines, and uses `THREAD_ABORTSAFE`. The staged park counts
+admitted sleepers under the GPU lock, including threads reacquiring it,
+and caps them at 32 per service across both queues. A refusal re-observes
+the target before polling. The return from the sleep primitive is never
+completion evidence. Public XNU's
+[`IOLocks.cpp`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOLocks.cpp#L90)
+documents the underlying mutex sleep and wake path. At macOS 26.7.2
+(`25G332`), static SDK/KDK checks accept exactly three additional imports
+from the existing IOKit and Mach interfaces. No implementation from XNU
+was copied.
+
+ASan/UBSan and TSan each passed the original 481 checks and 113 additional
+ones; four deliberately defective variants failed. The complete driver
+compiled only to nonloadable objects (377 to 380 imports); all 172 production
+inputs are unchanged. See the
+[sanitized results](validation/build34-r3-event-iokit-offline-20261121.json).
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_event_iokit.py \
+  --out build/build34-r3-event-iokit-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+The source and ops pointer remain unbound. Matching exports establish static
+availability, not live kernel enrollment or unload safety. The consumer's
+ownership, deferred IRQ delivery and teardown, fence visibility, native
+protocol, and GPU performance/stability acceptance remain open. No IRQ,
+device packet, installed artifact, or runtime setting was changed.
