@@ -216,6 +216,12 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    publisher lease, and tests actual staged sleep/wake invalidation.
    Asynchronous consumer admission, marker/attached accelerator lifetime,
    queue-engine drain and pairing with an authorized boot scope remain open.
+   A separate [post-clear VM detach stage](BUILD34-VM-LIFETIME.md#follow-up-post-clear-invalidation)
+   reproduces the old invalidation-before-clear order and tests that the
+   cleared tables precede the modeled TLB request. An uncertain ACK retains
+   the busy context, hardware owner and BO backing behind the sticky VM gate.
+   This closes one CPU ordering prerequisite only; fresh native ACK, page
+   walk, writer drain and hardware-safe release remain unproved.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete

@@ -129,3 +129,48 @@ paired protocol/visibility, completion events and
 fresh compatible SDK/GPU/FPS/stability acceptance remain open. Keep accepted
 R1b/R2a/plugin/startup settings, daily PR28 policy and disabled resident monitors.
 R3 remains active and R4–R6 do not advance; see the [ledger](BUILD34-R3-PLAN.md).
+
+## Follow-up: post-clear invalidation
+
+On November 22, 2026, a CPU fixture reproduced an ordering defect in the
+staged `vmidFree`: its invalidation request was issued while the page tables
+still contained the old entries. The [follow-up transform](../tools/build34_exact_vm_detach.py)
+derives the frozen overlap-snapshot stage and changes only `vmidFree`. The
+existing ownership, checked global retirement and chunk checks still precede
+all writes. The bound path now clears and flushes the used page-table bytes,
+then calls the same checked TLB helper before dropping reciprocal VMID
+ownership. On timeout, the tables have already been cleared: keep the busy,
+closing context, the VMID and all backing, set the sticky VM-fault gate, and
+do not retry or release on a late ACK. A failed detach is not a rollback of
+the table writes.
+
+The [runner](../tools/test_build34_exact_vm_detach.py) substitutes only the
+verified `vmidFree` body into the frozen legacy-close CPU fixture. The old
+body fails at the request-before-clear assertion. The new body passes
+**4,495 checks per sanitizer** (ASan/UBSan and TSan) across two cases: delayed
+ACK before VMID and BO release, and missing ACK with backing still retained
+after a later level bit and reaper attempt. It also checks stale-generation
+refusal and bounds the clear at the used pages across two chunks. This is
+not verification of the full newer native close path. The predecessor's
+overlap snapshot separately passes its 240 checks per sanitizer. See the
+[sanitized evidence](validation/build34-r3-vm-detach-offline-20261122.json).
+
+Reproduce on the default build34 branch with a fresh ignored output path
+and the `legacy-close.cpp` emitted by `test-build34-exact-legacy-close`
+from its frozen inputs. If the matching fixture is already available, point
+`EXACT_CLOSE_OUT` to its directory and skip the generation command:
+
+```sh
+EXACT_CLOSE_OUT=build/build34-r3-legacy-close-for-detach-private
+nice -n 15 taskpolicy -b make -j1 test-build34-exact-legacy-close \
+  EXACT_CLOSE_OUT="$EXACT_CLOSE_OUT"
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_vm_detach.py \
+  --out build/build34-r3-vm-detach-new-private \
+  --legacy-fixture "$EXACT_CLOSE_OUT/legacy-close.cpp"
+```
+
+The CPU register model does not establish a fresh ACK, device visibility of
+the cleared tables, actual page walk, external writer drain or native BO
+release safety. All 172 production inputs are unchanged. This is a separate
+source-only prerequisite, not an admitted kernel candidate. Rollback is to
+leave this transform unapplied; nothing was installed or loaded.
