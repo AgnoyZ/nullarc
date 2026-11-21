@@ -318,3 +318,11 @@ test-build34-exact-watchdog:
 test-build34-exact-service-timer:
 	@test -n "$(EXACT_SERVICE_TIMER_OUT)" || (echo "Set EXACT_SERVICE_TIMER_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_service_timer.py --out "$(EXACT_SERVICE_TIMER_OUT)"
+
+# Complete native source/object check only; private timer KPI admission must refuse.
+.PHONY: test-build34-exact-native-sdk
+test-build34-exact-native-sdk:
+	@test -n "$(KERNEL_SDK)" || (echo "Set KERNEL_SDK to the reviewed matching SDK checkout"; exit 2)
+	@test -n "$(KDK)" || (echo "Set KDK to the current OS version/build's KDK"; exit 2)
+	@test -n "$(EXACT_NATIVE_SDK_OUT)" || (echo "Set EXACT_NATIVE_SDK_OUT to a fresh private worktree build path"; exit 2)
+	python3 -B tools/test_build34_exact_native_sdk.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_NATIVE_SDK_OUT)"

@@ -28,7 +28,7 @@ independent remote SHA check.
 | Resource and object teardown | Source-only owned VM/BO cleanup, conditional legacy/exact close and bounded CPU-fence publication pass CPU tests; a later owned KERNEL/ONCE timer stage pins the service before publication, serializes rearm against stop and uses a distinct checked cancellation worker, retaining failed handles; service/GPU permanent quarantine remains | Prove native BO/object/callback/thread-call/module lifetimes, authoritative queue/external-writer drain, cache/CPU visibility, page walk/ACK and stop/unload; complete healthy service reclamation and the paired exact CPU-fence protocol; CPU timer drain alone cannot grant either; see `BUILD34-SERVICE-TIMER.md` |
 | Watchdog and controlled recovery | Source-only actual watchdog/submit tests reproduce unlocked observation and SQ after RLC timeout in the preceding methods; the later checked stage binds pending context allocations, holds the GPU lock through recovery, invalidates normal completion, bounds ready-only RLC attempts and separates diagnostic old-generation observation | Prove native coherent reads, RLC ACK freshness/recovery semantics, external old-writer ownership and callback/mapping/timer/stop lifetimes; diagnostic completion cannot clear a fault, retire resources or turn a new adoption into old-work drain; see `BUILD34-WATCHDOG.md` |
 | Completion notification | No AMD completion event/interrupt route | Prove native wait registration/recheck/wakeup/lifetime, spurious/lost wakeup handling and bounded fallback; do not invent NVIDIA selectors or enable unknown IRQ bits |
-| Frozen native integration | No R3 native candidate | Complete entrypoint/VM audit, actual SDK compile, exact build34 provenance and paired runtime/ABI validation without weakening existing build34 admission |
+| Frozen native integration | The complete corrected staged translation unit compiles to a nonloadable x86_64 object with the pinned actual SDK; current-OS-metadata-matching KDK timer audit refuses its private-only cancellation import; no R3 native candidate | Replace the private cancellation dependency through proved public APIs; finish entrypoint/VM audit, reader/protocol/lifecycle integration, exact build34 provenance and paired runtime/ABI validation without weakening admission; see `BUILD34-NATIVE-SDK.md` |
 | Hardware acceptance | None for R3 | Fresh compatible finite recovery scope; exact loaded images, dual-queue/gap and full-arena correctness, timeout/lifecycle and desktop behavior, measured FPS/CPU/latency and stated-duration stability |
 
 The ledger records evidence levels, not a count of tests as a substitute for
@@ -139,6 +139,14 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    all GPU/service resources and permanent service quarantine. Actual native
    KPI/module lifetime, queue/writer drain and a final healthy reclaimer remain
    required; the CPU model does not close those requirements.
+   A subsequent [complete native translation-unit check](BUILD34-NATIVE-SDK.md)
+   catches and corrects the missing client forward declaration that the CPU
+   class double masked. Both control and corrected stage compile to nonloadable
+   objects using the pinned SDK. The matching-build KDK symbolsets independently
+   expose the inherited private-only `thread_call_cancel_wait` dependency;
+   native admission remains refused. Public service-timer lifecycle integration
+   is therefore required before any kernel candidate, alongside the unresolved
+   reader/protocol/drain requirements. No private provider is added or bypassed.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete
