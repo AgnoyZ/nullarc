@@ -170,3 +170,14 @@ with its actual EOP source and independently verified fence data, account
 for overflow or dropped events, and prove exclusive IH ownership before
 touching the ring or enabling interrupt generation. Keep the event backend
 unbound until that evidence and its lifecycle checks are available.
+
+The follow-up collector also checks `IOPCIMSIMode` and counts interrupt
+accounting legend entries on the same PCI provider. Both fields are hints.
+Public IOPCIFamily uses [one marker for both MSI and MSI-X](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L612-L638);
+public XNU's [statistics removal](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOService.cpp#L8524-L8564)
+clears the live statistics pointer and keeps the reporter. An absent marker or
+legend does not demonstrate that the device is idle or unclaimed. Two further
+build34 reads on macOS 26.7.2 (`25G332`) matched: two descriptors, no MSI marker,
+and zero matching legend entries. See the
+[sanitized follow-up](validation/build34-r3-pci-irq-route-hints-20261121.json)
+and the [proposed route trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md).

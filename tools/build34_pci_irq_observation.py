@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Summarize cached 780M PCI interrupt descriptors without resolving interrupts."""
+"""Summarize 780M PCI interrupt registry metadata without resolving interrupts."""
 import json
 import platform
 import plistlib
@@ -13,6 +13,10 @@ CHILDREN = 'IORegistryEntryChildren'
 CONTROLLERS = 'IOInterruptControllers'
 SPECIFIERS = 'IOInterruptSpecifiers'
 MESSAGED = 'IOPCIMessagedInterruptController'
+MSI_MARKER = 'IOPCIMSIMode'
+REPORT_LEGEND = 'IOReportLegend'
+REPORT_GROUP = 'IOReportGroupName'
+IRQ_ACCOUNTING = 'Interrupt Statistics (by index)'
 PCI_QUERY = ['/usr/sbin/ioreg', '-a', '-r', '-d', '2', '-c', 'IOPCIDevice']
 PHX_QUERY = ['/usr/sbin/ioreg', '-a', '-r', '-d', '2', '-c', 'PhxBringup']
 
@@ -55,8 +59,13 @@ def pci_snapshot(blob):
     if (type(names) is not list or type(specifiers) is not list or len(names) != len(specifiers) or
             not all(type(n) is str and n for n in names) or not all(type(s) is bytes and s for s in specifiers)):
         raise ValueError('Malformed interrupt descriptor pair')
+    marker = pci.get(MSI_MARKER, None)
+    if MSI_MARKER in pci and type(marker) is not bool:
+        raise ValueError('Malformed PCI MSI marker')
+    irq_legend_count = sum(item.get(REPORT_GROUP) == IRQ_ACCOUNTING
+                           for item in entries(pci.get(REPORT_LEGEND, [])))
     # Compare raw identities and specifiers only in memory, never in the report.
-    return provider_id, child_id, names, specifiers
+    return provider_id, child_id, names, specifiers, marker, irq_legend_count
 
 
 def summarize(before, service, after, version, build):
@@ -66,7 +75,7 @@ def summarize(before, service, after, version, build):
     if first != pci_snapshot(after):
         raise ValueError('PCI snapshot changed around service observation')
     phx = only(roots(service))
-    _, child_id, names, _ = first
+    _, child_id, names, _, marker, irq_legend_count = first
     if (entry_id(phx) != child_id or phx.get(CLASS) != 'PhxBringup' or
             type(phx.get('phx-build')) is not int or phx['phx-build'] != 34):
         raise ValueError('Build34 service is not the observed PCI child')
@@ -75,7 +84,9 @@ def summarize(before, service, after, version, build):
                 os_version=version, os_build=build, pci='1002:1900', PhxBringup_build=34,
                 direct_pci_provider_matched=True, descriptor_count=len(names),
                 messaged_controller_count=messaged, other_controller_count=len(names) - messaged,
-                active_interrupt_mode_proved=False, eop_delivery_proved=False,
+                msi_registry_marker='absent' if marker is None else 'true' if marker else 'false',
+                irq_accounting_legend_count=irq_legend_count,
+                active_interrupt_mode_proved=False, active_isr_proved=False, eop_delivery_proved=False,
                 ih_consumer_ownership_proved=False, fence_visibility_proved=False,
                 device_opened=False, raw_registry_saved=False)
 

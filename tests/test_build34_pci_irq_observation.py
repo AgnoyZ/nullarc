@@ -26,7 +26,8 @@ class PCIDescriptorTests(unittest.TestCase):
         report = self.summarize()
         self.assertEqual((report['descriptor_count'], report['messaged_controller_count'],
                           report['other_controller_count']), (2, 1, 1))
-        self.assertFalse(any(report[k] for k in ('active_interrupt_mode_proved', 'eop_delivery_proved',
+        self.assertEqual((report['msi_registry_marker'], report['irq_accounting_legend_count']), ('absent', 0))
+        self.assertFalse(any(report[k] for k in ('active_interrupt_mode_proved', 'active_isr_proved', 'eop_delivery_proved',
                                                'ih_consumer_ownership_proved', 'fence_visibility_proved')))
         rendered = json.dumps(report)
         for private in ('75240', '75241', 'private', obs.MESSAGED):
@@ -50,6 +51,29 @@ class PCIDescriptorTests(unittest.TestCase):
     def test_same_counts_with_changed_payload_are_refused(self):
         with self.assertRaises(ValueError):
             self.summarize(after={**self.pci, obs.SPECIFIERS: [b'different', b'value']})
+
+    def test_marker_and_legend_are_hints_only(self):
+        self.pci[obs.REPORT_LEGEND] = [{obs.REPORT_GROUP: obs.IRQ_ACCOUNTING, 'private-channel': 99189},
+                                      {obs.REPORT_GROUP: 'private-other-group'}]
+        for marker in (True, False):
+            with self.subTest(marker=marker):
+                self.pci[obs.MSI_MARKER] = marker
+                report = self.summarize()
+                self.assertEqual(report['msi_registry_marker'], str(marker).lower())
+                self.assertEqual(report['irq_accounting_legend_count'], 1)
+                self.assertFalse(report['active_interrupt_mode_proved'])
+                self.assertFalse(report['active_isr_proved'])
+                self.assertFalse(report['ih_consumer_ownership_proved'])
+                rendered = json.dumps(report)
+                for private in ('99189', 'private-channel', 'private-other-group'):
+                    self.assertNotIn(private, rendered)
+
+    def test_changing_or_malformed_hints_are_refused(self):
+        for extra in ({obs.MSI_MARKER: True}, {obs.MSI_MARKER: 1},
+                      {obs.REPORT_LEGEND: [{obs.REPORT_GROUP: obs.IRQ_ACCOUNTING}]},
+                      {obs.REPORT_LEGEND: ['bad-entry']}):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                self.summarize(after={**self.pci, **extra})
 
     def test_duplicate_identity_is_refused(self):
         with self.assertRaises(ValueError):
