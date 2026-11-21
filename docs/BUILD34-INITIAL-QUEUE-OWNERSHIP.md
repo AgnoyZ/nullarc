@@ -20,6 +20,41 @@ the linked Linux driver code; no source or binaries were imported.
 | [`mes_v11_0_enable`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/mes_v11_0.c#L813-L860) and [`gfx_v11_0_hw_fini`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L4343-L4378) | MES halt/reset is separate from disabling the managed GFX/Compute queues, stopping CP, and disabling GART. The non-VF teardown logs some failures and continues. | A control write or successful top-level teardown return does not certify that all prior DMA/writebacks are visible or finished. Linux's teardown and allocation lifecycle are not build34's initial ownership contract. |
 | [`soc21_asic_reset_method`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/soc21.c#L371-L399), [`soc21_need_reset_on_init`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/soc21.c#L468-L483), and [SMU 13.0.4 Mode 2](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_4_ppt.c#L1075-L1079) | The default reset selector uses Mode 2 for MP1 13.0.4. Its SMU callback returns the mailbox command result. The separate SOC21 init predicate returns false for APUs. | Neither the recovery selector nor the init predicate establishes that a normal macOS restart reset the APU, that the firmware can safely take this command at startup, or what old writers are covered. |
 
+### What the Mode 2 recovery path can establish
+
+- **Mailbox result:** the pinned [common SMU wrapper](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/pm/swsmu/smu_cmn.c#L407-L478)
+  serializes normal requests and interprets a reply. It can also return
+  success without publishing a message when hardware access is disabled
+  or a VF is not allowed the message. Even a verified fresh response on
+  the native path provides no per-engine or write-visibility result.
+- **Cancellation:** the [pre-ASIC reset phase](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c#L5244-L5282)
+  clears job fence slots and forces completion on scheduler-ready rings
+  before the later ASIC reset. The [force-completion helper](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c#L760-L765)
+  sets cancellation errors on the remaining fences and uses a
+  [CPU store](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_fence.c#L99-L105)
+  to write the last sequence if the ring has a CPU fence address. A fence
+  reaching the submitted sequence after cancellation is therefore not proof
+  of a GPU write or old work drain.
+- **Recovery:** after the [reset call and ASIC init](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c#L5350-L5408),
+  the driver can report that reset succeeded before IP resume and
+  [the new IB ring tests](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c#L5479-L5487).
+  Those tests check new work after reinitialization. They do not sample
+  the old PSP/GART/IH storage at the proposed handoff boundary.
+
+Linux's [S4 workaround](https://github.com/torvalds/linux/commit/fedb6ae49758658bd4a90689c26dc3c3a3f9c3cd)
+uses the same Mode 2 command before unloading MP1. A [November 7, 2026 UTC mailing-list patch](https://lore-kernel.gnuweeb.org/amd-gfx/20261107204801.624322-1-raymondjup46%40gmail.com/T/)
+reports that the command stopped replying on a Ryzen 7 7840HS after S0i3
+and that issuing it during subsequent hibernation hung the system. The
+proposal skips the sequence in that power state; it does not add a drain
+receipt. This is a report from a different platform and sequence, not a
+reproduction of the build34 host's startup behavior.
+
+For R3, keep a verified firmware response, cancellation of software waits,
+new work progress, and authorization to reuse old storage separate. The last
+still requires identified writers, a documented stop and visibility boundary,
+and proof that no owner rearms them before takeover. The reviewed Linux files
+carry MIT-style grants; no source was imported and no reset was issued.
+
 ## Ordering gap in build34
 
 The production `PhxBringup::start()` enables PCI bus mastering and memory
