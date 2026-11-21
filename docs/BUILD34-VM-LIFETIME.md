@@ -189,7 +189,7 @@ publishing a new 64 KiB chunk it requires a CPU mapping, descriptor length
 and a single returned segment covering the chunk. The base and last 4 KiB
 frame must fit the existing PTE mask. Failure releases only the unpublished
 descriptor. Accepted chunks are still zeroed and flushed before publication.
-The pinned public XNU [implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L5850-L5855)
+The pinned public XNU [implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L6258-L6261)
 uses the same default `getPhysicalSegment` lookup for `getPhysicalAddress`;
 the staged call also requests the segment length. No XNU code was copied.
 
