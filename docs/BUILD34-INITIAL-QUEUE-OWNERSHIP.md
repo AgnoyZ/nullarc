@@ -45,6 +45,41 @@ the shell reservation covers only the paired `full.sh` entrypoint. Writing
 the selector to sample HQDs is itself a device write. Do not add that sequence
 to the accepted passive BAR observer or run it on the active desktop.
 
+## Offline indexed observation transaction
+
+`tools/build34_exact_hqd_observation.py` derives an internal method from the
+paired claim stage. The method holds the service lease, exclusive raw-writer
+lease and GPU lock across selector save, bank selection, sample and verified
+restore. It refuses immediately on contention, sleep, service closure,
+VM fault, prior adoption or an unbound backend. It requests only one of four
+named banks and leaves the caller's output unchanged on refusal. Once selection
+is attempted, it attempts one restoration even if the selection reported an
+error. A failed bank check or unconfirmed restoration permanently closes raw
+writes and vetoes both adoption requests for that service instance.
+
+The CPU fixtures use the staged method, actual raw register write/adoption
+method bodies and synthetic register storage. ASan/UBSan and TSan each pass
+229 checks, including an interfering raw caller, service closure during a
+sample, and faults at save, select, sample, verification or restore. Four
+broken variants are detected. The complete before/after driver compiles as
+nonloadable x86_64 objects with the same 377 KDK-resolved imports and four
+existing warnings. All 172 production inputs are unchanged. Run it via:
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_hqd_observation.py \
+  --out build/build34-r3-hqd-observation-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+The native backend is null. There is no user selector, public entrypoint,
+startup change or new MMIO operation. Reverting the offline stage means
+omitting the transform. A future backend must verify the real selector and
+readback semantics and hold power/mapping ownership even through restoration
+after an observed stop. The final closure check is not atomic with stop;
+the diagnostic result cannot be used as a persistent admission credential.
+The staged gate excludes local raw calls, not external
+writers or a different hardware owner. A successful inactive sample is
+diagnostic; no queue, firmware writer or storage is declared safe on its basis.
+
 ## Evidence required before reusing storage
 
 1. Identify the current device, service, boot and first writer before *any*
