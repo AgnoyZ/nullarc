@@ -105,6 +105,9 @@ before the new owner takes control. Until either boundary is proven, keep IH
 reads out of the startup observer and leave the live IRQ path untouched. Any
 later diagnostic read needs its own verified address, side-effect and
 power/mapping contract; a diagnostic idle sample cannot authorize a handoff.
+The [target reset review](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#reset-paths-on-the-target)
+found no advertised standard PCIe FLR in cached metadata and no verified
+GPU-only bridge reset or platform handoff. It does not change this gate.
 
 ## Stop, rollback and later acceptance
 

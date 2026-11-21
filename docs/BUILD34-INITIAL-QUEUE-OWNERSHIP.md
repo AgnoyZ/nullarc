@@ -1,8 +1,9 @@
 # Build34 R3 initial queue ownership
 
-Status: source review only. No old-writer drain is proved on gfx1103/macOS,
-no new MMIO or firmware operations were run, and the native reader remains
-unbound. This is a prerequisite to reusing bootstrap and fence storage.
+Status: source review and passive registry evidence. No old-writer drain is
+proved on gfx1103/macOS, no new MMIO or firmware operations were run, and the
+native reader remains unbound. This is a prerequisite to reusing bootstrap
+and fence storage.
 
 ## What Linux establishes
 
@@ -17,7 +18,7 @@ the linked Linux driver code; no source or binaries were imported.
 | [`mes_v11_0_kiq_dequeue` and `mes_v11_0_kiq_hw_fini`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/mes_v11_0.c#L1310-L1425) | The driver holds `srbm_mutex` over the indexed register sequence and restores selection. For an active HQD it requests dequeue and polls the active bit before clearing doorbell and pointer state. The teardown wrapper separately disables MES. | The dequeue helper returns `void`; on poll exhaustion it still clears control/pointer state. That sequence does not provide build34 with a positive drain acknowledgment. |
 | [`mes_v11_0_reset_queue_mmio`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/mes_v11_0.c#L337-L400) | The targeted reset has separate GFX and Compute sequences and returns a timeout if the selected HQD does not deactivate. | This is a better model for timeout propagation, but it still acts on a known queue and checks deactivation only. It does not prove PSP/SMU or already issued GPU writeback has drained. |
 | [`mes_v11_0_enable`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/mes_v11_0.c#L813-L860) and [`gfx_v11_0_hw_fini`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L4343-L4378) | MES halt/reset is separate from disabling the managed GFX/Compute queues, stopping CP, and disabling GART. The non-VF teardown logs some failures and continues. | A control write or successful top-level teardown return does not certify that all prior DMA/writebacks are visible or finished. Linux's teardown and allocation lifecycle are not build34's initial ownership contract. |
-| [`soc21_asic_reset_method`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/soc21.c#L343-L394), [`soc21_need_reset_on_init`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/soc21.c#L435-L449), and [SMU 13.0.4 Mode 2](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_4_ppt.c#L1020-L1024) | The default reset selector uses Mode 2 for MP1 13.0.4. Its SMU callback returns the mailbox command result. The separate SOC21 init predicate returns false for APUs. | Neither the recovery selector nor the init predicate establishes that a normal macOS restart reset the APU, that the firmware can safely take this command at startup, or what old writers are covered. |
+| [`soc21_asic_reset_method`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/soc21.c#L371-L399), [`soc21_need_reset_on_init`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/soc21.c#L468-L483), and [SMU 13.0.4 Mode 2](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_4_ppt.c#L1075-L1079) | The default reset selector uses Mode 2 for MP1 13.0.4. Its SMU callback returns the mailbox command result. The separate SOC21 init predicate returns false for APUs. | Neither the recovery selector nor the init predicate establishes that a normal macOS restart reset the APU, that the firmware can safely take this command at startup, or what old writers are covered. |
 
 ## Ordering gap in build34
 
@@ -64,6 +65,48 @@ predecessor or a reset whose documented scope covers those writers and their
 outstanding writes. Fresh fence storage, a new boot ID or a masked PCI route
 cannot prove that inherited writes to ring storage have stopped. Keep the
 native reader and event backend unbound while these conditions remain open.
+
+## Reset paths on the target
+
+On November 21, 2026, two stable `ioreg` samples on the running build34 PCI
+observer boot matched the exact Radeon provider, PhxBringup child and PCI
+bridge service. A second read-only implementation using targeted IOKit
+property and parent/child lookups reproduced all three classifications:
+
+- The cached PCIe Device Capabilities did not advertise standard PCIe
+  function-level reset (FLR).
+- PhxBringup's existing `phx-pci-cmd-before` sample, taken after its power
+  registration and before its own enable writes, had bus mastering and
+  memory decoding set. Neither bit identifies the previous owner or says
+  whether it left work pending.
+- The detected bridge service had seven other direct PCI children. The
+  service topology is not a verified electrical reset-domain map; it is
+  enough to reject assuming a bridge reset would affect only the GPU.
+
+See the [sanitized results](validation/build34-r3-reset-path-review-20261121.json).
+The [public IOPCIFamily bridge code](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIBridge.cpp#L3005-L3010)
+publishes Device Capabilities via `kIOPCIExpressDeviceCapabilitiesKey`;
+[`supportsFLR()`](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIDevice.cpp#L3655-L3658)
+uses the standard capability bit. The public source describes that path
+without attesting the running IOPCIFamily image. No direct PCI configuration
+access was requested. A broad registry dump can invoke property serializers;
+the targeted verification did not request link status or other unrelated
+properties. The result does not rule out a vendor-specific reset.
+
+| Path | Disposition for R3 |
+| --- | --- |
+| Standard PCIe FLR | Do not plan around an unadvertised function reset. In the [reference Linux PCI code](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/pci/pci.c#L4541-L4580), `pcie_reset_flr()` rejects missing capability; `pcie_flr()` can proceed after a Transactions Pending timeout. Reset return or transaction status alone is not proof of old IH, queue or firmware write drain. |
+| Secondary-bus/hot reset | No display-safe or GPU-only scope established. The same reference's [function-level fallback](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/pci/pci.c#L4993-L5009), `pci_parent_bus_reset()`, refuses when another device shares the secondary bus. Do not issue a bridge reset on the current stack. |
+| ACPI device/power-resource reset | A historical DSDT inspection did not find `_RST` or `_PRR` within the matched graphics/bridge subtree. This was not a review of the complete loaded DSDT/SSDT namespace. The [ACPI Specification 6.6](https://uefi.org/sites/default/files/resources/ACPI_Spec_6.6.pdf), sections 7.3.25-26, distinguishes a device-local reset from a shared reset resource. Locate the actual method and its affected resources before drawing any conclusion about this path. Do not evaluate AML methods to discover whether they are safe. |
+| SMU Mode 2, power transition or normal restart | No verified coverage or completed-write boundary for PSP, MES, IH and outstanding memory writes. A mailbox response, PCI configuration readiness or new boot identity is insufficient. |
+| GFX11 engine soft reset | AMD's [November 5, 2026 UTC v4 patch](https://www.mail-archive.com/amd-gfx%40lists.freedesktop.org/msg154925.html) covers a GFX-only recovery with an owned MES and saved queue state. Its two CP memory-busy polls can exhaust their budgets without aborting recovery. Compute and MES are outside the reset pulse, and the patch does not reset IH or verify IH drain. This is a reference for later recovery review, not an inherited-writer drain protocol. No code was imported. |
+
+Continue offline by tracing the full loaded ACPI namespace or an authoritative
+platform/firmware handoff for the identified predecessor. For any candidate
+mechanism, identify which engines and storage it covers, when old writes can
+no longer arrive and what prevents firmware rearming before build34 takes
+ownership. Without that contract, leave reset and IH reprogramming out of the
+trial and keep the installed build34 baseline in use.
 
 ## Offline indexed observation transaction
 

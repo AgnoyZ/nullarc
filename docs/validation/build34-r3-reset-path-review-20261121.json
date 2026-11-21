@@ -1,0 +1,31 @@
+{
+  "status": "passive-reset-path-review-drain-unproved",
+  "date": "2026-11-21",
+  "branch": "upstream34/vram-layout-fix",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "pci": "1002:1900",
+  "PhxBringup_build": 34,
+  "registry_observation": {
+    "methods": ["filtered-ioreg", "targeted-IOKit-property-reads"],
+    "stable_samples_per_method": 2,
+    "provider_child_and_bridge_match": true,
+    "standard_pcie_flr_advertised_in_cache": false,
+    "pre_enable_bus_master_set": true,
+    "pre_enable_memory_decode_set": true,
+    "other_direct_pci_children_under_bridge_service": 7
+  },
+  "historical_dsdt_subtree_inspection_only": true,
+  "complete_loaded_acpi_namespace_reviewed": false,
+  "new_loaded_image_attestation_performed": false,
+  "direct_pci_config_access_requested": false,
+  "new_mmio": false,
+  "acpi_method_evaluated": false,
+  "device_reset": false,
+  "gpu_work_submitted": false,
+  "new_restart": false,
+  "raw_diagnostics_saved": false,
+  "first_writer_proved": false,
+  "old_writer_drain_proved": false,
+  "R3_complete": false
+}
