@@ -86,6 +86,53 @@ helpers or native admission. Both complete original/proposed bootstrap sources
 are separately compiled to host-SDK x86_64 objects without linking or executing
 either tool. Initial external queue/hardware ownership remains unproved.
 
+## Checked paired bootstrap
+
+Deferral alone did not verify setup: `sched_test` ignored completion failures
+for `SET_HW_RESOURCES` and `QUERY_SCHED_STATUS`, and the queue routines could
+defer adoption after their compute or GFX sentinel polls expired. A failed
+`ADD_QUEUE` could leave zero or one pending adoption while `main` returned zero.
+The existing build34 layout wrappers already exit on IOKit errors or wrong
+reply sizes; the missing checks concern device results after successful transport.
+
+`tools/build34_exact_bootstrap_progress.py` derives the pinned deferred
+bootstrap. In this stage, an adoption request must select `kiqsched` with
+compute and GFX enabled, MC addressing, and normal clear state. It checks the
+previous MES marker and cleared per-command writeback, or initial scratch and
+test-buffer values for each queue, before publishing a write pointer that the
+device can poll independently of the doorbell. Each MES command must produce
+its query marker within the existing poll attempts and a nonzero command
+completion writeback, retaining the v11 bootstrap's interpretation of that
+writeback. Each queue must show both its scratch and distinct memory sentinel
+within its poll attempts. Both six-scalar records must be present before the
+first adoption. This does not make the two existing selector calls atomic:
+if the second fails, the wrapper exits and the first remains adopted.
+
+The transform also writes the MES completion payload by byte copy. The pinned
+predecessor casts a field in a four-byte-aligned packet to `uint64_t *`; UBSan
+reproduces its misaligned store. The old-flow CPU control disables alignment
+instrumentation only in that predecessor function to expose the separate
+control-flow failures. The checked form retains full ASan/UBSan coverage.
+Ten predecessor checks, 14 checked cases and three existing wrapper exits per
+form passed. The two complete bootstraps compiled to x86_64 MH_OBJECT, each
+with the same existing warning. The first run stopped at the synthetic geometry
+setup; the next reproduced the prior alignment failure. Neither used a GPU.
+
+The [sanitized result](validation/build34-r3-bootstrap-progress-offline-20261121.json)
+records the source pins and checks. Run the isolated check on x86_64 macOS:
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_bootstrap_progress.py \
+  --out build/build34-r3-bootstrap-progress-new-private
+```
+
+The fixture supplies synthetic geometry and replaces IOKit transport below the
+real build34 wrappers. Poll counts are modeled, with no elapsed-time guarantee.
+Marker readback is a bootstrap prerequisite, not proof of coherent retirement
+or drain of prior external GPU/firmware writers. The production bootstrap,
+driver and installed mapping observer are unaffected. Roll back the source-only
+stage by ceasing to derive it; no runtime rollback is needed.
+
 ## Validation and remaining audit
 
 The [sanitized result](validation/build34-r3-raw-handoff-offline-20261121.json)

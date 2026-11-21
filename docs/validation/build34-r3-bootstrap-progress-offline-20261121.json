@@ -1,0 +1,49 @@
+{
+  "status": "passed-checked-paired-mesboot-CPU-and-native-object",
+  "kernel_build": 34,
+  "parent_source_checkpoint": "08c185228080aa5ea5fb37f8f465de70ec6e95aa",
+  "frozen_input_sha256": {
+    "docs/validation/build34-r3-raw-handoff-offline-20261121.json": "a557e9e40343054347ecca30464093516bb559845a25fd801dc1cdf1e8c8c927",
+    "tools/phxctl/mesboot.c": "7a1e4de45589a40b3259bd33a790d9d537498e139fa56719145438801320a21f",
+    "tests/test_build34_exact_bootstrap_progress.c": "6ee4b78a950d706141cb544dd60c5f8c60622e384368416035ff41fcd937c6a8",
+    "tools/build34_exact_bootstrap_progress.py": "dbb4438580edc5f6cd61fda3bb1d27121926958094d0377416a7ff629c2b9fc3",
+    "tools/test_build34_exact_bootstrap_progress.py": "2fab4020451823736fe26b90bfecd0fd7df561462abbb5114784ace015ee65fd",
+    "tools/phxctl/mes_v11_api_def.h": "7b1b1e895e0faba305f1832bb815c617b51cbbdc6701dea4aa2084b52806b71a",
+    "tools/phxctl/PhxUpstream34Layout.h": "2f7e3124a99e97469debc9ee5d9bb760092c769ef530f99814257bc314f54de1",
+    "tools/phxctl/csb_gfx11.h": "f7400527d24ec6a60200ab670a2a78ac0f123d11dda4cc6b745a48e7b1e0d805"
+  },
+  "prior_bootstrap_sha256": "275a49dcf8363f5115244a8b2fdc2543c8fa83754340d227d19a5d9bcefe504d",
+  "checked_bootstrap_sha256": "6549cddf0b5cfc66a9ba945030059e953d670e3129e3b6ed5fa5d26f1e18faf3",
+  "ASan_UBSan_checks": {
+    "prior": 10,
+    "checked": 14
+  },
+  "existing_wrapper_exit_cases": {
+    "prior": [
+      "doorbell",
+      "short-reply",
+      "second-adoption"
+    ],
+    "checked": [
+      "doorbell",
+      "short-reply",
+      "second-adoption"
+    ]
+  },
+  "x86_64_MH_OBJECT_sha256": {
+    "prior": "9817e14480da4d3344b0b5667bceb5fc966aadd408f1ab57323e6742a3d4444f",
+    "checked": "1c357345f94793adc9ed261d52f0d1c3b3366f79a219b22fb904ff3eefb9e606"
+  },
+  "prior_packed_store_UB_reproduced": true,
+  "prior_flow_control_suppresses_alignment_only_in_mes_submit": true,
+  "unchanged_compiler_warnings": 1,
+  "production_inputs_unchanged": 172,
+  "hardware_candidate_created_or_installed": false,
+  "hardware_completion_or_writer_drain_accepted": false,
+  "effective_cache_or_native_reader_accepted": false,
+  "IOKit_opened": false,
+  "GPU_executed": false,
+  "power_actions": 0,
+  "FPS_accepted": false,
+  "R3_complete": false
+}
