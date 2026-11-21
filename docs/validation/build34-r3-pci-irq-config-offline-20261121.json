@@ -1,0 +1,32 @@
+{
+  "status": "passed-offline-pci-irq-config-observer",
+  "date": "2026-11-21",
+  "branch": "upstream34/vram-layout-fix",
+  "kernel_build": 34,
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "source_base_commit": "d225adf8607072262c6ec458cf29d3a1383e4a10",
+  "control_source_sha256": "9826065e11adc6ec7363459210704b685d1fc5df29758271ca674163254cd0c3",
+  "observer_source_sha256": "d3637b99c9994f420cbc1b11ec836e53a03322ac06369d56176be2f7d35e5d3e",
+  "production_inputs_unchanged": 172,
+  "asan_ubsan_checks": 1483,
+  "broken_variants_detected": [
+    "ignore-non-D0",
+    "ignore-changed-msi",
+    "accept-both-enabled",
+    "swap-function-mask-bit",
+    "skip-dynamic-msi-span"
+  ],
+  "native_objects_compiled": 2,
+  "native_import_count": 375,
+  "new_native_imports": 0,
+  "inherited_private_import": "_thread_call_cancel_wait",
+  "native_candidate_admitted": false,
+  "live_config_read": false,
+  "installed": false,
+  "loaded": false,
+  "GPU_executed": false,
+  "power_actions": 0,
+  "R3_complete": false
+}

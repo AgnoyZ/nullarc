@@ -17,6 +17,9 @@ MSI_MARKER = 'IOPCIMSIMode'
 REPORT_LEGEND = 'IOReportLegend'
 REPORT_GROUP = 'IOReportGroupName'
 IRQ_ACCOUNTING = 'Interrupt Statistics (by index)'
+START_CONFIG = 'phx-pci-irq-start-v1'
+START_CLASSES = {'both-message-enables-clear', 'msi-enable-set',
+                 'msix-enable-set-function-mask-clear', 'msix-enable-set-function-mask-set'}
 PCI_QUERY = ['/usr/sbin/ioreg', '-a', '-r', '-d', '2', '-c', 'IOPCIDevice']
 PHX_QUERY = ['/usr/sbin/ioreg', '-a', '-r', '-d', '2', '-c', 'PhxBringup']
 
@@ -46,6 +49,15 @@ def entry_id(entry):
     return value
 
 
+def start_config(entry):
+    if START_CONFIG not in entry:
+        return None
+    mode = entry[START_CONFIG]
+    if type(mode) is not str or mode not in START_CLASSES:
+        raise ValueError('Unknown start-time interrupt classification')
+    return mode
+
+
 def pci_snapshot(blob):
     pci = only([p for p in roots(blob) if p.get(CLASS) == 'IOPCIDevice' and
                 p.get('vendor-id') == b'\x02\x10\x00\x00' and p.get('device-id') == b'\x00\x19\x00\x00'])
@@ -65,7 +77,7 @@ def pci_snapshot(blob):
     irq_legend_count = sum(item.get(REPORT_GROUP) == IRQ_ACCOUNTING
                            for item in entries(pci.get(REPORT_LEGEND, [])))
     # Compare raw identities and specifiers only in memory, never in the report.
-    return provider_id, child_id, names, specifiers, marker, irq_legend_count
+    return provider_id, child_id, names, specifiers, marker, irq_legend_count, start_config(child)
 
 
 def summarize(before, service, after, version, build):
@@ -75,17 +87,22 @@ def summarize(before, service, after, version, build):
     if first != pci_snapshot(after):
         raise ValueError('PCI snapshot changed around service observation')
     phx = only(roots(service))
-    _, child_id, names, _, marker, irq_legend_count = first
+    _, child_id, names, _, marker, irq_legend_count, start_mode = first
     if (entry_id(phx) != child_id or phx.get(CLASS) != 'PhxBringup' or
             type(phx.get('phx-build')) is not int or phx['phx-build'] != 34):
         raise ValueError('Build34 service is not the observed PCI child')
+    if start_config(phx) != start_mode:
+        raise ValueError('Start-time classification changed around service observation')
     messaged = names.count(MESSAGED)
-    return dict(status='cached-pci-interrupt-descriptors-only' if names else 'no-cached-descriptors-visible',
+    status = ('start-time-pci-config-classification' if start_mode else
+              'cached-pci-interrupt-descriptors-only' if names else 'no-cached-descriptors-visible')
+    return dict(status=status,
                 os_version=version, os_build=build, pci='1002:1900', PhxBringup_build=34,
                 direct_pci_provider_matched=True, descriptor_count=len(names),
                 messaged_controller_count=messaged, other_controller_count=len(names) - messaged,
                 msi_registry_marker='absent' if marker is None else 'true' if marker else 'false',
                 irq_accounting_legend_count=irq_legend_count,
+                start_time_config_classification=start_mode or 'unavailable', loaded_image_identity_checked=False,
                 active_interrupt_mode_proved=False, active_isr_proved=False, eop_delivery_proved=False,
                 ih_consumer_ownership_proved=False, fence_visibility_proved=False,
                 device_opened=False, raw_registry_saved=False)

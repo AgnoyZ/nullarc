@@ -9,15 +9,16 @@ continues to use its existing waits. No event backend is bound.
 
 ## Admission gates, in order
 
-1. **Observe PCI configuration without registration.** Prepare a separate
-   build34 observer using the already retained `IOPCIDevice` at an existing
-   powered callback; it must not power up the device. Validate provider and
-   image identity, capability-list status, offsets, access widths and loop
-   bounds before interpreting only the standard MSI and MSI-X enable bits and,
-   where applicable, the MSI-X function mask. Refuse failed/all-ones reads,
-   malformed chains, contradictory enable bits and a concurrent transition.
-   Save only classifications. Capability enable, mask state and interrupt
-   delivery are separate facts. Do not read a named interrupt property, call
+1. **Observe PCI configuration without registration.** The
+   [offline start observer](BUILD34-PCI-IRQ-CONFIG.md) is prepared. It uses
+   the already retained `IOPCIDevice` on the existing start-time config-read
+   path, before this driver's power registration and enable writes; it does
+   not power up the device. It brackets the message-control reads with D0 and
+   identity checks and publishes only an allowed start-time classification.
+   Before a meaningful live observation, establish the exact image, provider
+   power/config access semantics and sealed rollback scope. Startup enable,
+   mask state, later configuration and interrupt delivery are separate facts.
+   Do not read a named interrupt property, call
    `getInterruptType`, or construct a provider-backed event source. Public XNU
    [registers the ISR during source initialization](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOInterruptEventSource.cpp#L72-L144);
    the public PCI [registration path can enable MSI/MSI-X](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L104-L123)

@@ -27,6 +27,7 @@ class PCIDescriptorTests(unittest.TestCase):
         self.assertEqual((report['descriptor_count'], report['messaged_controller_count'],
                           report['other_controller_count']), (2, 1, 1))
         self.assertEqual((report['msi_registry_marker'], report['irq_accounting_legend_count']), ('absent', 0))
+        self.assertEqual(report['start_time_config_classification'], 'unavailable')
         self.assertFalse(any(report[k] for k in ('active_interrupt_mode_proved', 'active_isr_proved', 'eop_delivery_proved',
                                                'ih_consumer_ownership_proved', 'fence_visibility_proved')))
         rendered = json.dumps(report)
@@ -74,6 +75,29 @@ class PCIDescriptorTests(unittest.TestCase):
                       {obs.REPORT_LEGEND: ['bad-entry']}):
             with self.subTest(extra=extra), self.assertRaises(ValueError):
                 self.summarize(after={**self.pci, **extra})
+
+    def test_start_configuration_never_proves_live_interrupts(self):
+        child = self.pci[obs.CHILDREN][0]
+        for mode in obs.START_CLASSES:
+            with self.subTest(mode=mode):
+                self.phx[obs.START_CONFIG] = child[obs.START_CONFIG] = mode
+                report = self.summarize()
+                self.assertEqual(report['status'], 'start-time-pci-config-classification')
+                self.assertEqual(report['start_time_config_classification'], mode)
+                self.assertFalse(any(report[key] for key in ('loaded_image_identity_checked',
+                                 'active_interrupt_mode_proved', 'active_isr_proved', 'eop_delivery_proved')))
+
+    def test_start_configuration_must_match_both_provider_snapshots(self):
+        self.phx[obs.START_CONFIG] = 'msi-enable-set'
+        with self.assertRaises(ValueError):
+            self.summarize()
+        child = self.pci[obs.CHILDREN][0]
+        child[obs.START_CONFIG] = self.phx[obs.START_CONFIG]
+        with self.assertRaises(ValueError):
+            self.summarize(after={**self.pci, obs.CHILDREN: [{**child, obs.START_CONFIG: 'both-message-enables-clear'}]})
+        self.phx[obs.START_CONFIG] = child[obs.START_CONFIG] = 'private-or-unrecognized'
+        with self.assertRaises(ValueError):
+            self.summarize()
 
     def test_duplicate_identity_is_refused(self):
         with self.assertRaises(ValueError):
