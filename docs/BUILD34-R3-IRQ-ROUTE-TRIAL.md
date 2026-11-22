@@ -106,6 +106,40 @@ set to false. `make test` runs 11 synthetic checks. Rollback is to omit the
 checker and its test entry. See the
 [offline record](validation/build34-r3-eop-evidence-offline-20261122.json).
 
+### Private raw IH capture validation
+
+The optional `check_ih_capture` path derives the vector fields instead of
+trusting caller-classified client/source/ring and MES fields. It accepts
+private snapshots of the primary ring in the same four cases. It reads
+exactly 32 captured little-endian bytes per entry and derives the header
+from dword 0 and the MES tag from dword 4, bit 24. See the pinned Linux
+[vector layout](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.c#L250-L286),
+[tag](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_mes_ctx.h#L116-L117)
+and [GFX11 dispatch](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L6231-L6259).
+This uses reference field meanings, not imported driver code.
+
+Each case has 2–64 bounded batches with independent times and the same
+service, route and two queue identities. The first is empty before submit;
+the last is empty during cleanup. Each batch must account for every entry
+implied by the byte cursor movement, including ring wrap. It brackets the
+captured bytes with equal producer writeback samples and rejects overflow,
+full, may-overflow, unknown bits, skipped consumer cursors, unrelated entries
+and extra EOPs. Unlike the Linux recovery path, the validator cannot clear
+overflow or salvage a partially overwritten window. The first independent
+BAR0 fence/payload gate is unchanged. Only this path reports
+`raw_ih_capture_checked`; both report `hardware_attested: false`.
+`make test` now runs 18 synthetic tests, including seven for raw capture.
+See the [offline capture record](validation/build34-r3-ih-capture-offline-20261122.json).
+
+An empty ring or stable writeback bracket can neither detect every unobserved
+overwrite nor prove device ordering. A separate collector must prove actual
+matching storage, generation and ordered visibility, complete capture without
+pointer reset or flag clear, and an independent first BAR0 read. This stage
+does not provide a runtime collector, MMIO read, registration, doorbell write
+or GPU submission. It returns no vector bytes, addresses or cursor values.
+Rollback is to omit the raw capture entry and its tests; the normalized
+checker remains unchanged.
+
 ## IH ownership review
 
 On November 21, 2026, two passive registry snapshots of the running PCI
@@ -126,6 +160,16 @@ driver registers [VM fault sources](https://github.com/torvalds/linux/blob/adc21
 An EOP-only filter does not justify taking the primary ring or discarding
 other vectors. These are Linux reference paths; they do not establish
 routing on the running macOS stack.
+
+The same [ring setup](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L212-L235)
+sets distinct address-space modes for bus and GPU virtual addresses, enables
+writeback, requests snooping and clears relaxed ordering. Its APU sizing path
+selects GPU virtual addresses when PSP loads firmware; the associated comment
+ties the bus-address alternative to a PSP boot-loader permission. This makes
+firmware provenance and translation part of the handoff, not a configuration
+detail that a new BAR mapping can bypass. It is not evidence that the PSP is
+currently programming the ring on this host, nor a definition of when old
+ring or writeback writes have drained.
 
 Linux's [ring disable clears the pointers](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L127-L189);
 the [IRQ shutdown](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L412-L421)

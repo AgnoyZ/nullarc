@@ -1,6 +1,7 @@
 """Check private, normalized build34 legacy EOP trial observations offline."""
 
 import re
+from struct import Struct
 
 
 _CASES = (("gfx", False), ("gfx", True), ("compute", False), ("compute", True))
@@ -9,6 +10,14 @@ _SOURCE = 0xB5
 _RINGS = {"gfx": 0x00, "compute": 0x04}
 _U32_MAX = (1 << 32) - 1
 _U64_MAX = (1 << 64) - 1
+_ENTRY = Struct("<8I")
+_IH_OFFSET = 0x3FFFC
+_IH_OVERFLOW = 1
+_IH_FULL_OR_AT_RISK = 0xC0000
+_MES_QUEUE_FLAG = 0x1000000
+_MAX_BATCHES = 64
+_CASE_FIELDS = ("queue interrupt recipe_sha256 target before first_read final_read start_ns submit_ns "
+                "close_ns cleanup_end_ns lost overflow fault")
 
 
 def _fields(record, names, label):
@@ -55,6 +64,88 @@ def _check_vector(vector, identity, queue, submit, read):
         raise ValueError("not the expected legacy CP EOP")
 
 
+def _decode_entry(data, identity, seen_ns):
+    if type(data) is not bytes or len(data) != _ENTRY.size:
+        raise ValueError("IH entry must contain exactly 32 captured bytes")
+    words = _ENTRY.unpack(data)
+    header = words[0]
+    return dict(identity=identity, seen_ns=seen_ns, client_id=header & 0xFF,
+                source_id=(header >> 8) & 0xFF, ring_id=(header >> 16) & 0xFF,
+                mes_tagged=bool(words[4] & _MES_QUEUE_FLAG))
+
+
+def _cursor(value, ring_size, *, writeback=False):
+    value = _integer(value, "IH cursor", low=0, high=_U32_MAX)
+    if writeback and value & (_IH_OVERFLOW | _IH_FULL_OR_AT_RISK):
+        raise ValueError("IH writeback signals overflow or insufficient ring space")
+    if value & ~_IH_OFFSET or value >= ring_size or value % _ENTRY.size:
+        raise ValueError("IH cursor outside the aligned ring")
+    return value
+
+
+def _capture_vectors(record, ring_size):
+    batches = record["ih_capture"]
+    if type(batches) is not list or not 2 <= len(batches) <= _MAX_BATCHES:
+        raise ValueError("require a bounded, bracketed IH capture")
+    _sample(record["before"])
+    identity = record["before"]["identity"]
+    previous_end = _integer(record["start_ns"], "window start")
+    submit = _integer(record["submit_ns"], "submission time")
+    close = _integer(record["close_ns"], "window close")
+    cleanup_end = _integer(record["cleanup_end_ns"], "cleanup end")
+    next_cursor = None
+    vectors = []
+    for index, batch in enumerate(batches):
+        _fields(batch, "identity begin_ns end_ns read_cursor writeback_before writeback_after entries", "IH batch")
+        if _identity(batch["identity"]) != identity:
+            raise ValueError("IH batch crossed a service, route or queue epoch")
+        begin = _integer(batch["begin_ns"], "IH batch start", low=previous_end)
+        end = _integer(batch["end_ns"], "IH batch end", low=begin, high=cleanup_end)
+        previous_end = end
+        read = _cursor(batch["read_cursor"], ring_size)
+        write = _cursor(batch["writeback_before"], ring_size, writeback=True)
+        if write != _cursor(batch["writeback_after"], ring_size, writeback=True):
+            raise ValueError("IH writeback changed during capture")
+        if next_cursor is not None and read != next_cursor:
+            raise ValueError("IH consumer cursor skipped or replayed entries")
+        next_cursor = write
+        expected = ((write - read) % ring_size) // _ENTRY.size
+        entries = batch["entries"]
+        if type(entries) is not list or len(entries) != expected:
+            raise ValueError("IH entry count disagrees with cursor movement")
+        if index == 0 and (expected or end >= submit):
+            raise ValueError("IH capture must begin empty before submission")
+        if index == len(batches) - 1 and (expected or begin < close):
+            raise ValueError("IH capture must end empty during cleanup")
+        if expected:
+            if expected != 1 or vectors or begin <= submit:
+                raise ValueError("unexpected IH traffic outside the single-entry trial")
+            vectors.append(_decode_entry(entries[0], identity, end))
+    return vectors
+
+
+def check_ih_capture(records, *, ring_size_bytes, observe_budget_ns, cleanup_budget_ns):
+    """Validate private primary-ring snapshots, without reading or acknowledging hardware.
+
+    Each batch describes one stable writeback interval and all entries between
+    its read cursor and writeback. The collector must attest visibility,
+    ownership, actual reads, no flag clearing and complete capture separately.
+    """
+    ring_size = _integer(ring_size_bytes, "IH ring size", low=2 * _ENTRY.size, high=_IH_OFFSET + 4)
+    if ring_size & (ring_size - 1):
+        raise ValueError("IH ring size must be a power of two")
+    if type(records) is not list or len(records) != len(_CASES):
+        raise ValueError("expected exactly four ordered route cases")
+    normalized = []
+    for record in records:
+        _fields(record, _CASE_FIELDS + " ih_capture", "raw route case")
+        item = {name: value for name, value in record.items() if name != "ih_capture"}
+        item["vectors"] = _capture_vectors(record, ring_size)
+        normalized.append(item)
+    result = check(normalized, observe_budget_ns=observe_budget_ns, cleanup_budget_ns=cleanup_budget_ns)
+    return dict(result, raw_ih_capture_checked=True)
+
+
 def check(records, *, observe_budget_ns, cleanup_budget_ns):
     """Refuse ambiguous evidence; never grant ownership, visibility or admission.
 
@@ -72,8 +163,7 @@ def check(records, *, observe_budget_ns, cleanup_budget_ns):
     route_epochs, queue_epochs, fence_values = set(), set(), set()
     recipes = {}
     for record, (queue, interrupt) in zip(records, _CASES):
-        _fields(record, "queue interrupt recipe_sha256 target before first_read final_read start_ns submit_ns "
-                        "close_ns cleanup_end_ns lost overflow fault vectors", "route case")
+        _fields(record, _CASE_FIELDS + " vectors", "route case")
         if record["queue"] != queue or record["interrupt"] is not interrupt:
             raise ValueError("expected control then EOP for GFX, then Compute")
         digest = record["recipe_sha256"]

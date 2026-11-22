@@ -1,0 +1,22 @@
+{
+  "status": "passed-offline-raw-ih-route-consistency",
+  "kernel_build_scope": 34,
+  "linux_reference_commit": "adc218676eef25575469234709c2d87185ca223a",
+  "raw_capture_test_methods": 7,
+  "unchanged_normalized_test_methods": 11,
+  "default_make_test_passed": true,
+  "default_firmware_fixture_tests_skipped": true,
+  "protected_production_inputs_unchanged": 172,
+  "raw_ih_capture_checked_in_cpu_fixtures": true,
+  "little_endian_entry_layout_and_mes_tag_checked": true,
+  "wrap_partial_count_cursor_skip_and_overflow_checked": true,
+  "first_independent_fence_record_gate_retained": true,
+  "hardware_attested": false,
+  "ih_owner_attested": false,
+  "old_writer_drain_proved": false,
+  "live_collector_enabled": false,
+  "mmio_accessed": false,
+  "interrupt_registered": false,
+  "gpu_executed": false,
+  "r3_accepted": false
+}

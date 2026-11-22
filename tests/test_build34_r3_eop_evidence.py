@@ -3,7 +3,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from build34_r3_eop_evidence import check
+from build34_r3_eop_evidence import check, check_ih_capture
 
 
 def fixture():
@@ -33,6 +33,35 @@ def fixture():
 
 def verify(records):
     return check(records, observe_budget_ns=100, cleanup_budget_ns=30)
+
+
+def capture_fixture(ring_size=128, cursor=96):
+    records = fixture()
+    for case in records:
+        normalized = case.pop("vectors")
+        start = case["start_ns"]
+        identity = case["before"]["identity"]
+        batches = []
+
+        def batch(begin, end, read, write, *entries):
+            batches.append(dict(identity=identity.copy(), begin_ns=start + begin, end_ns=start + end,
+                                read_cursor=read, writeback_before=write, writeback_after=write,
+                                entries=list(entries)))
+
+        batch(2, 3, cursor, cursor)
+        end_cursor = cursor
+        if normalized:
+            ring_id = normalized[0]["ring_id"]
+            entry = bytes((0x14, 0xB5, ring_id, 0x80)) + bytes(28)
+            end_cursor = (cursor + len(entry)) % ring_size
+            batch(37, 40, cursor, end_cursor, entry)
+        batch(105, 109, end_cursor, end_cursor)
+        case["ih_capture"] = batches
+    return records
+
+
+def verify_capture(records, ring_size=128):
+    return check_ih_capture(records, ring_size_bytes=ring_size, observe_budget_ns=100, cleanup_budget_ns=30)
 
 
 class RouteEvidence(unittest.TestCase):
@@ -147,6 +176,109 @@ class RouteEvidence(unittest.TestCase):
         records[1]["vectors"][0]["raw_words"] = []
         with self.assertRaisesRegex(ValueError, "unexpected IH vector fields"):
             verify(records)
+
+
+class RawIHCapture(unittest.TestCase):
+    def test_gfx_compute_wrap_and_nonwrap_preserve_normalized_result(self):
+        for ring_size, offset in ((128, 96), (128, 32), (64, 32), (262144, 262112)):
+            with self.subTest(ring_size=ring_size, offset=offset):
+                records = capture_fixture(ring_size, offset)
+                result = verify_capture(records, ring_size)
+                self.assertEqual(result, dict(verify(fixture()), raw_ih_capture_checked=True))
+                self.assertNotIn("vectors", records[1])
+                self.assertEqual(len(records[1]["ih_capture"][1]["entries"][0]), 32)
+
+    def test_header_layout_and_mes_tag_not_confused_with_ring_or_vmid_bits(self):
+        records = capture_fixture()
+        entry = records[3]["ih_capture"][1]["entries"]
+        tagged = bytearray(entry[0])
+        tagged[2] |= 0x80
+        tagged[3] |= 1
+        tagged[20] = 1
+        tagged[23] = 1
+        entry[0] = bytes(tagged)
+        self.assertIs(verify_capture(records)["hardware_attested"], False)
+        tagged[19] = 1
+        entry[0] = bytes(tagged)
+        with self.assertRaisesRegex(ValueError, "not the expected legacy CP EOP"):
+            verify_capture(records)
+
+    def test_bad_entry_length_type_byte_order_and_routing_refused(self):
+        original = capture_fixture()[3]["ih_capture"][1]["entries"][0]
+        for invalid in (original[:31], original + b"\0", bytearray(original), original[:4][::-1] + original[4:],
+                        bytes((0x14, 0xB5, 0x05, 0)) + original[4:], bytes((0x14, 0xB4, 4, 0)) + original[4:]):
+            with self.subTest(kind=type(invalid), length=len(invalid)), self.assertRaises(ValueError):
+                records = capture_fixture()
+                records[3]["ih_capture"][1]["entries"][0] = invalid
+                verify_capture(records)
+
+    def test_refuses_overflow_full_and_unsafe_geometry_from_either_writeback(self):
+        for field in ("writeback_before", "writeback_after"):
+            for bit in (1, 0x40000, 0x80000):
+                with self.subTest(field=field, bit=bit), self.assertRaisesRegex(ValueError, "overflow or insufficient"):
+                    records = capture_fixture()
+                    records[1]["ih_capture"][1][field] |= bit
+                    verify_capture(records)
+        for size in (0, 32, 96, 262145, True):
+            with self.subTest(size=size), self.assertRaisesRegex(ValueError, "ring size"):
+                verify_capture(capture_fixture(), size)
+        for field, value in (("read_cursor", 4), ("read_cursor", 128), ("writeback_before", 0x100000),
+                             ("writeback_after", True)):
+            with self.subTest(field=field, value=value), self.assertRaisesRegex(ValueError, "cursor"):
+                records = capture_fixture()
+                records[1]["ih_capture"][1][field] = value
+                verify_capture(records)
+
+    def test_refuses_unstable_writeback_omissions_duplicate_and_skipped_cursor(self):
+        for fields, message in ((dict(writeback_after=32), "changed during capture"),
+                                (dict(entries=[]), "entry count"),
+                                (dict(read_cursor=64), "skipped or replayed")):
+            with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, message):
+                records = capture_fixture()
+                records[1]["ih_capture"][1].update(fields)
+                verify_capture(records)
+        records = capture_fixture()
+        target = records[1]["ih_capture"][1]
+        target["entries"].append(target["entries"][0])
+        target["writeback_before"] = target["writeback_after"] = 32
+        with self.assertRaisesRegex(ValueError, "unexpected IH traffic"):
+            verify_capture(records)
+
+    def test_rejects_early_late_and_stale_batch_and_missing_bookends(self):
+        for index, fields, message in (
+            (0, dict(end_ns=1230), "begin empty before"),
+            (1, dict(begin_ns=1230), "outside the single-entry trial"),
+            (1, dict(end_ns=1250), "submit-to-read window"),
+            (2, dict(begin_ns=1299), "end empty during cleanup"),
+            (2, dict(end_ns=1321), "invalid IH batch end"),
+        ):
+            with self.subTest(index=index, fields=fields), self.assertRaisesRegex(ValueError, message):
+                records = capture_fixture()
+                records[1]["ih_capture"][index].update(fields)
+                verify_capture(records)
+        records = capture_fixture()
+        records[1]["ih_capture"][1]["identity"]["compute_generation"] += 1
+        with self.assertRaisesRegex(ValueError, "crossed a service, route or queue epoch"):
+            verify_capture(records)
+        for length in (0, 1, 65):
+            with self.subTest(length=length), self.assertRaisesRegex(ValueError, "bounded, bracketed"):
+                records = capture_fixture()
+                records[0]["ih_capture"] = records[0]["ih_capture"][:1] * length
+                verify_capture(records)
+
+    def test_retains_no_interrupt_control_and_first_fence_checks(self):
+        records = capture_fixture()
+        reference = records[1]["ih_capture"][1]
+        unexpected = dict(reference, identity=records[0]["before"]["identity"], begin_ns=1037, end_ns=1040)
+        records[0]["ih_capture"].insert(1, unexpected)
+        final = records[0]["ih_capture"][-1]
+        final.update(read_cursor=0, writeback_before=0, writeback_after=0)
+        with self.assertRaisesRegex(ValueError, "unexpected IH observations"):
+            verify_capture(records)
+        records = capture_fixture()
+        records[1]["first_read"]["payload_ok"] = False
+        with self.assertRaisesRegex(ValueError, "no fresh fence and verified payload"):
+            verify_capture(records)
 
 
 if __name__ == "__main__":
