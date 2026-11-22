@@ -524,6 +524,37 @@ firmware provenance, or IH handoff was made. Revert this isolated selector
 and its fixture changes to recover the earlier endpoint-only check. See the
 [sanitized result](validation/build34-r3-preboot-root-segment-20261123.json).
 
+### Corroborate the segment candidate with cached ACPI MCFG
+
+On macOS 26.7.2 (`25G332`), the opt-in `--check-acpi-mcfg` mode pairs each
+targeted topology observation with a read of the cached `ACPI Tables`
+property of `IOACPIPlatformExpert`. Two invocations each found two byte-matching
+`MCFG` samples. The table has one allocation entry, and its inclusive bus
+interval covers the observed bridge bus and entire downstream range. The
+parser follows the pinned ACPICA
+[MCFG header and allocation layout](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/include/acpi/actbl2.h#L1461-L1474).
+It checks signature, declared length, revision, checksum, reserved fields,
+entry count and same-segment overlap. It refuses partial coverage or another
+entry covering the bridge bus or any downstream bus; it does not interpret
+ECAM bases.
+
+This is a table-level cross-check against the PCI enumerator's cached buses,
+not an attestation of the selected root bridge, preboot bus assignment or
+loaded accessor. `MCFG` describes segment/bus windows, not the mapping of a
+particular ACPI root `_UID` to a window. Firmware can expose different boot
+and OS views. The previously retained DSDT did not byte-match the current
+cached DSDT and was not used to infer a root assignment. Establish that
+assignment from matching, independently reviewed evidence before sealing
+the firmware target. Still require attestation of the actual `GetLocation`
+implementation or use a separately reviewed observation that does not call it.
+
+Run the observer with `--check-acpi-mcfg` or its 15 synthetic cases with
+`--test-mcfg`, using the same Swift invocation above. The raw table remains
+in memory; the output contains no ECAM base, segment value, bus or UID. No
+AML method, ECAM access, PCI configuration read or MMIO is requested. The
+default invocation still does not query ACPI. Rollback is to omit this mode.
+See the [sanitized result](validation/build34-r3-preboot-mcfg-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

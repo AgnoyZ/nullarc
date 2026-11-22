@@ -79,8 +79,11 @@ it does not attest the firmware's path, segment or accessor. The [offline
 root-bridge check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#cross-check-the-uefi-root-bridge-segment-before-the-accessor)
 refuses an exact-root segment mismatch before the endpoint accessor. CPU
 and isolated OVMF tests passed, but both observations can share the same
-firmware state. Neither physical preboot attribution nor device drain is
-proved.
+firmware state. The [cached MCFG cross-check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#corroborate-the-segment-candidate-with-cached-acpi-mcfg)
+found one ACPI segment window covering the matching host bridge and downstream
+buses. It does not bind the firmware root UID to that window, attest preboot
+numbering or admit the accessor. Neither physical preboot attribution nor
+device drain is proved.
 
 ## Execution order
 
