@@ -463,6 +463,39 @@ target still needs independent accessor and target provenance and fresh
 authorization. See the
 [sanitized result](validation/build34-r3-preboot-pci-ovmf-20261123.json).
 
+### Constrain the target with passive macOS topology
+
+On November 23, 2026, two invocations of the targeted IOKit observer on
+macOS 26.7.2 (`25G332`) each produced two matching snapshots. The sole
+`1002:1900` PCI function was the published `PhxBringup` service's direct
+provider. Its `IODeviceTree` parent was one PCI bridge and the next ancestor
+had a numeric `_UID`. Those same bridge and root entries occurred in order
+in `IOService`. The endpoint's cached bus fell inside the bridge's cached
+secondary/subordinate range. The leading configuration cell in `reg` agreed
+with `pcidebug` for both PCI nodes; the tool did not inspect BAR fields.
+
+In the pinned Apple [configurator](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIConfigurator.cpp#L718-L753),
+`reg` and `pcidebug` are generated from the same PCI enumeration state and
+[can be updated in the device tree](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIConfigurator.cpp#L1630-L1653).
+Their agreement is a consistency check, not two independent firmware
+measurements. The EDK II [path builder](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Bus/Pci/PciBusDxe/PciEnumeratorSupport.c#L761-L780)
+appends the device and function to the firmware parent's path. The macOS
+result supplies a cross-check for the expected bridge/endpoint order and
+root UID, not the exact UEFI root node, segment, firmware bus assignment or
+loaded `GetLocation` implementation. Do not assume segment zero or seal a
+UEFI identity just from these OS properties.
+
+The observer is opt-in: run
+`swift -enable-bare-slash-regex tools/build34_r3_preboot_host_topology.swift`.
+It requests only named cached properties and parent/identity metadata, not
+a full property serialization, user-client open, PCI config read, interrupt
+property, AML method, or MMIO access. In the pinned Apple
+[`getProperty` reference](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIDevice.cpp#L1834-L1875),
+interrupt and link keys are explicitly special cases and are not queried.
+The observer prints no coordinates, registry identifiers or UID values and
+writes no host state. Scope and results are in the
+[sanitized record](validation/build34-r3-preboot-host-topology-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

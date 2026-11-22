@@ -72,9 +72,11 @@ checks two real EFI ABI metadata calls in a CPU fixture. Its [exact target
 selector](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#bind-attribution-to-the-complete-pci-path-and-location)
 also brackets them with full-path and admitted cached-location checks. The
 [OVMF test](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#isolated-ovmf-attribution-smoke-test)
-passed with real DXE services and synthetic PCI protocols. There is still no
-target platform accessor attestation, authorized physical attribution capture,
-or device drain proof.
+passed with real DXE services and synthetic PCI protocols. The [passive host
+check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#constrain-the-target-with-passive-macos-topology)
+corroborates the physical function and its bridge and root topology on macOS;
+it does not attest the firmware's path, segment or accessor. Neither physical
+preboot attribution nor device drain is proved.
 
 ## Execution order
 
