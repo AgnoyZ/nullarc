@@ -6,6 +6,10 @@ extern "C" {
 
 #ifdef PHX34_TEST_IOKIT
 #include "build34_r3_mesa_iokit.h"
+#ifdef PHX34_TEST_DRM
+#include "build34_r3_mesa_drm.h"
+#include "util/u_sync_provider.h"
+#endif
 #else
 int acd_kext_open_iokit(struct acd_kext **) { std::abort(); }
 #endif
@@ -351,6 +355,10 @@ struct FakeIOKit {
     Bridge bridge{false};
     mach_port_t port = 0x105;
     unsigned helloCalls = 0, closes = 0, helloFault = 0, failAllocation = 0;
+#ifdef PHX34_TEST_DRM
+    bool drm = false;
+    Pause *waitPause = nullptr;
+#endif
     static thread_local FakeIOKit *current;
 
     FakeIOKit() {
@@ -377,7 +385,12 @@ extern "C" kern_return_t phx34_fixture_method(mach_port_t conn, uint32_t selecto
     auto *fake = FakeIOKit::current;
     CHECK(fake && conn == 0x105 && fake->port == MACH_PORT_NULL && !fake->closes);
     if (selector == ACD_SEL_HELLO) {
-        CHECK(++fake->helloCalls == 1);
+        ++fake->helloCalls;
+#ifdef PHX34_TEST_DRM
+        CHECK(fake->helloCalls == 1 || (fake->drm && fake->helloCalls == 2 && fake->bridge.sessions == 1));
+#else
+        CHECK(fake->helloCalls == 1);
+#endif
         CHECK(scalars && scalarCount == 2 && scalars[0] == N48N_ABI_VERSION && scalars[1] == N48N_HELLO_F_MINOR);
         CHECK(!input && !inputSize && !output && !outputSize);
         CHECK(scalarOut && scalarOutCount && *scalarOutCount == 4);
@@ -391,7 +404,26 @@ extern "C" kern_return_t phx34_fixture_method(mach_port_t conn, uint32_t selecto
         scalarOut[3] = PHXN_VMID + (fake->helloFault == 6);
         return KERN_SUCCESS;
     }
+#ifdef PHX34_TEST_DRM
+    if (fake->drm && (selector == ACD_SEL_QUERY_INFO || selector == PHX_SEL_TOPOLOGY)) {
+        CHECK(fake->helloCalls == 2 && !scalars && !scalarCount && !input && !inputSize && !scalarOut && !scalarOutCount);
+        CHECK(output && outputSize);
+        if (selector == PHX_SEL_TOPOLOGY)
+            return static_cast<kern_return_t>(ACD_KR_UNSUPPORTED);
+        CHECK(*outputSize == sizeof(n48n_info));
+        auto &info = *static_cast<n48n_info *>(output);
+        info = {};
+        info.gb_addr_config = acd_canned_gb_addr_config(acd_canned_device());
+        info.va_low_last = info.va_high_last = UINT64_MAX;
+        return KERN_SUCCESS;
+    }
+    CHECK(fake->helloCalls == (fake->drm && selector != PHX34_R3_SEL_SESSION ? 2u : 1u));
+    if (selector == PHX34_R3_SEL_WAIT_RECEIPT && fake->waitPause)
+        fake->waitPause->arrive();
+    CHECK(!scalars && !scalarCount && !scalarOut && !scalarOutCount);
+#else
     CHECK(fake->helloCalls == 1 && !scalars && !scalarCount && !scalarOut && !scalarOutCount);
+#endif
     return Bridge::call(&fake->bridge, selector, input, inputSize, output, outputSize);
 }
 
@@ -463,6 +495,107 @@ static void iokit_adoption_errors() {
 }
 #endif
 
+#ifdef PHX34_TEST_DRM
+static void drm_drop(acd_device_handle device) {
+    auto *provider = acd_device_get_sync_provider(device);
+    provider->finalize(provider);
+    acd_device_deinitialize(device);
+}
+
+static uint32_t drm_signal_handle(util_sync_provider *provider) {
+    uint32_t handle = 0;
+    CHECK(provider->create(provider, 0, &handle) == 0 && handle);
+    return handle;
+}
+
+static uint64_t drm_submit(acd_device_handle device, uint32_t engine, uint32_t signal) {
+    drm_amdgpu_cs_chunk_ib ib{.va_start = 0x20000, .ib_bytes = 4, .ip_type = engine};
+    drm_amdgpu_cs_chunk_sem sem{.handle = signal};
+    drm_amdgpu_cs_chunk chunks[] = {
+        {AMDGPU_CHUNK_ID_IB, sizeof(ib) / 4, reinterpret_cast<uintptr_t>(&ib)},
+        {AMDGPU_CHUNK_ID_SYNCOBJ_OUT, sizeof(sem) / 4, reinterpret_cast<uintptr_t>(&sem)},
+    };
+    uint64_t pointers[] = {reinterpret_cast<uintptr_t>(&chunks[0]), reinterpret_cast<uintptr_t>(&chunks[1])};
+    drm_amdgpu_cs args{.in = {.ctx_id = 1, .num_chunks = 2, .chunks = reinterpret_cast<uintptr_t>(pointers)}};
+    CHECK(acd_ioctl(device, DRM_AMDGPU_CS, &args, sizeof(args)) == 0);
+    return args.out.handle;
+}
+
+static void drm_publish_and_drain() {
+    reset();
+    FakeIOKit fake;
+    fake.drm = true;
+    acd_device_handle primary = nullptr, secondary = nullptr;
+    uint32_t major = 0, minor = 0;
+    CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &primary) == -ENODEV && !primary);
+    CHECK(acd_device_initialize_exact_iokit(&fake.port, &major, &minor, &primary) == 0 && primary);
+    CHECK(fake.port == MACH_PORT_NULL && fake.helloCalls == 2 && fake.bridge.sessions == 1);
+    mach_port_t extra = 0x106;
+    CHECK(acd_device_initialize_exact_iokit(&extra, &major, &minor, &secondary) == -EBUSY && extra == 0x106 && !secondary);
+    CHECK(acd_device_initialize(&major, &minor, &secondary) == -EBUSY && !secondary);
+    CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &secondary) == 0 && secondary);
+    CHECK(acd_device_kext(primary, nullptr) == acd_device_kext(secondary, nullptr));
+    auto *provider = acd_device_get_sync_provider(primary);
+    CHECK(acd_sync_has_exact_completion(provider) && acd_sync_has_exact_completion(acd_device_get_sync_provider(secondary)));
+    auto *waiter = provider->clone(provider);
+    auto *observer = provider->clone(provider);
+    CHECK(waiter && observer);
+    uint32_t computeHandle = drm_signal_handle(provider), gfxHandle = drm_signal_handle(provider);
+    uint32_t unsubmitted = drm_signal_handle(observer);
+    const uint64_t compute = drm_submit(primary, AMDGPU_HW_IP_COMPUTE, computeHandle);
+    const uint64_t gfx = drm_submit(secondary, AMDGPU_HW_IP_GFX, gfxHandle);
+    CHECK(compute == 100 && gfx == 101);
+    fake.bridge.device.setFence(1, gfx);
+    CHECK(waiter->wait(waiter, &gfxHandle, 1, 0, 0, nullptr) == 0);
+    CHECK(waiter->wait(waiter, &computeHandle, 1, 0, 0, nullptr) == -1 && errno == ETIME);
+    CHECK(fake.bridge.acks == 1 && fake.bridge.client.exactRegistry.occupied() == 1);
+    drm_drop(primary);
+    CHECK(!fake.closes);
+
+    Pause pause;
+    fake.waitPause = &pause;
+    bool canceled = false;
+    std::thread waitThread([&] {
+        FakeIOKit::current = &fake;
+        canceled = waiter->wait(waiter, &computeHandle, 1, INT64_MAX, 0, nullptr) == -1 && errno == ECANCELED;
+    });
+    pause.wait();
+    std::thread closeThread([&] {
+        FakeIOKit::current = &fake;
+        drm_drop(secondary);
+    });
+    timespec now{};
+    CHECK(clock_gettime(CLOCK_MONOTONIC, &now) == 0);
+    const int64_t deadline = (now.tv_sec + 2) * 1000000000ll + now.tv_nsec;
+    CHECK(observer->wait(observer, &unsubmitted, 1, deadline, 0, nullptr) == -1 && errno == ECANCELED);
+    CHECK(!fake.closes);
+    acd_device_handle replacement = nullptr;
+    CHECK(acd_device_initialize_exact_iokit(&extra, &major, &minor, &replacement) == -EBUSY && extra == 0x106 && !replacement);
+    fake.bridge.device.setFence(0, compute);
+    pause.release();
+    waitThread.join();
+    closeThread.join();
+    CHECK(canceled && fake.closes == 1);
+    CHECK(waiter->wait(waiter, &gfxHandle, 1, 0, 0, nullptr) == -1 && errno == ECANCELED);
+    CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &replacement) == -ENODEV && !replacement);
+    waiter->finalize(waiter);
+    observer->finalize(observer);
+}
+
+static void drm_initial_clone_failure() {
+    reset();
+    FakeIOKit fake;
+    fake.drm = true;
+    fake.failAllocation = 8;
+    acd_device_handle device = nullptr;
+    uint32_t major = UINT32_MAX, minor = UINT32_MAX;
+    CHECK(acd_device_initialize_exact_iokit(&fake.port, &major, &minor, &device) == -ENOMEM);
+    CHECK(!device && fake.port == MACH_PORT_NULL && fake.closes == 1 && major == UINT32_MAX && minor == UINT32_MAX);
+    CHECK(fake.helloCalls == 2 && fake.bridge.sessions == 1 && !fake.bridge.submits);
+    CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &device) == -ENODEV && !device);
+}
+#endif
+
 int main() {
     paired_round_trip();
     full_receipts();
@@ -474,6 +607,12 @@ int main() {
 #ifdef PHX34_TEST_IOKIT
     iokit_adoption();
     iokit_adoption_errors();
+#endif
+#ifdef PHX34_TEST_DRM
+    unsetenv("RADV_DARWIN_MOCK");
+    unsetenv("RADV_DARWIN_HOST_BO");
+    drm_publish_and_drain();
+    drm_initial_clone_failure();
 #endif
     std::printf("PASS staged Mesa/native wire: %llu checks; GPU_executed=false\n",
                 static_cast<unsigned long long>(checks.load()));

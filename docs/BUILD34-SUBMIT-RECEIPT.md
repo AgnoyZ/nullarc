@@ -241,3 +241,45 @@ quiescence of callers before closing remain required. The close callback
 does not certify GPU/resource drain. The 172 production inputs, installed
 state and production exact capability remain unchanged. Roll back this
 source-only step by omitting the IOKit transform and optional test target.
+
+### DRM publication and sync shutdown
+
+The [DRM stage](../tools/build34_r3_mesa_drm.py) adds an explicit exact-only
+initializer to the staged Mesa source. It consumes a supplied connection
+only when no core is active or closing, completes IOKit adoption and the
+existing DRM handshake, then publishes the core after the first sync clone
+exists. Additional exact devices can deliberately join that core without a
+new port. A second supplied port or a legacy client cannot silently take
+over or share it. Failure after consuming the connection does not publish
+the core or retry with the legacy backend.
+
+The preceding core closed its transport when its last device went away,
+even though independently held sync clones could still call the backend.
+The staged last-device close removes the core from publication and closes
+sync admission before releasing the transport. A sync waiter holds a
+counted lease for the complete callback, with no sync lock held during the
+transport call. Close wakes pending waiters, waits for admitted callbacks
+to return, discards their late results, then clears the old context. It
+refuses new core creation during this drain. Callers still must quiesce
+direct device operations before freeing that device or its last provider
+handle. A wedged OS call has no proven cancellation path; the user-space
+drain is not a timeout guarantee, native queue drain or BO-release proof.
+
+ASan/UBSan and TSan each pass 8,832 checks. The CPU pairing uses the actual
+DRM ioctl path, sync-provider clones, Mesa IOKit wrapper and staged exact
+handlers. It completes later GFX while earlier Compute remains pending,
+holds a Compute callback across last-device close, verifies both an
+unsubmitted wait and a late returned completion are canceled, and checks
+single close and first-clone allocation failure. See the
+[DRM pairing record](validation/build34-r3-mesa-drm-offline-20261122.json).
+
+```sh
+make -j1 test-build34-r3-mesa-drm MESA_SOURCE="$MESA_SOURCE" \
+  R3_MESA_DRM_OUT=build/build34-r3-mesa-drm-drain-new-private
+```
+
+The OS symbols, Hello and device state are still test doubles. The normal
+RADV path does not call the exact initializer, and no real connection,
+production capability, kernel admission, GPU work or install is enabled.
+No protected production input changes. Omit this stage and its target to
+return to the preceding IOKit pairing.

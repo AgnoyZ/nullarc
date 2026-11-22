@@ -15,6 +15,7 @@ from build34_exact_progress_wire import (
     previous_stage, stage as progress_stage, stage_header as progress_header,
 )
 from build34_exact_submit import once
+from build34_r3_mesa_drm import stage_drm, stage_sync
 from build34_r3_mesa_iokit import IOKIT, IOKIT_SHA256, stage as iokit_stage
 from test_build34_exact_ownership import DRIVER, ROOT, method, sha
 from test_build34_exact_transport import DRM, KEXT, PATCH, PREFIX, SHAPE_PATCHES
@@ -22,7 +23,8 @@ from test_build34_exact_multitarget import apply, stage
 from upstream34_layout import radv_ib_tail
 
 
-def test(mesa, out, *, iokit=False):
+def test(mesa, out, *, iokit=False, drm=False):
+    iokit = iokit or drm
     mesa, out = Path(mesa).resolve(), Path(out).resolve()
     if out.exists() or ROOT / 'build' not in out.parents or not out.name.endswith('-private'):
         raise ValueError('Require a fresh ignored worktree build path ending -private')
@@ -43,6 +45,8 @@ def test(mesa, out, *, iokit=False):
     adapter = 'tools/build34_r3_mesa_wire.c'
     fixture = 'tests/test_build34_r3_mesa_wire.cpp'
     iokit_fixture = 'tests/test_build34_r3_mesa_iokit.c'
+    sync = PREFIX + 'ac_darwin_sync.c'
+    vamgr = PREFIX + 'amdgpu_vamgr.c'
     native_evidence = json.loads((ROOT / native_record).read_text())
     mesa_evidence = json.loads((ROOT / transport_record).read_text())
     patches = [*SHAPE_PATCHES, PATCH]
@@ -59,6 +63,9 @@ def test(mesa, out, *, iokit=False):
         iokit_staged = iokit_stage(iokit_source.decode()).encode()
         if not iokit_staged.startswith(iokit_source.split(b'#include', 1)[0]):
             raise ValueError('Original Mesa IOKit notice changed')
+    if drm:
+        paths.extend(['tools/build34_r3_mesa_drm.py', 'tools/build34_r3_mesa_drm.h',
+                      'docs/validation/build34-r3-mesa-iokit-offline-20261122.json'])
     inputs = {name: (ROOT / name).read_bytes() for name in paths}
     pinned = {**native_evidence['input_sha256'], **{name: mesa_evidence['input_sha256'][name] for name in patches}}
     if any(sha(inputs[name]) != digest for name, digest in pinned.items()):
@@ -76,12 +83,12 @@ def test(mesa, out, *, iokit=False):
     stage(inputs, frozen)
     stage(mesa_source, closure)
 
-    def run(args, label, *, cwd=out, timeout=90):
+    def run(args, label, *, cwd=out, timeout=90, expected_stderr=rb''):
         result = subprocess.run([str(arg) for arg in args], cwd=cwd, stdin=subprocess.DEVNULL,
                                 timeout=timeout, capture_output=True)
         (out / (label + '.stdout')).write_bytes(result.stdout)
         (out / (label + '.stderr')).write_bytes(result.stderr)
-        if result.returncode or result.stderr:
+        if result.returncode or not re.fullmatch(expected_stderr, result.stderr):
             raise RuntimeError(label + ' failed; inspect private logs')
         return result.stdout.decode()
 
@@ -96,6 +103,17 @@ def test(mesa, out, *, iokit=False):
     if iokit:
         stage({IOKIT: iokit_source}, out / 'iokit-baseline')
         (closure / IOKIT).write_bytes(iokit_staged)
+    if drm:
+        prior_iokit = json.loads(inputs['docs/validation/build34-r3-mesa-iokit-offline-20261122.json'])
+        if sha(iokit_staged) != prior_iokit['staged_iokit_source_sha256']:
+            raise ValueError('Previously reviewed IOKit stage changed')
+        for name, transform in [(DRM, stage_drm), (sync, stage_sync)]:
+            source = mesa_staged[name]
+            candidate = transform(source.decode()).encode()
+            if not candidate.startswith(source.split(b'#include', 1)[0]):
+                raise ValueError('Original Mesa notice changed: ' + name)
+            (closure / name).write_bytes(candidate)
+            mesa_staged[name] = candidate
 
     native_result = json.loads(run([sys.executable, '-B', ROOT / native_case, '--out', native],
                                    'native-regressions', cwd=ROOT, timeout=360))
@@ -147,6 +165,8 @@ def test(mesa, out, *, iokit=False):
                native / 'frozen/tests/test_build34_exact_receipt_peer.c']
     if iokit:
         sources.extend([closure / IOKIT, frozen / iokit_fixture])
+    if drm:
+        sources.extend(closure / name for name in (DRM, sync, vamgr, 'src/amd/common/amdgpu_devices.c'))
     for label, sanitizer in [('memory', 'address,undefined'), ('thread', 'thread')]:
         flags = ['-O1', '-g', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                  '-fno-omit-frame-pointer', '-fno-sanitize-recover=all', '-fsanitize=' + sanitizer]
@@ -162,6 +182,13 @@ def test(mesa, out, *, iokit=False):
                 extra.append('-DPHX34_TEST_IOKIT=1')
             if iokit and source in (closure / KEXT, closure / IOKIT):
                 extra.append('-Dcalloc=phx34_fixture_calloc')
+            if drm and source == frozen / fixture:
+                extra.append('-DPHX34_TEST_DRM=1')
+            if drm and source in (closure / DRM, closure / sync):
+                extra.append('-Dcalloc=phx34_fixture_calloc')
+            if drm and source == closure / vamgr:
+                extra.append('-Dlibdrm_container_of(ptr,sample,member)=((void *)((char *)(ptr) - '
+                             '__builtin_offsetof(__typeof__(*(sample)), member)))')
             run(['/usr/bin/xcrun', cc, standard, *flags, *includes, *extra,
                  '-MMD', '-MF', dep, '-c', source, '-o', obj], obj.stem + '-compile')
             deps = shlex.split(dep.read_text().replace('\\\n', ' ').split(':', 1)[1])
@@ -176,8 +203,10 @@ def test(mesa, out, *, iokit=False):
         run(['/usr/bin/xcrun', 'clang++', *flags, '-Wl,-dead_strip', *objects, '-o', binary], label + '-link')
         if re.search(r'IOKit|Metal|vulkan|PhxAccel', run(['/usr/bin/otool', '-L', binary], label + '-linkage'), re.I):
             raise ValueError('Device runtime linked')
+        log = (rb'radv-darwin: native kext: ABI 1\.9, build 34, VMID 8, max 64 IBs/submit, GB_ADDR_CONFIG '
+               rb'0x[0-9a-f]{8}, VRAM 0 MiB visible \+ 0 MiB hi, GTT cap 0 MiB\n') if drm else rb''
         result = re.fullmatch(r'PASS staged Mesa/native wire: (\d+) checks; GPU_executed=false\n',
-                              run([binary], label + '-test'))
+                              run([binary], label + '-test', expected_stderr=log))
         if not result:
             raise ValueError('Paired receipt suite did not pass')
         checks[label] = int(result[1])
@@ -211,6 +240,13 @@ def test(mesa, out, *, iokit=False):
                       actual_iokit_transport_compiled=True, iokit_symbols_test_doubles=True,
                       real_IOKit_called=False, native_hello_modeled=True,
                       drm_core_adopted=False, native_session_opened=False)
+    if drm:
+        report.update(status='passed-CPU-only-staged-Mesa-DRM-exact-publication-and-drain',
+                      staged_drm_source_sha256=sha(mesa_staged[DRM]),
+                      staged_sync_source_sha256=sha(mesa_staged[sync]),
+                      drm_core_adopted=True, drm_cs_dual_queue_paired_in_fixture=True,
+                      sync_backend_close_waits_for_transport_callback=True,
+                      native_drain_attested=False)
     (out / 'result-private.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report))
 
@@ -220,5 +256,6 @@ if __name__ == '__main__':
     parser.add_argument('--mesa-source', required=True, type=Path)
     parser.add_argument('--out', required=True, type=Path)
     parser.add_argument('--iokit', action='store_true')
+    parser.add_argument('--drm', action='store_true')
     args = parser.parse_args()
-    test(args.mesa_source, args.out, iokit=args.iokit)
+    test(args.mesa_source, args.out, iokit=args.iokit, drm=args.drm)

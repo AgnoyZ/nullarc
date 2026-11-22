@@ -210,6 +210,11 @@ test-build34-r3-mesa-iokit:
 	@test -n "$(MESA_SOURCE)" -a -n "$(R3_MESA_IOKIT_OUT)" || (echo "Set MESA_SOURCE and fresh R3_MESA_IOKIT_OUT"; exit 2)
 	python3 -B tools/test_build34_r3_mesa_wire.py --iokit --mesa-source "$(MESA_SOURCE)" --out "$(R3_MESA_IOKIT_OUT)"
 
+.PHONY: test-build34-r3-mesa-drm
+test-build34-r3-mesa-drm:
+	@test -n "$(MESA_SOURCE)" -a -n "$(R3_MESA_DRM_OUT)" || (echo "Set MESA_SOURCE and fresh R3_MESA_DRM_OUT"; exit 2)
+	python3 -B tools/test_build34_r3_mesa_wire.py --drm --mesa-source "$(MESA_SOURCE)" --out "$(R3_MESA_DRM_OUT)"
+
 # Staged native full-receipt dispatch with C peer, CPU objects only.
 .PHONY: test-build34-exact-receipt
 test-build34-exact-receipt:
