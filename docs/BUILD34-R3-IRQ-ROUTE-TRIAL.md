@@ -227,8 +227,9 @@ The same-generation samples still need an independent collector that
 establishes the effective BAR0 mapping/cache policy, the actual access order
 and the absence of other writes to these test slots. A matching snapshot
 does not prove that the GPU wrote it or that a sample was really the first
-read. Seal one mapping and accessor for the control and EOP arms. The
-[NBIO/HDP source audit](BUILD34-FENCE-READER.md#interrupt-transport-does-not-synchronize-bar0)
+read. The [attempt trace below](#bind-every-bar0-read-attempt) replaces
+combined sample records and checks the declared order and access identity.
+The [NBIO/HDP source audit](BUILD34-FENCE-READER.md#interrupt-transport-does-not-synchronize-bar0)
 does not support inserting a new flush or dummy read after the event to make
 the first fence read pass. Keep any later diagnostic read separate.
 `raw_bar0_samples_checked` reports only record consistency. Retain raw
@@ -264,6 +265,34 @@ only trace consistency. This is not a Mesa payload recipe or an authorization
 to write hardware, and there is still no live collector. Rollback is to omit
 this checker revision; do not use the older format to qualify the live route.
 See the [sanitized offline result](validation/build34-r3-one-shot-pm4-evidence-offline-20261123.json).
+
+### Bind every BAR0 read attempt
+
+Matching bytes in a merged snapshot did not distinguish a fence-first read
+from a payload-first read, a replacement mapping or a successful retry.
+The one-shot checker now requires three ordered attempts per sample: the
+submitting queue's full fence first, the peer fence next, then the complete
+guarded payload. Each records byte offset, start and end times, result status,
+raw bytes, both queue generations, service/route identity, and the token of the
+one mapping and accessor sealed for all four windows. The EOP copy must
+finish before the first fence attempt begins, not just before a sample ends.
+
+Number attempts on entry, before touching BAR0, starting at one for the
+trial. Count failures, short reads and accesses outside a sample as well.
+Seal the counter after closing and draining the read side, and collect it
+independently of the exported sample list. The checker requires consecutive
+ordinals and a final count of 36, with no failed, extra or overlapping read.
+A guarded-range attempt may include multiple loads; the admitted accessor
+must not hide retries, dummy reads, remapping or cache operations inside an
+attempt. Any failed first read remains a failed trial even if later diagnostics
+see the target. Retain the old merged format only as historical evidence.
+
+`bar0_attempt_trace_checked` proves consistency against a supplied trace and
+counter, not that instrumentation covers the real accesses, that the cache
+attributes are effective or that a GPU write was visible. There is no live
+collector. Keep raw bytes, offsets and tokens private. Rollback is to omit
+this offline checker revision; the prior format cannot qualify a new trial.
+See the [sanitized offline result](validation/build34-r3-one-shot-bar0-attempts-offline-20261123.json).
 
 ## IH ownership review
 

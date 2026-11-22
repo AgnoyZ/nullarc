@@ -251,20 +251,45 @@ def _payload_scope(scope, offsets, aperture_size):
     return start, regions
 
 
-def _raw_bar0_case(record, payload_offset, regions):
+def _bar0_reads(sample, offsets, identity, access_token, next_ordinal):
+    _fields(sample, "reads", "one-shot BAR0 sample")
+    reads = sample["reads"]
+    if type(reads) is not list or len(reads) != len(offsets):
+        raise ValueError("require exactly three ordered BAR0 read attempts per sample")
+    sizes = (_FENCE_BYTES, _FENCE_BYTES, _REGION_BYTES)
+    labels = ("fence read", "peer fence read", "guarded payload sample")
+    data = []
+    end = 1
+    for read, expected_offset, size, label in zip(reads, offsets, sizes, labels):
+        _fields(read, "identity access_token ordinal offset begin_ns end_ns ok data", "BAR0 read attempt")
+        if _identity(read["identity"]) != identity:
+            raise ValueError("BAR0 read crossed the admitted route or queue generation")
+        if _integer(read["access_token"], "BAR0 access token") != access_token:
+            raise ValueError("BAR0 read did not use the admitted mapping and accessor")
+        if _integer(read["ordinal"], "BAR0 read ordinal") != next_ordinal:
+            raise ValueError("BAR0 read attempt skipped or replayed")
+        next_ordinal += 1
+        if _integer(read["offset"], "BAR0 read offset", low=0) != expected_offset:
+            raise ValueError("BAR0 read not from the admitted offset in fence-first order")
+        begin = _integer(read["begin_ns"], "BAR0 read start", low=end)
+        end = _integer(read["end_ns"], "BAR0 read end", low=begin)
+        if read["ok"] is not True:
+            raise ValueError("failed BAR0 read attempt")
+        data.append(_bytes(read["data"], size, label))
+    return data, reads[0]["begin_ns"], end, next_ordinal
+
+
+def _raw_bar0_case(record, offsets, regions, identity, access_token, next_ordinal):
     case = record.copy()
     peer_value = None
     for name, region in zip(("before", "first_read", "final_read"), (regions[0], regions[1], regions[1])):
         sample = record[name]
-        _fields(sample, "identity begin_ns end_ns fence_offset other_fence_offset fence_data other_fence_data "
-                "payload_region_offset payload_region", "one-shot BAR0 sample")
-        offset = _integer(sample["payload_region_offset"], "sampled BAR0 guarded payload offset", low=0)
-        if offset != payload_offset:
-            raise ValueError("BAR0 payload sample not from the admitted offset")
-        if _bytes(sample["payload_region"], _REGION_BYTES, "guarded payload sample") != region:
+        data, begin, end, next_ordinal = _bar0_reads(sample, offsets, identity, access_token, next_ordinal)
+        fence_bytes, peer_bytes, payload = data
+        if payload != region:
             raise ValueError(f"BAR0 {name} payload or guard mismatch")
-        fence = int.from_bytes(_bytes(sample["fence_data"], _FENCE_BYTES, "fence read"), "little")
-        peer = int.from_bytes(_bytes(sample["other_fence_data"], _FENCE_BYTES, "peer fence read"), "little")
+        fence = int.from_bytes(fence_bytes, "little")
+        peer = int.from_bytes(peer_bytes, "little")
         if name == "before":
             if fence <= _U32_MAX:
                 raise ValueError("BAR0 pre-submit fence must poison the high dword")
@@ -273,12 +298,10 @@ def _raw_bar0_case(record, payload_offset, regions):
             raise ValueError(f"BAR0 {name} full fence does not match the submitted target")
         if peer != peer_value:
             raise ValueError("other queue full fence changed")
-        case[name] = {field: sample[field] for field in (
-            "identity", "begin_ns", "end_ns", "fence_offset", "other_fence_offset",
-        )}
-        case[name].update(fence=fence & _U32_MAX, other_fence=peer & _U32_MAX,
-                          payload_ok=name != "before")
-    return case, peer_value
+        case[name] = dict(identity=identity, begin_ns=begin, end_ns=end,
+                          fence_offset=offsets[0], other_fence_offset=offsets[1],
+                          fence=fence & _U32_MAX, other_fence=peer & _U32_MAX, payload_ok=name != "before")
+    return case, peer_value, next_ordinal
 
 
 def check_one_shot_irq_delivery(records, *, scope, terminal):
@@ -287,12 +310,13 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
     The caller supplies the independently bound scope and complete trace. This
     checks consistency, not loaded images, actual dispatch, DMA drain or admission.
     """
-    _fields(scope, "identity irq_source_token initial_read_cursor ring_size_bytes bar0_mc_base "
+    _fields(scope, "identity irq_source_token bar0_access_token initial_read_cursor ring_size_bytes bar0_mc_base "
             "bar0_size_bytes gfx_fence_offset compute_fence_offset observe_budget_ns cleanup_budget_ns "
             "terminal_deadline_ns payload_region_offset payload_guard_before payload_guard_after payload_challenges",
             "single-route scope")
     identity = _identity(scope["identity"])
     irq_token = _integer(scope["irq_source_token"], "admitted IRQ source token")
+    access_token = _integer(scope["bar0_access_token"], "admitted BAR0 access token")
     ring_size, mc_base, bar0_size = _geometry(scope["ring_size_bytes"], scope["bar0_mc_base"], scope["bar0_size_bytes"])
     cursor = _cursor(scope["initial_read_cursor"], ring_size)
     offsets = {queue: _integer(scope[queue + "_fence_offset"], "admitted BAR0 fence offset",
@@ -305,6 +329,7 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
 
     normalized = []
     next_dispatch = 1
+    next_read = 1
     prior_fences = {}
     for record, (queue, interrupt), regions in zip(records, _CASES, payload_regions):
         _fields(record, _CASE_FIELDS + " ih_capture submitted_pm4 isr_dispatches", "single-route case")
@@ -328,12 +353,11 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
 
         packet = _submitted_release(record["submitted_pm4"], mc_base + payload_offset + _GUARD_BYTES,
                                     regions[1][_GUARD_BYTES:-_GUARD_BYTES])
-        raw_case, peer_value = _raw_bar0_case(record, payload_offset, regions)
-        item, pair, cursor = _normalize_capture(raw_case, packet, ring_size, mc_base, bar0_size,
-                                                start_cursor=cursor, dispatch_ns=dispatch_ns)
         peer = "compute" if queue == "gfx" else "gfx"
-        if pair != (offsets[queue], offsets[peer]):
-            raise ValueError("BAR0 fence slots do not match the admitted queue pair")
+        raw_case, peer_value, next_read = _raw_bar0_case(
+            record, (offsets[queue], offsets[peer], payload_offset), regions, identity, access_token, next_read)
+        item, _, cursor = _normalize_capture(raw_case, packet, ring_size, mc_base, bar0_size,
+                                             start_cursor=cursor, dispatch_ns=dispatch_ns)
         if prior_fences.setdefault(peer, peer_value) != peer_value:
             raise ValueError("peer fence changed between route cases")
         prior_fences[queue] = item["target"]
@@ -341,16 +365,22 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
 
     result = _check_records(normalized, observe_budget_ns=scope["observe_budget_ns"],
                             cleanup_budget_ns=scope["cleanup_budget_ns"], fixed_identity=identity)
-    _fields(terminal, "identity source_token seen_ns dispatch_count", "terminal dispatch sample")
+    _fields(terminal, "identity source_token seen_ns dispatch_count bar0_access_token bar0_attempt_count",
+            "terminal route sample")
     if (_identity(terminal["identity"]) != identity or
             _integer(terminal["source_token"], "terminal IRQ source token") != irq_token):
         raise ValueError("terminal sample crossed the admitted route or source")
     if _integer(terminal["dispatch_count"], "terminal IRQ dispatch count", low=0) != next_dispatch - 1:
         raise ValueError("terminal IRQ dispatch count disagrees with the four windows")
+    if _integer(terminal["bar0_access_token"], "terminal BAR0 access token") != access_token:
+        raise ValueError("terminal BAR0 sample did not use the admitted mapping and accessor")
+    if _integer(terminal["bar0_attempt_count"], "terminal BAR0 attempt count", low=0) != next_read - 1:
+        raise ValueError("terminal BAR0 attempt count disagrees with the four windows")
     _integer(terminal["seen_ns"], "terminal sample time", low=normalized[-1]["cleanup_end_ns"],
              high=_integer(scope["terminal_deadline_ns"], "terminal deadline"))
     return dict(result, raw_ih_capture_checked=True, release_mem_checked=True, isr_dispatch_checked=True,
-                raw_bar0_samples_checked=True, submitted_pm4_checked=True, single_route_checked=True,
+                raw_bar0_samples_checked=True, bar0_attempt_trace_checked=True,
+                submitted_pm4_checked=True, single_route_checked=True,
                 old_writer_drain_proved=False)
 
 

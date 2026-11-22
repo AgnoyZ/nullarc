@@ -79,7 +79,12 @@ def verify_capture(records, ring_size=128, *, bar0_base=_BAR0_MC_BASE, bar0_size
 
 def rewrite_fence_slots(case, offset, peer_offset):
     for name in ("before", "first_read", "final_read"):
-        case[name].update(fence_offset=offset, other_fence_offset=peer_offset)
+        sample = case[name]
+        if "reads" in sample:
+            sample["reads"][0]["offset"] = offset
+            sample["reads"][1]["offset"] = peer_offset
+        else:
+            sample.update(fence_offset=offset, other_fence_offset=peer_offset)
     release = case.get("release_mem") if "submitted_pm4" not in case else case["submitted_pm4"][-32:]
     words = list(unpack("<8I", release))
     address = _BAR0_MC_BASE + offset
@@ -96,12 +101,13 @@ def one_shot_fixture():
     records = capture_fixture(ring_size, cursor)
     identity = dict(service_epoch=3, route_epoch=5, gfx_generation=7, compute_generation=9)
     scope = dict(identity=identity.copy(), initial_read_cursor=cursor, ring_size_bytes=ring_size,
-                 bar0_mc_base=_BAR0_MC_BASE, bar0_size_bytes=_BAR0_SIZE, irq_source_token=28,
+                 bar0_mc_base=_BAR0_MC_BASE, bar0_size_bytes=_BAR0_SIZE, irq_source_token=28, bar0_access_token=48,
                  gfx_fence_offset=16, compute_fence_offset=32, observe_budget_ns=100, cleanup_budget_ns=30,
                  terminal_deadline_ns=1760, payload_region_offset=128,
                  payload_guard_before=bytes([0xA5]) * 64, payload_guard_after=bytes([0x5A]) * 64,
                  payload_challenges=[dict(seed=bytes([2 * index]) * 1024, result=bytes([2 * index + 1]) * 1024)
                                      for index in range(len(records))])
+    ordinal = 0
     for index, case in enumerate(records):
         queue = case["queue"]
         is_gfx = queue == "gfx"
@@ -113,16 +119,20 @@ def one_shot_fixture():
         case.pop("recipe_sha256")
         for name in ("before", "first_read", "final_read"):
             sample = case[name]
-            sample["identity"] = identity.copy()
-            value = sample.pop("fence")
-            sample.pop("payload_ok")
-            sample.pop("other_fence")
             before = name == "before"
             payload = scope["payload_challenges"][index]["seed" if before else "result"]
-            sample.update(fence_data=pack("<2I", value, 0xDEADBEEF if before else 0),
-                          other_fence_data=pack("<Q", 7 if is_gfx else records[1]["target"]),
-                          payload_region_offset=scope["payload_region_offset"],
-                          payload_region=scope["payload_guard_before"] + payload + scope["payload_guard_after"])
+            reads = []
+            for offset, data in (
+                (sample["fence_offset"], pack("<2I", sample["fence"], 0xDEADBEEF if before else 0)),
+                (sample["other_fence_offset"], pack("<Q", 7 if is_gfx else records[1]["target"])),
+                (scope["payload_region_offset"], scope["payload_guard_before"] + payload + scope["payload_guard_after"]),
+            ):
+                ordinal += 1
+                begin = sample["begin_ns"] if not reads else sample["end_ns"]
+                reads.append(dict(identity=identity.copy(), access_token=scope["bar0_access_token"],
+                                  ordinal=ordinal, offset=offset, begin_ns=begin,
+                                  end_ns=sample["end_ns"], ok=True, data=data))
+            case[name] = dict(reads=reads)
         case["isr_dispatches"] = [dict(identity=identity.copy(), source_token=scope["irq_source_token"],
                                        ordinal=1 + index // 2, seen_ns=case["start_ns"] + 34)] if case["interrupt"] else []
         for batch in case["ih_capture"]:
@@ -135,7 +145,7 @@ def one_shot_fixture():
 
 def verify_one_shot(records, scope, **terminal_fields):
     terminal = dict(identity=scope["identity"].copy(), source_token=scope["irq_source_token"],
-                    seen_ns=1740, dispatch_count=2)
+                    seen_ns=1740, dispatch_count=2, bar0_access_token=scope["bar0_access_token"], bar0_attempt_count=36)
     terminal.update(terminal_fields)
     return check_one_shot_irq_delivery(records, scope=scope, terminal=terminal)
 
@@ -149,6 +159,7 @@ class OneShotIrqDelivery(unittest.TestCase):
         self.assertIs(result["release_mem_checked"], True)
         self.assertIs(result["submitted_pm4_checked"], True)
         self.assertIs(result["raw_bar0_samples_checked"], True)
+        self.assertIs(result["bar0_attempt_trace_checked"], True)
         self.assertIs(result["hardware_attested"], False)
         self.assertIs(result["old_writer_drain_proved"], False)
         self.assertEqual(records[1]["ih_capture"][-1]["read_cursor"], 0)
@@ -228,7 +239,7 @@ class OneShotIrqDelivery(unittest.TestCase):
                 case["isr_dispatches"][0]["seen_ns"] = case["start_ns"] + relative
                 verify_one_shot(records, scope)
         records, scope = one_shot_fixture()
-        records[3]["first_read"]["begin_ns"] = records[3]["ih_capture"][1]["end_ns"]
+        records[3]["first_read"]["reads"][0]["begin_ns"] = records[3]["ih_capture"][1]["end_ns"]
         with self.assertRaisesRegex(ValueError, "submit-to-read window"):
             verify_one_shot(records, scope)
 
@@ -237,8 +248,7 @@ class OneShotIrqDelivery(unittest.TestCase):
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, "admitted route or queue generation"):
                 records, scope = one_shot_fixture()
                 case = records[2]
-                for sample in (case["before"], case["first_read"], case["final_read"], *case["ih_capture"]):
-                    sample["identity"][field] += 1
+                case["final_read"]["reads"][1]["identity"][field] += 1
                 verify_one_shot(records, scope)
 
     def test_refuses_cursor_reset_before_first_window_or_across_wrap(self):
@@ -254,7 +264,7 @@ class OneShotIrqDelivery(unittest.TestCase):
 
     def test_refuses_new_self_consistent_packet_to_an_unadmitted_slot(self):
         for offset, peer_offset in ((40, 32), (16, 40), (32, 16)):
-            with self.subTest(offset=offset, peer_offset=peer_offset), self.assertRaisesRegex(ValueError, "admitted queue pair"):
+            with self.subTest(offset=offset, peer_offset=peer_offset), self.assertRaisesRegex(ValueError, "fence-first order"):
                 records, scope = one_shot_fixture()
                 rewrite_fence_slots(records[1], offset, peer_offset)
                 verify_one_shot(records, scope)
@@ -268,8 +278,8 @@ class OneShotIrqDelivery(unittest.TestCase):
             with self.subTest(case=index), self.assertRaisesRegex(ValueError, "peer fence changed between"):
                 records, scope = one_shot_fixture()
                 for name in ("before", "first_read", "final_read"):
-                    sample = records[index][name]
-                    sample["other_fence_data"] = pack("<Q", unpack("<Q", sample["other_fence_data"])[0] + (1 << 32))
+                    read = records[index][name]["reads"][1]
+                    read["data"] = pack("<Q", unpack("<Q", read["data"])[0] + (1 << 32))
                 verify_one_shot(records, scope)
 
     def test_requires_high_dword_overwrite_on_first_and_final_read(self):
@@ -277,23 +287,22 @@ class OneShotIrqDelivery(unittest.TestCase):
             with self.subTest(sample=name), self.assertRaisesRegex(ValueError, "full fence"):
                 records, scope = one_shot_fixture()
                 case = records[1]
-                case[name]["fence_data"] = pack("<2I", case["target"], 0xDEADBEEF)
+                case[name]["reads"][0]["data"] = pack("<2I", case["target"], 0xDEADBEEF)
                 verify_one_shot(records, scope)
         records, scope = one_shot_fixture()
-        before = records[1]["before"]
-        before["fence_data"] = before["fence_data"][:4] + bytes(4)
+        before = records[1]["before"]["reads"][0]
+        before["data"] = before["data"][:4] + bytes(4)
         with self.assertRaisesRegex(ValueError, "poison the high dword"):
             verify_one_shot(records, scope)
 
     def test_requires_complete_raw_reads_and_full_peer_stability(self):
-        for field, data, message in (("fence_data", bytes(4), "fence read byte count"),
-                                     ("other_fence_data", bytes(4), "peer fence read byte count"),
-                                     ("other_fence_data", pack("<2I", 7, 1), "other queue full fence changed"),
-                                     ("payload_region", bytes(1024), "payload sample byte count"),
-                                     ("payload_ok", True, "one-shot BAR0 sample fields")):
-            with self.subTest(field=field, message=message), self.assertRaisesRegex(ValueError, message):
+        for index, data, message in ((0, bytes(4), "fence read byte count"),
+                                     (1, bytes(4), "peer fence read byte count"),
+                                     (1, pack("<2I", 7, 1), "other queue full fence changed"),
+                                     (2, bytes(1024), "payload sample byte count")):
+            with self.subTest(index=index, message=message), self.assertRaisesRegex(ValueError, message):
                 records, scope = one_shot_fixture()
-                records[1]["first_read"][field] = data
+                records[1]["first_read"]["reads"][index]["data"] = data
                 verify_one_shot(records, scope)
 
     def test_rejects_stale_payload_and_both_guard_corruptions(self):
@@ -301,13 +310,13 @@ class OneShotIrqDelivery(unittest.TestCase):
                              ("final_read", 1088), ("final_read", 1151)):
             with self.subTest(sample=name, offset=offset), self.assertRaisesRegex(ValueError, "payload or guard mismatch"):
                 records, scope = one_shot_fixture()
-                sample = records[3][name]
-                data = bytearray(sample["payload_region"])
+                read = records[3][name]["reads"][2]
+                data = bytearray(read["data"])
                 data[offset] ^= 1
-                sample["payload_region"] = bytes(data)
+                read["data"] = bytes(data)
                 verify_one_shot(records, scope)
         records, scope = one_shot_fixture()
-        records[3]["first_read"]["payload_region"] = records[3]["before"]["payload_region"]
+        records[3]["first_read"]["reads"][2]["data"] = records[3]["before"]["reads"][2]["data"]
         with self.assertRaisesRegex(ValueError, "first_read payload or guard mismatch"):
             verify_one_shot(records, scope)
 
@@ -319,7 +328,7 @@ class OneShotIrqDelivery(unittest.TestCase):
                 scope["payload_region_offset"] = offset
                 verify_one_shot(records, scope)
         records, scope = one_shot_fixture()
-        records[1]["first_read"]["payload_region_offset"] += 4
+        records[1]["first_read"]["reads"][2]["offset"] += 4
         with self.assertRaisesRegex(ValueError, "not from the admitted offset"):
             verify_one_shot(records, scope)
 
@@ -344,6 +353,60 @@ class OneShotIrqDelivery(unittest.TestCase):
                                 (dict(seen_ns=1761), "invalid terminal sample time")):
             with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, message):
                 verify_one_shot(records, scope, **fields)
+
+    def test_bar0_mapping_and_accessor_cannot_change_within_or_between_arms(self):
+        for case, name, index in ((0, "before", 0), (1, "first_read", 0), (2, "final_read", 2)):
+            with self.subTest(case=case, sample=name), self.assertRaisesRegex(ValueError, "admitted mapping and accessor"):
+                records, scope = one_shot_fixture()
+                records[case][name]["reads"][index]["access_token"] += 1
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        with self.assertRaisesRegex(ValueError, "admitted mapping and accessor"):
+            verify_one_shot(records, scope, bar0_access_token=scope["bar0_access_token"] + 1)
+
+    def test_bar0_attempts_detect_gaps_replays_and_unreported_reads(self):
+        for delta in (-1, 1):
+            with self.subTest(delta=delta), self.assertRaisesRegex(ValueError, "skipped or replayed"):
+                records, scope = one_shot_fixture()
+                records[2]["before"]["reads"][0]["ordinal"] += delta
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        for count in (35, 37):
+            with self.subTest(attempts=count), self.assertRaisesRegex(ValueError, "attempt count disagrees"):
+                verify_one_shot(records, scope, bar0_attempt_count=count)
+
+    def test_failed_bar0_first_attempt_cannot_be_followed_by_a_passing_retry(self):
+        records, scope = one_shot_fixture()
+        reads = records[1]["first_read"]["reads"]
+        reads[0]["ok"] = False
+        with self.assertRaisesRegex(ValueError, "failed BAR0 read attempt"):
+            verify_one_shot(records, scope)
+        reads.insert(1, dict(reads[0], ok=True))
+        with self.assertRaisesRegex(ValueError, "exactly three ordered BAR0 read attempts"):
+            verify_one_shot(records, scope)
+
+    def test_rejects_bar0_peer_or_payload_first_and_overlapping_read_times(self):
+        for index in (1, 2):
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "fence-first order"):
+                records, scope = one_shot_fixture()
+                reads = records[3]["first_read"]["reads"]
+                reads[0]["offset"], reads[index]["offset"] = reads[index]["offset"], reads[0]["offset"]
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        reads = records[3]["first_read"]["reads"]
+        reads[1]["begin_ns"] = reads[0]["end_ns"] - 1
+        with self.assertRaisesRegex(ValueError, "invalid BAR0 read start"):
+            verify_one_shot(records, scope)
+
+    def test_rejects_legacy_merged_snapshot_even_with_correct_bytes(self):
+        records, scope = one_shot_fixture()
+        sample = records[1]["first_read"]
+        fence, peer, payload = sample.pop("reads")
+        sample.update(begin_ns=fence["begin_ns"], end_ns=payload["end_ns"], payload_region=payload["data"],
+                      fence_offset=fence["offset"], other_fence_offset=peer["offset"],
+                      fence_data=fence["data"], other_fence_data=peer["data"], payload_region_offset=payload["offset"])
+        with self.assertRaisesRegex(ValueError, "one-shot BAR0 sample fields"):
+            verify_one_shot(records, scope)
 
 
 class RouteEvidence(unittest.TestCase):
