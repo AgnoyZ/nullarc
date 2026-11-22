@@ -67,6 +67,10 @@ identifies a metadata-only lead for the exact function's managing driver.
 Neither an OpenCore console GOP match nor UEFI protocol exclusivity is an IH
 handoff. No preboot sample was collected, and any candidate predecessor still
 needs an independent device stop and completed-write boundary.
+The [offline PCI protocol adapter](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#offline-pci-protocol-attribution-adapter)
+checks two real EFI ABI metadata calls in a CPU fixture. It has no EFI entry
+or admitted target selection and still needs a firmware-environment test and
+separately authorized attribution capture.
 
 ## Execution order
 

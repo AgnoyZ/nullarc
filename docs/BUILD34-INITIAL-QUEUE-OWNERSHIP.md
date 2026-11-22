@@ -371,6 +371,39 @@ No preboot capture was made; the production gate still requires a separate
 stop and completed-write boundary before any storage reuse. See the
 [sanitized source review](validation/build34-r3-preboot-pci-attribution-20261123.json).
 
+### Offline PCI protocol attribution adapter
+
+The isolated `Phx34AttributePciManager` adapter uses the EDK II ABI, not a
+normalized transcript. Its only boot-service calls are `HandleProtocol`,
+`OpenProtocolInformation` for PCI I/O on the supplied controller, and
+`FreePool`. It does not call any PCI I/O, device-path, binding, image or GOP
+methods. The caller must independently resolve the exact PCI controller from
+its device path and location, supply both matched interfaces and ensure their
+lifetime, then run before the final memory-map window. Comparing pointers
+cannot itself admit that device or pin a protocol through driver unload.
+
+The adapter checks target identity on either side of two open-list snapshots
+and two binding-to-image resolutions. In the pinned DXE reference,
+[`HandleProtocol`](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Core/Dxe/Hand/Handle.c#L1040-L1054)
+is a nonexclusive open and can change the tracked count; querying the target
+only outside the two lists avoids comparing an intervening collector-made
+open. The adapter checks count, attributes, handles and driver image metadata
+with list order ignored. It refuses no manager, a different manager, a
+foreign child-controller agent, malformed or oversized lists, changed image
+identity and release failure without returning an attribution. There are no
+retries. The 64-entry cap bounds only the adapter's processing, not firmware
+allocation or service latency. Matching snapshots are not atomic or historical
+and do not pin anything after the call. Keep result handles private.
+
+Run `make test-build34-r3-preboot-pci R3_PREBOOT_EDK2_INCLUDE=/path/to/MdePkg/Include`
+with the EDK II headers at `46548b1adac82211d8d11da12dd914f41e7aa775`.
+These BSD-2-Clause-Patent headers are external build inputs, not vendored.
+The opt-in target runs CPU fixtures using the x86-64 firmware calling
+convention and compiles a freestanding COFF object without an EFI entry.
+No firmware executable, live acquisition, EFI change, or device drain is
+established. Rollback is to omit this isolated source and test target.
+See the [sanitized offline result](validation/build34-r3-preboot-pci-adapter-offline-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

@@ -71,6 +71,22 @@ test: $(TESTS)
 fixtures:
 	bash tools/fetch_test_firmware.sh tests/fixtures/phoenix
 
+R3_PREBOOT_PCI_OUT ?= $(TEST_BIN_DIR)/r3-preboot-pci
+
+.PHONY: test-build34-r3-preboot-pci
+test-build34-r3-preboot-pci:
+	@test -r "$(R3_PREBOOT_EDK2_INCLUDE)/Uefi.h" || { echo "Set R3_PREBOOT_EDK2_INCLUDE to the pinned EDK II MdePkg/Include"; exit 1; }
+	mkdir -p "$(R3_PREBOOT_PCI_OUT)"
+	clang -std=c11 -O1 -g -Wall -Wextra -Werror -fshort-wchar '-DEFIAPI=__attribute__((ms_abi))' \
+		-fsanitize=address,undefined -fno-sanitize-recover=all -isystem "$(R3_PREBOOT_EDK2_INCLUDE)" \
+		-isystem "$(R3_PREBOOT_EDK2_INCLUDE)/X64" -Itools tools/build34_r3_preboot_pci.c \
+		tests/test_build34_r3_preboot_pci.c -o "$(R3_PREBOOT_PCI_OUT)/test_preboot_pci"
+	"$(R3_PREBOOT_PCI_OUT)/test_preboot_pci"
+	clang -target x86_64-pc-windows-msvc -std=c11 -O2 -Wall -Wextra -Werror -fshort-wchar \
+		-ffreestanding -fno-builtin -fno-stack-protector -isystem "$(R3_PREBOOT_EDK2_INCLUDE)" \
+		-isystem "$(R3_PREBOOT_EDK2_INCLUDE)/X64" -c tools/build34_r3_preboot_pci.c \
+		-o "$(R3_PREBOOT_PCI_OUT)/attribution.obj"
+
 kext:
 	@echo "Building PhxBringup.kext..."
 	python3 tools/build_kext.py
