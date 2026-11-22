@@ -255,9 +255,11 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    a real scheduler or solve provider or device teardown.
    The [scheduler ABI review](BUILD34-EXACT-EVENT-WAIT.md#deferred-scheduler-abi-and-detach-review)
    rules out using the private thread-call activity query or the non-atomic
-   manual interrupt-source counter. Next model the retained providerless
-   workloop source, including late kicks and checked external detach. Even a
-   verified CPU detach will not close the IH owner and device-writer gates.
+   manual interrupt-source counter. The [staged workloop source](BUILD34-EXACT-EVENT-WAIT.md#staged-providerless-workloop)
+   closes wake admission before an independent checked detach, keeps the
+   context pinned on uncertainty and handles late kicks. This is not bound
+   to a provider. Prove native scheduling and teardown, IH ownership, old
+   device-writer drain, and order of event delivery versus the BAR0 read.
 6. Freeze and compile the complete native integration. Prepare a concrete
    source/ABI-matched candidate with fresh rollback/recovery controls before
    requesting any still-required installation/GPU/power authorization.

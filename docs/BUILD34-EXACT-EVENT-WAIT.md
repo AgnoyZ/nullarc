@@ -366,3 +366,57 @@ See the [sanitized scheduler review](validation/build34-r3-ih-scheduler-review-2
 This selects an adapter to model and compile next; it does not bind a live
 scheduler, establish a native teardown deadline or change the IH ownership,
 device-write drain, BAR0 visibility or native protocol gates.
+
+### Staged providerless workloop
+
+The [source-only adapter](../tools/build34_exact_ih_workloop.py) creates a
+dedicated `IOWorkLoop` with one `IOEventSource` only after IH admission.
+`prepare` retains the service and copy owner, opens the one-shot route, and
+publishes an attached source only after successful add and pointer readback.
+No production caller can reach it. A future provider must pin the returned
+source before any register/enable operation that can call the target inline.
+That provider pin is independent of the adapter's attachment pin.
+
+The interrupt entry just latches a route hint and requests work. A single
+atomic word holds a one-way close bit and the count of concurrent wake calls
+(not the number of interrupts). Admission uses a fixed fetch-add/sub pair,
+not a CAS retry, sleeping lock, or second interrupt counter. Every caller
+already owns a lifetime reference; an admitted wake keeps the attachment
+stable until `signalWorkAvailable` returns. A late wake that loses to closure
+does not touch the workloop, even after detach. `checkForWork` tries one
+bounded copy and posts a fresh work bit for a pending or partial batch; it
+returns false so the workloop releases its gate between passes. A copied
+vector only requests a validated fence recheck.
+
+`closeKicks` never attempts removal. The external cleanup caller must hold
+an independent source reference, hold no GPU or client locks, and wait or
+reschedule at its own deadline. `detach` rejects self-removal and returns
+busy while any wake is in flight. A single caller claims removal, revokes
+the route, and requests checked removal of the exact source. Only success
+with a null attachment readback releases the attachment pin. Failure or
+contradiction retains the pin and refuses retry. There is no synchronous
+stop/sleep callsite; the existing queue invalidation path makes queued work
+inert. A cleanup timeout does not cancel removal, release the provider pin,
+or establish DMA drain. A future adapter must also prove native gate
+behavior, copy lifetime and bounded underlying scheduling.
+
+Run the isolated checks with a fresh ignored output:
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_ih_workloop.py \
+  --out build/build34-r3-ih-workloop-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+The adapter remains staged. No IRQ provider, IH reader, MMIO, native event
+backend, or Mesa transport binding is installed by this transform. Omit it
+to roll back the experiment.
+
+The [offline result](validation/build34-r3-ih-workloop-offline-20261123.json)
+records 8 closed and 377 modeled checks under each of ASan/UBSan and TSan.
+All nine injected defects failed. The fixture covers an inline hint during
+arming, a 33-entry split, stale queued work after sleep or stop, wake versus
+detach on both sides of admission, a held copy, self-removal, concurrent
+removal and both error and misleading-success readbacks. The complete staged
+x86_64 source compiles to a nonloadable object. Its 25 additional imports are
+exactly the allowlisted IOKit/libkern symbols; all 406 resolve through the
+existing declared KDK providers. The 172 production inputs remain unchanged.

@@ -22,7 +22,7 @@ HEADERS = ('build34_exact_fence32.h', 'build34_exact_callbacks.h', 'build34_exac
 
 
 def check(out, inputs, previous, proposed, ownership, sdk, kdk, expected_import_count,
-          expected_warnings, reference, compiler_expected):
+          expected_warnings, reference, compiler_expected, *, added_imports=()):
     out = Path(out)
     if out.exists():
         raise ValueError('Fresh native-object output only')
@@ -112,7 +112,9 @@ def check(out, inputs, previous, proposed, ownership, sdk, kdk, expected_import_
             exports[name] = set(targets)
         else:
             exports[name] = set(run([nm, '-arch', 'x86_64', '-gUj', out / 'kdk' / paths[0]], name + '-exports').stdout.decode().splitlines())
-    if (imports['previous'] != imports['proposed'] or len(imports['proposed']) != expected_import_count or
+    expected_added = set(added_imports)
+    if (imports['previous'] & expected_added or (imports['previous'] | expected_added) != imports['proposed'] or
+            len(imports['proposed']) != expected_import_count or
             imports['proposed'] - set().union(*exports.values()) or '_thread_call_cancel_wait' in imports['proposed']):
         raise ValueError('Changed, unavailable or private native imports')
     if (sdk_inputs(sdk) != sdk_blobs or any((out / 'sdk' / n).read_bytes() != b for n, b in sdk_blobs.items()) or
@@ -122,7 +124,9 @@ def check(out, inputs, previous, proposed, ownership, sdk, kdk, expected_import_
         raise ValueError('SDK/KDK/toolchain drift')
     result = dict(sdk_commit=SDK_PIN, os_version=os_version, os_build=os_build, native_object_sha256=objects,
                   native_import_count=len(imports['proposed']), compiler_warnings=warnings,
-                  all_native_imports_have_existing_declared_KDK_provider=True, native_import_set_unchanged=True,
+                  all_native_imports_have_existing_declared_KDK_provider=True, native_import_set_unchanged=not expected_added,
                   actual_complete_native_translation_units_compiled=True, native_object_only=True)
+    if expected_added:
+        result['added_native_imports'] = sorted(expected_added)
     (out / 'native-result-private.json').write_text(json.dumps(result, indent=2) + '\n')
     return result
