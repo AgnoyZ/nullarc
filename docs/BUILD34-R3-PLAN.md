@@ -274,8 +274,10 @@ that same one-shot route. It does not bind a BAR0 reader or attest visibility.
    The [one-shot evidence checker](BUILD34-R3-IRQ-ROUTE-TRIAL.md#one-shot-route-and-actual-isr-trace)
    matches the current non-rearming route: it rejects copied vectors without
    same-source ISR records and checks slot/peer and IH cursor continuity across
-   the four windows. Real dispatch, first reads and terminal counts must still
-   come from an independently admitted hardware capture.
+   the four windows. The [PM4 check](BUILD34-R3-IRQ-ROUTE-TRIAL.md#bind-the-submitted-payload-and-fence-commands)
+   binds the payload bytes and the fence packet to one captured command stream
+   instead of trusting a recipe digest. Real published work, dispatch, first
+   reads and terminal counts still need an independently admitted capture.
 6. Freeze and compile the complete native integration. Prepare a concrete
    source/ABI-matched candidate with fresh rollback/recovery controls before
    requesting any still-required installation/GPU/power authorization.

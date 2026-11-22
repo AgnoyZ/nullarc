@@ -80,10 +80,15 @@ def verify_capture(records, ring_size=128, *, bar0_base=_BAR0_MC_BASE, bar0_size
 def rewrite_fence_slots(case, offset, peer_offset):
     for name in ("before", "first_read", "final_read"):
         case[name].update(fence_offset=offset, other_fence_offset=peer_offset)
-    words = list(unpack("<8I", case["release_mem"]))
+    release = case.get("release_mem") if "submitted_pm4" not in case else case["submitted_pm4"][-32:]
+    words = list(unpack("<8I", release))
     address = _BAR0_MC_BASE + offset
     words[3:5] = [address & 0xFFFFFFFF, address >> 32]
-    case["release_mem"] = pack("<8I", *words)
+    release = pack("<8I", *words)
+    if "submitted_pm4" in case:
+        case["submitted_pm4"] = case["submitted_pm4"][:-32] + release
+    else:
+        case["release_mem"] = release
 
 
 def one_shot_fixture():
@@ -101,6 +106,11 @@ def one_shot_fixture():
         queue = case["queue"]
         is_gfx = queue == "gfx"
         rewrite_fence_slots(case, 16 if is_gfx else 32, 32 if is_gfx else 16)
+        payload_address = _BAR0_MC_BASE + scope["payload_region_offset"] + 64
+        case["submitted_pm4"] = (pack("<4I", 0xC1023700, 0x00100500,
+                                      payload_address & 0xFFFFFFFF, payload_address >> 32) +
+                                 scope["payload_challenges"][index]["result"] + case.pop("release_mem"))
+        case.pop("recipe_sha256")
         for name in ("before", "first_read", "final_read"):
             sample = case[name]
             sample["identity"] = identity.copy()
@@ -137,12 +147,52 @@ class OneShotIrqDelivery(unittest.TestCase):
         self.assertIs(result["single_route_checked"], True)
         self.assertIs(result["isr_dispatch_checked"], True)
         self.assertIs(result["release_mem_checked"], True)
+        self.assertIs(result["submitted_pm4_checked"], True)
         self.assertIs(result["raw_bar0_samples_checked"], True)
         self.assertIs(result["hardware_attested"], False)
         self.assertIs(result["old_writer_drain_proved"], False)
         self.assertEqual(records[1]["ih_capture"][-1]["read_cursor"], 0)
         self.assertEqual(records[2]["ih_capture"][0]["read_cursor"], 0)
         self.assertEqual(records[3]["ih_capture"][-1]["read_cursor"], 32)
+
+    def test_rejects_detached_release_packet_and_claimed_recipe(self):
+        records, scope = one_shot_fixture()
+        for case in records:
+            case["release_mem"] = case.pop("submitted_pm4")[-32:]
+            case["recipe_sha256"] = ("a" if case["queue"] == "gfx" else "b") * 64
+        with self.assertRaisesRegex(ValueError, "single-route case"):
+            verify_one_shot(records, scope)
+
+    def test_rejects_missing_trailing_reordered_or_nonraw_pm4(self):
+        for variant in ("truncated", "extra", "release_first", "mutable"):
+            with self.subTest(variant=variant), self.assertRaisesRegex(ValueError, "captured PM4 stream|WRITE_DATA"):
+                records, scope = one_shot_fixture()
+                case = records[1]
+                pm4 = case["submitted_pm4"]
+                case["submitted_pm4"] = {"truncated": pm4[4:], "extra": pm4 + bytes(4),
+                                         "release_first": pm4[-32:] + pm4[:-32], "mutable": bytearray(pm4)}[variant]
+                verify_one_shot(records, scope)
+
+    def test_rejects_changed_pm4_header_control_destination_and_payload(self):
+        for offset, mask, message in ((2, 1, "WRITE_DATA header"), (6, 0x10, "WRITE_DATA.*control"),
+                                      (8, 0x40, "WRITE_DATA destination"), (12, 1, "WRITE_DATA destination"),
+                                      (16, 1, "WRITE_DATA payload"), (1039, 1, "WRITE_DATA payload")):
+            with self.subTest(offset=offset), self.assertRaisesRegex(ValueError, message):
+                records, scope = one_shot_fixture()
+                case = records[3]
+                data = bytearray(case["submitted_pm4"])
+                data[offset] ^= mask
+                case["submitted_pm4"] = bytes(data)
+                verify_one_shot(records, scope)
+
+    def test_rejects_interrupt_mode_change_inside_submitted_pm4(self):
+        records, scope = one_shot_fixture()
+        case = records[1]
+        data = bytearray(case["submitted_pm4"])
+        data[-21] ^= 2
+        case["submitted_pm4"] = bytes(data)
+        with self.assertRaisesRegex(ValueError, "RELEASE_MEM.*control"):
+            verify_one_shot(records, scope)
 
     def test_ih_copy_without_isr_or_irq_in_control_cannot_pass(self):
         for case_index, count in ((0, 1), (1, 0), (3, 2)):

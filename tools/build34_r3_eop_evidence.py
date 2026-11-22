@@ -12,12 +12,16 @@ _U32_MAX = (1 << 32) - 1
 _U64_MAX = (1 << 64) - 1
 _ENTRY = Struct("<8I")
 _RELEASE_MEM = Struct("<8I")
+_WRITE_DATA_PREFIX = Struct("<4I")
 _RELEASE_HEADER = 0xC0064900
 _RELEASE_EVENT = 0x06603514
 _RELEASE_DATA64 = 2 << 29
 _RELEASE_INT_AFTER_CONFIRM = 2 << 24
+_WRITE_DATA_CONTROL = 0x00100500
 _FENCE_BYTES = 8
-_PAYLOAD_BYTES = 256 * 4
+_PAYLOAD_DWORDS = 256
+_PAYLOAD_BYTES = _PAYLOAD_DWORDS * 4
+_WRITE_DATA_HEADER = 0xC0003700 | ((_PAYLOAD_DWORDS + 2) << 16)
 _GUARD_BYTES = 64
 _REGION_BYTES = _PAYLOAD_BYTES + 2 * _GUARD_BYTES
 _IH_OFFSET = 0x3FFFC
@@ -25,8 +29,9 @@ _IH_OVERFLOW = 1
 _IH_FULL_OR_AT_RISK = 0xC0000
 _MES_QUEUE_FLAG = 0x1000000
 _MAX_BATCHES = 64
-_CASE_FIELDS = ("queue interrupt recipe_sha256 target before first_read final_read start_ns submit_ns "
+_CASE_FIELDS = ("queue interrupt target before first_read final_read start_ns submit_ns "
                 "close_ns cleanup_end_ns lost overflow fault")
+_LEGACY_CASE_FIELDS = _CASE_FIELDS + " recipe_sha256"
 _SAMPLE_FIELDS = "identity begin_ns end_ns fence other_fence payload_ok"
 
 
@@ -135,7 +140,7 @@ def _capture_vectors(record, batches, ring_size, *, start_cursor=None, dispatch_
     return vectors, next_cursor
 
 
-def _release_samples(record, bar0_mc_base, bar0_size):
+def _release_samples(record, packet, bar0_mc_base, bar0_size):
     samples = {}
     offsets = None
     offset_fields = ("fence_offset", "other_fence_offset")
@@ -151,7 +156,6 @@ def _release_samples(record, bar0_mc_base, bar0_size):
         offsets = pair
         samples[name] = {field: value for field, value in sample.items() if field not in offset_fields}
 
-    packet = record["release_mem"]
     if type(packet) is not bytes or len(packet) != _RELEASE_MEM.size:
         raise ValueError("require 32 captured RELEASE_MEM bytes")
     header, event, control, address_lo, address_hi, data_lo, data_hi, context = _RELEASE_MEM.unpack(packet)
@@ -177,9 +181,9 @@ def _geometry(ring_size_bytes, bar0_mc_base, bar0_size_bytes):
     return ring_size, mc_base, bar0_size
 
 
-def _normalize_capture(record, ring_size, mc_base, bar0_size, *, start_cursor=None, dispatch_ns=None):
+def _normalize_capture(record, packet, ring_size, mc_base, bar0_size, *, start_cursor=None, dispatch_ns=None):
     item = {name: record[name] for name in _CASE_FIELDS.split()}
-    samples, offsets = _release_samples(record, mc_base, bar0_size)
+    samples, offsets = _release_samples(record, packet, mc_base, bar0_size)
     item.update(samples)
     item["vectors"], next_cursor = _capture_vectors(item, record["ih_capture"], ring_size,
                                                      start_cursor=start_cursor, dispatch_ns=dispatch_ns)
@@ -194,8 +198,9 @@ def check_ih_capture(records, *, ring_size_bytes, bar0_mc_base, bar0_size_bytes,
         raise ValueError("expected exactly four ordered route cases")
     normalized = []
     for record in records:
-        _fields(record, _CASE_FIELDS + " ih_capture release_mem", "raw route case")
-        item, _, _ = _normalize_capture(record, ring_size, mc_base, bar0_size)
+        _fields(record, _LEGACY_CASE_FIELDS + " ih_capture release_mem", "raw route case")
+        item, _, _ = _normalize_capture(record, record["release_mem"], ring_size, mc_base, bar0_size)
+        item["recipe_sha256"] = record["recipe_sha256"]
         normalized.append(item)
     result = check(normalized, observe_budget_ns=observe_budget_ns, cleanup_budget_ns=cleanup_budget_ns)
     return dict(result, raw_ih_capture_checked=True, release_mem_checked=True)
@@ -205,6 +210,19 @@ def _bytes(value, size, label):
     if type(value) is not bytes or len(value) != size:
         raise ValueError(f"invalid {label} byte count")
     return value
+
+
+def _submitted_release(stream, payload_address, payload):
+    payload_end = _WRITE_DATA_PREFIX.size + _PAYLOAD_BYTES
+    _bytes(stream, payload_end + _RELEASE_MEM.size, "captured PM4 stream")
+    header, control, address_lo, address_hi = _WRITE_DATA_PREFIX.unpack_from(stream)
+    if (header, control) != (_WRITE_DATA_HEADER, _WRITE_DATA_CONTROL):
+        raise ValueError("unexpected WRITE_DATA header or control")
+    if (address_lo | (address_hi << 32)) != payload_address:
+        raise ValueError("WRITE_DATA destination does not match admitted BAR0 payload")
+    if stream[_WRITE_DATA_PREFIX.size:payload_end] != payload:
+        raise ValueError("WRITE_DATA payload does not match sealed challenge")
+    return stream[payload_end:]
 
 
 def _payload_scope(scope, offsets, aperture_size):
@@ -289,7 +307,7 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
     next_dispatch = 1
     prior_fences = {}
     for record, (queue, interrupt), regions in zip(records, _CASES, payload_regions):
-        _fields(record, _CASE_FIELDS + " ih_capture release_mem isr_dispatches", "single-route case")
+        _fields(record, _CASE_FIELDS + " ih_capture submitted_pm4 isr_dispatches", "single-route case")
         if record["queue"] != queue or record["interrupt"] is not interrupt:
             raise ValueError("expected control then EOP for GFX, then Compute")
         dispatches = record["isr_dispatches"]
@@ -308,8 +326,10 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
             dispatch_ns = _integer(dispatch["seen_ns"], "ISR dispatch time",
                                     low=_integer(record["submit_ns"], "submission time") + 1)
 
+        packet = _submitted_release(record["submitted_pm4"], mc_base + payload_offset + _GUARD_BYTES,
+                                    regions[1][_GUARD_BYTES:-_GUARD_BYTES])
         raw_case, peer_value = _raw_bar0_case(record, payload_offset, regions)
-        item, pair, cursor = _normalize_capture(raw_case, ring_size, mc_base, bar0_size,
+        item, pair, cursor = _normalize_capture(raw_case, packet, ring_size, mc_base, bar0_size,
                                                 start_cursor=cursor, dispatch_ns=dispatch_ns)
         peer = "compute" if queue == "gfx" else "gfx"
         if pair != (offsets[queue], offsets[peer]):
@@ -330,7 +350,8 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
     _integer(terminal["seen_ns"], "terminal sample time", low=normalized[-1]["cleanup_end_ns"],
              high=_integer(scope["terminal_deadline_ns"], "terminal deadline"))
     return dict(result, raw_ih_capture_checked=True, release_mem_checked=True, isr_dispatch_checked=True,
-                raw_bar0_samples_checked=True, single_route_checked=True, old_writer_drain_proved=False)
+                raw_bar0_samples_checked=True, submitted_pm4_checked=True, single_route_checked=True,
+                old_writer_drain_proved=False)
 
 
 def check(records, *, observe_budget_ns, cleanup_budget_ns):
@@ -353,15 +374,17 @@ def _check_records(records, *, observe_budget_ns, cleanup_budget_ns, fixed_ident
     prev_cleanup = 0
     route_epochs, queue_epochs, fence_values = set(), set(), set()
     recipes = {}
+    fields = _LEGACY_CASE_FIELDS if fixed_identity is None else _CASE_FIELDS
     for record, (queue, interrupt) in zip(records, _CASES):
-        _fields(record, _CASE_FIELDS + " vectors", "route case")
+        _fields(record, fields + " vectors", "route case")
         if record["queue"] != queue or record["interrupt"] is not interrupt:
             raise ValueError("expected control then EOP for GFX, then Compute")
-        digest = record["recipe_sha256"]
-        if type(digest) is not str or not re.fullmatch(r"[0-9a-f]{64}", digest):
-            raise ValueError("invalid control recipe fingerprint")
-        if recipes.setdefault(queue, digest) != digest:
-            raise ValueError("control and EOP recipes differ")
+        if fixed_identity is None:
+            digest = record["recipe_sha256"]
+            if type(digest) is not str or not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError("invalid control recipe fingerprint")
+            if recipes.setdefault(queue, digest) != digest:
+                raise ValueError("control and EOP recipes differ")
 
         before, first, final = record["before"], record["first_read"], record["final_read"]
         for sample in (before, first, final):

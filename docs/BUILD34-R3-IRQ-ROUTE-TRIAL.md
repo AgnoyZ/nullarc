@@ -225,8 +225,7 @@ one-shot check.
 
 The same-generation samples still need an independent collector that
 establishes the effective BAR0 mapping/cache policy, the actual access order
-and the absence of other writes to these test slots. The captured workload
-must independently match the presealed challenge; a matching data snapshot
+and the absence of other writes to these test slots. A matching snapshot
 does not prove that the GPU wrote it or that a sample was really the first
 read. Seal one mapping and accessor for the control and EOP arms. The
 [NBIO/HDP source audit](BUILD34-FENCE-READER.md#interrupt-transport-does-not-synchronize-bar0)
@@ -236,6 +235,35 @@ the first fence read pass. Keep any later diagnostic read separate.
 data privately. This change installs no collector and does not prove cache
 coherence, IH ownership or DMA drain. See the
 [sanitized offline result](validation/build34-r3-one-shot-bar0-evidence-offline-20261123.json).
+
+### Bind the submitted payload and fence commands
+
+The old one-shot path could accept a matching caller-supplied recipe digest
+and detached `RELEASE_MEM` packet without any record of the payload-writing
+command. The current path takes `submitted_pm4` instead. For this isolated
+route trial, require exactly one little-endian 256-dword `WRITE_DATA`
+followed by the eight-dword `RELEASE_MEM`, with no extra commands inside the
+recorded work. The [`WRITE_DATA` reference](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/soc15d.h)
+and [build34's existing confirmed memory-write packet](../tools/phxctl/mesboot.c#L669)
+are source references, not hardware qualification for this proposed recipe.
+Require the sequential memory destination with write confirmation, the
+admitted payload address past the leading guard, and every sealed result
+dword in order. Decode the fence packet from that same stream and check its
+cache/event control, destination, data and interrupt choice as before.
+The two arms now have the same checked command shape, varying only the sealed
+challenge data, fence target and requested interrupt. The older multi-route
+formats are unchanged and remain historical checks.
+
+A future collector must bind the bytes to the actual published work on the
+admitted queue and generation, not a recipe buffer or concatenated excerpts
+from different submissions. It must independently verify the queue context,
+the effective GPU destination and that no extra work intervenes before the
+fence. Any setup, ring publication or padding outside the two packets must
+also be accounted for and kept equivalent. `submitted_pm4_checked` proves
+only trace consistency. This is not a Mesa payload recipe or an authorization
+to write hardware, and there is still no live collector. Rollback is to omit
+this checker revision; do not use the older format to qualify the live route.
+See the [sanitized offline result](validation/build34-r3-one-shot-pm4-evidence-offline-20261123.json).
 
 ## IH ownership review
 
