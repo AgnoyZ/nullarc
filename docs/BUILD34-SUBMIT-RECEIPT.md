@@ -329,3 +329,35 @@ native session, prove external queue ownership/drain, coherent fence reads,
 real caller privilege and MIG delivery, RADV pairing and teardown. The
 offline administrator policy is not proof that the intended production RADV
 callers qualify or should gain raw diagnostic privileges.
+
+## Explicit Mesa exact service open
+
+The [source-only open stage](../tools/build34_r3_mesa_open.py) derives the
+reviewed IOKit, DRM and sync stages. The explicit Mesa DRM constructor opens
+`PhxBringup` with the current owning task and the factory's shared `N48R` type.
+It makes one open attempt, releases the service reference independently of
+the connection and hands a valid connection to the existing Hello/session
+adoption. No legacy `N48N`, proxy or mock is used on refusal. An adopted
+connection is closed exactly once if negotiation or initialization fails.
+
+The same constructor reuses a published exact core without opening another
+client; it refuses a legacy core or an in-progress final close. It publishes
+no core before the first sync clone succeeds. The CPU test doubles check
+matching, absence, admission errors, invalid success ports, handshake/session
+refusals, allocation failures and reuse. The staged DRM submit/wait/ACK test
+now starts with the explicit open, completes the later GFX receipt while
+Compute is pending, and observes transport close only after callback drain.
+
+Both ASan/UBSan and TSan pass 9,559 checks. The fixture uses SDK signatures,
+does not link a device runtime, and preserves all 172 production inputs.
+See [sanitized evidence](validation/build34-r3-mesa-exact-service-open-offline-20261122.json).
+
+```sh
+make -j1 test-build34-r3-mesa-exact-open MESA_SOURCE="$MESA_SOURCE" \
+  R3_MESA_EXACT_OPEN_OUT=build/build34-r3-mesa-exact-service-open-new-private
+```
+
+The normal RADV physical-device/profile and winsys entrypoints are unchanged;
+both must select the same negotiated mode before native integration. There
+was no real IOKit open, MIG exchange, reader/event binding, load or GPU work.
+Omit the open stage to retain the previous caller-supplied-connection stage.

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 #include "paired-native-receipt.h"
 
+#ifdef PHX34_TEST_EXACT_OPEN
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
 extern "C" {
 #include "build34_r3_mesa_wire.h"
 
@@ -355,6 +359,12 @@ struct FakeIOKit {
     Bridge bridge{false};
     mach_port_t port = 0x105;
     unsigned helloCalls = 0, closes = 0, helloFault = 0, failAllocation = 0;
+#ifdef PHX34_TEST_EXACT_OPEN
+    bool openEnabled = false, failMatch = false, missingService = false;
+    unsigned matches = 0, lookups = 0, opens = 0, releases = 0;
+    mach_port_t openedPort = 0x105;
+    uint32_t openStatus = ACD_KR_SUCCESS;
+#endif
 #ifdef PHX34_TEST_DRM
     bool drm = false;
     Pause *waitPause = nullptr;
@@ -371,6 +381,39 @@ struct FakeIOKit {
 
 thread_local FakeIOKit *FakeIOKit::current = nullptr;
 
+#ifdef PHX34_TEST_EXACT_OPEN
+static unsigned matchToken;
+static constexpr mach_port_t servicePort = 0x104;
+
+extern "C" CFMutableDictionaryRef phx34_fixture_match(const char *name) {
+    auto *fake = FakeIOKit::current;
+    CHECK(fake && fake->openEnabled && !std::strcmp(name, "PhxBringup") && ++fake->matches == 1);
+    return fake->failMatch ? nullptr : reinterpret_cast<CFMutableDictionaryRef>(&matchToken);
+}
+
+extern "C" mach_port_t phx34_fixture_lookup(mach_port_t port, CFDictionaryRef match) {
+    auto *fake = FakeIOKit::current;
+    CHECK(fake && fake->matches == 1 && ++fake->lookups == 1 && port == MACH_PORT_NULL);
+    CHECK(match == reinterpret_cast<CFDictionaryRef>(&matchToken) && !fake->failMatch);
+    return fake->missingService ? MACH_PORT_NULL : servicePort;
+}
+
+extern "C" kern_return_t phx34_fixture_open(mach_port_t service, task_port_t task, uint32_t type, mach_port_t *out) {
+    auto *fake = FakeIOKit::current;
+    CHECK(fake && fake->lookups == 1 && !fake->missingService && ++fake->opens == 1 && !fake->releases);
+    CHECK(service == servicePort && task == mach_task_self() && type == 0x4e343852u && out && *out == MACH_PORT_NULL);
+    if (fake->openStatus == ACD_KR_SUCCESS)
+        *out = fake->openedPort;
+    return static_cast<kern_return_t>(fake->openStatus);
+}
+
+extern "C" kern_return_t phx34_fixture_release(mach_port_t service) {
+    auto *fake = FakeIOKit::current;
+    CHECK(fake && service == servicePort && fake->opens == 1 && ++fake->releases == 1 && !fake->helloCalls);
+    return KERN_SUCCESS;
+}
+#endif
+
 extern "C" void *phx34_fixture_calloc(size_t count, size_t size) {
     auto *fake = FakeIOKit::current;
     if (fake && fake->failAllocation && --fake->failAllocation == 0)
@@ -384,6 +427,9 @@ extern "C" kern_return_t phx34_fixture_method(mach_port_t conn, uint32_t selecto
                                               size_t *outputSize) {
     auto *fake = FakeIOKit::current;
     CHECK(fake && conn == 0x105 && fake->port == MACH_PORT_NULL && !fake->closes);
+#ifdef PHX34_TEST_EXACT_OPEN
+    CHECK(!fake->openEnabled || (fake->releases == 1 && fake->openStatus == ACD_KR_SUCCESS));
+#endif
     if (selector == ACD_SEL_HELLO) {
         ++fake->helloCalls;
 #ifdef PHX34_TEST_DRM
@@ -430,6 +476,9 @@ extern "C" kern_return_t phx34_fixture_method(mach_port_t conn, uint32_t selecto
 extern "C" kern_return_t phx34_fixture_close(mach_port_t conn) {
     auto *fake = FakeIOKit::current;
     CHECK(fake && conn == 0x105 && fake->port == MACH_PORT_NULL && ++fake->closes == 1);
+#ifdef PHX34_TEST_EXACT_OPEN
+    CHECK(!fake->openEnabled || (fake->releases == 1 && fake->openStatus == ACD_KR_SUCCESS));
+#endif
     return KERN_SUCCESS;
 }
 
@@ -528,12 +577,28 @@ static void drm_publish_and_drain() {
     acd_device_handle primary = nullptr, secondary = nullptr;
     uint32_t major = 0, minor = 0;
     CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &primary) == -ENODEV && !primary);
+#ifdef PHX34_TEST_EXACT_OPEN
+    fake.openEnabled = true;
+    fake.port = MACH_PORT_NULL;
+    CHECK(acd_device_open_exact_iokit(nullptr, &minor, &primary) == -EINVAL && !fake.matches);
+    CHECK(acd_device_open_exact_iokit(&major, &minor, nullptr) == -EINVAL && !fake.matches);
+    CHECK(acd_device_open_exact_iokit(&major, &minor, &primary) == 0 && primary);
+    CHECK(fake.opens == 1 && fake.releases == 1);
+    CHECK(acd_device_open_exact_iokit(&major, &minor, &primary) == -EINVAL && primary);
+#else
     CHECK(acd_device_initialize_exact_iokit(&fake.port, &major, &minor, &primary) == 0 && primary);
+#endif
     CHECK(fake.port == MACH_PORT_NULL && fake.helloCalls == 2 && fake.bridge.sessions == 1);
     mach_port_t extra = 0x106;
     CHECK(acd_device_initialize_exact_iokit(&extra, &major, &minor, &secondary) == -EBUSY && extra == 0x106 && !secondary);
     CHECK(acd_device_initialize(&major, &minor, &secondary) == -EBUSY && !secondary);
+#ifdef PHX34_TEST_EXACT_OPEN
+    fake.failAllocation = 2;
+    CHECK(acd_device_open_exact_iokit(&major, &minor, &secondary) == -ENOMEM && !secondary && !fake.closes);
+    CHECK(acd_device_open_exact_iokit(&major, &minor, &secondary) == 0 && secondary && fake.opens == 1);
+#else
     CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &secondary) == 0 && secondary);
+#endif
     CHECK(acd_device_kext(primary, nullptr) == acd_device_kext(secondary, nullptr));
     auto *provider = acd_device_get_sync_provider(primary);
     CHECK(acd_sync_has_exact_completion(provider) && acd_sync_has_exact_completion(acd_device_get_sync_provider(secondary)));
@@ -571,6 +636,9 @@ static void drm_publish_and_drain() {
     CHECK(!fake.closes);
     acd_device_handle replacement = nullptr;
     CHECK(acd_device_initialize_exact_iokit(&extra, &major, &minor, &replacement) == -EBUSY && extra == 0x106 && !replacement);
+#ifdef PHX34_TEST_EXACT_OPEN
+    CHECK(acd_device_open_exact_iokit(&major, &minor, &replacement) == -EBUSY && !replacement && fake.opens == 1);
+#endif
     fake.bridge.device.setFence(0, compute);
     pause.release();
     waitThread.join();
@@ -594,6 +662,66 @@ static void drm_initial_clone_failure() {
     CHECK(fake.helloCalls == 2 && fake.bridge.sessions == 1 && !fake.bridge.submits);
     CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &device) == -ENODEV && !device);
 }
+
+#ifdef PHX34_TEST_EXACT_OPEN
+static void exact_open_errors() {
+    struct Refusal {
+        bool failMatch, missingService;
+        uint32_t status;
+        mach_port_t port;
+        int error;
+    };
+    const Refusal cases[] = {
+        {true, false, ACD_KR_SUCCESS, 0, -ENOMEM},
+        {false, true, ACD_KR_SUCCESS, 0, -ENODEV},
+        {false, false, ACD_KR_UNSUPPORTED, 0, -ENODEV},
+        {false, false, ACD_KR_NOT_READY, 0, -ENODEV},
+        {false, false, ACD_KR_NOT_PRIVILEGED, 0, -EACCES},
+        {false, false, ACD_KR_EXCLUSIVE_ACCESS, 0, -EBUSY},
+        {false, false, ACD_KR_SUCCESS, MACH_PORT_NULL, -EIO},
+        {false, false, ACD_KR_SUCCESS, MACH_PORT_DEAD, -EIO},
+    };
+    for (const auto &refusal : cases) {
+        reset();
+        FakeIOKit fake;
+        fake.openEnabled = true;
+        fake.failMatch = refusal.failMatch;
+        fake.missingService = refusal.missingService;
+        fake.openStatus = refusal.status;
+        fake.openedPort = refusal.port;
+        acd_device_handle device = nullptr;
+        uint32_t major = UINT32_MAX, minor = UINT32_MAX;
+        CHECK(acd_device_open_exact_iokit(&major, &minor, &device) == refusal.error);
+        CHECK(!device && major == UINT32_MAX && minor == UINT32_MAX);
+        CHECK(fake.matches == 1 && fake.lookups == !refusal.failMatch);
+        CHECK(fake.opens == (!refusal.failMatch && !refusal.missingService) && fake.releases == fake.opens);
+        CHECK(!fake.helloCalls && !fake.bridge.sessions && !fake.closes && !packetWrites);
+        CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &device) == -ENODEV && !device);
+    }
+}
+
+static void exact_open_cleanup() {
+    for (unsigned test = 0; test < 10; ++test) {
+        reset();
+        FakeIOKit fake;
+        fake.drm = fake.openEnabled = true;
+        fake.port = MACH_PORT_NULL;
+        fake.failAllocation = test < 8 ? test + 1 : 0;
+        if (test == 8)
+            fake.helloFault = 4;
+        if (test == 9)
+            fake.bridge.client.hello = false;
+        acd_device_handle device = nullptr;
+        uint32_t major = UINT32_MAX, minor = UINT32_MAX;
+        const int expected = test < 8 ? -ENOMEM : test == 8 ? -EPROTO : -ENODEV;
+        CHECK(acd_device_open_exact_iokit(&major, &minor, &device) == expected);
+        CHECK(!device && major == UINT32_MAX && minor == UINT32_MAX);
+        CHECK(fake.opens == (test >= 2) && fake.releases == fake.opens && fake.closes == fake.opens);
+        CHECK(!fake.bridge.submits && !fake.bridge.waits && !fake.bridge.acks && !packetWrites);
+        CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &device) == -ENODEV && !device);
+    }
+}
+#endif
 #endif
 
 int main() {
@@ -613,6 +741,10 @@ int main() {
     unsetenv("RADV_DARWIN_HOST_BO");
     drm_publish_and_drain();
     drm_initial_clone_failure();
+#ifdef PHX34_TEST_EXACT_OPEN
+    exact_open_errors();
+    exact_open_cleanup();
+#endif
 #endif
     std::printf("PASS staged Mesa/native wire: %llu checks; GPU_executed=false\n",
                 static_cast<unsigned long long>(checks.load()));

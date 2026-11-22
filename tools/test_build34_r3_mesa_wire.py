@@ -17,13 +17,19 @@ from build34_exact_progress_wire import (
 from build34_exact_submit import once
 from build34_r3_mesa_drm import stage_drm, stage_sync
 from build34_r3_mesa_iokit import IOKIT, IOKIT_SHA256, stage as iokit_stage
+from build34_r3_mesa_open import stage_drm as open_drm_stage, stage_iokit as open_iokit_stage
 from test_build34_exact_ownership import DRIVER, ROOT, method, sha
 from test_build34_exact_transport import DRM, KEXT, PATCH, PREFIX, SHAPE_PATCHES
 from test_build34_exact_multitarget import apply, stage
 from upstream34_layout import radv_ib_tail
 
 
-def test(mesa, out, *, iokit=False, drm=False):
+EXACT_OPEN_WIRE = 'tools/build34_exact_open_wire.h'
+EXACT_OPEN_WIRE_SHA256 = '3871eccc5e3aca90936d1fc76ea01a7824c5fe534712a225a8c1ab6d4099a5e8'
+
+
+def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
+    drm = drm or exact_open
     iokit = iokit or drm
     mesa, out = Path(mesa).resolve(), Path(out).resolve()
     if out.exists() or ROOT / 'build' not in out.parents or not out.name.endswith('-private'):
@@ -42,6 +48,7 @@ def test(mesa, out, *, iokit=False, drm=False):
     transport_record = 'docs/validation/build34-r3-transport-offline-20261121.json'
     native_record = 'docs/validation/build34-r3-submit-receipt-offline-20261121.json'
     dispatch_record = 'docs/validation/build34-r3-mesa-dispatch-offline-20261122.json'
+    drm_record = 'docs/validation/build34-r3-mesa-drm-offline-20261122.json'
     adapter = 'tools/build34_r3_mesa_wire.c'
     fixture = 'tests/test_build34_r3_mesa_wire.cpp'
     iokit_fixture = 'tests/test_build34_r3_mesa_iokit.c'
@@ -66,8 +73,12 @@ def test(mesa, out, *, iokit=False, drm=False):
     if drm:
         paths.extend(['tools/build34_r3_mesa_drm.py', 'tools/build34_r3_mesa_drm.h',
                       'docs/validation/build34-r3-mesa-iokit-offline-20261122.json'])
+    if exact_open:
+        paths.extend([drm_record, 'tools/build34_r3_mesa_open.py', EXACT_OPEN_WIRE])
     inputs = {name: (ROOT / name).read_bytes() for name in paths}
     pinned = {**native_evidence['input_sha256'], **{name: mesa_evidence['input_sha256'][name] for name in patches}}
+    if exact_open:
+        pinned[EXACT_OPEN_WIRE] = EXACT_OPEN_WIRE_SHA256
     if any(sha(inputs[name]) != digest for name, digest in pinned.items()):
         raise ValueError('Previously reviewed inputs changed')
     driver = inputs[DRIVER].decode()
@@ -114,6 +125,15 @@ def test(mesa, out, *, iokit=False, drm=False):
                 raise ValueError('Original Mesa notice changed: ' + name)
             (closure / name).write_bytes(candidate)
             mesa_staged[name] = candidate
+    if exact_open:
+        prior_drm = json.loads(inputs[drm_record])
+        for stage_name, source in [('iokit', iokit_staged), ('drm', mesa_staged[DRM]), ('sync', mesa_staged[sync])]:
+            if sha(source) != prior_drm['staged_' + stage_name + '_source_sha256']:
+                raise ValueError('Previously reviewed DRM predecessor changed: ' + stage_name)
+        iokit_staged = open_iokit_stage(iokit_staged.decode()).encode()
+        (closure / IOKIT).write_bytes(iokit_staged)
+        mesa_staged[DRM] = open_drm_stage(mesa_staged[DRM].decode()).encode()
+        (closure / DRM).write_bytes(mesa_staged[DRM])
 
     native_result = json.loads(run([sys.executable, '-B', ROOT / native_case, '--out', native],
                                    'native-regressions', cwd=ROOT, timeout=360))
@@ -184,6 +204,8 @@ def test(mesa, out, *, iokit=False, drm=False):
                 extra.append('-Dcalloc=phx34_fixture_calloc')
             if drm and source == frozen / fixture:
                 extra.append('-DPHX34_TEST_DRM=1')
+            if exact_open and source in (frozen / fixture, frozen / iokit_fixture):
+                extra.append('-DPHX34_TEST_EXACT_OPEN=1')
             if drm and source in (closure / DRM, closure / sync):
                 extra.append('-Dcalloc=phx34_fixture_calloc')
             if drm and source == closure / vamgr:
@@ -196,7 +218,11 @@ def test(mesa, out, *, iokit=False, drm=False):
                 raise ValueError('Unfrozen compilation dependency')
             if iokit and source == closure / IOKIT:
                 imports = run(['/usr/bin/nm', '-u', obj], obj.stem + '-imports')
-                if any(symbol not in imports.split() for symbol in ('_IOConnectCallMethod', '_IOServiceClose')):
+                required = ['_IOConnectCallMethod', '_IOServiceClose']
+                if exact_open:
+                    required.extend(['_IOServiceMatching', '_IOServiceGetMatchingService', '_IOServiceOpen',
+                                     '_IOObjectRelease'])
+                if any(symbol not in imports.split() for symbol in required):
                     raise ValueError('Incomplete IOKit transport compile')
             objects.append(obj)
         binary = out / (label + '-CPU-only')
@@ -247,6 +273,12 @@ def test(mesa, out, *, iokit=False, drm=False):
                       drm_core_adopted=True, drm_cs_dual_queue_paired_in_fixture=True,
                       sync_backend_close_waits_for_transport_callback=True,
                       native_drain_attested=False)
+    if exact_open:
+        report.update(status='passed-CPU-only-staged-Mesa-R3-exact-service-open',
+                      open_type='N48R', open_service='PhxBringup', cpu_fixture_service_open=True,
+                      fixture_open_refusal_does_not_fall_back=True,
+                      fixture_open_reuses_exact_core_and_refuses_while_draining=True,
+                      normal_RADV_entry_changed=False)
     (out / 'result-private.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report))
 
@@ -257,5 +289,6 @@ if __name__ == '__main__':
     parser.add_argument('--out', required=True, type=Path)
     parser.add_argument('--iokit', action='store_true')
     parser.add_argument('--drm', action='store_true')
+    parser.add_argument('--exact-open', action='store_true')
     args = parser.parse_args()
-    test(args.mesa_source, args.out, iokit=args.iokit, drm=args.drm)
+    test(args.mesa_source, args.out, iokit=args.iokit, drm=args.drm, exact_open=args.exact_open)

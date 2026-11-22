@@ -6,5 +6,6 @@
 struct acd_kext;
 
 int acd_kext_adopt_exact_iokit(mach_port_t *connection, struct acd_kext **out);
+int acd_kext_open_exact_iokit(struct acd_kext **out);
 
 #endif

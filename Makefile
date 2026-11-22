@@ -215,6 +215,11 @@ test-build34-r3-mesa-drm:
 	@test -n "$(MESA_SOURCE)" -a -n "$(R3_MESA_DRM_OUT)" || (echo "Set MESA_SOURCE and fresh R3_MESA_DRM_OUT"; exit 2)
 	python3 -B tools/test_build34_r3_mesa_wire.py --drm --mesa-source "$(MESA_SOURCE)" --out "$(R3_MESA_DRM_OUT)"
 
+.PHONY: test-build34-r3-mesa-exact-open
+test-build34-r3-mesa-exact-open:
+	@test -n "$(MESA_SOURCE)" -a -n "$(R3_MESA_EXACT_OPEN_OUT)" || (echo "Set MESA_SOURCE and fresh R3_MESA_EXACT_OPEN_OUT"; exit 2)
+	python3 -B tools/test_build34_r3_mesa_wire.py --exact-open --mesa-source "$(MESA_SOURCE)" --out "$(R3_MESA_EXACT_OPEN_OUT)"
+
 # Staged native full-receipt dispatch with C peer, CPU objects only.
 .PHONY: test-build34-exact-receipt
 test-build34-exact-receipt:
