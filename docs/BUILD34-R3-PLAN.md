@@ -81,8 +81,10 @@ refuses an exact-root segment mismatch before the endpoint accessor. CPU
 and isolated OVMF tests passed, but both observations can share the same
 firmware state. The [cached MCFG cross-check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#corroborate-the-segment-candidate-with-cached-acpi-mcfg)
 found one ACPI segment window covering the matching host bridge and downstream
-buses. It does not bind the firmware root UID to that window, attest preboot
-numbering or admit the accessor. A separate [path-only candidate observation](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#observe-a-candidate-manager-without-invoking-the-location-accessor)
+buses. The [current static root check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#match-the-current-static-acpi-root-to-the-observed-device-chain)
+now matches the DSDT root and both device scopes to that host topology, with
+the static ACPI default segment agreeing with MCFG. This does not attest the
+runtime namespace, preboot path or segment. A separate [path-only candidate observation](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#observe-a-candidate-manager-without-invoking-the-location-accessor)
 now finds the expected firmware driver for an OVMF-enumerated emulated PCI
 device without calling the endpoint's location accessor. This removes that
 call from the candidate observation, not the need for independent target

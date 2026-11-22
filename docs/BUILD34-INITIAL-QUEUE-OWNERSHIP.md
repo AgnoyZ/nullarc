@@ -555,6 +555,38 @@ AML method, ECAM access, PCI configuration read or MMIO is requested. The
 default invocation still does not query ACPI. Rollback is to omit this mode.
 See the [sanitized result](validation/build34-r3-preboot-mcfg-20261123.json).
 
+### Match the current static ACPI root to the observed device chain
+
+The opt-in `--check-acpi-root /path/to/iasl` mode samples the target's cached
+ACPI paths and the current DSDT, SSDTs and MCFG twice, requiring identical
+inputs. On macOS 26.7.2 (`25G332`), two invocations each validated one DSDT
+and 40 SSDTs. The current DSDT contains the matching root, bridge and endpoint
+declarations at their full namespace scopes. The root has a literal PCI root
+`_HID` and matching static `_UID` and `_BBN`; the two literal `_ADR` values
+match the cached device/function pairs. No `_SEG` NameSeg bytes occur in the
+exposed AML tables. The static ACPI default of segment zero agrees with the
+single covering MCFG allocation. The pinned Linux
+[`acpi_pci_root_add`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/acpi/pci_root.c#L629-L687)
+also uses zero when no `_SEG` object is found, but can derive the live bus
+range from `_CRS` instead of `_BBN`.
+
+The observer verifies the pinned [MaciASL iASL 20200925](https://github.com/acidanthera/MaciASL/blob/97ed950d2811b0b4cc802abc337316e16dd6aeeb/Dist/iasl-stable)
+binary hash, disassembles only the sampled DSDT with a bounded subprocess
+in a private temporary directory, and deletes the input and output before
+reporting. Its scope check is restricted to literal declarations in that
+disassembly format, not a general AML interpreter. `--test-acpi-root` checks
+10 fixtures. The output contains only classifications and counts, no
+addresses, names, UID, or raw firmware. The default observer and MCFG-only
+mode do not invoke iASL. Rollback is to omit the optional root check.
+
+This ties the matching static **OS-visible ACPI** root to the MCFG candidate.
+It neither evaluates `_CRS` or other methods nor proves the complete runtime
+namespace. It must not be used to assume UEFI segment zero, encode the exact
+UEFI root HID, or identify an installed firmware driver. Preboot path and
+root protocol identity still need independent verification and a fresh grant
+for physical observation. See the
+[sanitized result](validation/build34-r3-preboot-acpi-root-20261123.json).
+
 ### Observe a candidate manager without invoking the location accessor
 
 `Phx34ObservePciManagerAtPath` is separate from the location-qualified API.

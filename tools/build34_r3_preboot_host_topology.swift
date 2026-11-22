@@ -1,5 +1,6 @@
 import Foundation
 import IOKit
+import CryptoKit
 
 func refuse(_ reason: String) -> Never {
     print("refused_\(reason)")
@@ -71,9 +72,26 @@ struct TopologySample: Equatable {
     let identity: [UInt64]
     let bridgeBus: Int
     let downstream: ClosedRange<Int>
+    let acpi: ACPITarget?
 }
 
-func sample() -> TopologySample {
+struct ACPITarget: Equatable {
+    let names: [String]
+    let rootUID: UInt32
+    let bridgeADR: UInt32
+    let endpointADR: UInt32
+}
+
+func acpiPath(_ entry: io_registry_entry_t) -> [String]? {
+    let prefix = "IOACPIPlane:/"
+    guard let value = property(entry, "acpi-path") as? String, value.hasPrefix(prefix) else { return nil }
+    let components = value.dropFirst(prefix.count).split(separator: "/", omittingEmptySubsequences: false)
+    let names = components.map { String($0.prefix { $0 != "@" }) }
+    let syntax = /^[A-Z_][A-Z_0-9]{0,3}$/
+    return names.allSatisfy { (try? syntax.wholeMatch(in: $0)) != nil } ? names : nil
+}
+
+func sample(checkACPI: Bool = false) -> TopologySample {
     let target = uniqueService("IOPCIDevice") { entry in
         (property(entry, "vendor-id") as? Data) == Data([2, 16, 0, 0]) &&
         (property(entry, "device-id") as? Data) == Data([0, 25, 0, 0])
@@ -119,8 +137,19 @@ func sample() -> TopologySample {
 
     let identity = [entryID(driver), entryID(target), entryID(bridge), entryID(root), UInt64(uid)] + ancestors +
         (endpoint.address + parentBridge.address).map(UInt64.init)
+    let acpi: ACPITarget?
+    if checkACPI {
+        guard let rootPath = acpiPath(root), let bridgePath = acpiPath(bridge), let targetPath = acpiPath(target),
+              rootPath.count == 2, bridgePath.count == 3, targetPath.count == 4,
+              bridgePath.starts(with: rootPath), targetPath.starts(with: bridgePath) else { refuse("acpi_path") }
+        acpi = ACPITarget(names: targetPath, rootUID: uid,
+                          bridgeADR: UInt32(parentBridge.address[1] << 16 | parentBridge.address[2]),
+                          endpointADR: UInt32(endpoint.address[1] << 16 | endpoint.address[2]))
+    } else {
+        acpi = nil
+    }
     return TopologySample(identity: identity, bridgeBus: parentBridge.address[0],
-                          downstream: parentBridge.downstream[0]...parentBridge.downstream[1])
+                          downstream: parentBridge.downstream[0]...parentBridge.downstream[1], acpi: acpi)
 }
 
 struct MCFGWindow {
@@ -158,12 +187,172 @@ func uniqueMCFGCover(_ windows: [MCFGWindow], bridgeBus: Int, downstream: Closed
         candidate.buses.contains(downstream.upperBound)
 }
 
-func cachedMCFG() -> Data {
+func cachedTables() -> [String: Any] {
     let platform = uniqueService("IOACPIPlatformExpert") { _ in true }
     defer { IOObjectRelease(platform) }
-    guard let tables = property(platform, "ACPI Tables") as? NSDictionary,
-          let table = tables["MCFG"] as? Data else { refuse("missing_cached_mcfg") }
-    return table
+    guard let tables = property(platform, "ACPI Tables") as? [String: Any] else { refuse("missing_cached_acpi") }
+    return tables
+}
+
+struct ACPITables: Equatable {
+    let dsdt: Data
+    let mcfg: Data
+    let aml: [Data]
+}
+
+func staticTables() -> ACPITables {
+    let tables = cachedTables()
+    guard let dsdt = tables["DSDT"] as? Data, let mcfg = tables["MCFG"] as? Data else {
+        refuse("missing_cached_dsdt_or_mcfg")
+    }
+    let aml = tables.keys.sorted().flatMap { key -> [Data] in
+        if let data = tables[key] as? Data { return [data] }
+        return tables[key] as? [Data] ?? []
+    }.filter { table in
+        ["DSDT", "SSDT", "PSDT"].contains(String(decoding: table.prefix(4), as: UTF8.self))
+    }
+    guard (1...256).contains(aml.count), aml.filter({ $0.starts(with: "DSDT".utf8) }) == [dsdt],
+          aml.allSatisfy({ table in
+              guard (36...2_097_152).contains(table.count) else { return false }
+              let declared = table.dropFirst(4).prefix(4).enumerated().reduce(0) {
+                  $0 | (Int($1.element) << ($1.offset * 8))
+              }
+              return declared == table.count && table.reduce(UInt8(0), &+) == 0
+          }) else { refuse("invalid_cached_aml") }
+    return ACPITables(dsdt: dsdt, mcfg: mcfg, aml: aml)
+}
+
+func staticRootRefusal(_ asl: String, _ target: ACPITarget, bus: Int) -> String? {
+    guard target.names.count == 4, target.names[0] == "_SB" || target.names[0] == "_SB_" else {
+        return "acpi_system_bus_scope"
+    }
+    let lines = asl.components(separatedBy: .newlines).map { line in
+        let line = line.replacingOccurrences(of: #"/\*.*?\*/"#, with: "", options: .regularExpression)
+        return line.range(of: "//").map { String(line[..<$0.lowerBound]) } ?? line
+    }
+    func bodies(_ words: Set<String>, in range: Range<Int>, depth: Int) -> [Range<Int>] {
+        let indent = String(repeating: " ", count: depth * 4)
+        let matches = range.filter { words.contains(lines[$0].trimmingCharacters(in: .whitespaces)) &&
+            lines[$0].prefix(while: { $0 == " " }).count == indent.count }
+        return matches.compactMap { index in
+            guard index + 1 < range.upperBound, lines[index + 1].trimmingCharacters(in: .whitespaces) == "{",
+                  let end = ((index + 2)..<range.upperBound).first(where: {
+                      lines[$0].prefix(while: { $0 == " " }).count == indent.count &&
+                      lines[$0].trimmingCharacters(in: .whitespaces) == "}"
+                  }) else { return nil }
+            return (index + 2)..<end
+        }
+    }
+    func value(_ field: String, in range: Range<Int>, depth: Int) -> String? {
+        let prefix = String(repeating: " ", count: depth * 4) + "Name (\(field), "
+        let matches = range.map { lines[$0] }.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1, let line = matches.first else { return nil }
+        let plain = line.trimmingCharacters(in: .whitespaces)
+        let start = "Name (\(field), "
+        guard plain.hasSuffix(")") else { return nil }
+        return plain.dropFirst(start.count).dropLast().trimmingCharacters(in: .whitespaces)
+    }
+    func number(_ field: String, in range: Range<Int>, depth: Int) -> UInt32? {
+        guard let literal = value(field, in: range, depth: depth) else { return nil }
+        if literal == "Zero" { return 0 }
+        if literal == "One" { return 1 }
+        return literal.hasPrefix("0x") ? UInt32(literal.dropFirst(2), radix: 16) : UInt32(literal)
+    }
+
+    let systemBuses = bodies(["Scope (_SB)", "Scope (_SB_)", "Scope (\\_SB)", "Scope (\\_SB_)"],
+                             in: lines.indices, depth: 1)
+    let roots = systemBuses.flatMap { bodies(["Device (\(target.names[1]))"], in: $0, depth: 2) }
+    guard roots.count == 1, let root = roots.first else { return "acpi_root_scope" }
+    let bridges = bodies(["Device (\(target.names[2]))"], in: root, depth: 3)
+    guard bridges.count == 1, let bridge = bridges.first else { return "acpi_bridge_scope" }
+    let endpoints = bodies(["Device (\(target.names[3]))"], in: bridge, depth: 4)
+    guard endpoints.count == 1, let endpoint = endpoints.first else { return "acpi_endpoint_scope" }
+    guard let hid = value("_HID", in: root, depth: 3),
+          ["EisaId (\"PNP0A08\")", "EisaId (\"PNP0A03\")", "\"PNP0A08\"", "\"PNP0A03\""].contains(hid) else {
+        return "acpi_root_hid"
+    }
+    guard number("_UID", in: root, depth: 3) == target.rootUID else { return "acpi_root_uid" }
+    guard number("_BBN", in: root, depth: 3) == UInt32(bus) else { return "acpi_root_bus" }
+    guard number("_ADR", in: bridge, depth: 4) == target.bridgeADR else { return "acpi_bridge_adr" }
+    guard number("_ADR", in: endpoint, depth: 5) == target.endpointADR else { return "acpi_endpoint_adr" }
+    return nil
+}
+
+func disassembleStaticRoot(_ dsdt: Data, using executable: String) throws -> String {
+    let binary = URL(fileURLWithPath: executable)
+    let digest = SHA256.hash(data: try Data(contentsOf: binary)).map { String(format: "%02x", $0) }.joined()
+    guard digest == "93f1f48e6f1ea26b14b45f4a0b6e65a660c1cc6f14969348ec9411ae6b969c12" else {
+        throw CocoaError(.fileReadCorruptFile)
+    }
+    let fileManager = FileManager.default
+    let privateDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try fileManager.createDirectory(at: privateDirectory, withIntermediateDirectories: false,
+                                    attributes: [.posixPermissions: 0o700])
+    do {
+        try dsdt.write(to: privateDirectory.appendingPathComponent("table.aml"))
+        let task = Process()
+        task.executableURL = binary
+        task.currentDirectoryURL = privateDirectory
+        task.arguments = ["-d", "table.aml"]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        let finished = DispatchSemaphore(value: 0)
+        task.terminationHandler = { _ in finished.signal() }
+        try task.run()
+        if finished.wait(timeout: .now() + 10) == .timedOut {
+            if task.isRunning { kill(task.processIdentifier, SIGKILL) }
+            task.waitUntilExit()
+            throw CocoaError(.fileReadUnknown)
+        }
+        task.waitUntilExit()
+        guard task.terminationStatus == 0 else { throw CocoaError(.fileReadCorruptFile) }
+        let asl = try String(contentsOf: privateDirectory.appendingPathComponent("table.dsl"), encoding: .utf8)
+        try fileManager.removeItem(at: privateDirectory)
+        return asl
+    } catch {
+        try? fileManager.removeItem(at: privateDirectory)
+        throw error
+    }
+}
+
+func testStaticRoot() {
+    let fixture = """
+        Scope (\\_SB)
+        {
+            Device (PCIR)
+            {
+                Name (_HID, EisaId ("PNP0A08") /* PCI Express root */)
+                Name (_UID, 0x34)
+                Name (_BBN, One)
+                Device (BRDG)
+                {
+                    Name (_ADR, 0x00060001) // Synthetic bridge
+                    Device (GFXD)
+                    {
+                        Name (_ADR, Zero)
+                    }
+                }
+            }
+        }
+    """
+    let target = ACPITarget(names: ["_SB", "PCIR", "BRDG", "GFXD"], rootUID: 0x34, bridgeADR: 0x60001, endpointADR: 0)
+    func changed(_ old: String, _ new: String) -> String? {
+        staticRootRefusal(fixture.replacingOccurrences(of: old, with: new), target, bus: 1)
+    }
+    let cases = [
+        staticRootRefusal(fixture, target, bus: 1) == nil,
+        staticRootRefusal(fixture + "\n" + fixture, target, bus: 1) == "acpi_root_scope",
+        changed("Scope (\\_SB)", "Scope (\\_TZ)") == "acpi_root_scope",
+        changed("Device (BRDG)", "Device (OTHR)") == "acpi_bridge_scope",
+        changed("Device (GFXD)", "Device (OTHR)") == "acpi_endpoint_scope",
+        changed("PNP0A08", "ACPI0004") == "acpi_root_hid",
+        changed("_UID, 0x34", "_UID, 0x35") == "acpi_root_uid",
+        changed("Name (_BBN, One)", "Method (_BBN, 0)") == "acpi_root_bus",
+        changed("0x00060001", "0x00060000") == "acpi_bridge_adr",
+        changed("_ADR, Zero", "_ADR, One") == "acpi_endpoint_adr"
+    ]
+    guard cases.allSatisfy({ $0 }) else { refuse("acpi_root_fixture_failed") }
+    print("static_acpi_root_fixture_cases_passed=\(cases.count)")
 }
 
 func testMCFG() {
@@ -217,14 +406,40 @@ if arguments == ["--test-mcfg"] {
     testMCFG()
     exit(0)
 }
+if arguments == ["--test-acpi-root"] {
+    testStaticRoot()
+    exit(0)
+}
+if arguments.count == 2 && arguments[0] == "--check-acpi-root" {
+    let first = sample(checkACPI: true)
+    let firstTables = staticTables()
+    let second = sample(checkACPI: true)
+    let secondTables = staticTables()
+    guard first == second, firstTables == secondTables, let target = first.acpi else { refuse("unstable_acpi_inputs") }
+    guard !firstTables.aml.contains(where: { $0.range(of: Data("_SEG".utf8)) != nil }) else {
+        refuse("explicit_or_unresolved_acpi_segment")
+    }
+    guard let windows = mcfgWindows(firstTables.mcfg), uniqueMCFGCover(windows, bridgeBus: first.bridgeBus,
+                                                                       downstream: first.downstream),
+          windows.contains(where: { $0.segment == 0 && $0.buses.contains(first.bridgeBus) }) else {
+        refuse("acpi_default_segment_or_mcfg_disagrees")
+    }
+    guard let asl = try? disassembleStaticRoot(firstTables.dsdt, using: arguments[1]) else { refuse("acpi_disassembly") }
+    if let reason = staticRootRefusal(asl, target, bus: first.bridgeBus) { refuse(reason) }
+    print("matching_input_pairs=2; validated_aml_tables=\(firstTables.aml.count); static_root_uid_adr_bbn_match=true")
+    print("no_seg_nameseg_in_exposed_aml=true; static_acpi_default_segment_matches_mcfg=true")
+    print("runtime_aml_namespace_or_uefi_path_attested=false")
+    exit(0)
+}
 let checkMCFG = arguments == ["--check-acpi-mcfg"]
 guard checkMCFG || arguments.isEmpty else { refuse("arguments") }
 let first = sample()
-let firstMCFG = checkMCFG ? cachedMCFG() : nil
+let firstMCFG = checkMCFG ? cachedTables()["MCFG"] as? Data : nil
 let second = sample()
-let secondMCFG = checkMCFG ? cachedMCFG() : nil
+let secondMCFG = checkMCFG ? cachedTables()["MCFG"] as? Data : nil
 guard first == second else { refuse("unstable_topology") }
-if let table = firstMCFG {
+if checkMCFG {
+    guard let table = firstMCFG, secondMCFG != nil else { refuse("missing_cached_mcfg") }
     guard firstMCFG == secondMCFG else { refuse("unstable_cached_mcfg") }
     guard let windows = mcfgWindows(table) else { refuse("invalid_cached_mcfg") }
     guard uniqueMCFGCover(windows, bridgeBus: first.bridgeBus, downstream: first.downstream) else {
