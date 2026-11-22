@@ -186,10 +186,10 @@ and the [proposed route trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md).
 
 The [staged ingress](../tools/build34_exact_ih_ingress.py) derives the complete
 exact-open source and replaces its generic queue-number notification helper
-with a deferred entry taking a route identity and a copied 32-byte vector.
-The caller must retain the service, carry the identity captured for that
-route, and own the validated delivery path. Reconstructing the identity from
-the current queue state when a delayed vector arrives does not qualify.
+with a deferred entry taking a route identity and a bounded batch of copied
+32-byte vectors. The caller must retain the service, carry the identity
+captured for that route, and own the validated delivery path. Reconstructing
+the identity or batch ordinal from current state at delivery does not qualify.
 
 Under `gpuLock`, publication and delivery check the current service, route
 epoch and both queue generations. The decoder uses the existing provisional
@@ -198,6 +198,25 @@ It maps ring `0x04` to build34 queue 0 (Compute) and ring `0x00` to queue 1
 (GFX), not to the numerically different DRM IP types. A rejection is not an
 acknowledgment or permission to drop traffic. The owning consumer must handle
 all other vectors independently.
+
+The route starts with an admitted ring size and read cursor. The entry checks
+that the software capture ordinal is consecutive, including after cursor
+wrap, and that the read cursor equals the previous accepted batch's end.
+Producer writeback samples must match and describe an aligned in-range
+cursor without status bits. The batch must contain the next contiguous
+prefix of available entries, capped at 32 per call. A longer backlog can
+span multiple batches without advancing past uncopied entries. Duplicate
+EOPs coalesce to at most one hint per queue per batch. An invalid batch on
+the current live route marks it lost before delivering any of that batch's
+hints. A stale route is rejected before inspecting batch continuity and
+cannot poison the current route.
+
+These checks apply to immutable CPU-owned captures, not to DMA memory. The
+owner must establish the starting cursor, actual complete ordered capture,
+capture-time ordinals, buffer lifetime and overflow observation. Matching
+writeback samples alone do not rule out an unobserved overwrite. The result
+is a wake mask or a rejection, never an IH read-pointer acknowledgment or
+permission to consume entries or reuse the ring.
 
 A recognized vector changes only the matching wake stamp. It cannot write a
 fence, advance the prefix, or release resources. Queue invalidation revokes
@@ -220,17 +239,21 @@ The CPU runner verifies the closed configuration and an explicitly modeled
 positive route. It exercises wrong source and queue, tagged MES, stale
 service and route, incorrect peer generation, wrong-queue wake, loss while
 enrolled, sleep/stop wakeup, and refused rearm after modeled queue readoption.
-ASan/UBSan and TSan each passed 32 closed and 319 modeled checks; eleven fault
-variants were rejected, including premature rearm. Both complete native
+It also tests partial processing of a 33-entry backlog, ring wrap, wrapped
+replay, unstable or flagged writeback, cursor gaps, wrong counts and wake
+coalescing. ASan/UBSan and TSan each passed 33 closed and 608 modeled checks;
+18 fault variants were rejected, including premature rearm. Both complete native
 sources compile to nonloadable objects with the same 381 imports; the 172
 protected production inputs are unchanged. The
-[retirement-hold record](validation/build34-r3-ih-retirement-offline-20261123.json)
+[batch-ingress record](validation/build34-r3-ih-batch-ingress-offline-20261123.json)
 supersedes the behavior in the
+[retirement-hold record](validation/build34-r3-ih-retirement-offline-20261123.json)
+and the
 [original ingress record](validation/build34-r3-ih-ingress-offline-20261123.json).
 
 ```sh
 nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_ih_ingress.py \
-  --out build/build34-r3-ih-retirement-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+  --out build/build34-r3-ih-batch-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
 ```
 
 Native admission is hard false and no delivery operations are installed.

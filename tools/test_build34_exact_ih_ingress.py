@@ -10,7 +10,7 @@ from unittest.mock import patch
 import build34_native_object_check as native_objects
 from build34_exact_event_iokit import DECLARATIONS as IOKIT_DECLARATIONS, FIELDS_AT, SLEEP, WAKE
 from build34_exact_event_wait import AVAILABLE, ENTRY, FIELDS, INVALIDATE, PARK, SNAPSHOT, WAIT
-from build34_exact_ih_ingress import ADMIT, CLOSE, DECLARATIONS, DELIVER, LOSE, MATCH, OPEN, previous_stage, stage, stage_header
+from build34_exact_ih_ingress import ADMIT, CLOSE, CURSOR, DECLARATIONS, DELIVER, LOSE, MATCH, OPEN, previous_stage, stage, stage_header
 from build34_exact_submit import once
 from test_build34_exact_event_iokit import DOUBLES
 from test_build34_exact_open import BASE, EXTRA, FACTORY_RECORD, KDK_RECORD, PROTECTED, git
@@ -20,7 +20,7 @@ REFERENCE = 'docs/validation/build34-r3-exact-open-offline-20261122.json'
 BASE_FIXTURE = 'tests/test_build34_exact_event_wait.cpp'
 FIXTURE = 'tests/test_build34_exact_ih_ingress.cpp'
 OWNERSHIP = 'tools/build34_exact_ownership.h'
-METHODS = (AVAILABLE, SNAPSHOT, PARK, SLEEP, WAKE, ADMIT, OPEN, MATCH, CLOSE, LOSE, DELIVER, INVALIDATE, WAIT)
+METHODS = (AVAILABLE, SNAPSHOT, PARK, SLEEP, WAKE, ADMIT, CURSOR, OPEN, MATCH, CLOSE, LOSE, DELIVER, INVALIDATE, WAIT)
 
 
 def test(out, sdk, kdk):
@@ -120,11 +120,19 @@ def test(out, sdk, kdk):
                                     'exactIHState != ExactIHState::Active && exactIHState != ExactIHState::Retiring &&', True),
         'rearm-before-old-route-drain': ('exactIHState == ExactIHState::Empty &&',
                                          'exactIHState != ExactIHState::Active && exactIHState != ExactIHState::Lost &&', True),
-        'deliver-from-nonactive-route': ('exactIHState == ExactIHState::Active &&\n           ', '', True),
+        'admit-batch-from-nonactive-route': (' || exactIHState != ExactIHState::Active', '', True),
         'ignore-loss-during-retirement': ('(exactIHState == ExactIHState::Active || exactIHState == ExactIHState::Retiring)',
                                           'exactIHState == ExactIHState::Active', True),
         'erase-retiring-identity': ('exactIHState = ExactIHState::Retiring;',
                                      'exactIHRoute = {}; exactIHState = ExactIHState::Retiring;', True),
+        'accept-wrapped-replay': ('batch.ordinal != exactIHBatchOrdinal + 1 || ', '', True),
+        'skip-consumer-cursor': ('batch.read != exactIHNext || ', '', True),
+        'accept-unstable-writeback': ('batch.before != batch.after || ', '', True),
+        'accept-invalid-producer-cursor': (' || !validExactIHCursor(batch.before, exactIHRingSize)', '', True),
+        'accept-incomplete-batch': ('batch.count != expected', 'batch.count > expected', True),
+        'jump-over-partial-batch': ('exactIHNext = (batch.read + batch.count * kExactIHEntryBytes) & (exactIHRingSize - 1);',
+                                    'exactIHNext = batch.before;', True),
+        'wake-twice-for-same-queue': ('!(queueMask & bit) && ', '', True),
     }
     for label, (old, new, modeled) in mutations.items():
         exercise(label, once(proposed, old, new), 'address,undefined', modeled, True)
@@ -136,9 +144,10 @@ def test(out, sdk, kdk):
     git('diff', '--quiet', BASE, '--', *PROTECTED)
     if any((ROOT / name).read_bytes() != blob for name, blob in inputs.items()):
         raise ValueError('Inputs changed during verification')
-    result = dict(status='passed-offline-IH-retirement-hold', build=34, checks=counts,
+    result = dict(status='passed-offline-IH-batch-ingress', build=34, checks=counts,
                   rejected_mutants=list(mutations), staged_source_sha256=sha(proposed.encode()),
                   previous_source_sha256=sha(previous.encode()), protected_production_inputs=len(production),
+                  max_entries_per_batch=32, native_ring_consumer_bound=False,
                   hold_rearm_until_old_route_drain=True, old_writer_drain_proved=False,
                   native_event_backend_bound=False, native_open_admitted=False, IH_accessed=False,
                   ISR_registered=False, GPU_executed=False, R3_complete=False, **native)
