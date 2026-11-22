@@ -214,7 +214,7 @@ PCI message-enable result do not close that gap. No new MMIO, interrupt
 registration, power action or GPU submission was performed for this review.
 
 The pinned Linux v6.12 reference selects
-[IH v6 for OSSSYS 6.0.1](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c#L1879-L1910).
+[IH v6 for OSSSYS 6.0.1](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_discovery.c#L1917-L1921).
 Its [APU path allocates the primary hardware ring only](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L571-L614);
 the separately initialized software ring is not an alternate hardware ring.
 Do not presume an available private second hardware ring for EOP. The same
@@ -223,7 +223,7 @@ An EOP-only filter does not justify taking the primary ring or discarding
 other vectors. These are Linux reference paths; they do not establish
 routing on the running macOS stack.
 
-The same [ring setup](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L212-L235)
+The same [ring setup](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L215-L235)
 sets distinct address-space modes for bus and GPU virtual addresses, enables
 writeback, requests snooping and clears relaxed ordering. Its APU sizing path
 selects GPU virtual addresses when PSP loads firmware; the associated comment
@@ -269,6 +269,28 @@ GPU-only bridge reset or platform handoff. The current exposed ACPI table
 review located explicit reset objects on other devices and resources; it
 did not establish a GPU reset or complete runtime namespace. The ownership
 and drain gate remains open.
+
+### Follow-up: ring-full handling and translated DMA drain
+
+Linux sets [`RB_FULL_DRAIN_ENABLE`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L265-L306)
+when configuring `ih1`, alongside disabling overflow on that ring.
+The APU path does not allocate `ih1`. This is an initialization control,
+not a checked stop or DMA completion result for the primary ring.
+The [forced pointer update path](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L77-L116)
+configures when a self interrupt reports a write pointer. It does not
+return a completed-write acknowledgment.
+
+Account for three distinct paths. The IH produces vectors in the ring and
+can DMA its write pointer to a separately programmed address; the CPU
+consumer [stores the read-pointer shadow and rings the doorbell](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L508-L524).
+The [allocation reference](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.c#L41-L101)
+can put the ring and pointer shadows in different allocations. A receipt
+for only the ring pages would not cover a separately mapped writeback
+page or an already issued consumer doorbell. AMD specifies a conditional
+[host-mapper page-reuse boundary](BUILD34-SYSTEM-WRITEBACK.md#amd-invalidation-completion-is-a-mapping-boundary)
+for translated DMA. It supplies neither producer stop nor doorbell
+ownership, and its coverage of either inherited IH write destination is
+unverified here. This source review admits no live operation.
 
 ### Follow-up: direct child attribution
 

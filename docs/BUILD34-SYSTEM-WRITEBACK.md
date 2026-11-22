@@ -103,6 +103,36 @@ pinned and the scope closed to reuse; do not claim the old API mapping
 survived. No IOMMU commands, DMA operations or hardware state changes
 were performed for this review. No Linux or XNU code was imported.
 
+### AMD invalidation completion is a mapping boundary
+
+AMD's [IOMMU specification 48882-PUB, revision 3.10 (PDF mirror)](https://kib.kiev.ua/x86docs/AMD/IOMMU/48882-3.10.pdf),
+sections 2.4.1 and 2.4.11.2, defines a positive boundary for reclaiming
+pages from translated DMA: make the entries non-present, invalidate the
+applicable translations and observe completion of the matching
+`COMPLETION_WAIT`. Invalidation does not complete while matching DMA that
+used the old cached translations is still in flight. Where a remote IOTLB
+is active, use the device-side invalidation and ordering rules in sections
+2.4.4 and 2.4.11.1; a host cache-only result would omit that coverage.
+`COMPLETION_WAIT` by itself is an IOMMU command boundary. It
+does not stop a producer, invalidate unchanged mappings or cover traffic
+that bypasses translation (section 2.1). Section 2.4.5 separately defines
+interrupt remapping cache invalidation; the page-reuse result is not proof
+that all previously issued MSI messages have been delivered.
+
+Before crediting this boundary, require the actual mapper and requesters,
+all ring/writeback destinations and aliases, and a checked result tied to
+revocation of those mappings. Refuse if any path is untranslated or
+unattributed, any alias stays live, or completion fails or cannot be tied to
+the revocation. The mapper must account for `IOTLB_INV_TIMEOUT` (section
+2.5.8), including when reset interrupts a remote invalidation (section
+2.1.4.13). A command completion token does not substitute for that error
+check. Even with coverage for the old pages, keep producer stop,
+doorbell ownership and prevention of rearm as separate requirements. A late
+request must not be able to hit a new mapping that reuses the old device
+address. This is a source-derived requirement, not authority to edit the
+running mapper, unmap the inherited ring or release its backing. No source
+text, register sequence or binary was imported.
+
 ## TLB acknowledgement is not translation proof
 
 Linux's [GART invalidation](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_gart.c#L397-L417)
