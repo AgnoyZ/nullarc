@@ -18,6 +18,8 @@ from build34_exact_submit import once
 from build34_r3_mesa_drm import stage_drm, stage_sync
 from build34_r3_mesa_iokit import IOKIT, IOKIT_SHA256, stage as iokit_stage
 from build34_r3_mesa_open import stage_drm as open_drm_stage, stage_iokit as open_iokit_stage
+from build34_r3_radv_entry import ENTRY_SHA256, PHYSICAL, WRAPPER, WINSYS
+from build34_r3_radv_entry import stage_drm as entry_drm_stage, stage_physical, stage_wrapper
 from test_build34_exact_ownership import DRIVER, ROOT, method, sha
 from test_build34_exact_transport import DRM, KEXT, PATCH, PREFIX, SHAPE_PATCHES
 from test_build34_exact_multitarget import apply, stage
@@ -28,7 +30,8 @@ EXACT_OPEN_WIRE = 'tools/build34_exact_open_wire.h'
 EXACT_OPEN_WIRE_SHA256 = '3871eccc5e3aca90936d1fc76ea01a7824c5fe534712a225a8c1ab6d4099a5e8'
 
 
-def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
+def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=False):
+    exact_open = exact_open or radv_entry
     drm = drm or exact_open
     iokit = iokit or drm
     mesa, out = Path(mesa).resolve(), Path(out).resolve()
@@ -49,9 +52,11 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
     native_record = 'docs/validation/build34-r3-submit-receipt-offline-20261121.json'
     dispatch_record = 'docs/validation/build34-r3-mesa-dispatch-offline-20261122.json'
     drm_record = 'docs/validation/build34-r3-mesa-drm-offline-20261122.json'
+    open_record = 'docs/validation/build34-r3-mesa-exact-service-open-offline-20261122.json'
     adapter = 'tools/build34_r3_mesa_wire.c'
     fixture = 'tests/test_build34_r3_mesa_wire.cpp'
     iokit_fixture = 'tests/test_build34_r3_mesa_iokit.c'
+    entry_fixture = 'tests/test_build34_r3_radv_entry.c'
     sync = PREFIX + 'ac_darwin_sync.c'
     vamgr = PREFIX + 'amdgpu_vamgr.c'
     native_evidence = json.loads((ROOT / native_record).read_text())
@@ -75,6 +80,11 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
                       'docs/validation/build34-r3-mesa-iokit-offline-20261122.json'])
     if exact_open:
         paths.extend([drm_record, 'tools/build34_r3_mesa_open.py', EXACT_OPEN_WIRE])
+    if radv_entry:
+        paths.extend([open_record, 'tools/build34_r3_radv_entry.py', 'tools/build34_r3_radv_entry.h', entry_fixture])
+        entry_source = {name: (mesa / name).read_bytes() for name in ENTRY_SHA256}
+        if {name: sha(data) for name, data in entry_source.items()} != ENTRY_SHA256:
+            raise ValueError('Previously reviewed RADV entry input changed')
     inputs = {name: (ROOT / name).read_bytes() for name in paths}
     pinned = {**native_evidence['input_sha256'], **{name: mesa_evidence['input_sha256'][name] for name in patches}}
     if exact_open:
@@ -134,6 +144,35 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
         (closure / IOKIT).write_bytes(iokit_staged)
         mesa_staged[DRM] = open_drm_stage(mesa_staged[DRM].decode()).encode()
         (closure / DRM).write_bytes(mesa_staged[DRM])
+    if radv_entry:
+        prior_open = json.loads(inputs[open_record])
+        for stage_name, source in [('iokit', iokit_staged), ('drm', mesa_staged[DRM]), ('sync', mesa_staged[sync])]:
+            if sha(source) != prior_open['staged_' + stage_name + '_source_sha256']:
+                raise ValueError('Previously reviewed exact open predecessor changed: ' + stage_name)
+        physical = stage_physical(entry_source[PHYSICAL].decode())
+        wrapper = stage_wrapper(entry_source[WRAPPER].decode())
+        entry_staged = {PHYSICAL: physical.encode(), WRAPPER: wrapper.encode(), WINSYS: entry_source[WINSYS]}
+        for name, data in entry_staged.items():
+            if not data.startswith(entry_source[name].split(b'#include', 1)[0]):
+                raise ValueError('Original Mesa notice changed: ' + name)
+        stage(entry_staged, closure)
+        mesa_staged.update(entry_staged)
+        mesa_staged[DRM] = entry_drm_stage(mesa_staged[DRM].decode()).encode()
+        (closure / DRM).write_bytes(mesa_staged[DRM])
+        entry_blocks = {
+            'radv-entry-wrapper.inc': wrapper[wrapper.index('struct ac_drm_device {'):wrapper.index('\n};') + 3] +
+            '\n' + '\n'.join(method(wrapper, signature) for signature in
+                ('int\nac_drm_darwin_exact_profile(', 'int ac_drm_device_initialize(',
+                 'struct util_sync_provider *ac_drm_device_get_sync_provider(',
+                 'void ac_drm_device_deinitialize(')),
+            'radv-entry-physical.inc': method(physical, 'VkResult\nradv_darwin_enumerate_physical_devices('),
+        }
+        winsys = entry_source[WINSYS].decode()
+        for name in ('radv_amdgpu_winsys_query_info', 'radv_amdgpu_winsys_create'):
+            block = method(winsys, 'VkResult\n' + name + '(')
+            if block.count('r = ac_drm_device_initialize(fd, is_virtio, &drm_major, &drm_minor, &dev);') != 1:
+                raise ValueError('RADV winsys no longer uses the shared Darwin initializer: ' + name)
+        stage({name: block.encode() for name, block in entry_blocks.items()}, frozen / 'tools')
 
     native_result = json.loads(run([sys.executable, '-B', ROOT / native_case, '--out', native],
                                    'native-regressions', cwd=ROOT, timeout=360))
@@ -187,6 +226,8 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
         sources.extend([closure / IOKIT, frozen / iokit_fixture])
     if drm:
         sources.extend(closure / name for name in (DRM, sync, vamgr, 'src/amd/common/amdgpu_devices.c'))
+    if radv_entry:
+        sources.append(frozen / entry_fixture)
     for label, sanitizer in [('memory', 'address,undefined'), ('thread', 'thread')]:
         flags = ['-O1', '-g', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                  '-fno-omit-frame-pointer', '-fno-sanitize-recover=all', '-fsanitize=' + sanitizer]
@@ -206,6 +247,8 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
                 extra.append('-DPHX34_TEST_DRM=1')
             if exact_open and source in (frozen / fixture, frozen / iokit_fixture):
                 extra.append('-DPHX34_TEST_EXACT_OPEN=1')
+            if radv_entry and source == frozen / fixture:
+                extra.append('-DPHX34_TEST_RADV_ENTRY=1')
             if drm and source in (closure / DRM, closure / sync):
                 extra.append('-Dcalloc=phx34_fixture_calloc')
             if drm and source == closure / vamgr:
@@ -247,6 +290,8 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
                   (out / 'iokit-baseline' / IOKIT).read_bytes() != iokit_source or
                   (closure / IOKIT).read_bytes() != iokit_staged):
         raise ValueError('Mesa IOKit input drift')
+    if radv_entry and any((mesa / name).read_bytes() != data for name, data in entry_source.items()):
+        raise ValueError('Mesa RADV entry input drift')
     if protected != {name: sha((ROOT / name).read_bytes()) for name in names}:
         raise ValueError('Production input drift')
     report = dict(status='passed-CPU-only-paired-Mesa-native-receipt-wire', kernel_build=34,
@@ -279,6 +324,13 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False):
                       fixture_open_refusal_does_not_fall_back=True,
                       fixture_open_reuses_exact_core_and_refuses_while_draining=True,
                       normal_RADV_entry_changed=False)
+    if radv_entry:
+        report.update(status='passed-CPU-only-staged-RADV-R3-exact-entry', normal_RADV_entry_changed=False,
+                      staged_RADV_entry_uses_exact_only=True, actual_enumeration_and_drm_wrapper_compiled=True,
+                      physical_device_and_winsys_creation_modeled=True, winsys_shared_initializer_source_checked=True,
+                      profile_read_uses_owned_core_without_new_sync_clone=True, live_vulkan_runtime_built=False,
+                      entry_base_source_sha256=ENTRY_SHA256,
+                      entry_staged_source_sha256={name: sha(data) for name, data in entry_staged.items()})
     (out / 'result-private.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report))
 
@@ -290,5 +342,6 @@ if __name__ == '__main__':
     parser.add_argument('--iokit', action='store_true')
     parser.add_argument('--drm', action='store_true')
     parser.add_argument('--exact-open', action='store_true')
+    parser.add_argument('--radv-entry', action='store_true')
     args = parser.parse_args()
-    test(args.mesa_source, args.out, iokit=args.iokit, drm=args.drm, exact_open=args.exact_open)
+    test(args.mesa_source, args.out, iokit=args.iokit, drm=args.drm, exact_open=args.exact_open, radv_entry=args.radv_entry)

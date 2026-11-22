@@ -369,6 +369,10 @@ struct FakeIOKit {
     bool drm = false;
     Pause *waitPause = nullptr;
 #endif
+#ifdef PHX34_TEST_RADV_ENTRY
+    bool radvProfile = false;
+    unsigned topologyCalls = 0;
+#endif
     static thread_local FakeIOKit *current;
 
     FakeIOKit() {
@@ -454,8 +458,25 @@ extern "C" kern_return_t phx34_fixture_method(mach_port_t conn, uint32_t selecto
     if (fake->drm && (selector == ACD_SEL_QUERY_INFO || selector == PHX_SEL_TOPOLOGY)) {
         CHECK(fake->helloCalls == 2 && !scalars && !scalarCount && !input && !inputSize && !scalarOut && !scalarOutCount);
         CHECK(output && outputSize);
-        if (selector == PHX_SEL_TOPOLOGY)
+        if (selector == PHX_SEL_TOPOLOGY) {
+#ifdef PHX34_TEST_RADV_ENTRY
+            if (fake->radvProfile) {
+                CHECK(*outputSize == sizeof(phx_topology) && ++fake->topologyCalls == 1);
+                auto &profile = *static_cast<phx_topology *>(output);
+                profile = {};
+                profile.version = PHX_TOPOLOGY_VERSION;
+                profile.flags = PHX_TOPOLOGY_CAPTURED | PHX_TOPOLOGY_RUNTIME_READY;
+                profile.vendor = 0x1002;
+                profile.device = 0x1900;
+                profile.revision = 0xbb;
+                profile.num_shader_engines = profile.num_shader_arrays_per_engine = profile.num_cu_per_sh = 1;
+                profile.num_rb_pipes = profile.enabled_rb_pipes_mask = profile.cu_active_number = 1;
+                profile.cu_bitmap[0][0] = 1;
+                return KERN_SUCCESS;
+            }
+#endif
             return static_cast<kern_return_t>(ACD_KR_UNSUPPORTED);
+        }
         CHECK(*outputSize == sizeof(n48n_info));
         auto &info = *static_cast<n48n_info *>(output);
         info = {};
@@ -722,6 +743,50 @@ static void exact_open_cleanup() {
     }
 }
 #endif
+
+#ifdef PHX34_TEST_RADV_ENTRY
+extern "C" int phx34_fixture_radv_enumerate(int, bool, bool);
+extern "C" void phx34_fixture_radv_logical_open();
+extern "C" void phx34_fixture_radv_logical_close();
+extern "C" void phx34_fixture_radv_physical_close();
+
+extern "C" void phx34_fixture_assert(bool passed) { CHECK(passed); }
+
+static void radv_entry_lifetime() {
+    for (unsigned scenario = 0; scenario < 6; ++scenario) {
+        reset();
+        FakeIOKit fake;
+        fake.drm = fake.openEnabled = fake.radvProfile = true;
+        fake.port = MACH_PORT_NULL;
+        if (scenario == 5)
+            fake.openStatus = ACD_KR_NOT_READY;
+        const bool success = scenario < 3;
+        const int create = scenario == 3 ? -1 : scenario == 4 ? -3 : 0;
+        CHECK(phx34_fixture_radv_enumerate(create, scenario == 1, success) == (scenario == 3 ? -1 : 0));
+        CHECK(fake.opens == 1 && fake.releases == 1);
+        CHECK(fake.topologyCalls == (scenario != 5) && fake.bridge.sessions == (scenario != 5));
+        CHECK(!fake.bridge.submits && !fake.bridge.waits && !fake.bridge.acks && !packetWrites);
+        if (success) {
+            CHECK(fake.closes == 0);
+            phx34_fixture_radv_logical_open();
+            CHECK(fake.opens == 1 && fake.closes == 0);
+            if (scenario == 2) {
+                phx34_fixture_radv_physical_close();
+                CHECK(fake.closes == 0);
+                phx34_fixture_radv_logical_close();
+            } else {
+                phx34_fixture_radv_logical_close();
+                CHECK(fake.closes == 0);
+                phx34_fixture_radv_physical_close();
+            }
+        }
+        CHECK(fake.closes == (scenario != 5));
+        acd_device_handle no_core = nullptr;
+        uint32_t major = 0, minor = 0;
+        CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &no_core) == -ENODEV && !no_core);
+    }
+}
+#endif
 #endif
 
 int main() {
@@ -744,6 +809,9 @@ int main() {
 #ifdef PHX34_TEST_EXACT_OPEN
     exact_open_errors();
     exact_open_cleanup();
+#endif
+#ifdef PHX34_TEST_RADV_ENTRY
+    radv_entry_lifetime();
 #endif
 #endif
     std::printf("PASS staged Mesa/native wire: %llu checks; GPU_executed=false\n",

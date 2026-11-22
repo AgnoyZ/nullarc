@@ -357,7 +357,42 @@ make -j1 test-build34-r3-mesa-exact-open MESA_SOURCE="$MESA_SOURCE" \
   R3_MESA_EXACT_OPEN_OUT=build/build34-r3-mesa-exact-service-open-new-private
 ```
 
-The normal RADV physical-device/profile and winsys entrypoints are unchanged;
-both must select the same negotiated mode before native integration. There
-was no real IOKit open, MIG exchange, reader/event binding, load or GPU work.
+This stage alone leaves the normal RADV physical-device/profile and winsys
+entrypoints unchanged. There was no real IOKit open, MIG exchange,
+reader/event binding, load or GPU work.
 Omit the open stage to retain the previous caller-supplied-connection stage.
+
+## Isolated RADV entry pairing
+
+The [next source stage](../tools/build34_r3_radv_entry.py) routes the existing
+Darwin `ac_drm_device_initialize` entry to the exact-only constructor.
+The pinned winsys query and logical-device creation both use that initializer;
+there is no environment switch or legacy retry in this stage. Enumeration
+holds that DRM device across physical-device construction, copies the profile
+from the same negotiated core without a temporary device or sync clone, and
+passes ownership to the physical device up to its existing destructor. A
+construction failure releases the owner. If construction already holds an
+owner, enumeration drops its extra reference. The production Mesa path and
+the earlier IB-tail runtime recipe are not changed.
+
+The actual staged enumeration function, wrapper, and DRM transport path pass
+10,000 checks each under ASan/UBSan and TSan. The CPU model checks that a
+non-canned profile reaches enumeration, that query and logical-device
+acquisition reuse one exact connection, that either destruction order
+closes it only at the last release, and that failed enumeration publishes no
+device or fallback. Full staged wrapper and physical-device translation
+units also pass syntax checks with the previous isolated Mesa configuration.
+Physical-device construction and winsys operations are modeled, not a full
+Vulkan runtime test. See the
+[offline result](validation/build34-r3-radv-exact-entry-offline-20261122.json).
+
+```sh
+make -j1 test-build34-r3-radv-entry MESA_SOURCE="$MESA_SOURCE" \
+  R3_RADV_ENTRY_OUT=build/build34-r3-radv-exact-entry-new-private
+```
+
+Use the pinned Mesa dependency closure plus the baseline wrapper, physical
+device and winsys sources identified by the report. Omit this stage to keep
+the previous explicit open without changing normal entrypoints. No full R3
+runtime was linked, installed or loaded. Real owning-task admission, MIG,
+IH ownership and drain, fence visibility and hardware acceptance remain open.
