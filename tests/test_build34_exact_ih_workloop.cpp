@@ -1,4 +1,3 @@
-using IOReturn = int;
 static constexpr IOReturn kIOReturnSuccess = 0, kIOReturnBusy = -1, kIOReturnNotReady = -2,
     kIOReturnNotPermitted = -3, kIOReturnNotAttached = -4, kIOReturnError = -5;
 
@@ -219,7 +218,8 @@ int main() {
     CHECK(source->detach() == kIOReturnSuccess && loop->removeCount == 1);
     releaseCaller(waking, scheduled, source);
 
-    for (bool stop : {false, true}) {
+    enum class Invalidation { Queue, Sleep, Stop };
+    for (auto trigger : {Invalidation::Queue, Invalidation::Sleep, Invalidation::Stop}) {
         Trial invalidated;
         Capture pending;
         invalidated.gpu.modeledIHAdmission = true;
@@ -227,19 +227,56 @@ int main() {
         CHECK(source && source->activate());
         loop = source->getWorkLoop();
         source->hint();
-        if (stop) invalidated.gpu.exactCallbacks.close();
-        IOLockLock(invalidated.gpu.gpuLock);
-        invalidated.gpu.exactStopped = stop;
-        invalidated.gpu.isSleeping = !stop;
-        invalidated.gpu.invalidateExactQueues();
-        IOLockUnlock(invalidated.gpu.gpuLock);
+        if (trigger == Invalidation::Stop) {
+            invalidated.gpu.stop(nullptr);
+            CHECK(invalidated.gpu.exactStopped && invalidated.gpu.hangDrainRequests == 1);
+        } else if (trigger == Invalidation::Sleep) {
+            CHECK(invalidated.gpu.setPowerState(0, nullptr) == IOPMAckImplied);
+            CHECK(invalidated.gpu.isSleeping);
+            CHECK(invalidated.gpu.setPowerState(1, nullptr) == IOPMAckImplied);
+            CHECK(!invalidated.gpu.isSleeping);
+        } else {
+            IOLockLock(invalidated.gpu.gpuLock);
+            invalidated.gpu.invalidateExactQueues();
+            IOLockUnlock(invalidated.gpu.gpuLock);
+        }
+        CHECK(loop->removeCount == 0 && source->getWorkLoop() == loop);
         source->hint();
         CHECK(loop->turn() && !pending.calls && loop->wakeCount == 1);
         CHECK(invalidated.gpu.exactIHState == PhxBringup::ExactIHState::Retiring);
-        source->closeAdmission();
+        CHECK(!source->activate());
         CHECK(source->detach() == kIOReturnSuccess);
+        if (trigger == Invalidation::Stop) {
+            CHECK(invalidated.gpu.references == 3);
+            invalidated.gpu.release();
+        }
         releaseCaller(invalidated, pending, source);
     }
+
+    Trial busyStop;
+    Capture stopped;
+    busyStop.gpu.modeledIHAdmission = true;
+    source = prepare(busyStop, stopped);
+    CHECK(source && source->activate());
+    loop = source->getWorkLoop();
+    {
+        decltype(busyStop.gpu.exactCallbacks)::Lease callback(busyStop.gpu.exactCallbacks);
+        CHECK(callback);
+        beforeKick = [&] {
+            busyStop.gpu.stop(nullptr);
+            CHECK(!busyStop.gpu.exactStopped && busyStop.gpu.hangDrainRequests == 1);
+            CHECK(busyStop.gpu.exactIHState == PhxBringup::ExactIHState::Active);
+            CHECK(loop->removeCount == 0);
+        };
+        source->hint();
+        CHECK(!beforeKick && !loop->wakeCount && loop->turn(true) && !stopped.calls);
+    }
+    busyStop.gpu.sealStoppedQueues();
+    CHECK(busyStop.gpu.exactIHState == PhxBringup::ExactIHState::Retiring && busyStop.gpu.exactStopped);
+    CHECK(source->detach() == kIOReturnSuccess);
+    CHECK(busyStop.gpu.references == 3);
+    busyStop.gpu.release();
+    releaseCaller(busyStop, stopped, source);
 
     Trial copying;
     Capture paused;
@@ -253,7 +290,8 @@ int main() {
     std::thread worker([&] { CHECK(loop->turn()); });
     copy.wait();
     source->hint();
-    source->closeAdmission();
+    CHECK(copying.gpu.setPowerState(0, nullptr) == IOPMAckImplied);
+    CHECK(copying.gpu.isSleeping && copying.gpu.exactIHState == PhxBringup::ExactIHState::Retiring);
     beforeRemove = [&] { CHECK(false); };
     CHECK(source->detach() == kIOReturnBusy && loop->removeCount == 0 && source->references == 3);
     CHECK(beforeRemove);

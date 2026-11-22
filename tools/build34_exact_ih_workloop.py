@@ -1,9 +1,24 @@
 """Stage a retained providerless workloop source; native IH admission stays closed."""
 
-from build34_exact_ih_ingress import stage as previous_stage, stage_header
+from build34_exact_ih_ingress import CLOSE, stage as previous_stage, stage_header
 from build34_exact_submit import once
+from test_build34_exact_ownership import method
 
 ANCHOR = 'OSDefineMetaClassAndStructors(PhxBringup, IOService)\n'
+STOP = 'void PhxBringup::stop('
+STOP_ADMISSION = '    if (!exactCallbacks.close()) return;\n'
+ROUTE_ADMISSION = '    __atomic_fetch_or(&exactIHSignals, kIHClosed, __ATOMIC_ACQ_REL);\n'
+CLOSE_WORK = '    closeExactIHWorkAdmission();\n'
+ADMISSION_FIELDS = '''    friend class PhxExactIHWorkSource;
+    static constexpr uint64_t kExactIHKickClosed = 1ull << 63;
+    static_assert(__atomic_always_lock_free(sizeof(uint64_t), nullptr), "IH kick admission requires lock-free atomics");
+    alignas(uint64_t) uint64_t exactIHKicks{0};
+    phx34_exact::CallbackGate<1> exactIHTurns;
+    void closeExactIHWorkAdmission() {
+        __atomic_fetch_or(&exactIHKicks, kExactIHKickClosed, __ATOMIC_ACQ_REL);
+        exactIHTurns.close();
+    }
+'''
 SOURCE = '''
 class PhxExactIHWorkSource final : public IOEventSource {
     OSDeclareDefaultStructors(PhxExactIHWorkSource)
@@ -22,10 +37,7 @@ protected:
 private:
     enum class Attachment : uint32_t { Preparing, Attached, Removing, Detached, Held };
     Attachment attachment{Attachment::Preparing};
-    static constexpr uint64_t kKickClosed = 1ull << 63;
-    static_assert(__atomic_always_lock_free(sizeof(uint64_t), nullptr), "IH kick admission requires lock-free atomics");
-    alignas(uint64_t) uint64_t kicks{0};
-    phx34_exact::CallbackGate<1> turns;
+    static constexpr uint64_t kKickClosed = PhxBringup::kExactIHKickClosed;
     PhxBringup *gpu{nullptr};
     IOWorkLoop *loop{nullptr};
     OSObject *captureOwner{nullptr};
@@ -78,13 +90,13 @@ PhxExactIHWorkSource *PhxExactIHWorkSource::prepare(PhxBringup *gpu, uint32_t ri
 
 bool PhxExactIHWorkSource::accepting() const {
     return getAttachment() == Attachment::Attached &&
-        !(__atomic_load_n(&kicks, __ATOMIC_ACQUIRE) & kKickClosed);
+        !(__atomic_load_n(&gpu->exactIHKicks, __ATOMIC_ACQUIRE) & kKickClosed);
 }
 
 void PhxExactIHWorkSource::kick() {
-    const uint64_t earlier = __atomic_fetch_add(&kicks, 1, __ATOMIC_ACQ_REL);
+    const uint64_t earlier = __atomic_fetch_add(&gpu->exactIHKicks, 1, __ATOMIC_ACQ_REL);
     if (!(earlier & kKickClosed)) signalWorkAvailable();
-    __atomic_fetch_sub(&kicks, 1, __ATOMIC_ACQ_REL);
+    __atomic_fetch_sub(&gpu->exactIHKicks, 1, __ATOMIC_ACQ_REL);
 }
 
 bool PhxExactIHWorkSource::activate() {
@@ -99,12 +111,11 @@ void PhxExactIHWorkSource::hint() {
 }
 
 void PhxExactIHWorkSource::closeAdmission() {
-    __atomic_fetch_or(&kicks, kKickClosed, __ATOMIC_ACQ_REL);
-    turns.close();
+    gpu->closeExactIHWorkAdmission();
 }
 
 bool PhxExactIHWorkSource::checkForWork() {
-    decltype(turns)::Lease turn(turns);
+    decltype(gpu->exactIHTurns)::Lease turn(gpu->exactIHTurns);
     if (turn && accepting()) {
         bool wake = false;
         gpu->collectExactIH(route, capture, captureOwner, wake);
@@ -115,12 +126,12 @@ bool PhxExactIHWorkSource::checkForWork() {
 
 IOReturn PhxExactIHWorkSource::detach() {
     if (loop->onThread() || loop->inGate()) return kIOReturnNotPermitted;
-    if (__atomic_load_n(&kicks, __ATOMIC_ACQUIRE) != kKickClosed) return kIOReturnBusy;
+    if (__atomic_load_n(&gpu->exactIHKicks, __ATOMIC_ACQUIRE) != kKickClosed) return kIOReturnBusy;
     Attachment attached = Attachment::Attached, removing = Attachment::Removing;
     if (!__atomic_compare_exchange(&attachment, &attached, &removing, false,
                                     __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) return kIOReturnNotReady;
     gpu->loseExactIHRoute(route);
-    if (!turns.drained()) {
+    if (!gpu->exactIHTurns.drained()) {
         setAttachment(Attachment::Attached);
         return kIOReturnBusy;
     }
@@ -145,5 +156,8 @@ def stage(source):
     source = once(source, '#include <IOKit/IOWorkLoop.h>\n',
                   '#include <IOKit/IOWorkLoop.h>\n#include <IOKit/IOEventSource.h>\n')
     source = once(source, '    struct ExactIHRoute {\n',
-                  '    friend class PhxExactIHWorkSource;\n    struct ExactIHRoute {\n')
+                  ADMISSION_FIELDS + '    struct ExactIHRoute {\n')
+    for signature, anchor in ((STOP, STOP_ADMISSION), (CLOSE, ROUTE_ADMISSION)):
+        old = method(source, signature)
+        source = once(source, old, once(old, anchor, anchor + CLOSE_WORK))
     return once(source, ANCHOR, ANCHOR + SOURCE)

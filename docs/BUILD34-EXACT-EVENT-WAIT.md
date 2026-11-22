@@ -402,10 +402,15 @@ attachment pin. Failure or contradiction retains the pin and refuses retry.
 This separates a paused copier from a potentially blocking workloop call;
 it does not bound native IOKit removal or prove that a closed source's
 `checkForWork` is never invoked again. Such a call cannot admit a turn.
-There is no synchronous stop/sleep callsite; queue invalidation still makes
-queued work inert. A cleanup timeout cannot cancel a removal already in
-progress, release the provider pin, establish ISR drain or prove device DMA
-drain. Keep those release conditions independent.
+The wake and copier gates live on the retained one-shot service route.
+Stop closes them immediately after closing service callback admission,
+including when a busy callback defers queue sealing. Sleep and queue
+invalidation close them as part of route revocation; a later wake does not
+reopen them. These lifecycle hooks only close gates. They do not invoke a
+source, enter IOKit removal, or release a pin. A cleanup timeout cannot
+cancel a removal already in progress, release the provider pin, establish
+ISR drain or prove device DMA drain. Keep those release conditions
+independent.
 
 Run the isolated checks with a fresh ignored output:
 
@@ -436,3 +441,14 @@ queued turns remain inert. The no-drain-check variant fails at entry to the
 remove call rather than on a barrier timeout. ASan/UBSan and TSan each passed
 8 closed and 385 modeled checks; 12 fault variants were rejected. The
 complete nonloadable staged source still resolves the same 406 imports.
+
+The [lifecycle follow-up](validation/build34-r3-ih-workloop-lifecycle-offline-20261123.json)
+exercises the staged stop, sleep/wake and queue invalidation methods, not
+just direct calls to the adapter's close method. A wake paused before
+admission loses to stop even when a service callback is still live. A
+copier paused across sleep keeps its pins and defers removal. ASan/UBSan
+and TSan each passed 8 closed and 490 modeled checks; 14 fault variants
+were rejected. Both complete translation units compiled to nonloadable
+objects. The proposed object retains the original workloop's 406 imports,
+and all 172 protected production inputs still match. CPU gate closure is
+not provider unregister, native workloop drain or AMD device-write drain.
