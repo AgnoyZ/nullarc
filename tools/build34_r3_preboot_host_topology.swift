@@ -398,6 +398,86 @@ func staticRootRefusal(_ asl: String, _ target: ACPITarget, bus: Int) -> String?
     return nil
 }
 
+func staticSegmentRefusal(_ tables: ACPITables, _ topology: TopologySample) -> String? {
+    guard !tables.aml.contains(where: { $0.range(of: Data("_SEG".utf8)) != nil }) else {
+        return "explicit_or_unresolved_acpi_segment"
+    }
+    guard let windows = mcfgWindows(tables.mcfg), uniqueMCFGCover(windows, bridgeBus: topology.bridgeBus,
+                                                               downstream: topology.downstream),
+          windows.contains(where: { $0.segment == 0 && $0.buses.contains(topology.bridgeBus) }) else {
+        return "acpi_default_segment_or_mcfg_disagrees"
+    }
+    return nil
+}
+
+struct CaptureInputs: Equatable {
+    let topology: TopologySample
+    let tables: ACPITables
+    let properties: Data
+}
+
+struct CaptureTargetRefusal: Error {
+    let reason: String
+}
+
+func captureTargetPath(_ first: CaptureInputs, _ second: CaptureInputs, asl: String) throws -> Data {
+    guard first == second, let target = first.topology.acpi else {
+        throw CaptureTargetRefusal(reason: "unstable_capture_inputs")
+    }
+    if let reason = staticSegmentRefusal(first.tables, first.topology) ??
+        staticRootRefusal(asl, target, bus: first.topology.bridgeBus) {
+        throw CaptureTargetRefusal(reason: reason)
+    }
+    guard let nodes = efiPropertyNodes(first.properties),
+          let path = uniqueEFIPropertyPath(nodes, for: first.topology.pciPath) else {
+        throw CaptureTargetRefusal(reason: "unsupported_or_ambiguous_capture_path")
+    }
+    return first.properties.subdata(in: path)
+}
+
+func captureTargetSource(_ path: Data) -> Data {
+    let bytes = path.map { String(format: "0x%02x", $0) }
+    let rows = stride(from: 0, to: bytes.count, by: 12).map { offset in
+        "    " + bytes[offset..<min(offset + 12, bytes.count)].joined(separator: ", ") + ","
+    }
+    return Data(([
+        "#include \"build34_r3_preboot_pci.h\"", "",
+        "static CONST UINT8 target_path[] = {",
+    ] + rows + [
+        "};", "", "CONST PHX34_PREBOOT_PCI_PATH_IDENTITY Phx34CaptureTarget = {",
+        "    .DevicePath = target_path,", "    .DevicePathBytes = sizeof(target_path),", "    .Segment = 0,",
+        "};", "",
+    ]).joined(separator: "\n").utf8)
+}
+
+func captureInputs() -> CaptureInputs {
+    CaptureInputs(topology: sample(checkACPI: true), tables: staticTables(), properties: cachedEFIProperties())
+}
+
+func writePrivateCaptureTarget(_ bytes: Data) throws -> String {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    let build = root.appendingPathComponent("build", isDirectory: true)
+    let attributes = try build.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+    guard attributes.isDirectory == true, attributes.isSymbolicLink == false else {
+        throw CaptureTargetRefusal(reason: "private_capture_build_directory")
+    }
+    var template = build.appendingPathComponent("r3-preboot-capture-private.XXXXXX").path.utf8CString
+    guard let newPath = template.withUnsafeMutableBufferPointer({ buffer in
+        mkdtemp(buffer.baseAddress!).map { String(cString: $0) }
+    }) else {
+        throw CaptureTargetRefusal(reason: "private_capture_directory_creation")
+    }
+    let directory = URL(fileURLWithPath: newPath, isDirectory: true)
+    do {
+        try captureTargetSource(bytes).write(to: directory.appendingPathComponent("target.c"), options: .withoutOverwriting)
+        try bytes.write(to: directory.appendingPathComponent("target-path.bin"), options: .withoutOverwriting)
+    } catch {
+        try? FileManager.default.removeItem(at: directory)
+        throw error
+    }
+    return "build/\(directory.lastPathComponent)"
+}
+
 func disassembleStaticRoot(_ dsdt: Data, using executable: String) throws -> String {
     let binary = URL(fileURLWithPath: executable)
     let digest = SHA256.hash(data: try Data(contentsOf: binary)).map { String(format: "%02x", $0) }.joined()
@@ -435,7 +515,7 @@ func disassembleStaticRoot(_ dsdt: Data, using executable: String) throws -> Str
     }
 }
 
-func testStaticRoot() {
+func testStaticRoot(includeCapture: Bool = false) {
     let fixture = """
         Scope (\\_SB)
         {
@@ -456,6 +536,10 @@ func testStaticRoot() {
         }
     """
     let target = ACPITarget(names: ["_SB", "PCIR", "BRDG", "GFXD"], rootUID: 0x34, bridgeADR: 0x60001, endpointADR: 0)
+    if includeCapture {
+        testCaptureTarget(asl: fixture, target: target)
+        return
+    }
     func changed(_ old: String, _ new: String) -> String? {
         staticRootRefusal(fixture.replacingOccurrences(of: old, with: new), target, bus: 1)
     }
@@ -475,29 +559,29 @@ func testStaticRoot() {
     print("static_acpi_root_fixture_cases_passed=\(cases.count)")
 }
 
-func testMCFG() {
-    func makeTable(_ rows: [(UInt16, UInt8, UInt8)], change: (inout [UInt8]) -> Void = { _ in }) -> Data {
-        let size = 44 + rows.count * 16
-        var bytes = [UInt8](repeating: 0, count: size)
-        bytes.replaceSubrange(0..<4, with: "MCFG".utf8)
-        bytes[4] = UInt8(truncatingIfNeeded: size)
-        bytes[5] = UInt8(truncatingIfNeeded: size >> 8)
-        bytes[8] = 1
-        for (index, (segment, start, end)) in rows.enumerated() {
-            let offset = 44 + index * 16
-            bytes[offset + 8] = UInt8(truncatingIfNeeded: segment)
-            bytes[offset + 9] = UInt8(segment >> 8)
-            bytes[offset + 10] = start
-            bytes[offset + 11] = end
-        }
-        change(&bytes)
-        bytes[9] = 0 &- bytes.reduce(UInt8(0), &+)
-        return Data(bytes)
+func makeMCFGTable(_ rows: [(UInt16, UInt8, UInt8)], change: (inout [UInt8]) -> Void = { _ in }) -> Data {
+    let size = 44 + rows.count * 16
+    var bytes = [UInt8](repeating: 0, count: size)
+    bytes.replaceSubrange(0..<4, with: "MCFG".utf8)
+    bytes[4] = UInt8(truncatingIfNeeded: size)
+    bytes[5] = UInt8(truncatingIfNeeded: size >> 8)
+    bytes[8] = 1
+    for (index, (segment, start, end)) in rows.enumerated() {
+        let offset = 44 + index * 16
+        bytes[offset + 8] = UInt8(truncatingIfNeeded: segment)
+        bytes[offset + 9] = UInt8(segment >> 8)
+        bytes[offset + 10] = start
+        bytes[offset + 11] = end
     }
+    change(&bytes)
+    bytes[9] = 0 &- bytes.reduce(UInt8(0), &+)
+    return Data(bytes)
+}
 
-    let good = makeTable([(7, 32, 95), (3, 0, 31)])
-    let ambiguous = makeTable([(7, 32, 95), (0x0107, 60, 60)])
-    let split = makeTable([(7, 32, 63), (7, 64, 95)])
+func testMCFG() {
+    let good = makeMCFGTable([(7, 32, 95), (3, 0, 31)])
+    let ambiguous = makeMCFGTable([(7, 32, 95), (0x0107, 60, 60)])
+    let split = makeMCFGTable([(7, 32, 63), (7, 64, 95)])
     var badChecksum = good
     badChecksum[9] ^= 1
     let cases = [
@@ -505,20 +589,71 @@ func testMCFG() {
         mcfgWindows(ambiguous).map { uniqueMCFGCover($0, bridgeBus: 32, downstream: 33...95) } == false,
         mcfgWindows(split).map { uniqueMCFGCover($0, bridgeBus: 32, downstream: 33...95) } == false,
         mcfgWindows(good).map { uniqueMCFGCover($0, bridgeBus: 96, downstream: 97...100) } == false,
-        mcfgWindows(makeTable([])) == nil,
-        mcfgWindows(makeTable(Array(repeating: (7, 32, 63), count: 257))) == nil,
+        mcfgWindows(makeMCFGTable([])) == nil,
+        mcfgWindows(makeMCFGTable(Array(repeating: (7, 32, 63), count: 257))) == nil,
         mcfgWindows(Data(good.dropLast())) == nil,
-        mcfgWindows(makeTable([(7, 32, 31)])) == nil,
-        mcfgWindows(makeTable([(7, 32, 63), (7, 63, 95)])) == nil,
-        mcfgWindows(makeTable([(7, 32, 63)]) { $0[0] ^= 1 }) == nil,
-        mcfgWindows(makeTable([(7, 32, 63)]) { $0[4] ^= 1 }) == nil,
-        mcfgWindows(makeTable([(7, 32, 63)]) { $0[8] ^= 1 }) == nil,
-        mcfgWindows(makeTable([(7, 32, 63)]) { $0[36] = 1 }) == nil,
-        mcfgWindows(makeTable([(7, 32, 63)]) { $0[56] = 1 }) == nil,
+        mcfgWindows(makeMCFGTable([(7, 32, 31)])) == nil,
+        mcfgWindows(makeMCFGTable([(7, 32, 63), (7, 63, 95)])) == nil,
+        mcfgWindows(makeMCFGTable([(7, 32, 63)]) { $0[0] ^= 1 }) == nil,
+        mcfgWindows(makeMCFGTable([(7, 32, 63)]) { $0[4] ^= 1 }) == nil,
+        mcfgWindows(makeMCFGTable([(7, 32, 63)]) { $0[8] ^= 1 }) == nil,
+        mcfgWindows(makeMCFGTable([(7, 32, 63)]) { $0[36] = 1 }) == nil,
+        mcfgWindows(makeMCFGTable([(7, 32, 63)]) { $0[56] = 1 }) == nil,
         mcfgWindows(badChecksum) == nil
     ]
     guard cases.allSatisfy({ $0 }) else { refuse("mcfg_fixture_failed") }
     print("mcfg_fixture_cases_passed=\(cases.count)")
+}
+
+func testCaptureTarget(asl: String, target: ACPITarget) {
+    let path: [UInt8] = [2, 1, 12, 0, 0xd0, 0x41, 3, 10, 0x34, 0, 0, 0,
+                         1, 1, 6, 0, 1, 6, 1, 1, 6, 0, 0, 0, 0x7f, 0xff, 4, 0]
+    let node: [UInt8] = [52, 0, 0, 0, 1, 0, 0, 0] + path + [8, 0, 0, 0, 0x41, 0, 0, 0, 8, 0, 0, 0, 0xa5, 2, 3, 4]
+    let properties = Data([64, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] + node)
+    let duplicate = Data([116, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0] + node + node)
+    let coords = PCIPathCoordinates(rootUID: target.rootUID, hops: [target.bridgeADR, target.endpointADR])
+    let table = makeMCFGTable([(0, 1, 6)])
+    func inputs(properties: Data, table: Data, aml: [Data] = [], identity: UInt64 = 1) -> CaptureInputs {
+        CaptureInputs(topology: TopologySample(identity: [identity], bridgeBus: 1, downstream: 2...6,
+                                               acpi: target, pciPath: coords),
+                      tables: ACPITables(dsdt: Data(), mcfg: table, aml: aml), properties: properties)
+    }
+    let good = inputs(properties: properties, table: table)
+    let changed = inputs(properties: properties, table: table, identity: 2)
+    let wrongSegment = inputs(properties: properties, table: makeMCFGTable([(1, 1, 6)]))
+    let overlapping = inputs(properties: properties, table: makeMCFGTable([(0, 1, 6), (1, 6, 6)]))
+    let explicitSegment = inputs(properties: properties, table: table, aml: [Data("_SEG".utf8)])
+    let ambiguous = inputs(properties: duplicate, table: table)
+    let short = inputs(properties: Data(properties.dropLast()), table: table)
+    func check(_ first: CaptureInputs, _ second: CaptureInputs, asl: String, reason: String) -> Bool {
+        do {
+            _ = try captureTargetPath(first, second, asl: asl)
+            return false
+        } catch let refusal as CaptureTargetRefusal {
+            return refusal.reason == reason
+        } catch {
+            return false
+        }
+    }
+    guard let bytes = try? captureTargetPath(good, good, asl: asl) else { refuse("capture_target_fixture_failed") }
+    let source = String(decoding: captureTargetSource(bytes), as: UTF8.self)
+    let cases = [
+        bytes == Data(path),
+        source.contains(".Segment = 0,") && source.contains(".DevicePathBytes = sizeof(target_path),"),
+        source.contains("0x7f, 0xff, 0x04, 0x00,") && !source.contains("0xa5"),
+        check(good, changed, asl: asl, reason: "unstable_capture_inputs"),
+        check(good, wrongSegment, asl: asl, reason: "unstable_capture_inputs"),
+        check(good, ambiguous, asl: asl, reason: "unstable_capture_inputs"),
+        check(wrongSegment, wrongSegment, asl: asl, reason: "acpi_default_segment_or_mcfg_disagrees"),
+        check(overlapping, overlapping, asl: asl, reason: "acpi_default_segment_or_mcfg_disagrees"),
+        check(explicitSegment, explicitSegment, asl: asl, reason: "explicit_or_unresolved_acpi_segment"),
+        check(ambiguous, ambiguous, asl: asl, reason: "unsupported_or_ambiguous_capture_path"),
+        check(short, short, asl: asl, reason: "unsupported_or_ambiguous_capture_path"),
+        check(good, good, asl: asl.replacingOccurrences(of: "Device (BRDG)", with: "Device (OTHR)"),
+              reason: "acpi_bridge_scope")
+    ]
+    guard cases.allSatisfy({ $0 }) else { refuse("capture_target_fixture_failed") }
+    print("capture_target_fixture_cases_passed=\(cases.count)")
 }
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -546,20 +681,35 @@ if arguments == ["--test-acpi-root"] {
     testStaticRoot()
     exit(0)
 }
+if arguments == ["--test-capture-target"] {
+    testStaticRoot(includeCapture: true)
+    exit(0)
+}
+if arguments.count == 2 && arguments[0] == "--prepare-capture-target" {
+    _ = umask(0o077)
+    let first = captureInputs()
+    guard let asl = try? disassembleStaticRoot(first.tables.dsdt, using: arguments[1]) else {
+        refuse("acpi_disassembly")
+    }
+    let second = captureInputs()
+    do {
+        let bytes = try captureTargetPath(first, second, asl: asl)
+        print("private_capture_target_directory=\(try writePrivateCaptureTarget(bytes))")
+        print("paired_cached_evidence_matches=true; physical_identity_attested=false; activation_authorized=false")
+    } catch let refusal as CaptureTargetRefusal {
+        refuse(refusal.reason)
+    } catch {
+        refuse("private_capture_target_write")
+    }
+    exit(0)
+}
 if arguments.count == 2 && arguments[0] == "--check-acpi-root" {
     let first = sample(checkACPI: true)
     let firstTables = staticTables()
     let second = sample(checkACPI: true)
     let secondTables = staticTables()
     guard first == second, firstTables == secondTables, let target = first.acpi else { refuse("unstable_acpi_inputs") }
-    guard !firstTables.aml.contains(where: { $0.range(of: Data("_SEG".utf8)) != nil }) else {
-        refuse("explicit_or_unresolved_acpi_segment")
-    }
-    guard let windows = mcfgWindows(firstTables.mcfg), uniqueMCFGCover(windows, bridgeBus: first.bridgeBus,
-                                                                       downstream: first.downstream),
-          windows.contains(where: { $0.segment == 0 && $0.buses.contains(first.bridgeBus) }) else {
-        refuse("acpi_default_segment_or_mcfg_disagrees")
-    }
+    if let reason = staticSegmentRefusal(firstTables, first) { refuse(reason) }
     guard let asl = try? disassembleStaticRoot(firstTables.dsdt, using: arguments[1]) else { refuse("acpi_disassembly") }
     if let reason = staticRootRefusal(asl, target, bus: first.bridgeBus) { refuse(reason) }
     print("matching_input_pairs=2; validated_aml_tables=\(firstTables.aml.count); static_root_uid_adr_bbn_match=true")

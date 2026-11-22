@@ -102,6 +102,12 @@ wrong-segment control. This validates the application entry, not an admitted
 real target or an executed physical scope. The next capture must preserve
 the working EFI and be separately authorized; it still cannot turn a
 candidate locator into device ownership or a completed-write boundary.
+The [inactive host-specific preparation](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#prepare-the-inactive-host-specific-capture-candidate)
+now combines the cached path and static ACPI/MCFG candidate under paired
+samples. Two private links produce the same digest and an independent PE
+readback verifies the embedded target. No launch route or grant has been
+established; the candidate remains unexecuted, with no proof of physical
+preboot identity, IH ownership or old-writer drain.
 
 ## Execution order
 

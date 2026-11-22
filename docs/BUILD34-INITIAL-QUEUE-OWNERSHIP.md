@@ -717,8 +717,8 @@ repeats matched the exact expected public Virtio GUID and returned
 runner passed unchanged in default mode. Only source and sanitized test
 results are retained; the runner deletes both guest applications.
 
-The real target source and application remain unbuilt. For a physical
-trial, first review the private candidate path and segment against the
+At that OVMF checkpoint the real target source and application were not
+built. For a physical trial, review the private candidate path and segment against the
 independent topology/ACPI results. Bind the exact target input and
 application digest in a new scope and obtain separate authorization for
 one manual metadata-only observation at a specified boot stage. Do not
@@ -730,6 +730,40 @@ accepted macOS stack independently after any separately authorized startup.
 A path/segment match here would corroborate the live handle database, not
 read the endpoint vendor/device ID, prove IH ownership or prove drain.
 See the [sanitized record](validation/build34-r3-preboot-capture-entry-20261123.json).
+
+### Prepare the inactive host-specific capture candidate
+
+`--prepare-capture-target /path/to/pinned/iasl` brackets DSDT disassembly
+with two snapshots of the cached PCI topology, ACPI tables and EFI device
+properties. It requires the same sole Radeon and direct PhxBringup
+provider, matching static root/hops, a unique covering MCFG window that
+agrees with the static ACPI segment default, and one full EFI property path
+for those coordinates. Input drift, a competing window, an unresolved
+segment, a malformed or duplicate path, or a static root mismatch refuses.
+The mode writes only the selected binary path and its C initializer to a
+fresh private directory under ignored `build/`. It emits no path bytes,
+coordinates, property values, ACPI dumps or digests to stdout. The inactive
+directory may be deleted without changing boot state.
+
+On macOS 26.7.2 (`25G332`), both independent preparations yielded
+byte-identical private inputs. Two separate freestanding links of the
+tested capture entry yielded the same unsigned x86-64 EFI application.
+Independent PE readback matched the entry, embedded path, length and segment
+to the candidate, checked relocation of its path pointer and found no DLL
+imports. One private copy and its checked SHA-256 manifest are retained
+read-only for review, with the activation flag false. This is a local digest
+binding, not a signature, a boot policy admission or a root-enforced seal.
+Neither build was staged, loaded or executed. Twelve combined fixtures,
+the prior parser and adapter suites, and the default regression tests passed.
+
+The boot-property path and static segment are still candidates. The next
+step needs explicit authorization for one observation on the physical host
+and evidence of an already permitted manual launch route. Do not change
+boot order, EFI, security or NVRAM to make a route available. A pre-OpenCore
+sample describes only the database at that stage; it does not show all
+firmware writers or rule out a later rebind. Do not publish the input,
+binary, private digests, or physical locator. See the
+[sanitized preparation record](validation/build34-r3-preboot-host-capture-preparation-20261123.json).
 
 ### PCI quiescence is not an IH handoff
 
