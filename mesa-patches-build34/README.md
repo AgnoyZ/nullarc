@@ -25,6 +25,11 @@ of these patches implements or enables an exact native backend, native GPU
 queue dependencies or a deployment. See
 [R3 design, CPU evidence and remaining admission work](../docs/BUILD34-EXACT-COMPLETION.md).
 
+Patch 0007 adds the bounded receipt cache. The separate CPU pairing target
+connects that cache to the staged build34 submit/wait/ACK handlers. Its
+adapter requires a connection-bound owner and an independent prefix operation.
+See [Mesa transport pairing](../docs/BUILD34-SUBMIT-RECEIPT.md#mesa-transport-pairing).
+
 `0001-radv-original34-immutable-ib-tail.patch` modifies exactly three MIT Mesa
 Darwin transport files. The input hashes and the 30-file build/test dependency
 closure are pinned by `tools/upstream34_layout/radv_ib_tail_sources.json`.

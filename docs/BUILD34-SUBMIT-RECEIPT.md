@@ -103,3 +103,48 @@ The [R3 ledger](BUILD34-R3-PLAN.md) still requires native integration and real
 GPU/FPS/stability acceptance. Do not build or deploy the quarantining staged
 source. There is no changed installed state to roll back; keep accepted
 R1b/R2a/plugin/startup settings and the R4–R6 hold.
+
+## Mesa transport pairing
+
+The follow-on adapter connects the actual Mesa 0007 completion cache to the
+actual staged submit, wait and ACK handlers in the same process. It checks
+the Mesa and Phx submit layouts at compile time, wraps the single batch in a
+zero-initialized 2,112-byte envelope and checks the full 64-byte reply. Wait
+and ACK require the exact echoed receipt. The returned queue is the native
+queue chosen by the driver. The adapter rejects CPU user-fence requests
+locally before entering the wire. See [`build34_r3_mesa_wire.c`](../tools/build34_r3_mesa_wire.c).
+
+The adapter takes a connection-bound owner and an independent prefix
+operation from its caller. A successful exact wait reads the same session's
+prefix with a zero-time snapshot before returning both observations to Mesa.
+This adds one prefix call to an uncached successful wait. A prefix read
+failure delays completion publication and ACK. An owner mismatch or invalid
+prefix fails the session. The pairing test supplies the prefix from the
+staged retirement method operating on CPU-backed fences. Native prefix
+transport, visibility and timing remain open.
+
+For the reviewed selector-66 implementation, `Busy` and `NoResources` return
+before submission publication and before a native receipt survives the
+request. The adapter reports those statuses as retryable backpressure for
+that implementation. It treats a lost or malformed reply after dispatch as
+uncertain. Only ACK's specific `Busy` status retains retryable ACK ownership.
+Binding requires the same checked protocol implementation and session for all
+callbacks, plus caller quiescence before destruction.
+
+The runner rechecks all 30 pinned Mesa inputs, reapplies 0003–0007 and runs
+the staged native regression suite before pairing both sides. ASan/UBSan
+and TSan each pass 5,674 paired checks. The test covers GFX completing while
+an earlier Compute receipt holds the global prefix, late cache reads after
+ACK, full 64-receipt admission and recovery, CPU-fence refusal, and corrupted
+or lost replies. See the [validation record](validation/build34-r3-mesa-wire-offline-20261122.json).
+
+```sh
+make -j1 test-build34-r3-mesa-wire MESA_SOURCE="$MESA_SOURCE" \
+  R3_MESA_WIRE_OUT=build/build34-r3-paired-mesa-wire-new-private
+```
+
+The stage runs through CPU call doubles. Production integration still
+requires negotiated capability and immutable session identity, the actual
+IOKit call and checked prefix path, CPU-fence publication, caller retry and
+lifecycle handling, and hardware validation. Rollback is to omit the
+isolated adapter and its test target.
