@@ -687,6 +687,50 @@ to identify a candidate for a separate provenance and device-write review.
 Revert this isolated change to recover the previous metadata-only result.
 See the [sanitized result](validation/build34-r3-preboot-fv-locator-20261123.json).
 
+### Exercise the fixed-target capture entry in OVMF
+
+The capture entry links against one immutable `Phx34CaptureTarget`: a
+complete binary path and expected root segment. There is no default target,
+live discovery fallback, load-option override or device-access route.
+It calls the previously tested path-only adapter once and returns to the
+caller. It uses the existing UEFI text console for one line, without
+changing its mode or directly invoking GOP. Firmware console routing can
+render that line on the display; this is not a claim of zero firmware side
+effects. There is no filesystem, variable, PCI config, MMIO, FV file read,
+driver binding change or power operation in the application.
+
+An `FV` result includes only the candidate file GUID for **private** module
+lookup, never a handle, path, image address, or image bytes. `NO_FV` means
+there is a sampled manager but no usable FV locator. `NO_MAPPING`,
+`NOT_FOUND`, and `REFUSED` do not supply a locator. `NOT_FOUND` can mean
+a missing match at several steps, not that the Radeon has no predecessor.
+The GUID names a file within a firmware-volume context; it need not be
+unique across all volumes or certify the loaded bytes. If identification
+is ambiguous, keep the writer unknown. Only the classified result belongs
+in a published record; never publish the physical console line or a photo.
+
+Use the isolated guest runner with `--capture` and the same pinned inputs
+as above. It links the actual entry with the emulated Virtio target, then
+changes just the expected segment for a negative control. Both independent
+repeats matched the exact expected public Virtio GUID and returned
+`NO_MAPPING` without a locator for the wrong segment. The legacy guest
+runner passed unchanged in default mode. Only source and sanitized test
+results are retained; the runner deletes both guest applications.
+
+The real target source and application remain unbuilt. For a physical
+trial, first review the private candidate path and segment against the
+independent topology/ACPI results. Bind the exact target input and
+application digest in a new scope and obtain separate authorization for
+one manual metadata-only observation at a specified boot stage. Do not
+change the working EFI, boot order, NVRAM or security. Use only an already
+permitted removable launch route; do not connect/disconnect drivers or
+bypass policy to make one available. Stop after one result or a refusal,
+without automatic retry, and remove the removable test media. Verify the
+accepted macOS stack independently after any separately authorized startup.
+A path/segment match here would corroborate the live handle database, not
+read the endpoint vendor/device ID, prove IH ownership or prove drain.
+See the [sanitized record](validation/build34-r3-preboot-capture-entry-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

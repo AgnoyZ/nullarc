@@ -96,6 +96,12 @@ adds stable FV2 handle/file metadata to that result in the CPU and OVMF
 fixtures without reading an image. It lets a later review identify a module
 candidate; it does not attest an exact loaded image, physical preboot
 attribution, IH ownership or device drain.
+The [fixed-target capture entry](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#exercise-the-fixed-target-capture-entry-in-ovmf)
+now reports a bounded candidate locator in two OVMF runs and refuses a
+wrong-segment control. This validates the application entry, not an admitted
+real target or an executed physical scope. The next capture must preserve
+the working EFI and be separately authorized; it still cannot turn a
+candidate locator into device ownership or a completed-write boundary.
 
 ## Execution order
 
