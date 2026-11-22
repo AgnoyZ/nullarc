@@ -70,9 +70,11 @@ needs an independent device stop and completed-write boundary.
 The [offline PCI protocol adapter](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#offline-pci-protocol-attribution-adapter)
 checks two real EFI ABI metadata calls in a CPU fixture. Its [exact target
 selector](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#bind-attribution-to-the-complete-pci-path-and-location)
-also brackets them with full-path and admitted cached-location checks. No EFI
-entry, platform accessor attestation, firmware runtime test, or authorized
-capture is in place.
+also brackets them with full-path and admitted cached-location checks. The
+[OVMF test](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#isolated-ovmf-attribution-smoke-test)
+passed with real DXE services and synthetic PCI protocols. There is still no
+target platform accessor attestation, authorized physical attribution capture,
+or device drain proof.
 
 ## Execution order
 

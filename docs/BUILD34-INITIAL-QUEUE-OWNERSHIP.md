@@ -426,10 +426,42 @@ driver connections, or device commands itself. These checks assume trusted
 boot services and valid, live installed path storage; equality is not image
 attestation, device fencing, or a guarantee against unsampled changes.
 
-The same opt-in target now runs the selector and attribution together in the
-x86-64 CPU fixture. There is still no linked EFI program or firmware runtime
-test. Revert only this selector stage to recover the earlier handle-only
-adapter. See the [sanitized result](validation/build34-r3-preboot-pci-selection-offline-20261123.json).
+The same opt-in target runs the selector and attribution together in the
+x86-64 CPU fixture. At that checkpoint there was no linked EFI program or
+firmware runtime test. Revert only the selector stage to recover the earlier
+handle-only adapter. See the
+[sanitized result](validation/build34-r3-preboot-pci-selection-offline-20261123.json).
+
+### Isolated OVMF attribution smoke test
+
+The adapter subsequently passed in an x86-64 UEFI application on QEMU TCG
+with the distribution's EDK II OVMF image. The fixture installs a new private
+test device path and PCI I/O protocol on a synthetic handle, not a guest
+physical-device function. Its only PCI callback supplies the synthetic
+location tuple. The actual DXE `LocateDevicePath`, `HandleProtocol`,
+`OpenProtocolInformation`, and `FreePool` run unchanged. The manager must be
+absent before the fixture opens `BY_DRIVER`, match the exact binding and
+loaded image after the open, and be absent again after closing it. The wrong
+bus, wrong accessor and actual DXE path-prefix match must refuse. Only after
+removing the fixture's protocols does the application report success.
+
+Run `python3 -B tools/test_build34_r3_preboot_guest.py` with explicit
+`--qemu`, `--linker`, `--edk2-include`, `--uefi-code` and `--uefi-vars` paths
+to trusted inputs. Use x86-64 QEMU, a GNU PE linker accepting `i386pep`,
+Clang, and the external EDK II headers pinned above. The host runner bounds
+execution and reads only the guest result. It exposes a temporary read-only
+test FAT volume, a read-only firmware image and a disposable variable store;
+no network, physical device, host disk or current EFI is passed through.
+The fixture and runner are repository sources. No QEMU, linker, firmware,
+guest executable or raw boot log is distributed.
+
+This establishes actual DXE API behavior on the pinned virtual firmware with
+synthetic PCI and driver-binding metadata. It neither identifies an installed
+Radeon firmware accessor nor validates physical PCI ownership or any device
+write boundary. Keep the host stack unchanged. A preboot capture on the real
+target still needs independent accessor and target provenance and fresh
+authorization. See the
+[sanitized result](validation/build34-r3-preboot-pci-ovmf-20261123.json).
 
 ### PCI quiescence is not an IH handoff
 
