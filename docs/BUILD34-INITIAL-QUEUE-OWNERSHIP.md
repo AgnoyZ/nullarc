@@ -496,6 +496,34 @@ The observer prints no coordinates, registry identifiers or UID values and
 writes no host state. Scope and results are in the
 [sanitized record](validation/build34-r3-preboot-host-topology-20261123.json).
 
+### Cross-check the UEFI root bridge segment before the accessor
+
+The PCI device-path nodes identify device/function, not segment or bus. The
+offline selector now resolves the sealed ACPI root node plus its end marker
+against `EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL` and compares the exact published
+root path. It reads the protocol's `SegmentNumber` data field before invoking
+the separately admitted endpoint `GetLocation`. A missing root, prefix match,
+or wrong segment refuses before that call. The selector repeats the root
+check after the endpoint and manager checks and rejects a replacement handle,
+path or interface. No root bridge method, including `Configuration`, runs.
+
+UEFI defines
+[`SegmentNumber`](https://uefi.org/specs/UEFI/2.11/14_Protocols_PCI_Bus_Support.html#efi-pci-root-bridge-i-o-protocol)
+as the PCI segment of the root bridge. The pinned EDK II `GetLocation`
+implementation itself reads `PciRootBridgeIo->SegmentNumber`; agreement is
+therefore a consistency check on two interfaces, not independent firmware
+attestation. Do not fill in the sealed segment from the checked interface,
+assume segment zero, or use a match to authorize the unknown real accessor.
+The contract still assumes trusted boot services and live protocol storage.
+
+The ASan/UBSan fixture passed 33 attribution and 41 selection cases. The
+isolated OVMF fixture passed twice with a synthetic root and endpoint at a
+nonzero segment, rejecting a wrong segment before calling `GetLocation`.
+Neither used physical PCI. No preboot observation on the target, proof of
+firmware provenance, or IH handoff was made. Revert this isolated selector
+and its fixture changes to recover the earlier endpoint-only check. See the
+[sanitized result](validation/build34-r3-preboot-root-segment-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

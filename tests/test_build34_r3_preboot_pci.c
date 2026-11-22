@@ -2,6 +2,7 @@
 
 #include <Protocol/DriverBinding.h>
 #include <Protocol/LoadedImage.h>
+#include <Protocol/PciRootBridgeIo.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,11 +16,12 @@
 } while (0)
 
 static const EFI_GUID pci_guid = EFI_PCI_IO_PROTOCOL_GUID;
+static const EFI_GUID root_guid = EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID;
 static const EFI_GUID path_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
 static const EFI_GUID binding_guid = EFI_DRIVER_BINDING_PROTOCOL_GUID;
 static const EFI_GUID image_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 
-static UINT8 controller, manager, image, child, console, image_memory;
+static UINT8 controller, manager, image, child, console, image_memory, root_handle, other_root_handle;
 static EFI_DEVICE_PATH_PROTOCOL device_path, other_path;
 static EFI_PCI_IO_PROTOCOL pci, other_pci;
 static EFI_DRIVER_BINDING_PROTOCOL binding;
@@ -33,11 +35,13 @@ typedef enum {
     LOCATE_FAILED, PREFIX_MATCH, FOREIGN_REMAINDER, NULL_CONTROLLER, TAMPERED_LOOKUP,
     SHORT_PUBLISHED_PATH, CHANGED_PUBLISHED_PATH, UNKNOWN_READER, LOCATION_FAILED, LOCATION_WARNING,
     PARTIAL_LOCATION, WRONG_LOCATION_BUS, WRONG_LOCATION_SEGMENT, WRONG_LOCATION_DEVICE, WRONG_LOCATION_FUNCTION,
-    LATE_LOCATE_FAILED, LATE_LOCATION_CHANGED, LATE_PCI_REPLACED, LATE_READER_REPLACED
+    LATE_LOCATE_FAILED, LATE_LOCATION_CHANGED, LATE_PCI_REPLACED, LATE_READER_REPLACED,
+    ROOT_MISSING, ROOT_PREFIX, ROOT_PATH_CHANGED, ROOT_IO_MISSING, ROOT_WRONG_SEGMENT,
+    ROOT_LATE_SEGMENT, ROOT_LATE_HANDLE, ROOT_LATE_PATH, ROOT_LATE_IO
 } LOCATION_SCENARIO;
 
 static LOCATION_SCENARIO location_scenario;
-static UINTN location_reads, locate_calls;
+static UINTN location_reads, locate_calls, root_locates, root_io_reads;
 
 typedef struct {
     ACPI_HID_DEVICE_PATH Root;
@@ -54,6 +58,8 @@ static const FIXTURE_PATH valid_path = {
 
 static FIXTURE_PATH sealed_path, installed_path;
 static struct { ACPI_HID_DEVICE_PATH Root; PCI_DEVICE_PATH Bridge; EFI_DEVICE_PATH_PROTOCOL End; } prefix;
+static struct ROOT_PATH { ACPI_HID_DEVICE_PATH Root; EFI_DEVICE_PATH_PROTOCOL End; } root_path, other_root_path;
+static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL root_io, other_root_io;
 
 typedef struct {
     EFI_OPEN_PROTOCOL_INFORMATION_ENTRY rows[4];
@@ -71,9 +77,21 @@ lookup(EFI_HANDLE handle, EFI_GUID *guid, VOID **interface)
 {
     *interface = NULL;
     if (memcmp(guid, &path_guid, sizeof(*guid)) == 0) {
+        if (handle == &root_handle || handle == &other_root_handle) {
+            *interface = root_locates == 2 && location_scenario == ROOT_LATE_PATH ? &other_root_path : &root_path;
+            return EFI_SUCCESS;
+        }
         CHECK(handle == &controller);
         ++path_reads;
         *interface = change_path && path_reads == 2 ? &other_path : published_path;
+    } else if (memcmp(guid, &root_guid, sizeof(*guid)) == 0) {
+        CHECK(handle == &root_handle || handle == &other_root_handle);
+        CHECK(++root_io_reads == root_locates);
+        if (location_scenario == ROOT_IO_MISSING)
+            return EFI_UNSUPPORTED;
+        if (root_locates == 2 && location_scenario == ROOT_LATE_SEGMENT)
+            ++root_io.SegmentNumber;
+        *interface = root_locates == 2 && location_scenario == ROOT_LATE_IO ? &other_root_io : &root_io;
     } else if (memcmp(guid, &pci_guid, sizeof(*guid)) == 0) {
         CHECK(handle == &controller);
         ++pci_reads;
@@ -148,7 +166,7 @@ reset(void)
     binding = (EFI_DRIVER_BINDING_PROTOCOL){.ImageHandle = &image, .DriverBindingHandle = &manager};
     allocations[0] = allocations[1] = NULL;
     open_reads = path_reads = pci_reads = binding_reads = image_reads = releases = 0;
-    location_reads = locate_calls = 0;
+    location_reads = locate_calls = root_locates = root_io_reads = 0;
     target_reads_at_sample = 1;
     location_scenario = LOCATION_OK;
     published_path = &device_path;
@@ -231,7 +249,20 @@ exercise(SCENARIO scenario, EFI_STATUS expected, UINTN expected_releases)
 static EFI_STATUS EFIAPI
 locate(EFI_GUID *guid, EFI_DEVICE_PATH_PROTOCOL **path, EFI_HANDLE *handle)
 {
+    if (memcmp(guid, &root_guid, sizeof(*guid)) == 0) {
+        CHECK(memcmp(*path, &valid_path.Root, sizeof(valid_path.Root)) == 0 && root_locates < 2);
+        ++root_locates;
+        if (location_scenario == ROOT_MISSING)
+            return EFI_NOT_FOUND;
+        if (location_scenario != ROOT_PREFIX)
+            *path = (EFI_DEVICE_PATH_PROTOCOL *)((UINT8 *)*path + sizeof(ACPI_HID_DEVICE_PATH));
+        CHECK(memcmp(*path, location_scenario == ROOT_PREFIX ? (const VOID *)&valid_path.Root : &valid_path.End,
+                     sizeof(EFI_DEVICE_PATH_PROTOCOL)) == 0);
+        *handle = root_locates == 2 && location_scenario == ROOT_LATE_HANDLE ? &other_root_handle : &root_handle;
+        return EFI_SUCCESS;
+    }
     CHECK(memcmp(guid, &pci_guid, sizeof(*guid)) == 0 && *path != &sealed_path.Root.Header);
+    CHECK(root_locates == 1 && root_io_reads == 1);
     CHECK(memcmp(*path, &valid_path, sizeof(valid_path)) == 0 && locate_calls < 2);
     ++locate_calls;
     if (location_scenario == LOCATE_FAILED || (location_scenario == LATE_LOCATE_FAILED && locate_calls == 2))
@@ -274,6 +305,8 @@ exercise_location(LOCATION_SCENARIO scenario, EFI_STATUS expected, UINTN locates
     target_reads_at_sample = 2;
     sealed_path = installed_path = valid_path;
     published_path = &installed_path.Root.Header;
+    root_path = other_root_path = (struct ROOT_PATH){valid_path.Root, valid_path.End};
+    root_io = other_root_io = (EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL){.SegmentNumber = 2};
     pci.GetLocation = other_pci.GetLocation = get_location;
     EFI_BOOT_SERVICES boot = {.HandleProtocol = lookup, .OpenProtocolInformation = open_information,
                               .FreePool = release_buffer, .LocateDevicePath = locate};
@@ -301,6 +334,8 @@ exercise_location(LOCATION_SCENARIO scenario, EFI_STATUS expected, UINTN locates
         break;
     case CHANGED_PUBLISHED_PATH: installed_path.Root.UID ^= 1; break;
     case UNKNOWN_READER: pci.GetLocation = NULL; break;
+    case ROOT_PATH_CHANGED: root_path.Root.UID ^= 1; break;
+    case ROOT_WRONG_SEGMENT: ++root_io.SegmentNumber; break;
     default: break;
     }
 
@@ -313,7 +348,8 @@ exercise_location(LOCATION_SCENARIO scenario, EFI_STATUS expected, UINTN locates
     CHECK(releases == snapshots && allocations[0] == NULL && allocations[1] == NULL);
     if (expected == EFI_SUCCESS) {
         CHECK(attribution.BindingHandle == &manager && attribution.ImageHandle == &image && attribution.OpenEntryCount == 3);
-        CHECK(path_reads == 4 && pci_reads == 4 && binding_reads == 2 && image_reads == 2);
+        CHECK(path_reads == 4 && pci_reads == 4 && binding_reads == 2 && image_reads == 2 &&
+              root_locates == 2 && root_io_reads == 2);
     } else {
         CHECK(attribution.BindingHandle == NULL && attribution.ImageHandle == NULL && attribution.OpenEntryCount == 0);
     }
@@ -359,7 +395,12 @@ int main(void)
         {WRONG_LOCATION_SEGMENT, EFI_NO_MAPPING, 1, 1, 0}, {WRONG_LOCATION_DEVICE, EFI_NO_MAPPING, 1, 1, 0},
         {WRONG_LOCATION_FUNCTION, EFI_NO_MAPPING, 1, 1, 0}, {LATE_LOCATE_FAILED, EFI_NOT_FOUND, 2, 1, 2},
         {LATE_LOCATION_CHANGED, EFI_NO_MAPPING, 2, 2, 2}, {LATE_PCI_REPLACED, EFI_NO_MAPPING, 2, 2, 2},
-        {LATE_READER_REPLACED, EFI_UNSUPPORTED, 2, 1, 2}
+        {LATE_READER_REPLACED, EFI_UNSUPPORTED, 2, 1, 2},
+        {ROOT_MISSING, EFI_NOT_FOUND, 0, 0, 0}, {ROOT_PREFIX, EFI_NO_MAPPING, 0, 0, 0},
+        {ROOT_PATH_CHANGED, EFI_NO_MAPPING, 0, 0, 0}, {ROOT_IO_MISSING, EFI_UNSUPPORTED, 0, 0, 0},
+        {ROOT_WRONG_SEGMENT, EFI_NO_MAPPING, 0, 0, 0}, {ROOT_LATE_SEGMENT, EFI_NO_MAPPING, 2, 2, 2},
+        {ROOT_LATE_HANDLE, EFI_NO_MAPPING, 2, 2, 2}, {ROOT_LATE_PATH, EFI_NO_MAPPING, 2, 2, 2},
+        {ROOT_LATE_IO, EFI_NO_MAPPING, 2, 2, 2}
     };
     for (UINTN index = 0; index < sizeof(locations) / sizeof(*locations); ++index)
         exercise_location(locations[index].scenario, locations[index].expected, locations[index].locates,

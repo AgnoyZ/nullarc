@@ -1,6 +1,7 @@
 #include "build34_r3_preboot_pci.h"
 
 #include <Protocol/DriverBinding.h>
+#include <Protocol/PciRootBridgeIo.h>
 
 typedef struct {
     ACPI_HID_DEVICE_PATH Root;
@@ -14,6 +15,11 @@ typedef struct {
     EFI_DEVICE_PATH_PROTOCOL End;
 } GUEST_LONG_PATH;
 
+typedef struct {
+    ACPI_HID_DEVICE_PATH Root;
+    EFI_DEVICE_PATH_PROTOCOL End;
+} GUEST_ROOT_PATH;
+
 static GUEST_PATH fixture_path = {
     {{ACPI_DEVICE_PATH, ACPI_DP, {sizeof(ACPI_HID_DEVICE_PATH), 0}}, EISA_PNP_ID(0x0A08), 0x52334755},
     {{HARDWARE_DEVICE_PATH, HW_PCI_DP, {sizeof(PCI_DEVICE_PATH), 0}}, 7, 31},
@@ -22,7 +28,10 @@ static GUEST_PATH fixture_path = {
 
 static EFI_GUID path_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
 static EFI_GUID pci_guid = EFI_PCI_IO_PROTOCOL_GUID;
+static EFI_GUID root_guid = EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID;
 static EFI_GUID binding_guid = EFI_DRIVER_BINDING_PROTOCOL_GUID;
+static GUEST_ROOT_PATH fixture_root_path;
+static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL fixture_root_io = {.SegmentNumber = 0x5233};
 static EFI_PCI_IO_PROTOCOL fixture_pci;
 static EFI_DRIVER_BINDING_PROTOCOL fixture_binding;
 static UINTN location_reads;
@@ -88,6 +97,11 @@ check_attribution(EFI_BOOT_SERVICES *boot, EFI_HANDLE image, EFI_HANDLE controll
     if (Phx34AttributePciManagerAtLocation(boot, &wrong, &attribution) != EFI_UNSUPPORTED ||
         !empty_attribution(&attribution) || location_reads != 4)
         return 7;
+    wrong = identity;
+    ++wrong.Segment;
+    if (Phx34AttributePciManagerAtLocation(boot, &wrong, &attribution) != EFI_NO_MAPPING ||
+        !empty_attribution(&attribution) || location_reads != 4)
+        return 14;
 
     GUEST_LONG_PATH longer = {fixture_path.Root, fixture_path.Endpoint, fixture_path.Endpoint, fixture_path.End};
     wrong = identity;
@@ -113,14 +127,18 @@ EfiMain(EFI_HANDLE image, EFI_SYSTEM_TABLE *system)
         return EFI_INVALID_PARAMETER;
 
     EFI_BOOT_SERVICES *boot = system->BootServices;
-    EFI_HANDLE controller = NULL, manager = NULL;
+    EFI_HANDLE root = NULL, controller = NULL, manager = NULL;
     BOOLEAN opened = FALSE;
     UINTN failure;
 
     fixture_pci.GetLocation = fixture_location;
     fixture_binding.ImageHandle = image;
-    if (boot->InstallMultipleProtocolInterfaces(&controller, &path_guid, &fixture_path,
-                                               &pci_guid, &fixture_pci, NULL) != EFI_SUCCESS) {
+    fixture_root_path = (GUEST_ROOT_PATH){fixture_path.Root, fixture_path.End};
+    if (boot->InstallMultipleProtocolInterfaces(&root, &path_guid, &fixture_root_path,
+                                               &root_guid, &fixture_root_io, NULL) != EFI_SUCCESS) {
+        failure = 15;
+    } else if (boot->InstallMultipleProtocolInterfaces(&controller, &path_guid, &fixture_path,
+                                                      &pci_guid, &fixture_pci, NULL) != EFI_SUCCESS) {
         failure = 1;
     } else if (boot->InstallProtocolInterface(&manager, &binding_guid, EFI_NATIVE_INTERFACE,
                                               &fixture_binding) != EFI_SUCCESS) {
@@ -137,6 +155,9 @@ EfiMain(EFI_HANDLE image, EFI_SYSTEM_TABLE *system)
     if (controller != NULL && boot->UninstallMultipleProtocolInterfaces(controller, &pci_guid, &fixture_pci,
                                                                        &path_guid, &fixture_path, NULL) != EFI_SUCCESS)
         failure = 13;
+    if (root != NULL && boot->UninstallMultipleProtocolInterfaces(root, &root_guid, &fixture_root_io,
+                                                                 &path_guid, &fixture_root_path, NULL) != EFI_SUCCESS)
+        failure = 16;
     if (failure != 0) {
         CHAR16 message[] = L"PHX34_PREBOOT_GUEST_FAIL 00\r\n";
         message[25] = (CHAR16)(L'0' + failure / 10);

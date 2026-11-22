@@ -75,8 +75,12 @@ also brackets them with full-path and admitted cached-location checks. The
 passed with real DXE services and synthetic PCI protocols. The [passive host
 check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#constrain-the-target-with-passive-macos-topology)
 corroborates the physical function and its bridge and root topology on macOS;
-it does not attest the firmware's path, segment or accessor. Neither physical
-preboot attribution nor device drain is proved.
+it does not attest the firmware's path, segment or accessor. The [offline
+root-bridge check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#cross-check-the-uefi-root-bridge-segment-before-the-accessor)
+refuses an exact-root segment mismatch before the endpoint accessor. CPU
+and isolated OVMF tests passed, but both observations can share the same
+firmware state. Neither physical preboot attribution nor device drain is
+proved.
 
 ## Execution order
 
