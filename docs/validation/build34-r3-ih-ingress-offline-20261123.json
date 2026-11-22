@@ -1,0 +1,40 @@
+{
+  "status": "passed-offline-IH-hint-ingress",
+  "build": 34,
+  "checks": {
+    "asan_ubsan": {"closed": 31, "modeled": 269},
+    "tsan": {"closed": 31, "modeled": 269}
+  },
+  "rejected_mutants": [
+    "bypass-admission",
+    "accept-tagged-MES-vector",
+    "swap-native-queue-indices",
+    "accept-other-service",
+    "accept-other-generation",
+    "accept-old-route",
+    "rearm-after-stream-loss"
+  ],
+  "staged_source_sha256": "940d41ad6e17af4c3a765f6611d532debf68e9838349c6b61489c8998a918444",
+  "previous_source_sha256": "01a782a991e8f7457b37eb593efe03deaa309f88d12856647590df1a599354eb",
+  "protected_production_inputs": 172,
+  "protected_production_base": "e9ee265ce005693f2928b4f981dfd097ca53fb80",
+  "native_event_backend_bound": false,
+  "native_open_admitted": false,
+  "IH_accessed": false,
+  "ISR_registered": false,
+  "GPU_executed": false,
+  "R3_complete": false,
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "native_object_sha256": {
+    "previous": "45dec8dfb0068636ebae67a4a612c927e0fed2c558500d749f45a8d65f278237",
+    "proposed": "e610281e181351987f89af463c677057f1e7e0bf64a35c7ca95a7208a3e0bc97"
+  },
+  "native_import_count": 381,
+  "compiler_warnings_unchanged": true,
+  "all_native_imports_have_existing_declared_KDK_provider": true,
+  "native_import_set_unchanged": true,
+  "actual_complete_native_translation_units_compiled": true,
+  "native_object_only": true
+}

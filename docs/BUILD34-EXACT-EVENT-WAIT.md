@@ -181,3 +181,48 @@ build34 reads on macOS 26.7.2 (`25G332`) matched: two descriptors, no MSI marker
 and zero matching legend entries. See the
 [sanitized follow-up](validation/build34-r3-pci-irq-route-hints-20261121.json)
 and the [proposed route trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md).
+
+## Deferred IH hint admission
+
+The [staged ingress](../tools/build34_exact_ih_ingress.py) derives the complete
+exact-open source and replaces its generic queue-number notification helper
+with a deferred entry taking a route identity and a copied 32-byte vector.
+The caller must retain the service, carry the identity captured for that
+route, and own the validated delivery path. Reconstructing the identity from
+the current queue state when a delayed vector arrives does not qualify.
+
+Under `gpuLock`, publication and delivery check the current service, route
+epoch and both queue generations. The decoder uses the existing provisional
+legacy GFX11 signature; it filters out tagged MES and unrecognized vectors.
+It maps ring `0x04` to build34 queue 0 (Compute) and ring `0x00` to queue 1
+(GFX), not to the numerically different DRM IP types. A rejection is not an
+acknowledgment or permission to drop traffic. The owning consumer must handle
+all other vectors independently.
+
+A recognized vector changes only the matching wake stamp. It cannot write a
+fence, advance the prefix, or release resources. A reported stream loss on
+the current route closes it and prevents rearm on that service instance.
+Queue invalidation closes the route and wakes sleepers; old notifications
+and old loss reports cannot affect a new generation. A lost event route
+keeps the existing bounded polling path.
+
+The CPU runner verifies the closed configuration and an explicitly modeled
+positive route. It exercises wrong source and queue, tagged MES, stale
+service and route, incorrect peer generation, wrong-queue wake, loss while
+enrolled and invalidation during sleep and stop. ASan/UBSan and TSan each
+passed 31 closed and 269 modeled checks; seven fault variants were rejected.
+The complete native source compiles to nonloadable objects with the same
+381 imports. The 172 protected production inputs are unchanged. See the
+[sanitized record](validation/build34-r3-ih-ingress-offline-20261123.json).
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_ih_ingress.py \
+  --out build/build34-r3-ih-ingress-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+Native admission is hard false and no delivery operations are installed.
+The entry does not poll or consume an IH ring, acknowledge a doorbell,
+register an ISR, or prove the decoder against this APU. The owner, ordered
+capture, loss detection and device-write drain must come from the separately
+admitted hardware route. Omit the transform for offline rollback; no live
+changes were made.
