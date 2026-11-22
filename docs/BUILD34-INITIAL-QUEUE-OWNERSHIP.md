@@ -55,6 +55,33 @@ still requires identified writers, a documented stop and visibility boundary,
 and proof that no owner rearms them before takeover. The reviewed Linux files
 carry MIT-style grants; no source was imported and no reset was issued.
 
+### PSP ring stop is not a firmware handoff
+
+Linux v6.12 [selects the PSP 13.0.4 implementation](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c#L240-L243)
+for that MP0 version. On the non-VF path, its
+[ring stop](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/psp_v13_0_4.c#L194-L221)
+issues a destroy request and waits for the mailbox response bit after a
+delay. It does not check the low status bits in that wait, identify the old
+ring allocation or check for outstanding writes to old command and fence
+storage. The [native create path](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/psp_v13_0_4.c#L256-L285)
+waits for readiness, programs the new ring and checks response plus status;
+it does not use the VF's pre-create ring-stop sequence. The
+[destroy wrapper](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/psp_v13_0_4.c#L290-L306)
+logs failed stop and still frees its own backing. Do not adopt that
+release rule or infer a cross-owner DMA boundary from it.
+
+Build34's [destroy path](../src/phxbringup/PhxBringup.cpp#L1106) checks the
+response bit and zero status, but clears software ring state even on
+timeout. The [staged uncertainty guard](BUILD34-RAW-QUEUE-HANDOFF.md#published-psp-work-without-an-acknowledgment)
+retains state on that error. Neither a successful mailbox result nor that
+fail-closed guard proves a fresh response for an identified inherited ring,
+completed writes, or revocation of another firmware writer's IH access.
+Before reusing these regions, require the predecessor's ring/command/fence
+identity, exclusive mailbox ownership and a documented stop and completion
+boundary. A PSP command acknowledgment must not be substituted for the
+separate IH writer and doorbell handoff. No PSP command, register access,
+firmware operation or allocation change was performed for this review.
+
 ## Ordering gap in build34
 
 The production `PhxBringup::start()` enables PCI bus mastering and memory
