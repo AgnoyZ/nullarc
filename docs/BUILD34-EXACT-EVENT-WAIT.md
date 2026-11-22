@@ -313,3 +313,56 @@ and 972 modeled checks; 34 fault variants were rejected. The pinned SDK/KDK
 comparison still has 381 imports, and all 172 production inputs are
 unchanged. The staged admission remains false; no ISR, native scheduler,
 paired RADV transport or live 780M completion route is established.
+
+### Deferred scheduler ABI and detach review
+
+The macOS `26.7.2 (25G332)` x86_64 KDK image and all six currently declared
+providers match the pinned timer-review hashes. A symbol-table check resolved
+the offered KPI references and aliases to definitions in that image. Four
+ordinary thread-call operations are offered by `com.apple.kpi.mach`, but
+neither `thread_call_isactive` nor `thread_call_cancel_wait` is offered. A
+header declaration or a definition in the KDK kernel is not enough to import
+either. The pinned [thread-call implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/osfmk/kern/thread_call.c#L1086-L1137)
+and the KDK `thread_call_free` body allow an ordinary running invocation to
+keep the call's internal reference after a successful free. Cancel can also
+remove a pending ONCE reschedule while the first invocation still runs. Do
+not use either return value to release callback context.
+
+Do not use a providerless `IOInterruptEventSource::interruptOccurred` as a
+generic multi-producer kick. The [normal path](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOInterruptEventSource.cpp#L448-L469)
+increments its producer counter without atomic read-modify-write, matching
+the KDK x86_64 instruction. The deferred [consumer](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOInterruptEventSource.cpp#L317-L341)
+uses the producer/consumer delta. The R3 kick can come from activation,
+deferred continuation or interrupt context. Their decisions can be serialized
+without serializing the ensuing calls to a second, non-atomic counter.
+
+Use the existing route latch as the work predicate for the next offline
+adapter: one providerless `IOEventSource` on a dedicated `IOWorkLoop`.
+The checked IOKit KPI offers source wake, add and remove. The
+[workloop wake](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOWorkLoop.cpp#L489-L498)
+uses a short interrupt-safe lock to set a work bit and wake the thread. It
+does not call the consumer inline. `IOEventSource::signalWorkAvailable`
+dereferences its attached loop, so retaining the source object alone is not
+enough to make wake concurrent with detach. Keep the source attached and
+all callback context pinned until kick admission is closed and all already
+admitted callers, including provider entry and late continuations, have
+left. The new adapter must demonstrate this boundary before trying removal.
+
+The [worker loop](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOWorkLoop.cpp#L375-L425)
+holds its gate while checking active sources and can rescan under that gate
+when a source returns `true`. Do not use an unconditional `true` return to
+drain a continuing backlog. Invoke one bounded capture per check, schedule
+further work outside that rescan mechanism, and recheck revocation before
+copy and repost. The [remove command](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOWorkLoop.cpp#L312-L316)
+uses the same [recursive gate](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOCommandGate.cpp#L196-L215)
+and [unlinks and clears the source's workloop pointer](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOWorkLoop.cpp#L623-L672).
+Checked detach of the exact attached source by an independent cleanup worker
+is a candidate queued-work boundary, not a deadline or an ISR drain receipt.
+No self-detach from the active source or removal under the GPU/client locks.
+A timeout observing removal must retain all callback context; it does not
+cancel the removal or authorize freeing anything.
+
+See the [sanitized scheduler review](validation/build34-r3-ih-scheduler-review-20261123.json).
+This selects an adapter to model and compile next; it does not bind a live
+scheduler, establish a native teardown deadline or change the IH ownership,
+device-write drain, BAR0 visibility or native protocol gates.

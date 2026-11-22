@@ -1,0 +1,44 @@
+{
+  "status": "passed-static-scheduler-ABI-and-detach-review",
+  "build": 34,
+  "reviewed_source_base": "a33480f3f983ce89607cb725ba60833a52573cd7",
+  "xnu_reference": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "KDK_kernel_sha256": "a91aad0da9d0a2f545c06859524bb048f4e2e392e46aa12da9fabe652081be53",
+  "KDK_metadata_and_six_declared_providers_match_prior_record": true,
+  "offered_KPI_interface_targets_resolve_in_KDK": true,
+  "checked_KPI_symbols": {
+    "com.apple.kpi.mach": [
+      "thread_call_allocate_with_options",
+      "thread_call_enter",
+      "thread_call_free",
+      "thread_call_cancel"
+    ],
+    "com.apple.kpi.iokit": [
+      "IOEventSource::signalWorkAvailable",
+      "IOWorkLoop::addEventSource",
+      "IOWorkLoop::removeEventSource"
+    ],
+    "defined_in_kernel_but_not_offered_by_declared_provider": [
+      "thread_call_isactive",
+      "thread_call_cancel_wait"
+    ]
+  },
+  "manual_interrupt_source_has_nonatomic_producer_increment": true,
+  "successful_ordinary_thread_call_free_proves_callback_return": false,
+  "selected_for_offline_followup": "retained providerless IOEventSource on dedicated IOWorkLoop",
+  "source_wake_requires_stable_workloop_attachment": true,
+  "workloop_removal_can_wait_on_recursive_gate": true,
+  "native_teardown_deadline_proved": false,
+  "declared_KPI_dependencies_changed": false,
+  "production_inputs_changed": false,
+  "scheduler_implemented": false,
+  "live_IRQ_dispatch_verified": false,
+  "native_event_backend_bound": false,
+  "IH_accessed": false,
+  "old_writer_drain_proved": false,
+  "ISR_registered": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}
