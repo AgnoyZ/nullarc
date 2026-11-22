@@ -1,7 +1,6 @@
 #include "build34_r3_preboot_pci.h"
 
 #include <Protocol/DriverBinding.h>
-#include <Protocol/LoadedImage.h>
 #include <Protocol/PciRootBridgeIo.h>
 
 typedef struct {
@@ -37,7 +36,6 @@ static EFI_GUID path_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
 static EFI_GUID pci_guid = EFI_PCI_IO_PROTOCOL_GUID;
 static EFI_GUID root_guid = EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID;
 static EFI_GUID binding_guid = EFI_DRIVER_BINDING_PROTOCOL_GUID;
-static EFI_GUID image_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 static GUEST_ROOT_PATH fixture_root_path;
 static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL fixture_root_io = {.SegmentNumber = 0x5233};
 static EFI_PCI_IO_PROTOCOL fixture_pci;
@@ -84,16 +82,9 @@ check_boot_disk(EFI_BOOT_SERVICES *boot, EFI_HANDLE image)
     if (Phx34ObservePciManagerAtPath(boot, &identity, &observation) != EFI_SUCCESS ||
         observation.Candidate.BindingHandle == NULL || observation.Candidate.ImageHandle == image)
         return 17;
-    VOID *interface = NULL;
-    if (boot->HandleProtocol(observation.Candidate.ImageHandle, &image_guid, &interface) != EFI_SUCCESS ||
-        interface == NULL)
+    if (observation.FirmwareFile.VolumeHandle == NULL)
         return 18;
-    CONST EFI_LOADED_IMAGE_PROTOCOL *loaded = interface;
-    CONST EFI_DEVICE_PATH_PROTOCOL *path = loaded->FilePath;
-    if (path == NULL || path->Type != MEDIA_DEVICE_PATH || path->SubType != MEDIA_PIWG_FW_FILE_DP ||
-        path->Length[0] != sizeof(MEDIA_FW_VOL_FILEPATH_DEVICE_PATH) || path->Length[1] != 0)
-        return 19;
-    CONST UINT8 *file = (CONST UINT8 *)path + OFFSET_OF(MEDIA_FW_VOL_FILEPATH_DEVICE_PATH, FvFileName);
+    CONST UINT8 *file = (CONST UINT8 *)&observation.FirmwareFile.FileGuid;
     CONST UINT8 *expected = (CONST UINT8 *)&virtio_pci_file;
     for (UINTN index = 0; index < sizeof(virtio_pci_file); ++index) {
         if (file[index] != expected[index])
@@ -128,7 +119,8 @@ check_attribution(EFI_BOOT_SERVICES *boot, EFI_HANDLE image, EFI_HANDLE controll
     EFI_STATUS observed = Phx34ObservePciManagerAtPath(boot, &path, &observation);
     fixture_pci.GetLocation = fixture_location;
     if (observed != EFI_SUCCESS || observation.Candidate.BindingHandle != manager ||
-        observation.Candidate.ImageHandle != image || rejected_locations != 0 || location_reads != 3)
+        observation.Candidate.ImageHandle != image || observation.FirmwareFile.VolumeHandle != NULL ||
+        rejected_locations != 0 || location_reads != 3)
         return 21;
 
     PHX34_PREBOOT_PCI_IDENTITY wrong = identity;

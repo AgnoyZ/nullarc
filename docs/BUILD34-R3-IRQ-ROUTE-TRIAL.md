@@ -74,16 +74,16 @@ locations. Trial admission still needs an independent match to the live HQDs
 and their storage. See [`mesboot.c`](../tools/phxctl/mesboot.c#L342) and
 [`adoptQueue`](../src/phxbringup/PhxBringup.cpp#L739).
 
-Linux v6.12 registers one CP EOP source for both queues. Its client ID is
+The pinned Linux GFX11 driver registers one CP EOP source for both queues. Its client ID is
 `0x14` (`GRBM_CP`) and its source ID is `0xB5` (`CP_EOP_INTERRUPT`). For an
 untagged legacy entry, ring ID bits 0–1 carry pipe, 2–3 carry ME and 4–6 carry
 queue. The expected low seven bits are `0x00` for GFX `(0, 0, 0)` and `0x04`
 for Compute `(1, 0, 0)`. MES-tagged entries use a different identity path.
 These are source-derived expectations for the planned AMD trial. See the
-pinned [client ID](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/soc15_ih_clientid.h#L100),
-[source ID](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/ivsrcid/gfx/irqsrcs_gfx_11_0_0.h#L56),
-[registration](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L1584)
-and [legacy decoder](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L6232).
+pinned [client ID](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/soc15_ih_clientid.h#L92-L95),
+[source ID](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/ivsrcid/gfx/irqsrcs_gfx_11_0_0.h#L49-L53),
+[registration](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L1480-L1486)
+and [legacy decoder](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L5822-L5847).
 
 The original multi-route diagnostic checker requires GFX control/EOP
 followed by Compute control/EOP, each with a fresh route epoch, active queue

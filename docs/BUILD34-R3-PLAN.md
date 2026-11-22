@@ -91,7 +91,11 @@ the same path from configuration without resolving a controller. A separate
 now finds the expected firmware driver for an OVMF-enumerated emulated PCI
 device without calling the endpoint's location accessor. This removes that
 call from the candidate observation, not the need for independent target
-provenance. Neither physical preboot attribution nor device drain is proved.
+provenance. The [firmware-file locator](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#return-a-candidate-firmware-volume-file-locator)
+adds stable FV2 handle/file metadata to that result in the CPU and OVMF
+fixtures without reading an image. It lets a later review identify a module
+candidate; it does not attest an exact loaded image, physical preboot
+attribution, IH ownership or device drain.
 
 ## Execution order
 

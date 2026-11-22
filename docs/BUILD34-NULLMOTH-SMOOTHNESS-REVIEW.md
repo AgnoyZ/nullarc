@@ -1,5 +1,13 @@
 # Build34 smoothness comparison with NullMoth
 
+November 23 R3 checkpoint: the [preboot candidate locator](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#return-a-candidate-firmware-volume-file-locator)
+now passes CPU and isolated OVMF tests. It is a step toward identifying a
+firmware predecessor, not a live AMD event source. Keep the NVIDIA RM
+selector out of build34. A wake remains a hint until the exact same-generation
+BAR0 fence is visible; bounded polling and conservative global retirement
+remain separate. R3 is not yet comparable to the pinned NVK/RM path on live
+completion, and no matched 780M performance result exists.
+
 November 22 R3 checkpoint: the staged Mesa/RADV receipt transport pairs
 submit, exact wait, ACK, session discovery and checked global-prefix reads
 through one CPU call path. The separate exact open stage checks mode, caller
@@ -207,8 +215,8 @@ and resource lifetime together.
 
 The current `RELEASE_MEM` packet at line 908 requests 64-bit fence data
 without an interrupt. `doWaitSeq` polls/yields as described above. NullMoth's
-`nvk/nvk-macos.patch:9708` still contains polling/backoff, but
-`nvkmd_nvrm_wait_block` at line 9748 defaults to completion-event sleeping
+`nvk/nvk-macos.patch` still contains polling/backoff, but
+`nvkmd_nvrm_wait_block` defaults to completion-event sleeping
 for WindowServer after a short spin. Its code snapshots the event count,
 rechecks channel semaphores, and bounds event sleeps to 2 ms. Ordinary apps
 default to polling there; missing/copy-only events fall back as well. This

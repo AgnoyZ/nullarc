@@ -1,6 +1,9 @@
 #include "build34_r3_preboot_pci.h"
 
+#include <Pi/PiFirmwareFile.h>
+#include <Pi/PiFirmwareVolume.h>
 #include <Protocol/DriverBinding.h>
+#include <Protocol/FirmwareVolume2.h>
 #include <Protocol/LoadedImage.h>
 #include <Protocol/PciRootBridgeIo.h>
 
@@ -20,6 +23,9 @@ typedef struct {
     CONST EFI_LOADED_IMAGE_PROTOCOL *Image;
     CONST VOID *Base;
     UINT64 Size;
+    CONST EFI_DEVICE_PATH_PROTOCOL *FirmwarePath;
+    CONST VOID *VolumeInterface;
+    PHX34_PREBOOT_FIRMWARE_FILE FirmwareFile;
 } IMAGE_SAMPLE;
 
 typedef struct {
@@ -33,6 +39,10 @@ static EFI_GUID root_bridge_io = EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID;
 static EFI_GUID device_path = EFI_DEVICE_PATH_PROTOCOL_GUID;
 static EFI_GUID driver_binding = EFI_DRIVER_BINDING_PROTOCOL_GUID;
 static EFI_GUID loaded_image = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+static EFI_GUID firmware_volume = EFI_FIRMWARE_VOLUME2_PROTOCOL_GUID;
+
+static BOOLEAN node_is(CONST UINT8 *node, UINT8 type, UINT8 subtype, UINTN length);
+static BOOLEAN same_path(CONST UINT8 *expected, CONST UINT8 *actual, UINTN bytes);
 
 static EFI_STATUS
 strict_status(EFI_STATUS status)
@@ -141,8 +151,53 @@ same_sample(CONST OPEN_SAMPLE *first, CONST OPEN_SAMPLE *second)
     return TRUE;
 }
 
+static BOOLEAN
+exact_firmware_file_path(CONST UINT8 *bytes)
+{
+    return node_is(bytes, MEDIA_DEVICE_PATH, MEDIA_PIWG_FW_FILE_DP, sizeof(MEDIA_FW_VOL_FILEPATH_DEVICE_PATH)) &&
+           node_is(bytes + sizeof(MEDIA_FW_VOL_FILEPATH_DEVICE_PATH), END_DEVICE_PATH_TYPE,
+                   END_ENTIRE_DEVICE_PATH_SUBTYPE, sizeof(EFI_DEVICE_PATH_PROTOCOL));
+}
+
 static EFI_STATUS
-resolve_image(EFI_BOOT_SERVICES *boot, EFI_HANDLE controller, EFI_HANDLE manager,
+read_firmware_origin(EFI_BOOT_SERVICES *boot, IMAGE_SAMPLE *sample)
+{
+    CONST EFI_LOADED_IMAGE_PROTOCOL *image = sample->Image;
+    CONST EFI_DEVICE_PATH_PROTOCOL *path = image->FilePath;
+    if (path == NULL || path->Type != MEDIA_DEVICE_PATH || path->SubType != MEDIA_PIWG_FW_FILE_DP)
+        return EFI_SUCCESS;
+
+    EFI_HANDLE volume = image->DeviceHandle;
+    CONST UINT8 *bytes = (CONST UINT8 *)path;
+    if (image->Revision < EFI_LOADED_IMAGE_PROTOCOL_REVISION || volume == NULL || volume == sample->Handle ||
+        !exact_firmware_file_path(bytes))
+        return EFI_COMPROMISED_DATA;
+
+    EFI_GUID file = {0};
+    UINT8 *guid = (UINT8 *)&file;
+    CONST UINT8 *file_bytes = bytes + OFFSET_OF(MEDIA_FW_VOL_FILEPATH_DEVICE_PATH, FvFileName);
+    for (UINTN index = 0; index < sizeof(file); ++index)
+        guid[index] = file_bytes[index];
+    CONST EFI_GUID empty = {0};
+    if (same_path(guid, (CONST UINT8 *)&empty, sizeof(file)))
+        return EFI_COMPROMISED_DATA;
+
+    VOID *interface = NULL;
+    EFI_STATUS status = boot->HandleProtocol(volume, &firmware_volume, &interface);
+    if (status != EFI_SUCCESS)
+        return status;
+    if (interface == NULL || image->DeviceHandle != volume || image->FilePath != path ||
+        image->Revision < EFI_LOADED_IMAGE_PROTOCOL_REVISION || !exact_firmware_file_path(bytes) ||
+        !same_path(guid, file_bytes, sizeof(file)))
+        return EFI_COMPROMISED_DATA;
+    sample->FirmwarePath = path;
+    sample->VolumeInterface = interface;
+    sample->FirmwareFile = (PHX34_PREBOOT_FIRMWARE_FILE){.VolumeHandle = volume, .FileGuid = file};
+    return EFI_SUCCESS;
+}
+
+static EFI_STATUS
+resolve_image(EFI_BOOT_SERVICES *boot, EFI_HANDLE controller, EFI_HANDLE manager, BOOLEAN include_origin,
               IMAGE_SAMPLE *sample)
 {
     VOID *interface = NULL;
@@ -165,16 +220,29 @@ resolve_image(EFI_BOOT_SERVICES *boot, EFI_HANDLE controller, EFI_HANDLE manager
     sample->Image = image;
     sample->Base = image->ImageBase;
     sample->Size = image->ImageSize;
-    return EFI_SUCCESS;
+    return include_origin ? read_firmware_origin(boot, sample) : EFI_SUCCESS;
 }
 
-EFI_STATUS EFIAPI
-Phx34AttributePciManager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *target,
-                         PHX34_PREBOOT_PCI_ATTRIBUTION *attribution)
+static BOOLEAN
+same_image(CONST IMAGE_SAMPLE *first, CONST IMAGE_SAMPLE *last)
+{
+    return first->Binding == last->Binding && first->Handle == last->Handle && first->Image == last->Image &&
+           first->Base == last->Base && first->Size == last->Size && first->FirmwarePath == last->FirmwarePath &&
+           first->VolumeInterface == last->VolumeInterface &&
+           first->FirmwareFile.VolumeHandle == last->FirmwareFile.VolumeHandle &&
+           same_path((CONST UINT8 *)&first->FirmwareFile.FileGuid, (CONST UINT8 *)&last->FirmwareFile.FileGuid,
+                     sizeof(EFI_GUID));
+}
+
+static EFI_STATUS
+attribute_pci_manager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *target,
+                      PHX34_PREBOOT_PCI_ATTRIBUTION *attribution, PHX34_PREBOOT_FIRMWARE_FILE *origin)
 {
     if (attribution == NULL)
         return EFI_INVALID_PARAMETER;
     *attribution = (PHX34_PREBOOT_PCI_ATTRIBUTION){0};
+    if (origin != NULL)
+        *origin = (PHX34_PREBOOT_FIRMWARE_FILE){0};
     if (boot == NULL || boot->HandleProtocol == NULL || boot->OpenProtocolInformation == NULL ||
         boot->FreePool == NULL || target == NULL || target->Controller == NULL ||
         target->DevicePath == NULL || target->PciIo == NULL)
@@ -188,16 +256,14 @@ Phx34AttributePciManager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET
     if (status == EFI_SUCCESS)
         status = read_sample(boot, identity.Controller, NULL, &first);
     if (status == EFI_SUCCESS)
-        status = resolve_image(boot, identity.Controller, first.Manager, &image);
+        status = resolve_image(boot, identity.Controller, first.Manager, origin != NULL, &image);
     if (status == EFI_SUCCESS)
         status = read_sample(boot, identity.Controller, first.Entries, &second);
     if (status == EFI_SUCCESS && !same_sample(&first, &second))
         status = EFI_COMPROMISED_DATA;
     if (status == EFI_SUCCESS)
-        status = resolve_image(boot, identity.Controller, second.Manager, &confirmation);
-    if (status == EFI_SUCCESS &&
-        (image.Binding != confirmation.Binding || image.Handle != confirmation.Handle ||
-         image.Image != confirmation.Image || image.Base != confirmation.Base || image.Size != confirmation.Size))
+        status = resolve_image(boot, identity.Controller, second.Manager, origin != NULL, &confirmation);
+    if (status == EFI_SUCCESS && !same_image(&image, &confirmation))
         status = EFI_COMPROMISED_DATA;
     if (status == EFI_SUCCESS)
         status = check_target(boot, &identity);
@@ -210,8 +276,17 @@ Phx34AttributePciManager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET
         attribution->BindingHandle = first.Manager;
         attribution->ImageHandle = image.Handle;
         attribution->OpenEntryCount = first.Count;
+        if (origin != NULL)
+            *origin = image.FirmwareFile;
     }
     return strict_status(status);
+}
+
+EFI_STATUS EFIAPI
+Phx34AttributePciManager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *target,
+                         PHX34_PREBOOT_PCI_ATTRIBUTION *attribution)
+{
+    return attribute_pci_manager(boot, target, attribution, NULL);
 }
 
 static BOOLEAN
@@ -463,12 +538,12 @@ Phx34ObservePciManagerAtPath(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_PA
 
     PHX34_PREBOOT_PCI_TARGET first = {0}, last = {0};
     ROOT_SAMPLE first_root = {0}, last_root = {0};
-    PHX34_PREBOOT_PCI_ATTRIBUTION candidate = {0};
+    PHX34_PREBOOT_PCI_PATH_OBSERVATION result = {0};
     EFI_STATUS status = resolve_root(boot, &sealed, TRUE, &first_root);
     if (status == EFI_SUCCESS)
         status = resolve_by_path(boot, &sealed, TRUE, &first);
     if (status == EFI_SUCCESS)
-        status = Phx34AttributePciManager(boot, &first, &candidate);
+        status = attribute_pci_manager(boot, &first, &result.Candidate, &result.FirmwareFile);
     if (status == EFI_SUCCESS)
         status = resolve_by_path(boot, &sealed, TRUE, &last);
     if (status == EFI_SUCCESS && !same_target(&first, &last))
@@ -478,6 +553,6 @@ Phx34ObservePciManagerAtPath(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_PA
     if (status == EFI_SUCCESS && !same_root(&first_root, &last_root))
         status = EFI_NO_MAPPING;
     if (status == EFI_SUCCESS)
-        observation->Candidate = candidate;
+        *observation = result;
     return strict_status(status);
 }

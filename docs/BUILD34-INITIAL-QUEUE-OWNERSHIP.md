@@ -657,6 +657,36 @@ physical Radeon manager, still less the IH owner or any device-write drain.
 Revert this isolated API and fixture change to return to the location-only
 selector. See the [sanitized result](validation/build34-r3-preboot-path-observation-20261123.json).
 
+### Return a candidate firmware-volume file locator
+
+The path-only API now returns the observed candidate's boot-local FV2 handle
+and file GUID when both loaded-image samples identify the same firmware
+file. The [pinned EFI loaded-image definition](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdePkg/Include/Protocol/LoadedImage.h#L49-L54)
+defines `FilePath` relative to `DeviceHandle`. The adapter accepts only a
+single firmware-file node immediately followed by an entire-path end node,
+with a nonzero file GUID and FV2 present on that `DeviceHandle`. It snapshots
+the checked handle, compares both path and protocol observations, and clears
+the result if later root or endpoint checks fail. Non-FV origins still return
+the candidate alone; malformed FV metadata, a failed lookup or changed
+origin refuses. Neither of the two attribution-only APIs checks FV2.
+
+The caller receives metadata, not an FV protocol reference or a file read.
+No FV method, executable-byte read, PCI callback or device access is added.
+The comparisons are two samples of trusted live Boot Services metadata, not
+an atomic pin, persisted identity, cryptographic digest or proof that the
+candidate ever wrote an IH ring. Firmware code outside the observed PCI
+binding may also be a predecessor. Do not publish physical handles or file
+GUIDs, or infer a stop or drain boundary from an observed locator.
+
+The ASan/UBSan suite passed 33 attribution, 41 location and 34 path-only
+cases. Two isolated OVMF runs verified the returned `VirtioPciDeviceDxe`
+file locator and the absence of a locator for the guest test application.
+No physical preboot collector ran. A later target observation requires its
+own independently reviewed identity and authorization. Use the locator only
+to identify a candidate for a separate provenance and device-write review.
+Revert this isolated change to recover the previous metadata-only result.
+See the [sanitized result](validation/build34-r3-preboot-fv-locator-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

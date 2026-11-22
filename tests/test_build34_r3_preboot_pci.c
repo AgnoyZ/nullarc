@@ -1,6 +1,9 @@
 #include "build34_r3_preboot_pci.h"
 
+#include <Pi/PiFirmwareFile.h>
+#include <Pi/PiFirmwareVolume.h>
 #include <Protocol/DriverBinding.h>
+#include <Protocol/FirmwareVolume2.h>
 #include <Protocol/LoadedImage.h>
 #include <Protocol/PciRootBridgeIo.h>
 
@@ -20,12 +23,17 @@ static const EFI_GUID root_guid = EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID;
 static const EFI_GUID path_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
 static const EFI_GUID binding_guid = EFI_DRIVER_BINDING_PROTOCOL_GUID;
 static const EFI_GUID image_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+static const EFI_GUID fv_guid = EFI_FIRMWARE_VOLUME2_PROTOCOL_GUID;
+static const EFI_GUID zero_guid = {0};
 
 static UINT8 controller, manager, image, child, console, image_memory, root_handle, other_root_handle, other_controller;
 static EFI_DEVICE_PATH_PROTOCOL device_path, other_path;
 static EFI_PCI_IO_PROTOCOL pci, other_pci;
 static EFI_DRIVER_BINDING_PROTOCOL binding;
 static EFI_LOADED_IMAGE_PROTOCOL loaded_image;
+static UINT8 volume, other_volume;
+static EFI_FIRMWARE_VOLUME2_PROTOCOL fv, other_fv;
+static UINTN volume_reads;
 static EFI_DEVICE_PATH_PROTOCOL *published_path;
 static UINTN target_reads_at_sample;
 
@@ -46,10 +54,28 @@ static UINTN location_reads, locate_calls, root_locates, root_io_reads;
 typedef enum {
     PATH_OK, PATH_NULL_ACCESSOR, PATH_NO_SERVICE, PATH_BAD_SEAL, PATH_UNKNOWN_SEGMENT, PATH_NO_PCI_HANDLES,
     PATH_OVERSIZED_HANDLES, PATH_PARTIAL_HANDLE, PATH_NULL_HANDLE, PATH_PREFIX_ONLY, PATH_DUP_ROOT,
-    PATH_DUP_ENDPOINT, PATH_LATE_DUP_ENDPOINT, PATH_LATE_ENDPOINT_REPLACED, PATH_LATE_ROOT_REPLACED
+    PATH_DUP_ENDPOINT, PATH_LATE_DUP_ENDPOINT, PATH_LATE_ENDPOINT_REPLACED, PATH_LATE_ROOT_REPLACED,
+    PATH_FV_OK, PATH_OTHER_ORIGIN, PATH_FV_BAD_REVISION, PATH_FV_BAD_NODE, PATH_FV_NO_END, PATH_FV_ZERO_GUID,
+    PATH_FV_NO_HANDLE, PATH_FV_IMAGE_HANDLE, PATH_FV_MISSING, PATH_FV_NULL, PATH_FV_WARNING, PATH_FV_LATE_GUID,
+    PATH_FV_LATE_PATH, PATH_FV_LATE_VOLUME, PATH_FV_LATE_INTERFACE, PATH_FV_LATE_NON_FV,
+    PATH_FV_CHANGED_DURING_LOOKUP, PATH_FV_CHANGED_GUID_DURING_LOOKUP, PATH_FV_CHANGED_END_DURING_LOOKUP
 } PATH_SCENARIO;
 
 static PATH_SCENARIO path_scenario;
+
+typedef struct {
+    MEDIA_FW_VOL_FILEPATH_DEVICE_PATH File;
+    EFI_DEVICE_PATH_PROTOCOL End;
+} FIXTURE_FV_PATH;
+
+static const FIXTURE_FV_PATH valid_fv_path = {
+    .File = {
+        .Header = {MEDIA_DEVICE_PATH, MEDIA_PIWG_FW_FILE_DP, {sizeof(MEDIA_FW_VOL_FILEPATH_DEVICE_PATH), 0}},
+        .FvFileName = {0x12345678, 0x4321, 0xabcd, {1, 2, 3, 4, 5, 6, 7, 8}},
+    },
+    .End = {END_DEVICE_PATH_TYPE, END_ENTIRE_DEVICE_PATH_SUBTYPE, {sizeof(EFI_DEVICE_PATH_PROTOCOL), 0}},
+};
+static FIXTURE_FV_PATH fv_path, other_fv_path;
 
 typedef struct {
     ACPI_HID_DEVICE_PATH Root;
@@ -124,7 +150,32 @@ lookup(EFI_HANDLE handle, EFI_GUID *guid, VOID **interface)
         ++image_reads;
         loaded_image.ImageSize = change_image && image_reads == 2 ? 8192 : 4096;
         loaded_image.ImageBase = empty_base ? NULL : &image_memory;
+        if (image_reads == 2) {
+            if (path_scenario == PATH_FV_LATE_GUID)
+                ++fv_path.File.FvFileName.Data1;
+            if (path_scenario == PATH_FV_LATE_PATH)
+                loaded_image.FilePath = &other_fv_path.File.Header;
+            if (path_scenario == PATH_FV_LATE_VOLUME)
+                loaded_image.DeviceHandle = &other_volume;
+            if (path_scenario == PATH_FV_LATE_NON_FV)
+                loaded_image.FilePath = &installed_path.Root.Header;
+        }
         *interface = &loaded_image;
+    } else if (memcmp(guid, &fv_guid, sizeof(*guid)) == 0) {
+        CHECK(handle == loaded_image.DeviceHandle && (handle == &volume || handle == &other_volume));
+        CHECK(++volume_reads == image_reads);
+        if (path_scenario == PATH_FV_MISSING)
+            return EFI_UNSUPPORTED;
+        if (path_scenario == PATH_FV_WARNING)
+            return EFI_WARN_UNKNOWN_GLYPH;
+        if (path_scenario != PATH_FV_NULL)
+            *interface = path_scenario == PATH_FV_LATE_INTERFACE && volume_reads == 2 ? &other_fv : &fv;
+        if (volume_reads == 2 && path_scenario == PATH_FV_CHANGED_DURING_LOOKUP)
+            loaded_image.DeviceHandle = &other_volume;
+        if (volume_reads == 2 && path_scenario == PATH_FV_CHANGED_GUID_DURING_LOOKUP)
+            ++fv_path.File.FvFileName.Data1;
+        if (volume_reads == 2 && path_scenario == PATH_FV_CHANGED_END_DURING_LOOKUP)
+            fv_path.End.SubType = END_INSTANCE_DEVICE_PATH_SUBTYPE;
     } else {
         CHECK(FALSE);
     }
@@ -178,9 +229,12 @@ reset(void)
     samples[1].rows[0] = samples[0].rows[2];
     samples[1].rows[2] = samples[0].rows[0];
     binding = (EFI_DRIVER_BINDING_PROTOCOL){.ImageHandle = &image, .DriverBindingHandle = &manager};
+    loaded_image = (EFI_LOADED_IMAGE_PROTOCOL){.Revision = EFI_LOADED_IMAGE_PROTOCOL_REVISION};
+    fv_path = other_fv_path = valid_fv_path;
     allocations[0] = allocations[1] = NULL;
     open_reads = path_reads = pci_reads = binding_reads = image_reads = releases = 0;
     location_reads = locate_calls = root_locates = root_io_reads = 0;
+    volume_reads = 0;
     target_reads_at_sample = 1;
     location_scenario = LOCATION_OK;
     path_scenario = PATH_OK;
@@ -349,7 +403,7 @@ enumerate_handles(EFI_LOCATE_SEARCH_TYPE search, EFI_GUID *guid, VOID *key, UINT
 }
 
 static void
-exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots)
+exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots, UINTN expected_volume_reads)
 {
     reset();
     path_scenario = scenario;
@@ -365,7 +419,14 @@ exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots)
     EFI_BOOT_SERVICES boot = {.HandleProtocol = lookup, .OpenProtocolInformation = open_information,
                               .FreePool = release_buffer, .LocateHandle = enumerate_handles};
     PHX34_PREBOOT_PCI_PATH_IDENTITY identity = {(const UINT8 *)&sealed_path, sizeof(sealed_path), 2};
-    PHX34_PREBOOT_PCI_PATH_OBSERVATION observation = {{&console, &console, 123}};
+    PHX34_PREBOOT_PCI_PATH_OBSERVATION observation = {
+        .Candidate = {.BindingHandle = &console, .ImageHandle = &console, .OpenEntryCount = 123},
+        .FirmwareFile = {.VolumeHandle = &console, .FileGuid = valid_fv_path.File.FvFileName},
+    };
+    if (scenario >= PATH_FV_OK || scenario == PATH_LATE_ROOT_REPLACED) {
+        loaded_image.FilePath = &fv_path.File.Header;
+        loaded_image.DeviceHandle = &volume;
+    }
 
     switch (scenario) {
     case PATH_NULL_ACCESSOR: pci.GetLocation = NULL; break;
@@ -374,6 +435,13 @@ exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots)
     case PATH_UNKNOWN_SEGMENT: ++identity.Segment; break;
     case PATH_LATE_ENDPOINT_REPLACED: location_scenario = LATE_PCI_REPLACED; break;
     case PATH_LATE_ROOT_REPLACED: location_scenario = ROOT_LATE_IO; break;
+    case PATH_OTHER_ORIGIN: loaded_image.FilePath = &installed_path.Root.Header; break;
+    case PATH_FV_BAD_REVISION: --loaded_image.Revision; break;
+    case PATH_FV_BAD_NODE: --fv_path.File.Header.Length[0]; break;
+    case PATH_FV_NO_END: fv_path.End.SubType = END_INSTANCE_DEVICE_PATH_SUBTYPE; break;
+    case PATH_FV_ZERO_GUID: fv_path.File.FvFileName = zero_guid; break;
+    case PATH_FV_NO_HANDLE: loaded_image.DeviceHandle = NULL; break;
+    case PATH_FV_IMAGE_HANDLE: loaded_image.DeviceHandle = &image; break;
     default: break;
     }
 
@@ -382,6 +450,7 @@ exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots)
         fprintf(stderr, "path scenario %u returned %#llx, expected %#llx\n",
                 (unsigned)scenario, (unsigned long long)actual, (unsigned long long)expected);
     CHECK(actual == expected && location_reads == 0 && open_reads == snapshots && releases == snapshots);
+    CHECK(volume_reads == expected_volume_reads);
     CHECK(allocations[0] == NULL && allocations[1] == NULL);
     CONST PHX34_PREBOOT_PCI_ATTRIBUTION *candidate = &observation.Candidate;
     if (expected == EFI_SUCCESS) {
@@ -390,6 +459,10 @@ exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots)
     } else {
         CHECK(candidate->BindingHandle == NULL && candidate->ImageHandle == NULL && candidate->OpenEntryCount == 0);
     }
+    BOOLEAN has_fv = scenario == PATH_FV_OK;
+    CONST EFI_GUID *expected_guid = has_fv ? &valid_fv_path.File.FvFileName : &zero_guid;
+    CHECK(observation.FirmwareFile.VolumeHandle == (has_fv ? &volume : NULL));
+    CHECK(memcmp(&observation.FirmwareFile.FileGuid, expected_guid, sizeof(*expected_guid)) == 0);
 }
 
 static void
@@ -501,17 +574,29 @@ int main(void)
         exercise_location(locations[index].scenario, locations[index].expected, locations[index].locates,
                           locations[index].reads, locations[index].snapshots);
     printf("PASS %zu exact preboot PCI selection scenarios (CPU fixture only)\n", sizeof(locations) / sizeof(*locations));
-    CONST struct { PATH_SCENARIO scenario; EFI_STATUS expected; UINTN snapshots; } paths[] = {
-        {PATH_OK, EFI_SUCCESS, 2}, {PATH_NULL_ACCESSOR, EFI_SUCCESS, 2}, {PATH_NO_SERVICE, EFI_INVALID_PARAMETER, 0},
-        {PATH_BAD_SEAL, EFI_INVALID_PARAMETER, 0}, {PATH_UNKNOWN_SEGMENT, EFI_NO_MAPPING, 0},
-        {PATH_NO_PCI_HANDLES, EFI_NOT_FOUND, 0}, {PATH_OVERSIZED_HANDLES, EFI_BUFFER_TOO_SMALL, 0},
-        {PATH_PARTIAL_HANDLE, EFI_COMPROMISED_DATA, 0}, {PATH_NULL_HANDLE, EFI_COMPROMISED_DATA, 0},
-        {PATH_PREFIX_ONLY, EFI_NOT_FOUND, 0}, {PATH_DUP_ROOT, EFI_NO_MAPPING, 0}, {PATH_DUP_ENDPOINT, EFI_NO_MAPPING, 0},
-        {PATH_LATE_DUP_ENDPOINT, EFI_NO_MAPPING, 2}, {PATH_LATE_ENDPOINT_REPLACED, EFI_NO_MAPPING, 2},
-        {PATH_LATE_ROOT_REPLACED, EFI_NO_MAPPING, 2}
+    CONST struct { PATH_SCENARIO scenario; EFI_STATUS expected; UINTN snapshots, volume_reads; } paths[] = {
+        {PATH_OK, EFI_SUCCESS, 2, 0}, {PATH_NULL_ACCESSOR, EFI_SUCCESS, 2, 0},
+        {PATH_NO_SERVICE, EFI_INVALID_PARAMETER, 0, 0}, {PATH_BAD_SEAL, EFI_INVALID_PARAMETER, 0, 0},
+        {PATH_UNKNOWN_SEGMENT, EFI_NO_MAPPING, 0, 0}, {PATH_NO_PCI_HANDLES, EFI_NOT_FOUND, 0, 0},
+        {PATH_OVERSIZED_HANDLES, EFI_BUFFER_TOO_SMALL, 0, 0}, {PATH_PARTIAL_HANDLE, EFI_COMPROMISED_DATA, 0, 0},
+        {PATH_NULL_HANDLE, EFI_COMPROMISED_DATA, 0, 0}, {PATH_PREFIX_ONLY, EFI_NOT_FOUND, 0, 0},
+        {PATH_DUP_ROOT, EFI_NO_MAPPING, 0, 0}, {PATH_DUP_ENDPOINT, EFI_NO_MAPPING, 0, 0},
+        {PATH_LATE_DUP_ENDPOINT, EFI_NO_MAPPING, 2, 0}, {PATH_LATE_ENDPOINT_REPLACED, EFI_NO_MAPPING, 2, 0},
+        {PATH_LATE_ROOT_REPLACED, EFI_NO_MAPPING, 2, 2},
+        {PATH_FV_OK, EFI_SUCCESS, 2, 2}, {PATH_OTHER_ORIGIN, EFI_SUCCESS, 2, 0},
+        {PATH_FV_BAD_REVISION, EFI_COMPROMISED_DATA, 1, 0}, {PATH_FV_BAD_NODE, EFI_COMPROMISED_DATA, 1, 0},
+        {PATH_FV_NO_END, EFI_COMPROMISED_DATA, 1, 0}, {PATH_FV_ZERO_GUID, EFI_COMPROMISED_DATA, 1, 0},
+        {PATH_FV_NO_HANDLE, EFI_COMPROMISED_DATA, 1, 0}, {PATH_FV_IMAGE_HANDLE, EFI_COMPROMISED_DATA, 1, 0},
+        {PATH_FV_MISSING, EFI_UNSUPPORTED, 1, 1}, {PATH_FV_NULL, EFI_COMPROMISED_DATA, 1, 1},
+        {PATH_FV_WARNING, EFI_PROTOCOL_ERROR, 1, 1}, {PATH_FV_LATE_GUID, EFI_COMPROMISED_DATA, 2, 2},
+        {PATH_FV_LATE_PATH, EFI_COMPROMISED_DATA, 2, 2}, {PATH_FV_LATE_VOLUME, EFI_COMPROMISED_DATA, 2, 2},
+        {PATH_FV_LATE_INTERFACE, EFI_COMPROMISED_DATA, 2, 2}, {PATH_FV_LATE_NON_FV, EFI_COMPROMISED_DATA, 2, 1},
+        {PATH_FV_CHANGED_DURING_LOOKUP, EFI_COMPROMISED_DATA, 2, 2},
+        {PATH_FV_CHANGED_GUID_DURING_LOOKUP, EFI_COMPROMISED_DATA, 2, 2},
+        {PATH_FV_CHANGED_END_DURING_LOOKUP, EFI_COMPROMISED_DATA, 2, 2},
     };
     for (UINTN index = 0; index < sizeof(paths) / sizeof(*paths); ++index)
-        exercise_path(paths[index].scenario, paths[index].expected, paths[index].snapshots);
+        exercise_path(paths[index].scenario, paths[index].expected, paths[index].snapshots, paths[index].volume_reads);
     printf("PASS %zu preboot path-only observation scenarios (CPU fixture only)\n", sizeof(paths) / sizeof(*paths));
     return EXIT_SUCCESS;
 }
