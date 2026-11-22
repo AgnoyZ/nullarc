@@ -5,12 +5,14 @@ static constexpr uint8_t compute[32] = {0x14, 0xb5, 0x04};
 
 int main() {
     using Route = PhxBringup::ExactIHRoute;
+    using RouteState = PhxBringup::ExactIHState;
     Trial trial;
     PhxBringup &gpu = trial.gpu;
     Route route{};
     CHECK(!gpu.openExactIHRoute(route) && !route.epoch);
     CHECK(!gpu.notifyExactIH(route, gfx));
     CHECK(trial.client.wait(1, 500) == Status::TimedOut && polls == 1);
+    CHECK(gpu.exactIHState == RouteState::Empty);
 #if MODELED_IH
     gpu.modeledIHAdmission = true;
     gpu.serviceId = 0;
@@ -71,6 +73,8 @@ int main() {
     CHECK(gpu.loseExactIHRoute(route));
     waiting.join();
     CHECK(fallback == Status::TimedOut && fallbacks == 1);
+    CHECK(gpu.exactIHState == RouteState::Lost && gpu.exactIHRoute.epoch == route.epoch);
+    CHECK(!gpu.loseExactIHRoute(route));
     CHECK(!gpu.notifyExactIH(route, compute) && !gpu.openExactIHRoute(duplicate) && !duplicate.epoch);
 
     Trial invalidated;
@@ -88,21 +92,48 @@ int main() {
     invalidated.gpu.invalidateExactQueues();
     IOLockUnlock(invalidated.gpu.gpuLock);
     sleeper.join();
-    CHECK(lost == Status::Lost && !invalidated.gpu.exactIHRoute.epoch);
+    CHECK(lost == Status::Lost && invalidated.gpu.exactIHState == RouteState::Retiring);
+    CHECK(invalidated.gpu.exactIHRoute.epoch == original.epoch);
     CHECK(!invalidated.gpu.notifyExactIH(original, gfx) && !invalidated.gpu.openExactIHRoute(duplicate));
     IOLockLock(invalidated.gpu.gpuLock);
     invalidated.gpu.isSleeping = false;
     invalidated.gpu.exactQueueLive[0] = invalidated.gpu.exactQueueLive[1] = true;
     IOLockUnlock(invalidated.gpu.gpuLock);
-    CHECK(invalidated.gpu.openExactIHRoute(duplicate) && duplicate.epoch == original.epoch + 1);
-    CHECK(!invalidated.gpu.notifyExactIH(original, gfx) && !invalidated.gpu.loseExactIHRoute(original));
-    CHECK(invalidated.gpu.notifyExactIH(duplicate, gfx));
-    invalidated.gpu.exactCallbacks.close();
-    CHECK(!invalidated.gpu.notifyExactIH(duplicate, gfx));
+    CHECK(!invalidated.gpu.openExactIHRoute(duplicate) && !duplicate.epoch);
+    CHECK(!invalidated.gpu.notifyExactIH(original, gfx));
+    CHECK(!invalidated.gpu.loseExactIHRoute(route));
+    Route relabeled = original;
+    relabeled.generation[0] = invalidated.gpu.exactQueueGeneration[0];
+    relabeled.generation[1] = invalidated.gpu.exactQueueGeneration[1];
+    CHECK(!invalidated.gpu.notifyExactIH(relabeled, gfx) && !invalidated.gpu.loseExactIHRoute(relabeled));
+    CHECK(invalidated.gpu.lock.wakeCount[0] == 1 && invalidated.gpu.lock.wakeCount[1] == 1);
+    CHECK(invalidated.gpu.loseExactIHRoute(original));
+    CHECK(invalidated.gpu.exactIHState == RouteState::Lost);
+    CHECK(invalidated.gpu.lock.wakeCount[0] == 1 && invalidated.gpu.lock.wakeCount[1] == 1);
+    CHECK(!invalidated.gpu.openExactIHRoute(duplicate));
+
+    Trial stopped;
+    stopped.gpu.modeledIHAdmission = true;
+    stopped.gpu.serviceId = 3;
+    Route stopping{};
+    CHECK(stopped.gpu.openExactIHRoute(stopping));
+    stopped.gpu.lock.block = true;
+    Status cancelled{};
+    std::thread stoppingWaiter([&] { cancelled = stopped.client.wait(0, 1000000); });
+    stopped.waitForPark(0);
+    stopped.gpu.exactCallbacks.close();
+    CHECK(!stopped.gpu.notifyExactIH(stopping, compute));
+    IOLockLock(stopped.gpu.gpuLock);
+    stopped.gpu.exactStopped = true;
+    stopped.gpu.invalidateExactQueues();
+    IOLockUnlock(stopped.gpu.gpuLock);
+    stoppingWaiter.join();
+    CHECK(cancelled == Status::Lost && stopped.gpu.exactIHState == RouteState::Retiring);
+    CHECK(stopped.gpu.exactIHRoute.epoch == stopping.epoch && !stopped.gpu.openExactIHRoute(duplicate));
     IOLockLock(invalidated.gpu.gpuLock);
     invalidated.gpu.invalidateExactQueues();
     IOLockUnlock(invalidated.gpu.gpuLock);
-    CHECK(!invalidated.gpu.exactIHRoute.epoch && !invalidated.gpu.openExactIHRoute(duplicate));
+    CHECK(invalidated.gpu.exactIHState == RouteState::Lost && invalidated.gpu.exactIHRoute.epoch == original.epoch);
 #endif
     std::printf("PASS IH ingress: %u checks; modeled=%d\n", checks.load(), MODELED_IH);
 }

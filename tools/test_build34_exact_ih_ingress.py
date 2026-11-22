@@ -52,7 +52,8 @@ def test(out, sdk, kdk):
         raise ValueError('Unexpected native binding')
     unchanged = (SNAPSHOT, PARK, WAIT, 'bool PhxBringup::exactNativeOpenAdmitted(',
                  'bool PhxBringup::readExactPrefix(', 'IOReturn IOAccelPhxNativeClient::externalMethod(',
-                 'void PhxBringup::stop(', 'IOReturn PhxBringup::setPowerState(')
+                 'void PhxBringup::stop(', 'IOReturn PhxBringup::setPowerState(',
+                 'void PhxBringup::sealStoppedQueues(')
     if any(method(previous, signature) != method(proposed, signature) for signature in unchanged):
         raise ValueError('Unexpected event wait, sequence or platform lifecycle change')
     ownership = stage_header(inputs[OWNERSHIP].decode())
@@ -115,7 +116,15 @@ def test(out, sdk, kdk):
         'accept-other-service': (' && route.service == exactIHRoute.service', '', True),
         'accept-other-generation': ('route.generation[0] == exactIHRoute.generation[0] && ', '', True),
         'accept-old-route': (' && route.epoch == exactIHRoute.epoch', '', True),
-        'rearm-after-stream-loss': (' && !exactIHUncertain', '', True),
+        'rearm-after-stream-loss': ('exactIHState == ExactIHState::Empty &&',
+                                    'exactIHState != ExactIHState::Active && exactIHState != ExactIHState::Retiring &&', True),
+        'rearm-before-old-route-drain': ('exactIHState == ExactIHState::Empty &&',
+                                         'exactIHState != ExactIHState::Active && exactIHState != ExactIHState::Lost &&', True),
+        'deliver-from-nonactive-route': ('exactIHState == ExactIHState::Active &&\n           ', '', True),
+        'ignore-loss-during-retirement': ('(exactIHState == ExactIHState::Active || exactIHState == ExactIHState::Retiring)',
+                                          'exactIHState == ExactIHState::Active', True),
+        'erase-retiring-identity': ('exactIHState = ExactIHState::Retiring;',
+                                     'exactIHRoute = {}; exactIHState = ExactIHState::Retiring;', True),
     }
     for label, (old, new, modeled) in mutations.items():
         exercise(label, once(proposed, old, new), 'address,undefined', modeled, True)
@@ -127,9 +136,10 @@ def test(out, sdk, kdk):
     git('diff', '--quiet', BASE, '--', *PROTECTED)
     if any((ROOT / name).read_bytes() != blob for name, blob in inputs.items()):
         raise ValueError('Inputs changed during verification')
-    result = dict(status='passed-offline-IH-hint-ingress', build=34, checks=counts,
+    result = dict(status='passed-offline-IH-retirement-hold', build=34, checks=counts,
                   rejected_mutants=list(mutations), staged_source_sha256=sha(proposed.encode()),
                   previous_source_sha256=sha(previous.encode()), protected_production_inputs=len(production),
+                  hold_rearm_until_old_route_drain=True, old_writer_drain_proved=False,
                   native_event_backend_bound=False, native_open_admitted=False, IH_accessed=False,
                   ISR_registered=False, GPU_executed=False, R3_complete=False, **native)
     (out / 'result-private.json').write_text(json.dumps(result, indent=2) + '\n')

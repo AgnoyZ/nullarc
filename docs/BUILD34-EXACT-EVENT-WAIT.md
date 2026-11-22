@@ -200,24 +200,37 @@ acknowledgment or permission to drop traffic. The owning consumer must handle
 all other vectors independently.
 
 A recognized vector changes only the matching wake stamp. It cannot write a
-fence, advance the prefix, or release resources. A reported stream loss on
-the current route closes it and prevents rearm on that service instance.
-Queue invalidation closes the route and wakes sleepers; old notifications
-and old loss reports cannot affect a new generation. A lost event route
-keeps the existing bounded polling path.
+fence, advance the prefix, or release resources. Queue invalidation revokes
+delivery and wakes sleepers; instead of clearing the route, it preserves the
+service, epoch and generations in `Retiring`. Fresh queue adoption does not
+make that slot empty. A matching stream-loss report while the service gate is
+open moves the active or retiring route to `Lost`. Neither state can deliver
+hints or rearm on this service instance; unrelated or relabeled reports
+cannot alter the retained route. The event path falls back to the existing
+bounded polling for still-valid targets, while invalidated waits fail closed.
+
+There is deliberately no transition from `Retiring` to `Empty`: software
+invalidation, sleeper wakeup and PCI ISR removal are not an AMD IH device
+write-drain acknowledgment. A future owning backend must prove both CPU
+callback drain and device drain for this exact retained identity before it
+can release the route or its storage. This source stage retains metadata
+only and does not allocate or pin any IH hardware storage.
 
 The CPU runner verifies the closed configuration and an explicitly modeled
 positive route. It exercises wrong source and queue, tagged MES, stale
 service and route, incorrect peer generation, wrong-queue wake, loss while
-enrolled and invalidation during sleep and stop. ASan/UBSan and TSan each
-passed 31 closed and 269 modeled checks; seven fault variants were rejected.
-The complete native source compiles to nonloadable objects with the same
-381 imports. The 172 protected production inputs are unchanged. See the
-[sanitized record](validation/build34-r3-ih-ingress-offline-20261123.json).
+enrolled, sleep/stop wakeup, and refused rearm after modeled queue readoption.
+ASan/UBSan and TSan each passed 32 closed and 319 modeled checks; eleven fault
+variants were rejected, including premature rearm. Both complete native
+sources compile to nonloadable objects with the same 381 imports; the 172
+protected production inputs are unchanged. The
+[retirement-hold record](validation/build34-r3-ih-retirement-offline-20261123.json)
+supersedes the behavior in the
+[original ingress record](validation/build34-r3-ih-ingress-offline-20261123.json).
 
 ```sh
 nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_ih_ingress.py \
-  --out build/build34-r3-ih-ingress-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+  --out build/build34-r3-ih-retirement-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
 ```
 
 Native admission is hard false and no delivery operations are installed.

@@ -17,8 +17,9 @@ TOKEN = '''    struct ExactIHRoute {
     };
 '''
 DECLARATIONS = TOKEN + '''    ExactIHRoute exactIHRoute{};
+    enum class ExactIHState : uint8_t { Empty, Active, Retiring, Lost };
+    ExactIHState exactIHState{ExactIHState::Empty};
     uint64_t exactIHLastEpoch{0};
-    bool exactIHUncertain{false};
     bool exactIHIngressAdmitted() const;
     bool openExactIHRoute(ExactIHRoute &);
     bool exactIHRouteMatchesLocked(const ExactIHRoute &) const;
@@ -36,14 +37,15 @@ bool PhxBringup::openExactIHRoute(ExactIHRoute &out) {
     const uint64_t service = getRegistryEntryID();
     if (!service || service == UINT64_MAX) return false;
     IOLockLock(gpuLock);
-    const bool ready = exactIHIngressAdmitted() && !exactCallbacks.closed() && !exactStopped && !isSleeping && !exactIHUncertain &&
-        !exactIHRoute.epoch && exactIHLastEpoch < UINT64_MAX - 1 &&
+    const bool ready = exactIHIngressAdmitted() && !exactCallbacks.closed() && !exactStopped && !isSleeping &&
+        exactIHState == ExactIHState::Empty && exactIHLastEpoch < UINT64_MAX - 1 &&
         exactEventOps && exactEventOps->sleep && exactEventOps->wake && exactEventOps->queues == 3 &&
         exactQueueLive[0] && exactQueueLive[1] && exactQueueGeneration[0] && exactQueueGeneration[1] &&
         exactQueueGeneration[0] < UINT64_MAX - 1 && exactQueueGeneration[1] < UINT64_MAX - 1 &&
         exactEventSerial[0] < UINT64_MAX && exactEventSerial[1] < UINT64_MAX;
     if (ready) {
         exactIHRoute = {service, ++exactIHLastEpoch, {exactQueueGeneration[0], exactQueueGeneration[1]}};
+        exactIHState = ExactIHState::Active;
         out = exactIHRoute;
     }
     IOLockUnlock(gpuLock);
@@ -56,8 +58,8 @@ bool PhxBringup::exactIHRouteMatchesLocked(const ExactIHRoute &route) const {
 }
 
 void PhxBringup::closeExactIHRouteLocked() {
-    if (!exactIHRoute.epoch) return;
-    exactIHRoute = {};
+    if (exactIHState != ExactIHState::Active) return;
+    exactIHState = ExactIHState::Retiring;
     for (uint32_t queue = 0; queue < 2; ++queue) {
         if (exactEventSerial[queue] < UINT64_MAX) ++exactEventSerial[queue];
         exactEventOps->wake(gpuLock, &exactEventSerial[queue]);
@@ -68,10 +70,11 @@ bool PhxBringup::loseExactIHRoute(const ExactIHRoute &route) {
     phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
     if (!callback || !gpuLock) return false;
     IOLockLock(gpuLock);
-    const bool current = exactIHRouteMatchesLocked(route);
+    const bool current = (exactIHState == ExactIHState::Active || exactIHState == ExactIHState::Retiring) &&
+        exactIHRouteMatchesLocked(route);
     if (current) {
-        exactIHUncertain = true;
         closeExactIHRouteLocked();
+        exactIHState = ExactIHState::Lost;
     }
     IOLockUnlock(gpuLock);
     return current;
@@ -104,7 +107,7 @@ def stage(source):
     source = once(source, method(source, NOTIFY) + '\n', METHODS)
     available = method(source, AVAILABLE)
     source = once(source, available, once(available, 'return queue < 2 && exactEventOps',
-                  '''return queue < 2 && exactIHRoute.epoch &&
+                  '''return queue < 2 && exactIHState == ExactIHState::Active &&
            exactQueueLive[0] && exactQueueLive[1] &&
            exactIHRoute.generation[0] == exactQueueGeneration[0] &&
            exactIHRoute.generation[1] == exactQueueGeneration[1] && exactEventOps'''))
