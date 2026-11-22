@@ -1,0 +1,42 @@
+{
+  "status": "passed-offline-IH-poll-deadline",
+  "build": 34,
+  "prior_workloop_commit": "24fb55a388f241ae6e8220e836dd48759c0d5656",
+  "checks": {
+    "asan_ubsan": {"closed": 148, "modeled": 693},
+    "tsan": {"closed": 148, "modeled": 693}
+  },
+  "rejected_mutants": 18,
+  "new_poll_mutants_rejected": [
+    "fixed-ms-poll",
+    "uncapped-poll",
+    "sleep-after-poll-expiry",
+    "use-event-key-for-poll"
+  ],
+  "previous_source_sha256": "8d68ca19e339d43c1a53d33ca525f798cba88bfaa3ad059629865e40cdf82ed0",
+  "staged_source_sha256": "978f91d190055a730df05a6b79d6bffbf95f05eecd33ef989d476dcecc663eed",
+  "native_object_sha256": {
+    "previous": "083a832c442e1e19b89363d42860b7406607d85d3672c9a0154ca741a024ecf9",
+    "proposed": "ca75fe4c7cedd916c2a04b71acda5a00ac0cd3f361ea84c40154d51d2670e977"
+  },
+  "native_object_only": true,
+  "actual_complete_native_translation_units_compiled": true,
+  "native_import_count": 406,
+  "native_import_set_unchanged": true,
+  "all_native_imports_have_existing_declared_KDK_provider": true,
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_build": "25G332",
+  "protected_production_inputs": 172,
+  "protected_production_base": "e9ee265ce005693f2928b4f981dfd097ca53fb80",
+  "default_make_test_passed": true,
+  "default_firmware_fixture_tests_skipped": true,
+  "fallback_poll_clips_to_remaining_budget": true,
+  "native_wait_deadline_proved": false,
+  "native_event_backend_bound": false,
+  "native_open_admitted": false,
+  "old_writer_drain_proved": false,
+  "IH_accessed": false,
+  "ISR_registered": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}

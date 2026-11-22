@@ -157,6 +157,34 @@ int main() {
     Capture capture;
     CHECK(!prepare(closed, capture) && loopsCreated == 0);
     CHECK(capture.references == 1 && closed.gpu.references == 1);
+
+    Trial polling(false);
+    CHECK(polling.client.wait(1, 0) == Status::TimedOut && !pollSliceCount && !polls);
+    CHECK(polling.client.wait(1, 100000, 50000) == Status::TimedOut);
+    CHECK(pollSliceCount == 1 && pollSlices[0] == 50000 && !polls);
+    pollSliceCount = 0;
+    CHECK(polling.client.wait(1, 1100000) == Status::TimedOut);
+    CHECK(pollSliceCount == 2 && pollSlices[0] == 1000000 && pollSlices[1] == 100000 && !polls);
+
+    pollSliceCount = 0;
+    conversionDelay = 50000;
+    CHECK(polling.client.wait(1, 50000) == Status::TimedOut && !pollSliceCount);
+    constexpr uint64_t normalNow = 10000000;
+    now = UINT64_MAX - 1;
+    polling.gpu.pauseExactPoll(polling.client.receipts[1], polling.client.exactClientCallbacks, now, 3);
+    CHECK(!pollSliceCount);
+    now = normalNow;
+    nsPerTick = 10;
+    polling.gpu.pauseExactPoll(polling.client.receipts[1], polling.client.exactClientCallbacks, now, 1);
+    CHECK(!pollSliceCount);
+    nsPerTick = 1;
+
+    onPoll = [&] { polling.gpu.complete(1); };
+    CHECK(polling.client.wait(1, 50) == Status::Complete && pollSliceCount == 1 && pollSlices[0] == 50);
+    CHECK(polling.client.wait(0, 0) == Status::TimedOut);
+    pollSliceCount = 0;
+    onObservationUnlock = [&] { polling.client.exactClientCallbacks.close(); };
+    CHECK(polling.client.wait(0, 100) == Status::Closed && !pollSliceCount);
 #if MODELED_IH
     Trial rejected;
     rejected.gpu.modeledIHAdmission = true;
@@ -186,6 +214,10 @@ int main() {
     CHECK(!loop->turn());
     CHECK(arming.gpu.lock.wakeCount[0] == 1 && arming.gpu.lock.wakeCount[1] == 1);
     CHECK(arming.client.wait(1, 0) == Status::TimedOut);
+    arming.gpu.lock.spurious = true;
+    CHECK(arming.client.wait(1, 46000) == Status::TimedOut);
+    CHECK(arming.gpu.lock.parkCount[1] == 1 && pollSliceCount == 1 && pollSlices[0] == 46000);
+    pollSliceCount = 0;
     CHECK(source->detach() == kIOReturnBusy && loop->removeCount == 0);
 
     beforeKick = [&] {
@@ -196,6 +228,9 @@ int main() {
     CHECK(!beforeKick && !source->getWorkLoop() && loop->wakeCount == 2);
     source->hint();
     CHECK(!source->activate() && source->detach() == kIOReturnNotReady && loop->removeCount == 1);
+    onPoll = [&] { arming.gpu.complete(1); };
+    CHECK(arming.client.wait(1, 25000) == Status::Complete);
+    CHECK(pollSliceCount == 1 && pollSlices[0] == 25000 && arming.gpu.lock.parkCount[1] == 1);
     releaseCaller(arming, capture, source);
 
     Trial waking;

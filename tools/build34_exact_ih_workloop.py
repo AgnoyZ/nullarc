@@ -1,5 +1,6 @@
 """Stage a retained providerless workloop source; native IH admission stays closed."""
 
+from build34_exact_event_wait import ENTRY, WAIT
 from build34_exact_ih_ingress import CLOSE, stage as previous_stage, stage_header
 from build34_exact_submit import once
 from test_build34_exact_ownership import method
@@ -9,6 +10,40 @@ STOP = 'void PhxBringup::stop('
 STOP_ADMISSION = '    if (!exactCallbacks.close()) return;\n'
 ROUTE_ADMISSION = '    __atomic_fetch_or(&exactIHSignals, kIHClosed, __ATOMIC_ACQ_REL);\n'
 CLOSE_WORK = '    closeExactIHWorkAdmission();\n'
+POLL = 'void PhxBringup::pauseExactPoll('
+POLL_DECL = '''    void pauseExactPoll(const phx34_exact::Receipt &, const phx34_exact::CallbackGate<> &,
+                        uint64_t start, uint64_t timeout);
+'''
+POLL_AT = 'void PhxBringup::sleepExactIOKit('
+POLL_METHOD = '''void PhxBringup::pauseExactPoll(const phx34_exact::Receipt &receipt,
+                               const phx34_exact::CallbackGate<> &client, uint64_t start, uint64_t timeout) {
+    phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
+    if (!callback || !gpuLock) return;
+    IOLockLock(gpuLock);
+    if (!client.closed() && !exactCallbacks.closed() && !exactStopped && !isSleeping &&
+        receipt.queue < 2 && exactQueueLive[receipt.queue] &&
+        exactQueueGeneration[receipt.queue] == receipt.generation) {
+        const uint64_t now = mach_absolute_time();
+        uint64_t elapsed = 0;
+        absolutetime_to_nanoseconds(now - start, &elapsed);
+        if (elapsed < timeout) {
+            const uint64_t remaining = timeout - elapsed;
+            const uint64_t slice = remaining < 1000000 ? remaining : 1000000;
+            uint64_t ticks = 0;
+            nanoseconds_to_absolutetime(slice, &ticks);
+            if (ticks && ticks <= UINT64_MAX - now) {
+                uint64_t deadline = now + ticks;
+                if (mach_absolute_time() < deadline)
+                    (void)IOLockSleepDeadline(gpuLock, &deadline, deadline, THREAD_UNINT);
+            }
+        }
+    }
+    IOLockUnlock(gpuLock);
+}
+
+'''
+PRIOR_POLL = '            IOSleep(1);\n'
+BOUNDED_POLL = '            owner->pauseExactPoll(receipt, exactClientCallbacks, start, timeout);\n'
 ADMISSION_FIELDS = '''    friend class PhxExactIHWorkSource;
     static constexpr uint64_t kExactIHKickClosed = 1ull << 63;
     static_assert(__atomic_always_lock_free(sizeof(uint64_t), nullptr), "IH kick admission requires lock-free atomics");
@@ -151,7 +186,7 @@ void PhxExactIHWorkSource::free() {
 '''
 
 
-def stage(source):
+def stage_lifecycle(source):
     source = previous_stage(source)
     source = once(source, '#include <IOKit/IOWorkLoop.h>\n',
                   '#include <IOKit/IOWorkLoop.h>\n#include <IOKit/IOEventSource.h>\n')
@@ -161,3 +196,11 @@ def stage(source):
         old = method(source, signature)
         source = once(source, old, once(old, anchor, anchor + CLOSE_WORK))
     return once(source, ANCHOR, ANCHOR + SOURCE)
+
+
+def stage(source):
+    source = stage_lifecycle(source)
+    source = once(source, ENTRY, ENTRY + POLL_DECL)
+    source = once(source, POLL_AT, POLL_METHOD + POLL_AT)
+    wait = method(source, WAIT)
+    return once(source, wait, once(wait, PRIOR_POLL, BOUNDED_POLL))

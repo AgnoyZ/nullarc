@@ -43,8 +43,9 @@ The sleep interval is at most 1 ms and clipped to the remainder of the
 original monotonic request budget. Its absolute deadline must be anchored to
 the timestamp passed to the backend. Timeout and wake both lead to another
 observation. An early return with no notification change takes one polling
-turn after that observation. If no backend is available, the existing 1 ms
-polling path applies. Both paths can overshoot with scheduler delay; neither
+turn after that observation. In the original stage, no backend meant a
+fixed 1 ms poll interval; the [later stage](#bounded-polling-without-the-route)
+clips the fallback too. Both paths can overshoot with scheduler delay; neither
 promises a hard return deadline. Stop and queue invalidation wake affected
 waiters; client close is noticed at recheck, within the requested slice plus
 scheduling and lock delay if already asleep. A wake never grants device
@@ -452,3 +453,38 @@ were rejected. Both complete translation units compiled to nonloadable
 objects. The proposed object retains the original workloop's 406 imports,
 and all 172 protected production inputs still match. CPU gate closure is
 not provider unregister, native workloop drain or AMD device-write drain.
+
+### Bounded polling without the route
+
+The staged receipt wait now uses the same original request budget even
+when there is no event backend, the route is lost, or event sleep returns
+early without a new stamp. The preceding stage could request a full 1 ms
+poll delay with only 50 us remaining. The new polling turn borrows a service
+callback lease, checks the client and same queue generation under `gpuLock`,
+then takes a fresh clock sample to account for the lock acquisition. It
+requests an absolute sleep of at most 1 ms and at most the remaining budget,
+and skips unrepresentable or already expired deadlines.
+
+The private stack key is not an event stamp and has no wake producer, so
+AMD notifications cannot turn this polling arm into an event arm. The
+existing `IOLockSleepDeadline` drops `gpuLock` while parked and reacquires
+it on return; the client lock is not held. The timing-only sleep uses
+`THREAD_UNINT` and is not canceled by a lifecycle notification. A stop or
+invalidation observed before park suppresses it; one racing an admitted
+park may be observed at the next recheck. No external command, wire mode,
+prefix wait or legacy wait changes. Zero-budget requests still only poll,
+and on return the actual fence observation still decides completion before
+timeout. This bounds the requested interval, not lock or scheduler delay.
+
+The [offline result](validation/build34-r3-ih-poll-deadline-offline-20261123.json)
+records 148 closed-admission and 693 modeled checks under each sanitizer.
+It checks the 50 us remainder, 1 ms ceiling plus final partial slice, elapsed
+conversion, spurious event return, and completion via fallback after route
+loss. The 18 rejected variants include the fixed 1 ms predecessor, an
+uncapped slice, an expired park and aliasing the event key. Both complete
+x86_64 sources compile to nonloadable objects with the same 406 imports.
+
+The workloop transform remains unreachable on the native path. This change
+does not require IH delivery to poll, and does not establish native BAR0
+visibility, a live timeout or a measured latency improvement. For offline
+rollback, use the previous `stage_lifecycle` transform.

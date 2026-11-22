@@ -9,10 +9,11 @@ from unittest.mock import patch
 
 import build34_native_object_check as native_objects
 from build34_exact_event_iokit import DECLARATIONS as IOKIT_DECLARATIONS, FIELDS_AT
-from build34_exact_event_wait import ENTRY, FIELDS
+from build34_exact_event_wait import ENTRY, FIELDS, WAIT
 from build34_exact_ih_ingress import ADMIT, CLOSE, DECLARATIONS
 from build34_exact_ih_workloop import ADMISSION_FIELDS, CLOSE_WORK, ROUTE_ADMISSION, SOURCE, STOP, STOP_ADMISSION
-from build34_exact_ih_workloop import previous_stage, stage, stage_header
+from build34_exact_ih_workloop import BOUNDED_POLL, POLL, POLL_DECL, POLL_METHOD, PRIOR_POLL
+from build34_exact_ih_workloop import previous_stage, stage, stage_header, stage_lifecycle
 from build34_exact_submit import once
 from test_build34_exact_event_iokit import DOUBLES
 from test_build34_exact_ih_ingress import BASE_FIXTURE, METHODS, OWNERSHIP
@@ -20,6 +21,7 @@ from test_build34_exact_open import BASE, EXTRA, FACTORY_RECORD, KDK_RECORD, PRO
 from test_build34_exact_ownership import DRIVER, ROOT, method, sha
 
 REFERENCE = 'docs/validation/build34-r3-ih-signal-handoff-offline-20261123.json'
+LIFECYCLE = 'docs/validation/build34-r3-ih-workloop-lifecycle-offline-20261123.json'
 FIXTURE = 'tests/test_build34_exact_ih_workloop.cpp'
 GATE = 'build34_exact_callbacks.h'
 POWER = 'IOReturn PhxBringup::setPowerState('
@@ -56,6 +58,22 @@ public:
 
 class PhxBringup : public OSObject {
 '''
+POLL_DOUBLES = '''static constexpr unsigned THREAD_UNINT = 0;
+static thread_local unsigned pollSliceCount = 0;
+static thread_local uint64_t pollSlices[8]{};
+static thread_local uint64_t conversionDelay = 0;
+'''
+POLL_SLEEP = '''    if (kind == THREAD_UNINT) {
+        CHECK(gpuHeld && !clientHeld && key && key != p->keys[0] && key != p->keys[1]);
+        CHECK(deadline > now && deadline - now <= 1000000 && pollSliceCount < 8);
+        pollSlices[pollSliceCount++] = deadline - now;
+        IOLockUnlock(p);
+        now = deadline;
+        if (onPoll) std::exchange(onPoll, {})();
+        IOLockLock(p);
+        return 2;
+    }
+'''
 
 
 def test(out, sdk, kdk):
@@ -72,26 +90,30 @@ def test(out, sdk, kdk):
     header_names = native_objects.HEADERS + EXTRA
     inputs = {name: (ROOT / name).read_bytes() for name in {
         *production, *('tools/' + name for name in header_names), OWNERSHIP,
-        REFERENCE, FACTORY_RECORD, KDK_RECORD, BASE_FIXTURE, FIXTURE,
+        REFERENCE, LIFECYCLE, FACTORY_RECORD, KDK_RECORD, BASE_FIXTURE, FIXTURE,
         'tools/build34_exact_ih_workloop.py', 'tools/test_build34_exact_ih_workloop.py', 'tools/build34_native_object_check.py',
     }}
     reference = json.loads(inputs[REFERENCE])
     original = inputs[DRIVER].decode()
-    previous, proposed = previous_stage(original), stage(original)
-    if sha(previous.encode()) != reference['staged_source_sha256']:
-        raise ValueError('Prior staged IH source drift')
+    ingress, previous, proposed = previous_stage(original), stage_lifecycle(original), stage(original)
+    if (sha(ingress.encode()) != reference['staged_source_sha256'] or
+            sha(previous.encode()) != json.loads(inputs[LIFECYCLE])['staged_source_sha256']):
+        raise ValueError('Prior staged IH or lifecycle source drift')
     if method(proposed, ADMIT) != 'bool PhxBringup::exactIHIngressAdmitted() const {\n    return false;\n}\n':
         raise ValueError('Native IH admission must remain disabled')
     if any(re.search(name + r'\s*=', proposed) or proposed.count(name + '{nullptr}') != 1
            for name in ('exactDwordReader', 'exactFenceReader', 'exactEventOps')):
         raise ValueError('Unexpected native binding')
-    unchanged = (*(signature for signature in METHODS if signature != CLOSE), 'bool PhxBringup::start(',
+    unchanged = (*(signature for signature in METHODS if signature != WAIT), 'bool PhxBringup::start(', STOP,
                  POWER, SEAL, 'bool PhxBringup::exactNativeOpenAdmitted(', 'IOReturn IOAccelPhxNativeClient::externalMethod(')
     if any(method(previous, signature) != method(proposed, signature) for signature in unchanged):
         raise ValueError('Unexpected lifecycle, transport or IH ingress change')
     for signature, anchor in ((STOP, STOP_ADMISSION), (CLOSE, ROUTE_ADMISSION)):
-        if method(proposed, signature) != once(method(previous, signature), anchor, anchor + CLOSE_WORK):
+        if method(previous, signature) != once(method(ingress, signature), anchor, anchor + CLOSE_WORK):
             raise ValueError('Workloop admission must close without changing other lifecycle behavior')
+    reverted = once(once(once(proposed, POLL_DECL, ''), POLL_METHOD, ''), BOUNDED_POLL, PRIOR_POLL)
+    if reverted != previous:
+        raise ValueError('Unexpected change outside bounded polling')
     if proposed.count(SOURCE) != 1 or proposed.count('PhxExactIHWorkSource::prepare(') != 1:
         raise ValueError('Workloop source must remain unbound')
     ownership = stage_header(inputs[OWNERSHIP].decode())
@@ -103,7 +125,8 @@ def test(out, sdk, kdk):
                        for tool in ('clang++', 'otool'))
     base = inputs[BASE_FIXTURE].decode().partition('int main() {')[0]
     base = once(base, 'class PhxBringup {\n', OSOBJECT)
-    fields = ENTRY + once(FIELDS, FIELDS_AT, IOKIT_DECLARATIONS + FIELDS_AT)
+    base = once(base, 'static void IOSleep(unsigned ms)', '[[maybe_unused]] static void IOSleep(unsigned ms)')
+    fields = ENTRY + once(FIELDS, FIELDS_AT, POLL_DECL + IOKIT_DECLARATIONS + FIELDS_AT)
     fields = once(fields, '    bool notifyExactEvent(uint32_t queue, uint64_t generation); // deferred context only\n',
                   ADMISSION_FIELDS + DECLARATIONS)
     fields += '''    bool modeledIHAdmission = false;
@@ -116,6 +139,10 @@ def test(out, sdk, kdk):
     IOReturn setPowerState(unsigned long, IOService *);
 '''
     base = once(base, '    // PHX34_EVENT_FIELDS\n', fields)
+    doubles = POLL_DOUBLES + once(DOUBLES, '    CHECK(kind == THREAD_ABORTSAFE',
+                                  POLL_SLEEP + '    CHECK(kind == THREAD_ABORTSAFE')
+    doubles = once(doubles, '*ticks = ns / nsPerTick;',
+                   '*ticks = ns / nsPerTick; now += std::exchange(conversionDelay, 0);')
 
     def run(args, label, broken=False):
         process = subprocess.run([str(arg) for arg in args], cwd=out, capture_output=True, timeout=45,
@@ -129,9 +156,10 @@ def test(out, sdk, kdk):
             raise RuntimeError(label + ' failed; inspect private diagnostics')
         return process.stdout.decode()
 
-    def exercise(label, adapter, sanitizer, modeled, broken=False, skip_close=None, admission=ADMISSION_FIELDS):
-        signatures = (*METHODS, STOP, POWER, SEAL)
-        methods = [method(proposed, signature) for signature in signatures]
+    def exercise(label, adapter, sanitizer, modeled, broken=False, skip_close=None, admission=ADMISSION_FIELDS,
+                 driver=None):
+        signatures = (*METHODS, STOP, POWER, SEAL, POLL)
+        methods = [method(proposed if driver is None else driver, signature) for signature in signatures]
         power_index = signatures.index(POWER)
         methods[power_index] = once(methods[power_index], 'IOService *whichDevice) {\n',
                                     'IOService *whichDevice) {\n    (void)whichDevice;\n')
@@ -141,7 +169,7 @@ def test(out, sdk, kdk):
         if modeled:
             index = METHODS.index(ADMIT)
             methods[index] = once(methods[index], 'return false;', 'return modeledIHAdmission;')
-        fixture = once(once(base, ADMISSION_FIELDS, admission), '// PHX34_EVENT_METHODS', DOUBLES + '\n'.join(methods))
+        fixture = once(once(base, ADMISSION_FIELDS, admission), '// PHX34_EVENT_METHODS', doubles + '\n'.join(methods))
         adapter = once(adapter, 'void PhxExactIHWorkSource::kick() {\n',
                        'void PhxExactIHWorkSource::kick() {\n    if (beforeKick) std::exchange(beforeKick, {})();\n')
         fixture += once(inputs[FIXTURE].decode(), '// PHX34_WORKLOOP_SOURCE', adapter)
@@ -191,21 +219,35 @@ def test(out, sdk, kdk):
         exercise(label, SOURCE, 'address,undefined', True, True, skip_close=signature)
     exercise('leave-copier-turn-admission-open', SOURCE, 'address,undefined', True, True,
              admission=once(ADMISSION_FIELDS, '        exactIHTurns.close();\n', ''))
+    poll_mutants = {
+        'fixed-ms-poll': (BOUNDED_POLL, PRIOR_POLL),
+        'uncapped-poll': ('const uint64_t slice = remaining < 1000000 ? remaining : 1000000;',
+                          'const uint64_t slice = remaining;'),
+        'sleep-after-poll-expiry': ('if (mach_absolute_time() < deadline)\n                    (void)IOLockSleepDeadline(gpuLock, &deadline, deadline, THREAD_UNINT);',
+                                    '(void)IOLockSleepDeadline(gpuLock, &deadline, deadline, THREAD_UNINT);'),
+        'use-event-key-for-poll': ('IOLockSleepDeadline(gpuLock, &deadline, deadline, THREAD_UNINT)',
+                                   'IOLockSleepDeadline(gpuLock, &exactEventSerial[receipt.queue], deadline, THREAD_UNINT)'),
+    }
+    poll_method = method(proposed, POLL)
+    for label, (old, new) in poll_mutants.items():
+        broken = once(proposed, old, new) if old == BOUNDED_POLL else once(proposed, poll_method, once(poll_method, old, new))
+        exercise(label, SOURCE, 'address,undefined', False, True, driver=broken)
     with patch.object(native_objects, 'HEADERS', header_names):
         native = native_objects.check(out / 'native', inputs, previous, proposed, ownership, sdk, kdk,
                                       reference['native_import_count'] + len(ADDED_IMPORTS),
                                       json.loads(inputs[FACTORY_RECORD])['compiler_warnings']['proposed'],
-                                      json.loads(inputs[KDK_RECORD]), compiler, added_imports=ADDED_IMPORTS)
+                                      json.loads(inputs[KDK_RECORD]), compiler)
     git('diff', '--quiet', BASE, '--', *PROTECTED)
     if any((ROOT / name).read_bytes() != blob for name, blob in inputs.items()):
         raise ValueError('Inputs changed during verification')
     result = dict(status='passed-offline-IH-providerless-workloop', build=34, checks=counts,
-                  rejected_mutants=[*mutations, *lifecycle_mutants, 'leave-copier-turn-admission-open'],
+                  rejected_mutants=[*mutations, *lifecycle_mutants, 'leave-copier-turn-admission-open', *poll_mutants],
                   previous_source_sha256=sha(previous.encode()),
                   staged_source_sha256=sha(proposed.encode()), protected_production_inputs=len(production),
                   staged_providerless_scheduler=True, native_irq_scheduler_bound=False,
                   copier_turn_drained_before_workloop_removal=True,
                   lifecycle_closes_work_admission_without_removal=True,
+                  fallback_poll_clips_to_remaining_budget=True,
                   native_event_backend_bound=False, native_teardown_deadline_proved=False,
                   native_open_admitted=False, old_writer_drain_proved=False,
                   IH_accessed=False, ISR_registered=False, GPU_executed=False, R3_complete=False, **native)
