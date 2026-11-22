@@ -148,3 +148,27 @@ requires negotiated capability and immutable session identity, the actual
 IOKit call and checked prefix path, CPU-fence publication, caller retry and
 lifecycle handling, and hardware validation. Rollback is to omit the
 isolated adapter and its test target.
+
+### Separate sequence dispatch by mode
+
+The earlier composed dispatch lets a bound exact client reach legacy
+`Submit` and `WAITSEQ`. The old submit path returns only a sequence number,
+even when it reserves receipt metadata internally. Reaching it from a
+paired exact session would leave work without a receipt the Mesa cache can
+authenticate. Legacy `WAITSEQ` also has CPU-fence side effects and cannot
+implement the pure snapshot required by the cache.
+
+The [isolated dispatch transform](../tools/build34_exact_dispatch_mode.py)
+derives the latest mapping-admission stage. After the existing client and
+provider checks, exact sessions refuse legacy `Submit` and `WAITSEQ`, and
+legacy sessions refuse the three exact selectors. Other dispatch is unchanged.
+No factory or Hello change binds an exact client in production.
+
+The pairing runner composes and fingerprints the full source delta, then
+places the new dispatch body into the CPU receipt fixture. Lifecycle fields
+in that fixture are models, and the current legacy WAITSEQ body is a stub.
+The exact path still exercises the actual staged receipt handlers. Tests
+prove wrong-mode requests do not reach sequence handlers, and a legacy
+client still reaches both legacy routes. ASan/UBSan and TSan each pass
+5,765 checks. See the [dispatch pairing record](validation/build34-r3-mesa-dispatch-offline-20261122.json).
+Omit the transform to roll it back.

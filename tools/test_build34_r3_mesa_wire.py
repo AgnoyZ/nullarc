@@ -9,8 +9,9 @@ import shlex
 import subprocess
 import sys
 
+from build34_exact_dispatch_mode import DISPATCH, MODE_GATE, previous_stage, stage as dispatch_stage
 from build34_exact_submit import once
-from test_build34_exact_ownership import ROOT, sha
+from test_build34_exact_ownership import DRIVER, ROOT, method, sha
 from test_build34_exact_transport import DRM, KEXT, PATCH, PREFIX, SHAPE_PATCHES
 from test_build34_exact_multitarget import apply, stage
 from upstream34_layout import radv_ib_tail
@@ -33,17 +34,24 @@ def test(mesa, out):
     native_case = 'tools/test_build34_exact_submit_receipt.py'
     transport_record = 'docs/validation/build34-r3-transport-offline-20261121.json'
     native_record = 'docs/validation/build34-r3-submit-receipt-offline-20261121.json'
+    mapping_record = 'docs/validation/build34-r3-vm-ready-offline-20261122.json'
     adapter = 'tools/build34_r3_mesa_wire.c'
     fixture = 'tests/test_build34_r3_mesa_wire.cpp'
     native_evidence = json.loads((ROOT / native_record).read_text())
     mesa_evidence = json.loads((ROOT / transport_record).read_text())
     patches = [*SHAPE_PATCHES, PATCH]
     paths = [adapter, 'tools/build34_r3_mesa_wire.h', 'tools/test_build34_r3_mesa_wire.py', fixture,
-             transport_record, native_record, *patches, *native_evidence['input_sha256']]
+             'tools/build34_exact_dispatch_mode.py', mapping_record, transport_record, native_record,
+             *patches, *native_evidence['input_sha256']]
     inputs = {name: (ROOT / name).read_bytes() for name in paths}
     pinned = {**native_evidence['input_sha256'], **{name: mesa_evidence['input_sha256'][name] for name in patches}}
     if any(sha(inputs[name]) != digest for name, digest in pinned.items()):
         raise ValueError('Previously reviewed inputs changed')
+    driver = inputs[DRIVER].decode()
+    before, after = previous_stage(driver), dispatch_stage(driver)
+    if (sha(before.encode()) != json.loads(inputs[mapping_record])['staged_sha256'] or
+            once(after, MODE_GATE, '') != before):
+        raise ValueError('Composed mode gate changed source outside the dispatch delta')
     out.mkdir(parents=True, mode=0o700)
     frozen, closure, native = out / 'frozen', out / 'mesa', out / 'native-private'
     stage(inputs, frozen)
@@ -73,14 +81,21 @@ def test(mesa, out):
         if native_result[key] != native_evidence[key]:
             raise ValueError('Previously reviewed native result differs: ' + key)
     paired_native = native / 'paired-native-receipt.h'
-    paired_native.write_text(once((native / 'submit-receipt.cpp').read_text(), 'int main() {\n',
-                                 'void previous_receipt_suite() {\n'))
+    generated_native = (native / 'submit-receipt.cpp').read_text()
+    generated_native = once(generated_native, 'int main() {\n', 'void previous_receipt_suite() {\n')
+    binding = (native / 'submit-binding-CPU-only.h').read_text()
+    paired_binding = native / 'paired-native-binding.h'
+    paired_binding.write_text(once(binding, '    bool hello=false;\n', '    bool hello=false, boCleanupFault=false;\n'
+                                    '    uint32_t legacyState=2;\n'))
+    generated_native = once(generated_native, '#include "submit-binding-CPU-only.h"',
+                            '#include "paired-native-binding.h"')
+    paired_native.write_text(once(generated_native, method(generated_native, DISPATCH), method(after, DISPATCH)))
     native_headers = native / 'source/src/phxbringup'
     includes = ['-I' + str(path) for path in [native, native_headers, frozen / 'tools',
                 native / 'frozen/src/phxbringup', *(closure / name for name in ('include', 'include/darwin', 'src', 'src/amd', PREFIX))]]
     allowed = {str(path.resolve()) for root in (frozen, closure, native_headers, native / 'frozen')
                for path in root.rglob('*') if path.is_file() and '.git' not in path.relative_to(root).parts}
-    allowed |= {str(paired_native), str(native / 'submit-binding-CPU-only.h')}
+    allowed |= {str(paired_native), str(paired_binding)}
     checks = {}
     for label, sanitizer in [('memory', 'address,undefined'), ('thread', 'thread')]:
         flags = ['-O1', '-g', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
@@ -123,6 +138,7 @@ def test(mesa, out):
                   asan_ubsan_checks=checks['memory'], tsan_checks=checks['thread'],
                   frozen_Mesa_inputs=len(mesa_source), protected_production_inputs=len(names),
                   staged_native_submit_source_sha256=native_evidence['staged_driver_sha256'],
+                  staged_dispatch_source_sha256=sha(after.encode()),
                   staged_Mesa_transport_sha256=sha(mesa_staged[KEXT]),
                   native_regression_groups=native_result['groups'],
                   fixture_prefix_only=True, native_session_negotiated=False, iokit_opened=False,

@@ -170,10 +170,36 @@ static void uncertain_replies() {
     CHECK(bridge.prefixes == 1 && !bridge.acks && bridge.client.exactRegistry.occupied() == 1);
 }
 
+static void sequence_modes() {
+    reset();
+    Bridge bridge;
+    Request exactRequest;
+    CHECK(bridge.client.externalMethod(PHXN_SEL_WAITSEQ, &exactRequest.a, nullptr, nullptr, nullptr) ==
+          kIOReturnUnsupported);
+    CHECK(bridge.client.externalMethod(PHXN_SEL_SUBMIT, &exactRequest.a, nullptr, nullptr, nullptr) ==
+          kIOReturnUnsupported);
+    CHECK(exactRequest.a.scalarOutput[0] == sentinel && !packetWrites && !bridge.client.exactRegistry.occupied());
+    uint64_t sequence = 0;
+    CHECK(bridge.submit(AMDGPU_HW_IP_COMPUTE, &sequence) == 0 && sequence == 100);
+
+    PhxBringup legacyDevice;
+    IOAccelPhxNativeClient legacy;
+    CHECK(legacy.start(&legacyDevice));
+    legacy.hello = true;
+    Request legacyRequest;
+    for (uint32_t selector : {PHX34_R3_SEL_SUBMIT_RECEIPT, PHX34_R3_SEL_WAIT_RECEIPT, PHX34_R3_SEL_ACK_RECEIPT})
+        CHECK(legacy.externalMethod(selector, &legacyRequest.a, nullptr, nullptr, nullptr) == kIOReturnUnsupported);
+    CHECK(legacyRequest.a.scalarOutput[0] == sentinel && legacyDevice.gSeq == 99);
+    CHECK(legacy.externalMethod(PHXN_SEL_WAITSEQ, &legacyRequest.a, nullptr, nullptr, nullptr) == 123);
+    CHECK(legacy.externalMethod(PHXN_SEL_SUBMIT, &legacyRequest.a, nullptr, nullptr, nullptr) == kIOReturnSuccess);
+    CHECK(legacyRequest.a.scalarOutput[0] == 100 && legacyDevice.gSeq == 100);
+}
+
 int main() {
     paired_round_trip();
     full_receipts();
     uncertain_replies();
+    sequence_modes();
     std::printf("PASS staged Mesa/native wire: %llu checks; GPU_executed=false\n",
                 static_cast<unsigned long long>(checks.load()));
 }

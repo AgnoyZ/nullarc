@@ -1,0 +1,20 @@
+{
+  "status": "passed-CPU-only-paired-Mesa-native-receipt-wire",
+  "kernel_build": 34,
+  "asan_ubsan_checks": 5765,
+  "tsan_checks": 5765,
+  "frozen_Mesa_inputs": 30,
+  "protected_production_inputs": 172,
+  "staged_native_submit_source_sha256": "14daa2c23306f05bee4d7e64d5e18fe9d3262772356a6262ed1d62149f9daa85",
+  "staged_dispatch_source_sha256": "757cdb0025644f4dbdb1c8d4522d1bc8e53e7c98618929eab2c876da1e8800fd",
+  "staged_Mesa_transport_sha256": "1c177346dfe4b425263916f85fbadd8c9f3c5048d6c947fa134e99fa22516484",
+  "native_regression_groups": 2371,
+  "fixture_prefix_only": true,
+  "native_session_negotiated": false,
+  "iokit_opened": false,
+  "production_exact_capability_enabled": false,
+  "installed": false,
+  "loaded": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}

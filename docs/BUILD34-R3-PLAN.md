@@ -81,8 +81,11 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    returns that complete identity through a fixed envelope while refusing
    mixed-engine batches and unimplemented CPU user fences. It preserves
    actual queue fallback and retains published work on uncertain errors.
-   There is still no native exact mode request, capability negotiation,
-   independent global prefix/visibility or Mesa wire binding.
+   The [CPU wire pairing](BUILD34-SUBMIT-RECEIPT.md#mesa-transport-pairing)
+   connects the staged handlers to the Mesa cache and tests separation of
+   exact and legacy sequence dispatch. Native exact-mode request, capability
+   negotiation, a checked global-prefix endpoint and live visibility are
+   still required.
 4. Replace permanent healthy-client/service retention with proved callback/GPU
    drain and reclamation. Keep fault/uncertain-work quarantine distinct from
    successful completion; audit every VM mutation and native entrypoint.
