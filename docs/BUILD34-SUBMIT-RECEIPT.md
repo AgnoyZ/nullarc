@@ -491,10 +491,34 @@ python3 -B tools/test_build34_r3_radv_runtime.py \
 ```
 
 This executes actual full-library Vulkan API code with a CPU-only substitute;
-it does not execute its IBs, test actual positive-timeout expiry, prove
-dual-queue progress, or exercise real MIG, BAR0, EOP/ISR, or native resource
-drain. The sanitizers instrument the fixture, not RADV. No driver, runtime or
-settings were installed, no binary was uploaded, and no live rollback is
-needed. Omit `--exact-cs` to retain the original lifecycle and submit-refusal
-control. The next hardware gate remains exclusive IH ownership and
-independent old-writer drain, not this successful CPU wait.
+it does not execute its IBs or exercise real MIG, BAR0, EOP/ISR, or native
+resource drain. The sanitizers instrument the fixture, not RADV. No driver,
+runtime or settings were installed, no binary was uploaded, and no live
+rollback is needed. Omit `--exact-cs` to retain the original lifecycle and
+submit-refusal control.
+
+### Full Vulkan dual-queue overlap on CPU
+
+The same pinned exact-CS image now also runs a dedicated Compute queue and a
+separate GFX queue on one logical device and one modeled `N48R` session. It
+submits Compute first and GFX second with distinct receipt slots and queue
+generations. Both fences initially time out in zero-budget wait-any. The
+substitute then permits only GFX to complete. Wait-any returns success,
+GFX is acknowledged once and its late status is local, while the earlier
+Compute fence remains pending. The checked prefix stays below both
+submissions. Wait-all times out at both zero and a positive 25 ms budget;
+the substitute waits the requested bounded slice and still reports pending.
+There is no second ACK or prefix advance at this point.
+
+After the substitute permits Compute completion, wait-all succeeds, the
+separate prefix query reaches the GFX sequence and Compute is acknowledged
+once. The test checks each wire identity and the ACK order, and refuses
+legacy submit/wait methods. The earlier single-queue and refusal controls
+still pass. See the
+[offline dual-queue record](validation/build34-r3-radv-dual-queue-cpu-20261123.json).
+
+The timeout exercises the real Vulkan caller's deadline logic, not native
+kernel timing. The prefix and queue completion come from the CPU substitute,
+not from device writeback. This does not prove hardware overlap, independent
+BAR0 visibility, sleep or stop lifecycle, or stability. The next hardware
+gate remains exclusive IH ownership and independent old-writer drain.

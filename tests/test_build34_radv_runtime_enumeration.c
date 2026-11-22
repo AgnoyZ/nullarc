@@ -21,10 +21,13 @@ static void report_r3(unsigned scenario, unsigned devices)
    printf("{\"scenario\":%u,\"physical_devices\":%u,\"opens\":%u,\"closes\":%u,\"open_attempts\":%u,"
           "\"service_releases\":%u,\"session_calls\":%u,\"hello_calls\":%u,\"BO_creates\":%u,"
           "\"fake_IOKit_calls\":%u,\"modeled_exact_submits\":%u,\"zero_polls\":%u,\"positive_waits\":%u,"
-          "\"prefix_snapshots\":%u,\"exact_acks\":%u,\"native_submits\":0,\"GPU_executed\":false}\n",
+          "\"positive_pending\":%u,"
+          "\"prefix_snapshots\":%u,\"exact_acks\":%u,\"gap_prefixes\":%u,\"closed_prefixes\":%u,"
+          "\"native_submits\":0,\"GPU_executed\":false}\n",
           scenario, devices, phx34_cpu_opens(), phx34_cpu_closes(), phx34_cpu_attempts(),
           phx34_cpu_releases(), phx34_cpu_sessions(), phx34_cpu_hellos(), phx34_cpu_creates(), phx34_cpu_calls(),
-          trace->submits, trace->zero_polls, trace->positive_waits, trace->prefixes, trace->acks);
+          trace->submits, trace->zero_polls, trace->positive_waits, trace->positive_pending, trace->prefixes, trace->acks,
+          trace->gap_prefixes, trace->closed_prefixes);
 }
 #endif
 static void fixture_require(int okay, unsigned line)
@@ -34,7 +37,8 @@ static void fixture_require(int okay, unsigned line)
 #define require(okay) fixture_require((okay), __LINE__)
 
 #ifdef PHX34_CPU_R3
-static void test_submit(VkDevice device, uint32_t compute, PFN_vkGetDeviceProcAddr get_proc, unsigned scenario)
+static void test_submit(VkDevice device, const VkDeviceQueueCreateInfo *families, PFN_vkGetDeviceProcAddr get_proc,
+                        unsigned scenario)
 {
 #define DFN(name) PFN_##name name = (PFN_##name)get_proc(device, #name); require(name != NULL)
    DFN(vkGetDeviceQueue);
@@ -42,49 +46,75 @@ static void test_submit(VkDevice device, uint32_t compute, PFN_vkGetDeviceProcAd
    DFN(vkBeginCommandBuffer); DFN(vkEndCommandBuffer);
    DFN(vkCreateFence); DFN(vkDestroyFence); DFN(vkGetFenceStatus); DFN(vkQueueSubmit); DFN(vkWaitForFences);
 #undef DFN
-   VkQueue queue = VK_NULL_HANDLE;
-   vkGetDeviceQueue(device, compute, 0, &queue);
-   require(queue != VK_NULL_HANDLE);
-   VkCommandPool pool = VK_NULL_HANDLE;
-   const VkCommandPoolCreateInfo pool_info = {.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-                                             .queueFamilyIndex = compute};
-   require(vkCreateCommandPool(device, &pool_info, NULL, &pool) == VK_SUCCESS);
-   VkCommandBuffer command = VK_NULL_HANDLE;
-   const VkCommandBufferAllocateInfo alloc = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = pool, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1};
-   require(vkAllocateCommandBuffers(device, &alloc, &command) == VK_SUCCESS);
-   const VkCommandBufferBeginInfo begin = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-   require(vkBeginCommandBuffer(command, &begin) == VK_SUCCESS);
-   require(vkEndCommandBuffer(command) == VK_SUCCESS);
-   VkFence fence = VK_NULL_HANDLE;
-   const VkFenceCreateInfo fence_info = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-   require(vkCreateFence(device, &fence_info, NULL, &fence) == VK_SUCCESS);
-   require(vkGetFenceStatus(device, fence) == VK_NOT_READY);
-   const VkSubmitInfo submit = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-                                .commandBufferCount = 1, .pCommandBuffers = &command};
-   const VkResult submitted = vkQueueSubmit(queue, 1, &submit, fence);
+   const uint32_t count = scenario == CPU_EXACT_DUAL ? 2 : 1;
+   VkCommandPool pools[CPU_QUEUE_COUNT] = {0};
+   VkFence fences[CPU_QUEUE_COUNT] = {0};
+   for (uint32_t index = 0; index < count; ++index) {
+      const uint32_t family = families[index].queueFamilyIndex;
+      VkQueue queue = VK_NULL_HANDLE;
+      vkGetDeviceQueue(device, family, 0, &queue);
+      require(queue != VK_NULL_HANDLE);
+      const VkCommandPoolCreateInfo pool_info = {.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+                                                .queueFamilyIndex = family};
+      require(vkCreateCommandPool(device, &pool_info, NULL, &pools[index]) == VK_SUCCESS);
+      VkCommandBuffer command = VK_NULL_HANDLE;
+      const VkCommandBufferAllocateInfo alloc = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+         .commandPool = pools[index], .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount = 1};
+      require(vkAllocateCommandBuffers(device, &alloc, &command) == VK_SUCCESS);
+      const VkCommandBufferBeginInfo begin = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+      require(vkBeginCommandBuffer(command, &begin) == VK_SUCCESS);
+      require(vkEndCommandBuffer(command) == VK_SUCCESS);
+      const VkFenceCreateInfo fence_info = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+      require(vkCreateFence(device, &fence_info, NULL, &fences[index]) == VK_SUCCESS);
+      require(vkGetFenceStatus(device, fences[index]) == VK_NOT_READY);
+      const VkSubmitInfo submit = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                                   .commandBufferCount = 1, .pCommandBuffers = &command};
+      const VkResult expected = scenario == CPU_SUBMIT_REFUSED ? VK_ERROR_DEVICE_LOST : VK_SUCCESS;
+      require(vkQueueSubmit(queue, 1, &submit, fences[index]) == expected);
+   }
    const struct cpu_exact_trace *trace = phx34_cpu_exact_trace();
    if (scenario == CPU_SUBMIT_REFUSED) {
-      require(submitted == VK_ERROR_DEVICE_LOST && !trace->submits);
-   } else {
-      require(submitted == VK_SUCCESS && trace->submits == 1 && !trace->positive_waits && !trace->acks);
-      require(vkGetFenceStatus(device, fence) == VK_NOT_READY);
-      require(vkWaitForFences(device, 1, &fence, VK_TRUE, 0) == VK_TIMEOUT);
+      require(!trace->submits);
+   } else if (scenario == CPU_EXACT_SUBMIT) {
+      require(trace->submits == 1 && !trace->positive_waits && !trace->acks);
+      require(vkGetFenceStatus(device, fences[0]) == VK_NOT_READY);
+      require(vkWaitForFences(device, 1, fences, VK_TRUE, 0) == VK_TIMEOUT);
       require(trace->zero_polls >= 2 && !trace->positive_waits && !trace->acks);
-      require(vkWaitForFences(device, 1, &fence, VK_TRUE, 200000000ull) == VK_SUCCESS);
+      require(vkWaitForFences(device, 1, fences, VK_TRUE, 200000000ull) == VK_SUCCESS);
       require(trace->positive_waits == 1 && trace->prefixes == trace->zero_polls + 1 && trace->acks == 1);
       const unsigned calls = phx34_cpu_calls();
-      require(vkGetFenceStatus(device, fence) == VK_SUCCESS && phx34_cpu_calls() == calls);
+      require(vkGetFenceStatus(device, fences[0]) == VK_SUCCESS && phx34_cpu_calls() == calls);
+   } else {
+      require(trace->submits == 2 && !trace->acks && !trace->completed_mask);
+      require(vkWaitForFences(device, count, fences, VK_FALSE, 0) == VK_TIMEOUT);
+      phx34_cpu_schedule_completion(CPU_GFX);
+      require(vkWaitForFences(device, count, fences, VK_FALSE, 0) == VK_SUCCESS);
+      require(trace->completed_mask == (1u << CPU_GFX) && trace->acks == 1 &&
+              trace->ack_order[0] == CPU_GFX && trace->gap_prefixes && !trace->closed_prefixes);
+      const unsigned calls = phx34_cpu_calls();
+      require(vkGetFenceStatus(device, fences[1]) == VK_SUCCESS && phx34_cpu_calls() == calls);
+      require(vkGetFenceStatus(device, fences[0]) == VK_NOT_READY);
+      require(vkWaitForFences(device, count, fences, VK_TRUE, 0) == VK_TIMEOUT);
+      require(vkWaitForFences(device, count, fences, VK_TRUE, 25000000ull) == VK_TIMEOUT);
+      require(trace->positive_pending && trace->acks == 1 && !trace->closed_prefixes);
+      phx34_cpu_schedule_completion(CPU_COMPUTE);
+      require(vkWaitForFences(device, count, fences, VK_TRUE, 200000000ull) == VK_SUCCESS);
+      require(trace->positive_waits == trace->positive_pending + 1 &&
+              trace->prefixes == trace->zero_polls + trace->positive_waits &&
+              trace->closed_prefixes == 1 && trace->acks == 2 && trace->ack_order[1] == CPU_COMPUTE);
+      require(vkWaitForFences(device, count, fences, VK_TRUE, 0) == VK_SUCCESS);
    }
-   vkDestroyFence(device, fence, NULL);
-   vkDestroyCommandPool(device, pool, NULL);
+   for (uint32_t index = 0; index < count; ++index) {
+      vkDestroyFence(device, fences[index], NULL);
+      vkDestroyCommandPool(device, pools[index], NULL);
+   }
 }
 #endif
 
 int main(int argc, char **argv)
 {
 #ifdef PHX34_CPU_R3
-   require(argc == 3 && strlen(argv[2]) == 1 && argv[2][0] >= '0' && argv[2][0] <= '5');
+   require(argc == 3 && strlen(argv[2]) == 1 && argv[2][0] >= '0' && argv[2][0] <= '6');
    const unsigned scenario = argv[2][0] - '0';
    phx34_cpu_select(scenario);
 #else
@@ -148,11 +178,24 @@ int main(int argc, char **argv)
    VkDeviceQueueCreateInfo qi = {.sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, .queueFamilyIndex=compute,
                                 .queueCount=1, .pQueuePriorities=&priority};
    VkDeviceCreateInfo di = {.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, .queueCreateInfoCount=1, .pQueueCreateInfos=&qi};
+#ifdef PHX34_CPU_R3
+   VkDeviceQueueCreateInfo tested_families[CPU_QUEUE_COUNT] = {qi, qi};
+   if (scenario == CPU_EXACT_DUAL) {
+      uint32_t graphics = 0;
+      while (graphics < family_count && (!families[graphics].queueCount ||
+                                         !(families[graphics].queueFlags & VK_QUEUE_GRAPHICS_BIT)))
+         ++graphics;
+      require(graphics < family_count && graphics != compute);
+      tested_families[1].queueFamilyIndex = graphics;
+      di.queueCreateInfoCount = CPU_QUEUE_COUNT;
+      di.pQueueCreateInfos = tested_families;
+   }
+#endif
    VkDevice device = VK_NULL_HANDLE; require(vkCreateDevice(physical, &di, NULL, &device) == VK_SUCCESS);
    require(phx34_cpu_opens() == (enabled ? 1u : 3u) && phx34_cpu_closes() == (enabled ? 0u : 2u));
 #ifdef PHX34_CPU_R3
-   if (scenario == CPU_SUBMIT_REFUSED || scenario == CPU_EXACT_SUBMIT)
-      test_submit(device, compute, vkGetDeviceProcAddr, scenario);
+   if (scenario >= CPU_SUBMIT_REFUSED)
+      test_submit(device, tested_families, vkGetDeviceProcAddr, scenario);
 #endif
    PFN_vkDestroyDevice destroy = (PFN_vkDestroyDevice)vkGetDeviceProcAddr(device, "vkDestroyDevice"); require(destroy != NULL);
    destroy(device, NULL);

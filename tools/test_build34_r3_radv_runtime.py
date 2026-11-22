@@ -113,14 +113,19 @@ def test(runtime, output, exact_cs=False):
 
     results = {}
     scenarios = [(0, 'success'), (1, 'open_refused'), (2, 'missing_capability'), (3, 'short_session_reply')]
-    scenarios.append((5, 'exact_submit') if exact_cs else (4, 'submit_refused'))
+    scenarios += [(5, 'exact_submit'), (6, 'exact_dual_queue')] if exact_cs else [(4, 'submit_refused')]
     for index, name in scenarios:
         result = results[name] = json.loads(run([executable, copy, str(index)], name))
+        expected_submits = {5: 1, 6: 2}.get(index, 0)
         if (result['scenario'] != index or result['GPU_executed'] or result['native_submits'] or
-                result['physical_devices'] != (index in (0, 4, 5)) or result['open_attempts'] != 1 or
-                any(result[key] != (index == 5) for key in ('modeled_exact_submits', 'positive_waits', 'exact_acks')) or
-                (index == 5 and (result['zero_polls'] < 2 or result['prefix_snapshots'] != result['zero_polls'] + 1)) or
-                (index != 5 and (result['zero_polls'] or result['prefix_snapshots']))):
+                result['physical_devices'] != (index in (0, 4, 5, 6)) or result['open_attempts'] != 1 or
+                any(result[key] != expected_submits for key in ('modeled_exact_submits', 'exact_acks')) or
+                result['positive_waits'] != result['positive_pending'] + bool(expected_submits) or
+                bool(result['positive_pending']) != (index == 6) or
+                result['prefix_snapshots'] != result['zero_polls'] + result['positive_waits'] or
+                (expected_submits and result['zero_polls'] < 2) or
+                (not expected_submits and (result['zero_polls'] or result['prefix_snapshots'])) or
+                bool(result['gap_prefixes']) != (index == 6) or result['closed_prefixes'] != (index == 6)):
             raise ValueError('Incomplete or unexpected Vulkan lifecycle evidence')
     if (digest(library) != recorded['library_sha256'] or inventory(mesa) != manifest or
             production_snapshot() != protected or any(digest(path) != sha for path, sha in inputs.items())):
