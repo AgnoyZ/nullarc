@@ -7,6 +7,20 @@
 #include <string.h>
 #include "navi48_native_abi.h"
 
+#ifdef PHX34_CPU_R3
+#include "build34_exact_open_wire.h"
+#include "build34_exact_progress_wire.h"
+enum { CPU_OK, CPU_OPEN_REFUSED, CPU_SESSION_CAPS, CPU_SESSION_SHORT };
+static unsigned scenario, attempts, sessions, hellos, releases, matches;
+static unsigned match_token;
+const mach_port_t kIOMainPortDefault = MACH_PORT_NULL;
+#define IOKIT_API(mock, symbol) symbol
+#define IOKIT_LINKAGE
+#else
+#define IOKIT_API(mock, symbol) mock
+#define IOKIT_LINKAGE static
+#endif
+
 struct cpu_bo { void *data; uint64_t size; unsigned maps; };
 static struct cpu_bo bos[N48N_MAX_BOS];
 static unsigned opens, closes, creates, calls, blocked, next_handle = 1;
@@ -30,29 +44,66 @@ unsigned phx34_cpu_calls(void) { return calls; }
 unsigned phx34_cpu_blocked(void) { return blocked; }
 void phx34_cpu_arm(void) { require(!armed && blocked == 1 && !opens && !calls); armed = 1; blocked = 0; }
 
-static io_service_t cpu_match(mach_port_t port, CFDictionaryRef dict)
+#ifdef PHX34_CPU_R3
+void phx34_cpu_select(unsigned value) { require(!armed && value <= CPU_SESSION_SHORT); scenario = value; }
+unsigned phx34_cpu_attempts(void) { return attempts; }
+unsigned phx34_cpu_sessions(void) { return sessions; }
+unsigned phx34_cpu_hellos(void) { return hellos; }
+unsigned phx34_cpu_releases(void) { return releases; }
+
+CFMutableDictionaryRef IOServiceMatching(const char *name)
 {
+   require(armed && name && !strcmp(name, "PhxBringup") && matches == releases);
+   ++matches;
+   return (CFMutableDictionaryRef)&match_token;
+}
+#endif
+
+IOKIT_LINKAGE io_service_t IOKIT_API(cpu_match, IOServiceGetMatchingService)(mach_port_t port, CFDictionaryRef dict)
+{
+#ifdef PHX34_CPU_R3
+   require(armed && port == kIOMainPortDefault && dict == (CFDictionaryRef)&match_token &&
+           matches == attempts + 1 && opens == closes);
+#else
    (void)port;
    require(armed && dict && opens == closes);
    CFTypeRef name = CFDictionaryGetValue(dict, CFSTR("IOProviderClass"));
    require(name && CFEqual(name, CFSTR("PhxBringup")));
    CFRelease(dict);
+#endif
    return 0x3456;
 }
+#ifndef PHX34_CPU_R3
 static kern_return_t cpu_matches(mach_port_t port, CFDictionaryRef dict, io_iterator_t *out)
 {
    (void)port; (void)out;
    if (dict) CFRelease(dict);
    require(0); return kIOReturnNotPermitted;
 }
-static kern_return_t cpu_open(io_service_t service, task_port_t task, uint32_t type, io_connect_t *out)
+#endif
+IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_open, IOServiceOpen)(io_service_t service, task_port_t task,
+                                                             uint32_t type, io_connect_t *out)
 {
    if (!armed) { ++blocked; if (out) *out = 0; return kIOReturnNotPermitted; }
+#ifdef PHX34_CPU_R3
+   require(service == 0x3456 && task == mach_task_self() && type == PHX34_R3_UC_TYPE &&
+           out && *out == MACH_PORT_NULL && opens == closes && ++attempts == matches);
+   if (scenario == CPU_OPEN_REFUSED)
+      return kIOReturnNotReady;
+#else
    require(service == 0x3456 && task == mach_task_self() && type == N48N_UC_TYPE && out && opens == closes);
+#endif
    ++opens; *out = 0x789a; return KERN_SUCCESS;
 }
-static kern_return_t cpu_release(io_object_t object) { require(object == 0x3456); return KERN_SUCCESS; }
-static kern_return_t cpu_close(io_connect_t connection)
+IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_release, IOObjectRelease)(io_object_t object)
+{
+   require(object == 0x3456);
+#ifdef PHX34_CPU_R3
+   require(++releases == attempts);
+#endif
+   return KERN_SUCCESS;
+}
+IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_close, IOServiceClose)(io_connect_t connection)
 {
    require(armed && connection == 0x789a && opens == closes + 1 && !contexts);
    for (unsigned h = 1; h < next_handle; ++h) {
@@ -60,27 +111,51 @@ static kern_return_t cpu_close(io_connect_t connection)
    }
    require(!allocated); ++closes; return KERN_SUCCESS;
 }
-static kern_return_t cpu_map(io_connect_t connection, uint32_t h, task_port_t task,
-                            mach_vm_address_t *address, mach_vm_size_t *size, IOOptionBits options)
+IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_map, IOConnectMapMemory64)(io_connect_t connection, uint32_t h,
+   task_port_t task, mach_vm_address_t *address, mach_vm_size_t *size, IOOptionBits options)
 {
    require(armed && connection == 0x789a && opens == closes + 1 && task == mach_task_self() &&
            h && h < next_handle && bos[h].data && !bos[h].maps && options == kIOMapAnywhere && address && size);
    ++bos[h].maps; *address = (uintptr_t)bos[h].data; *size = bos[h].size; return KERN_SUCCESS;
 }
-static kern_return_t cpu_unmap(io_connect_t connection, uint32_t h, task_port_t task, mach_vm_address_t address)
+IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_unmap, IOConnectUnmapMemory64)(io_connect_t connection, uint32_t h,
+   task_port_t task, mach_vm_address_t address)
 {
    require(armed && connection == 0x789a && opens == closes + 1 && task == mach_task_self() &&
            h && h < next_handle && bos[h].maps == 1 && address == (uintptr_t)bos[h].data);
    --bos[h].maps; return KERN_SUCCESS;
 }
-static kern_return_t cpu_call(mach_port_t connection, uint32_t sel,
+IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t connection, uint32_t sel,
    const uint64_t *input, uint32_t input_count, const void *structure, size_t structure_size,
    uint64_t *output, uint32_t *output_count, void *result, size_t *result_size)
 {
    require(armed && connection == 0x789a && opens == closes + 1 && ++calls < 10000);
    switch (sel) {
+#ifdef PHX34_CPU_R3
+   case PHX34_R3_SEL_SESSION: {
+      require(releases == attempts && hellos == 1 && ++sessions == 1);
+      require(!input && !input_count && !output && !output_count && structure &&
+              structure_size == sizeof(struct phx34_r3_progress_request) && result && result_size &&
+              *result_size == sizeof(struct phx34_r3_progress_reply));
+      const struct phx34_r3_progress_request *request = structure;
+      require(request->version == PHX34_R3_WIRE_VERSION && request->size == sizeof(*request) &&
+              !request->owner && !request->target && !request->timeout_ns);
+      const struct phx34_r3_progress_reply reply = {
+         .version = PHX34_R3_WIRE_VERSION, .size = sizeof(reply), .build = PHX34_R3_PROGRESS_BUILD,
+         .flags = scenario == CPU_SESSION_CAPS ? PHX34_R3_CAP_EXACT_RECEIPTS : PHX34_R3_PROGRESS_FLAGS,
+         .owner = 11,
+      };
+      if (scenario == CPU_SESSION_SHORT)
+         --*result_size;
+      memcpy(result, &reply, *result_size);
+      return KERN_SUCCESS;
+   }
+#endif
    case N48N_SEL_HELLO:
       require(input_count == 2 && input[0] == 1 && input[1] == N48N_HELLO_F_MINOR && *output_count == 4);
+#ifdef PHX34_CPU_R3
+      require(releases == attempts && ++hellos == 1 + sessions && hellos <= 2);
+#endif
       output[0] = 1 | (12u << 16); output[1] = 34; output[2] = 64; output[3] = 8; return KERN_SUCCESS;
    case N48N_SEL_QUERYINFO: {
       require(result_size && *result_size == sizeof(struct n48n_info));
@@ -130,6 +205,7 @@ static kern_return_t cpu_call(mach_port_t connection, uint32_t sel,
       require(0); return kIOReturnNotPermitted;
    }
 }
+#ifndef PHX34_CPU_R3
 #define INTERPOSE(replacement, original) \
    __attribute__((used)) static const struct { const void *replace, *original; } \
    pair_##original __attribute__((section("__DATA,__interpose"))) = \
@@ -142,3 +218,4 @@ INTERPOSE(cpu_close, IOServiceClose);
 INTERPOSE(cpu_map, IOConnectMapMemory64);
 INTERPOSE(cpu_unmap, IOConnectUnmapMemory64);
 INTERPOSE(cpu_call, IOConnectCallMethod);
+#endif

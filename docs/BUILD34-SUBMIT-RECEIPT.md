@@ -419,8 +419,35 @@ python3 -B tools/build34_r3_radv_runtime.py \
 The isolated build retains the original source notices and checks that all
 172 production inputs remain unchanged. Outputs stay in the ignored private
 directory; the recipe never loads, installs, signs for deployment or uploads
-the runtime. Reverting the optional recipe requires no live rollback. Next,
-exercise Vulkan enumeration and logical-device teardown with the full linked
-library under an IOKit substitute that refuses any real opens. Real
-owning-task admission, MIG, IH ownership/drain, fence visibility and GPU
-acceptance remain separate and unproven.
+the runtime. Reverting the optional recipe requires no live rollback.
+
+## Full Vulkan lifecycle on CPU
+
+The [CPU-only runner](../tools/test_build34_r3_radv_runtime.py) verifies the
+full linked image and source hashes, then replaces the system IOKit dependency
+in a private copy with a test dylib. It verifies identical executable text
+and checks that all eight IOKit functions and `kIOMainPortDefault` resolve
+against the substitute. The test copy is ad hoc signed only to load into the
+host process. The original library is unchanged, and neither the runner nor
+the substitute links system IOKit. The substitute refuses unexpected
+selectors, including submit and wait.
+
+Actual Vulkan enumeration, dedicated-compute logical-device creation and
+destruction reused one modeled `N48R` session. `vkDestroyDevice` did not close
+the connection; `vkDestroyInstance` closed it once. Open refusal, missing
+checked-prefix capability and a short session reply each published zero
+physical devices, allocated zero BOs and made no legacy retry. The two
+session failures closed the accepted connection once. ASan/UBSan instrumented
+the host fixture, not the release RADV library. See the
+[sanitized lifecycle record](validation/build34-r3-radv-full-cpu-lifecycle-20261123.json).
+
+```sh
+python3 -B tools/test_build34_r3_radv_runtime.py \
+  --runtime "$R3_RADV_LINK_OUT" --out build/build34-r3-radv-lifecycle-new-private
+```
+
+Only the retargeted test copy ran. No real IOKit method, MIG transaction,
+GPU submission, install or upload occurred. Omit the runner to skip this
+private verification; no live rollback is needed. Real owning-task
+admission, native teardown, IH ownership/drain, fence visibility and GPU
+acceptance remain unproven.
