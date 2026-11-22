@@ -84,7 +84,10 @@ found one ACPI segment window covering the matching host bridge and downstream
 buses. The [current static root check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#match-the-current-static-acpi-root-to-the-observed-device-chain)
 now matches the DSDT root and both device scopes to that host topology, with
 the static ACPI default segment agreeing with MCFG. This does not attest the
-runtime namespace, preboot path or segment. A separate [path-only candidate observation](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#observe-a-candidate-manager-without-invoking-the-location-accessor)
+runtime namespace, preboot path or segment. The [cached boot-property check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#find-the-binary-path-candidate-in-this-boots-device-properties)
+found one complete binary path matching the host chain; a loader can publish
+the same path from configuration without resolving a controller. A separate
+[path-only candidate observation](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#observe-a-candidate-manager-without-invoking-the-location-accessor)
 now finds the expected firmware driver for an OVMF-enumerated emulated PCI
 device without calling the endpoint's location accessor. This removes that
 call from the candidate observation, not the need for independent target

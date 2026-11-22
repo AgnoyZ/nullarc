@@ -73,6 +73,12 @@ struct TopologySample: Equatable {
     let bridgeBus: Int
     let downstream: ClosedRange<Int>
     let acpi: ACPITarget?
+    let pciPath: PCIPathCoordinates
+}
+
+struct PCIPathCoordinates: Equatable {
+    let rootUID: UInt32
+    let hops: [UInt32]
 }
 
 struct ACPITarget: Equatable {
@@ -137,19 +143,133 @@ func sample(checkACPI: Bool = false) -> TopologySample {
 
     let identity = [entryID(driver), entryID(target), entryID(bridge), entryID(root), UInt64(uid)] + ancestors +
         (endpoint.address + parentBridge.address).map(UInt64.init)
+    let pciPath = PCIPathCoordinates(rootUID: uid, hops: [parentBridge.address, endpoint.address].map {
+        UInt32($0[1] << 16 | $0[2])
+    })
     let acpi: ACPITarget?
     if checkACPI {
         guard let rootPath = acpiPath(root), let bridgePath = acpiPath(bridge), let targetPath = acpiPath(target),
               rootPath.count == 2, bridgePath.count == 3, targetPath.count == 4,
               bridgePath.starts(with: rootPath), targetPath.starts(with: bridgePath) else { refuse("acpi_path") }
         acpi = ACPITarget(names: targetPath, rootUID: uid,
-                          bridgeADR: UInt32(parentBridge.address[1] << 16 | parentBridge.address[2]),
-                          endpointADR: UInt32(endpoint.address[1] << 16 | endpoint.address[2]))
+                          bridgeADR: pciPath.hops[0], endpointADR: pciPath.hops[1])
     } else {
         acpi = nil
     }
     return TopologySample(identity: identity, bridgeBus: parentBridge.address[0],
-                          downstream: parentBridge.downstream[0]...parentBridge.downstream[1], acpi: acpi)
+                          downstream: parentBridge.downstream[0]...parentBridge.downstream[1], acpi: acpi, pciPath: pciPath)
+}
+
+struct EFIPropertyNode {
+    let coordinates: PCIPathCoordinates
+    let path: Range<Int>
+}
+
+func efiPropertyNodes(_ data: Data) -> [EFIPropertyNode]? {
+    guard (12...1_048_576).contains(data.count) else { return nil }
+    let bytes = [UInt8](data)
+    func word(_ offset: Int) -> UInt32 {
+        (0..<4).reduce(0) { $0 | (UInt32(bytes[offset + $1]) << ($1 * 8)) }
+    }
+    let nodeCount = Int(word(8))
+    guard Int(word(0)) == bytes.count, word(4) == 1, (1...256).contains(nodeCount) else { return nil }
+    var nodes: [EFIPropertyNode] = []
+    var offset = 12
+    for _ in 0..<nodeCount {
+        guard bytes.count - offset >= 8 else { return nil }
+        let nodeSize = Int(word(offset))
+        let propertyCount = Int(word(offset + 4))
+        guard nodeSize >= 30, nodeSize <= bytes.count - offset, (1...256).contains(propertyCount) else { return nil }
+        let end = offset + nodeSize
+        let pathStart = offset + 8
+        guard word(pathStart) == 0x000c0102, [0x0a0341d0, 0x0a0841d0].contains(word(pathStart + 4)) else {
+            return nil
+        }
+        let uid = word(pathStart + 8)
+        var cursor = pathStart + 12
+        var hops: [UInt32] = []
+        while end - cursor >= 6 && word(cursor) == 0x00060101 {
+            let function = bytes[cursor + 4]
+            let device = bytes[cursor + 5]
+            guard function <= 7, device <= 31, cursor + 10 - pathStart <= 256 else { return nil }
+            hops.append(UInt32(device) << 16 | UInt32(function))
+            cursor += 6
+        }
+        guard !hops.isEmpty, end - cursor >= 4, word(cursor) == 0x0004ff7f else { return nil }
+        cursor += 4
+        let path = pathStart..<cursor
+        for _ in 0..<propertyCount {
+            guard end - cursor >= 4 else { return nil }
+            let nameSize = Int(word(cursor))
+            guard nameSize >= 8, nameSize <= end - cursor, nameSize % 2 == 0 else { return nil }
+            cursor += nameSize
+            guard bytes[cursor - 2] == 0, bytes[cursor - 1] == 0, end - cursor >= 4 else { return nil }
+            let valueSize = Int(word(cursor))
+            guard (4...(end - cursor)).contains(valueSize) else { return nil }
+            cursor += valueSize
+        }
+        guard cursor == end else { return nil }
+        nodes.append(EFIPropertyNode(coordinates: PCIPathCoordinates(rootUID: uid, hops: hops), path: path))
+        offset = end
+    }
+    return offset == bytes.count ? nodes : nil
+}
+
+func uniqueEFIPropertyPath(_ nodes: [EFIPropertyNode], for target: PCIPathCoordinates) -> Range<Int>? {
+    let matches = nodes.filter { $0.coordinates == target }
+    return matches.count == 1 ? matches.first?.path : nil
+}
+
+func cachedEFIProperties() -> Data {
+    let entry = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/efi")
+    guard entry != 0 else { refuse("missing_cached_efi_entry") }
+    defer { IOObjectRelease(entry) }
+    guard let data = property(entry, "device-properties") as? Data else { refuse("missing_cached_efi_properties") }
+    return data
+}
+
+func testEFIPropertyPaths() {
+    let path: [UInt8] = [2, 1, 12, 0, 0xd0, 0x41, 8, 10, 2, 0, 0, 0,
+                         1, 1, 6, 0, 1, 4, 1, 1, 6, 0, 0, 5, 0x7f, 0xff, 4, 0]
+    let node: [UInt8] = [52, 0, 0, 0, 1, 0, 0, 0] + path + [8, 0, 0, 0, 0x41, 0, 0, 0, 8, 0, 0, 0, 1, 2, 3, 4]
+    let fixture = Data([64, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] + node)
+    let target = PCIPathCoordinates(rootUID: 2, hops: [0x40001, 0x50000])
+    func mutated(_ index: Int, _ value: UInt8) -> Data {
+        var altered = fixture
+        altered[index] = value
+        return altered
+    }
+    func selection(_ data: Data, target: PCIPathCoordinates) -> Range<Int>? {
+        efiPropertyNodes(data).flatMap { uniqueEFIPropertyPath($0, for: target) }
+    }
+    let twice = Data([116, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0] + node + node)
+    var alternateRoot = twice
+    alternateRoot[78] = 3
+    var shortNode = Data(fixture.prefix(24))
+    shortNode[0] = 24
+    var shortProperty = Data(fixture.prefix(52))
+    shortProperty[0] = 52
+    shortProperty[12] = 40
+    let cases = [
+        selection(fixture, target: target) == 20..<48,
+        selection(mutated(26, 3), target: target) == 20..<48,
+        selection(fixture, target: PCIPathCoordinates(rootUID: 3, hops: target.hops)) == nil,
+        selection(fixture, target: PCIPathCoordinates(rootUID: 2, hops: [0x40001])) == nil,
+        selection(fixture, target: PCIPathCoordinates(rootUID: 2, hops: [0x40000, 0x50001])) == nil,
+        efiPropertyNodes(twice)?.count == 2 && selection(twice, target: target) == nil,
+        efiPropertyNodes(alternateRoot)?.count == 2 && selection(alternateRoot, target: target) == nil,
+        efiPropertyNodes(mutated(4, 2)) == nil,
+        efiPropertyNodes(mutated(12, 255)) == nil,
+        efiPropertyNodes(mutated(36, 8)) == nil,
+        efiPropertyNodes(mutated(45, 1)) == nil,
+        efiPropertyNodes(mutated(54, 9)) == nil,
+        efiPropertyNodes(mutated(56, 9)) == nil,
+        efiPropertyNodes(shortNode) == nil,
+        efiPropertyNodes(shortProperty) == nil,
+        efiPropertyNodes(Data(fixture.dropLast())) == nil
+    ]
+    guard cases.allSatisfy({ $0 }) else { refuse("efi_property_fixture_failed") }
+    print("efi_property_path_fixture_cases_passed=\(cases.count)")
 }
 
 struct MCFGWindow {
@@ -402,6 +522,22 @@ func testMCFG() {
 }
 
 let arguments = Array(CommandLine.arguments.dropFirst())
+if arguments == ["--test-efi-property-path"] {
+    testEFIPropertyPaths()
+    exit(0)
+}
+if arguments == ["--check-efi-property-path"] {
+    let first = sample()
+    let firstProperties = cachedEFIProperties()
+    let second = sample()
+    let secondProperties = cachedEFIProperties()
+    guard first == second, firstProperties == secondProperties else { refuse("unstable_efi_property_inputs") }
+    guard let nodes = efiPropertyNodes(firstProperties) else { refuse("unsupported_efi_property_buffer") }
+    guard uniqueEFIPropertyPath(nodes, for: first.pciPath) != nil else { refuse("missing_or_duplicate_efi_property_path") }
+    print("matching_input_pairs=2; validated_pci_property_paths=\(nodes.count); unique_target_path=true")
+    print("candidate_complete_binary_path_present=true; installed_firmware_path_or_segment_attested=false")
+    exit(0)
+}
 if arguments == ["--test-mcfg"] {
     testMCFG()
     exit(0)

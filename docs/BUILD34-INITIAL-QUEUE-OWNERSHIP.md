@@ -587,6 +587,38 @@ root protocol identity still need independent verification and a fresh grant
 for physical observation. See the
 [sanitized result](validation/build34-r3-preboot-acpi-root-20261123.json).
 
+### Find the binary path candidate in this boot's device properties
+
+On macOS 26.7.2 (`25G332`), two invocations of `--check-efi-property-path`
+each obtained two byte-identical snapshots of the cached `IODeviceTree:/efi`
+`device-properties` value. The buffer contained three simple PCI paths.
+Exactly one full path matched the cached root UID and bridge/endpoint
+device-function pairs already corroborated by DSDT. This supplies a binary
+candidate from this boot, including the root node of that record, instead
+of constructing its root HID from the ACPI HID.
+
+The parser checks the bounded version-1 envelope, node/property counts and
+lengths, and a single PCI root followed by ordered PCI nodes and an end
+marker. Unsupported paths, malformed data and multiple matches, including
+two root HID encodings with the same coordinates, refuse. It checks the
+name/value field boundaries without decoding or outputting property contents.
+The layout follows OpenCore 1.0.8's pinned
+[`DppDbGetPropertyBuffer`](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcDevicePropertyLib/OcDevicePropertyLib.c#L534-L578).
+`--test-efi-property-path` covers 16 synthetic cases. The new mode neither
+queries NVRAM nor reads, mounts or modifies any EFI filesystem. It emits
+no buffer, path bytes, properties, coordinates or path digest.
+
+The cached property is not the firmware handle database. The pinned
+[OpenCore configuration path](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcMainLib/OpenCoreDevProps.c#L105-L146)
+can convert `DeviceProperties.Add` text into a binary property key without
+resolving a controller. The observed record's producer was not determined.
+The binary path and the OS ACPI/MCFG candidate can constrain a narrowly
+scoped preboot check, but cannot admit the path or segment by themselves.
+Independently verify the exact published root and endpoint in the authorized
+preboot observation; never fall back to a prefix or treat matching as a
+driver or IH ownership proof. Rollback is to omit the optional mode.
+See the [sanitized result](validation/build34-r3-preboot-efi-property-path-20261123.json).
+
 ### Observe a candidate manager without invoking the location accessor
 
 `Phx34ObservePciManagerAtPath` is separate from the location-qualified API.
