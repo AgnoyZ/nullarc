@@ -62,6 +62,50 @@ continues to use its existing waits. No event backend is bound.
    These are reference semantics. No Linux or Apple implementation code is
    copied. Visibility of IH entries does not imply visibility through BAR0.
 
+## Offline route and first-read evidence
+
+Both build34 bootstrap queues request `map_legacy_kq` with pipe and queue 0.
+The bootstrap selects ME 0 for GFX and ME 1 for Compute in its HQD checks.
+The six-word adoption interface carries a software queue index and buffer
+locations. Trial admission still needs an independent match to the live HQDs
+and their storage. See [`mesboot.c`](../tools/phxctl/mesboot.c#L342) and
+[`adoptQueue`](../src/phxbringup/PhxBringup.cpp#L739).
+
+Linux v6.12 registers one CP EOP source for both queues. Its client ID is
+`0x14` (`GRBM_CP`) and its source ID is `0xB5` (`CP_EOP_INTERRUPT`). For an
+untagged legacy entry, ring ID bits 0–1 carry pipe, 2–3 carry ME and 4–6 carry
+queue. The expected low seven bits are `0x00` for GFX `(0, 0, 0)` and `0x04`
+for Compute `(1, 0, 0)`. MES-tagged entries use a different identity path.
+These are source-derived expectations for the planned AMD trial. See the
+pinned [client ID](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/soc15_ih_clientid.h#L100),
+[source ID](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/ivsrcid/gfx/irqsrcs_gfx_11_0_0.h#L56),
+[registration](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L1584)
+and [legacy decoder](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L6232).
+
+The offline checker requires GFX control/EOP followed by Compute control/EOP,
+each with a fresh route epoch, active queue generation and distinct seed and
+target fence values. Each pair must have the same independently derived
+recipe hash, normalizing the intentional interrupt choice, per-case storage
+and fresh sentinel values. The record must contain the pre-submit sample,
+the first independent fence/payload read after the matching EOP (a scheduled
+sample for the no-interrupt control), and a closing sample before the sealed
+observation deadline. Both reads must show the exact target and correct
+payload with the other queue's fence unchanged. A stale first read fails
+even if a later read matches. Each sampled interval and the vector must
+carry the same service, route and both queue identities. The checker rejects
+unexpected traffic, loss, overflow, faults, and overlapping or overdue case
+cleanup. See [`build34_r3_eop_evidence.py`](../tools/build34_r3_eop_evidence.py).
+
+The collector must independently attest boot and loaded image, ownership and
+drain, actual BAR0 reads and effective access ordering, fresh payload/guards,
+complete IH delivery through cleanup, recipe identity, and the captured
+monotonic times. Its first-read record must preserve a failed first attempt.
+Record terminal errors privately and use the existing first-failure stop
+rule. The pure checker returns record consistency with `hardware_attested`
+set to false. `make test` runs 11 synthetic checks. Rollback is to omit the
+checker and its test entry. See the
+[offline record](validation/build34-r3-eop-evidence-offline-20261122.json).
+
 ## IH ownership review
 
 On November 21, 2026, two passive registry snapshots of the running PCI

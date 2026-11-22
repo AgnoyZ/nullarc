@@ -234,6 +234,11 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    The actual caller tests use CPU doubles; no native release is admitted.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
+   The [offline EOP route checker](BUILD34-R3-IRQ-ROUTE-TRIAL.md#offline-route-and-first-read-evidence)
+   records the expected legacy GFX and Compute identities, checks paired
+   controls and requires fresh, same-generation fence and payload on the first
+   independent post-event read. Exclusive IH ownership and old-writer drain
+   still gate live collection and event binding.
 6. Freeze and compile the complete native integration. Prepare a concrete
    source/ABI-matched candidate with fresh rollback/recovery controls before
    requesting any still-required installation/GPU/power authorization.

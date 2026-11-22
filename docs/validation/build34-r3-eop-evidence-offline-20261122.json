@@ -1,0 +1,21 @@
+{
+  "status": "passed-offline-eop-record-checker",
+  "kernel_build": 34,
+  "source_checkpoint": "23b525deaeef1ee12795e25e11396db85efe5145",
+  "linux_reference": "adc218676eef25575469234709c2d87185ca223a",
+  "synthetic_test_methods": 11,
+  "planned_route_cases": ["gfx-control", "gfx-eop", "compute-control", "compute-eop"],
+  "production_inputs_unchanged": 172,
+  "default_make_j1_test_passed": true,
+  "unavailable_firmware_fixture_cases_skipped": true,
+  "observed_hardware_eop": false,
+  "IH_ownership_or_old_writer_drain_proved": false,
+  "BAR0_fence_visibility_proved": false,
+  "native_event_backend_bound": false,
+  "kernel_candidate_built": false,
+  "installed": false,
+  "loaded": false,
+  "GPU_executed": false,
+  "R3_complete": false,
+  "R4_R6_started": false
+}
