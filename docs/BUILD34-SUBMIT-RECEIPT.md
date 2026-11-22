@@ -393,6 +393,34 @@ make -j1 test-build34-r3-radv-entry MESA_SOURCE="$MESA_SOURCE" \
 
 Use the pinned Mesa dependency closure plus the baseline wrapper, physical
 device and winsys sources identified by the report. Omit this stage to keep
-the previous explicit open without changing normal entrypoints. No full R3
-runtime was linked, installed or loaded. Real owning-task admission, MIG,
-IH ownership and drain, fence visibility and hardware acceptance remain open.
+the previous explicit open without changing normal entrypoints. This CPU
+fixture does not link or load the full R3 runtime.
+
+## Private full RADV link
+
+On November 23, 2026, the [compile-only recipe](../tools/build34_r3_radv_runtime.py)
+verified the complete 12,969-entry Mesa baseline and overlaid only the hashed
+R3 pairing outputs, frozen protocol sources and two Meson entries. It compiled
+and linked the complete x86_64 RADV dylib in 775 steps. The final link checks
+verify eight reviewed translation units, including the winsys query/create
+unit and exact wire adapter, their required headers, the exact open/profile/
+sync-drain and Vulkan entry symbols, and no strong dynamically looked-up
+imports. The IOKit import set remains the same eight functions covered by
+the earlier CPU fixture. The uninstalled result is 20,702,984 bytes. See the
+[sanitized link record](validation/build34-r3-radv-full-link-offline-20261123.json).
+
+```sh
+python3 -B tools/build34_r3_radv_runtime.py \
+  --mesa-source "$FULL_MESA_BASELINE" --entry-evidence "$R3_RADV_ENTRY_OUT" \
+  --toolchain-bin "$MESA_TOOLS" --toolchain-bin "$GLSLANG_BIN" \
+  --toolchain-bin "$PKG_CONFIG_BIN" --out build/build34-r3-radv-link-new-private
+```
+
+The isolated build retains the original source notices and checks that all
+172 production inputs remain unchanged. Outputs stay in the ignored private
+directory; the recipe never loads, installs, signs for deployment or uploads
+the runtime. Reverting the optional recipe requires no live rollback. Next,
+exercise Vulkan enumeration and logical-device teardown with the full linked
+library under an IOKit substitute that refuses any real opens. Real
+owning-task admission, MIG, IH ownership/drain, fence visibility and GPU
+acceptance remain separate and unproven.
