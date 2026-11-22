@@ -41,12 +41,15 @@ continues to use its existing waits. No event backend is bound.
    See also [initial queue ownership](BUILD34-INITIAL-QUEUE-OWNERSHIP.md).
 3. **Correlate one queue at a time.** After both gates pass and an exact
    isolated build is authorized, use private allocations outside daily
-   queue, fence and IH storage with a fresh queue epoch and writeback value
-   for each case. With routing armed, first run one no-interrupt control and
-   one otherwise identical EOP-requesting submission on GFX. Verify teardown
-   before doing the same on Compute. These are the proposed four submissions,
-   with one outstanding at a time and no retry on a failed case. Seal finite
-   observation and cleanup deadlines in the trial before enabling it,
+   queue, fence and IH storage. Admit one service, one route and one
+   generation per queue for all four windows. Use a fresh fence seed and
+   target for each case, without resetting the ring or the other queue's
+   fence. With routing armed, run a no-interrupt control and one otherwise
+   identical EOP-requesting submission on GFX, then the same pair on
+   Compute. Check each window's completion before starting the next. Close
+   and tear down the one-shot route once, after the last window or on the
+   first failure. These are four submissions with one outstanding at a
+   time and no retry. Seal finite observation and teardown deadlines before enabling it,
    independently of the GPU progress path. Keep desktop takeover off in the
    route trial and use an independent recovery path. Match the actual IH
    client/source and engine/pipe/queue against the admitted legacy queue, a
@@ -82,9 +85,11 @@ pinned [client ID](https://github.com/torvalds/linux/blob/adc218676eef2557546923
 [registration](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L1584)
 and [legacy decoder](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L6232).
 
-The offline checker requires GFX control/EOP followed by Compute control/EOP,
-each with a fresh route epoch, active queue generation and distinct seed and
-target fence values. Each pair must have the same independently derived
+The original multi-route diagnostic checker requires GFX control/EOP
+followed by Compute control/EOP, each with a fresh route epoch, active queue
+generation and distinct seed and target fence values. It remains for
+historical records, not admission of the current one-shot workloop. Each
+pair must have the same independently derived
 recipe hash, normalizing the intentional interrupt choice, per-case storage
 and fresh sentinel values. The record must contain the pre-submit sample,
 the first independent fence/payload read after the matching EOP (a scheduled
@@ -166,6 +171,36 @@ normalized checker remains useful for fixtures and cannot replace raw
 capture. The follow-up [offline record](validation/build34-r3-eop-release-mem-offline-20261123.json)
 covers 23 synthetic tests. Rollback is to omit the packet validation
 follow-up; no live configuration was changed.
+
+### One-shot route and actual ISR trace
+
+The staged workloop does not rearm on the same service. The offline
+`check_one_shot_irq_delivery` path instead binds four windows to one
+independently supplied service/route/both-generations identity, IRQ source
+token, initial IH cursor, and BAR0 aperture and fence slots. The two controls
+must contain no ISR dispatches; each EOP arm must contain exactly one. The
+collector must record the ISR entry, not synthesize it from a copied vector,
+poll, or workloop wake. The dispatches must be consecutively numbered from
+one on the registered source and ordered after the submit and no later than
+the copy starts. The complete copy still precedes the first independent fence
+read. The checked terminal counter must match these dispatches, on the same
+source and route, after the last window but before the presealed deadline.
+Supply it from separately verified CPU teardown, not by counting records.
+
+Each next window starts at the previous IH bookend cursor, including across
+ring wrap. Its packet and reads must match the two admitted slots, even if
+substituted packet bytes and samples agree with each other. The peer fence
+must be unchanged across windows except when that queue itself completes a
+case. `close_ns` and `cleanup_end_ns` describe sealing an observation window,
+not detaching the physical route. The collector must preserve the complete
+trace across windows and teardown, including rejected or failed reads.
+
+Passing the offline checker is not hardware attestation. Equal cursors,
+matching ISR counts and timestamps cannot prove no unobserved DMA, exclusive
+IH ownership, the true loaded images or cache visibility. Keep source tokens,
+cursors, packet words and raw trace data private. No collection code, IRQ
+provider or device access was added. See the
+[sanitized test record](validation/build34-r3-one-shot-irq-evidence-offline-20261123.json).
 
 ## IH ownership review
 

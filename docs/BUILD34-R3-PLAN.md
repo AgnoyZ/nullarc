@@ -260,6 +260,11 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    context pinned on uncertainty and handles late kicks. This is not bound
    to a provider. Prove native scheduling and teardown, IH ownership, old
    device-writer drain, and order of event delivery versus the BAR0 read.
+   The [one-shot evidence checker](BUILD34-R3-IRQ-ROUTE-TRIAL.md#one-shot-route-and-actual-isr-trace)
+   matches the current non-rearming route: it rejects copied vectors without
+   same-source ISR records and checks slot/peer and IH cursor continuity across
+   the four windows. Real dispatch, first reads and terminal counts must still
+   come from an independently admitted hardware capture.
 6. Freeze and compile the complete native integration. Prepare a concrete
    source/ABI-matched candidate with fresh rollback/recovery controls before
    requesting any still-required installation/GPU/power authorization.

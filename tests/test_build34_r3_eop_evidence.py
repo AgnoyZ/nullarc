@@ -4,7 +4,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from build34_r3_eop_evidence import check, check_ih_capture
+from build34_r3_eop_evidence import check, check_ih_capture, check_one_shot_irq_delivery
 
 
 _BAR0_MC_BASE = 0x1200000000
@@ -75,6 +75,149 @@ def capture_fixture(ring_size=128, cursor=96):
 def verify_capture(records, ring_size=128, *, bar0_base=_BAR0_MC_BASE, bar0_size=_BAR0_SIZE):
     return check_ih_capture(records, ring_size_bytes=ring_size, bar0_mc_base=bar0_base,
                             bar0_size_bytes=bar0_size, observe_budget_ns=100, cleanup_budget_ns=30)
+
+
+def rewrite_fence_slots(case, offset, peer_offset):
+    for name in ("before", "first_read", "final_read"):
+        case[name].update(fence_offset=offset, other_fence_offset=peer_offset)
+    words = list(unpack("<8I", case["release_mem"]))
+    address = _BAR0_MC_BASE + offset
+    words[3:5] = [address & 0xFFFFFFFF, address >> 32]
+    case["release_mem"] = pack("<8I", *words)
+
+
+def one_shot_fixture():
+    cursor, ring_size = 96, 128
+    records = capture_fixture(ring_size, cursor)
+    identity = dict(service_epoch=3, route_epoch=5, gfx_generation=7, compute_generation=9)
+    scope = dict(identity=identity.copy(), initial_read_cursor=cursor, ring_size_bytes=ring_size,
+                 bar0_mc_base=_BAR0_MC_BASE, bar0_size_bytes=_BAR0_SIZE, irq_source_token=28,
+                 gfx_fence_offset=16, compute_fence_offset=32, observe_budget_ns=100, cleanup_budget_ns=30,
+                 terminal_deadline_ns=1760)
+    for index, case in enumerate(records):
+        queue = case["queue"]
+        is_gfx = queue == "gfx"
+        rewrite_fence_slots(case, 16 if is_gfx else 32, 32 if is_gfx else 16)
+        for name in ("before", "first_read", "final_read"):
+            case[name]["identity"] = identity.copy()
+            case[name]["other_fence"] = 7 if is_gfx else records[1]["target"]
+        case["isr_dispatches"] = [dict(identity=identity.copy(), source_token=scope["irq_source_token"],
+                                       ordinal=1 + index // 2, seen_ns=case["start_ns"] + 34)] if case["interrupt"] else []
+        for batch in case["ih_capture"]:
+            batch["identity"] = identity.copy()
+            batch["read_cursor"] = cursor
+            cursor = (cursor + 32 * len(batch["entries"])) % ring_size
+            batch["writeback_before"] = batch["writeback_after"] = cursor
+    return records, scope
+
+
+def verify_one_shot(records, scope, **terminal_fields):
+    terminal = dict(identity=scope["identity"].copy(), source_token=scope["irq_source_token"],
+                    seen_ns=1740, dispatch_count=2)
+    terminal.update(terminal_fields)
+    return check_one_shot_irq_delivery(records, scope=scope, terminal=terminal)
+
+
+class OneShotIrqDelivery(unittest.TestCase):
+    def test_single_route_wrap_correlates_dispatch_then_copy_then_fence(self):
+        records, scope = one_shot_fixture()
+        result = verify_one_shot(records, scope)
+        self.assertIs(result["single_route_checked"], True)
+        self.assertIs(result["isr_dispatch_checked"], True)
+        self.assertIs(result["release_mem_checked"], True)
+        self.assertIs(result["hardware_attested"], False)
+        self.assertIs(result["old_writer_drain_proved"], False)
+        self.assertEqual(records[1]["ih_capture"][-1]["read_cursor"], 0)
+        self.assertEqual(records[2]["ih_capture"][0]["read_cursor"], 0)
+        self.assertEqual(records[3]["ih_capture"][-1]["read_cursor"], 32)
+
+    def test_ih_copy_without_isr_or_irq_in_control_cannot_pass(self):
+        for case_index, count in ((0, 1), (1, 0), (3, 2)):
+            with self.subTest(case=case_index, dispatches=count), self.assertRaisesRegex(ValueError, "ISR dispatch"):
+                records, scope = one_shot_fixture()
+                records[case_index]["isr_dispatches"] = records[1]["isr_dispatches"] * count
+                verify_one_shot(records, scope)
+        _, scope = one_shot_fixture()
+        with self.assertRaisesRegex(ValueError, "single-route case"):
+            verify_one_shot(capture_fixture(), scope)
+
+    def test_checks_provider_route_identity_and_continuous_dispatch_ordinal(self):
+        for fields, message in ((dict(source_token=29), "admitted route or source"),
+                                (dict(ordinal=1), "skipped or replayed"),
+                                (dict(ordinal=3), "skipped or replayed"),
+                                (dict(ordinal=True), "invalid ISR dispatch ordinal")):
+            with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, message):
+                records, scope = one_shot_fixture()
+                records[3]["isr_dispatches"][0].update(fields)
+                verify_one_shot(records, scope)
+        for field in ("service_epoch", "route_epoch", "gfx_generation", "compute_generation"):
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "admitted route or source"):
+                records, scope = one_shot_fixture()
+                records[1]["isr_dispatches"][0]["identity"][field] += 1
+                verify_one_shot(records, scope)
+
+    def test_requires_dispatch_after_submit_and_before_the_vector_copy(self):
+        for relative, message in ((30, "invalid ISR dispatch time"), (38, "copy began before"),
+                                  (50, "copy began before")):
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, message):
+                records, scope = one_shot_fixture()
+                case = records[3]
+                case["isr_dispatches"][0]["seen_ns"] = case["start_ns"] + relative
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        records[3]["first_read"]["begin_ns"] = records[3]["ih_capture"][1]["end_ns"]
+        with self.assertRaisesRegex(ValueError, "submit-to-read window"):
+            verify_one_shot(records, scope)
+
+    def test_refuses_route_rearm_and_generation_change_between_cases(self):
+        for field in ("route_epoch", "gfx_generation", "compute_generation"):
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "admitted route or queue generation"):
+                records, scope = one_shot_fixture()
+                case = records[2]
+                for sample in (case["before"], case["first_read"], case["final_read"], *case["ih_capture"]):
+                    sample["identity"][field] += 1
+                verify_one_shot(records, scope)
+
+    def test_refuses_cursor_reset_before_first_window_or_across_wrap(self):
+        records, scope = one_shot_fixture()
+        scope["initial_read_cursor"] = 64
+        with self.assertRaisesRegex(ValueError, "skipped or replayed"):
+            verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        for batch in records[2]["ih_capture"]:
+            batch.update(read_cursor=96, writeback_before=96, writeback_after=96)
+        with self.assertRaisesRegex(ValueError, "skipped or replayed"):
+            verify_one_shot(records, scope)
+
+    def test_refuses_new_self_consistent_packet_to_an_unadmitted_slot(self):
+        for offset, peer_offset in ((40, 32), (16, 40), (32, 16)):
+            with self.subTest(offset=offset, peer_offset=peer_offset), self.assertRaisesRegex(ValueError, "admitted queue pair"):
+                records, scope = one_shot_fixture()
+                rewrite_fence_slots(records[1], offset, peer_offset)
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        scope["compute_fence_offset"] = scope["gfx_fence_offset"]
+        with self.assertRaisesRegex(ValueError, "invalid admitted BAR0 fence pair"):
+            verify_one_shot(records, scope)
+
+    def test_refuses_stable_but_changed_peer_across_windows(self):
+        for index in (1, 2, 3):
+            with self.subTest(case=index), self.assertRaisesRegex(ValueError, "peer fence changed between"):
+                records, scope = one_shot_fixture()
+                for name in ("before", "first_read", "final_read"):
+                    records[index][name]["other_fence"] += 1
+                verify_one_shot(records, scope)
+
+    def test_terminal_counter_detects_unreported_irq_and_requires_bounded_same_route_sample(self):
+        records, scope = one_shot_fixture()
+        for fields, message in ((dict(dispatch_count=3), "disagrees with the four windows"),
+                                (dict(dispatch_count=1), "disagrees with the four windows"),
+                                (dict(source_token=29), "crossed the admitted route or source"),
+                                (dict(identity=dict(scope["identity"], route_epoch=12)), "crossed the admitted route"),
+                                (dict(seen_ns=1719), "invalid terminal sample time"),
+                                (dict(seen_ns=1761), "invalid terminal sample time")):
+            with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, message):
+                verify_one_shot(records, scope, **fields)
 
 
 class RouteEvidence(unittest.TestCase):
