@@ -322,6 +322,48 @@ for a native fence visibility test. No EFI, NVRAM, driver or power changes,
 new GPU submissions, or device operations were performed for this review.
 See the [sanitized record](validation/build34-r3-firmware-handoff-20261121.json).
 
+### PCI quiescence is not an IH handoff
+
+Keep device producer stop, posted writes toward host memory, host writes
+toward the consumer doorbell, and on-chip writes separate. None of the
+following paths supplies a complete boundary:
+
+- **Firmware PCI `Flush()`.** The [EDK II PCI I/O contract](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdePkg/Include/Protocol/PciIo.h#L377-L392)
+  covers posted writes from the PCI host bridge to system memory. The
+  [wrapper](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Bus/Pci/PciBusDxe/PciIo.c#L1207-L1228)
+  delegates to the root bridge. The [generic implementation](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Bus/Pci/PciHostBridgeDxe/PciRootBridgeIo.c#L1718-L1745)
+  returns success without doing work itself; the contract requires a
+  controller-specific action to bring upstream posted writes to the host
+  bridge first. Success neither attests that this action ran nor covers
+  producer stop, on-chip writes or the old consumer's doorbell. This is a
+  reference implementation, not a review of the installed firmware.
+- **PCIe Transactions Pending.** The [Device Status field description](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntddk/ns-ntddk-_pci_express_device_status_register)
+  covers device-initiated non-posted requests; a zero can also follow
+  completion timeout. It does not certify posted-write drain or name the
+  old IH backing. Linux's [pending check and FLR caller](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/pci/pci.c#L4518-L4546)
+  poll just that bit and can proceed with reset even on timeout.
+- **Clear Bus Master Enable.** In the [EDK II attributes path](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Bus/Pci/PciBusDxe/PciIo.c#L1717-L1782),
+  disabling bus mastering is a command-register update and the disable
+  path replaces its status with success. In the [public Apple helper](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIDevice.cpp#L1346-L1369),
+  the return is the previous masked value, not a write status or readback.
+  Three bodies in the `25G332` x86_64 KDK reference have the corresponding
+  mask/update/old-value behavior. This does not attest live Radeon dispatch.
+  Even a separately confirmed clear bit would not prove old posted writes
+  or on-chip writers drained.
+
+[`PhxBringup::start`](../src/phxbringup/PhxBringup.cpp#L331) records a
+pre-enable command sample and then enables bus mastering and memory decoding.
+A clear bit earlier could neither supply a handoff receipt nor prevent that
+reactivation. Do not toggle it or add a generic flush, arbitrary PCI read
+or pending-bit wait to the installed startup path.
+
+Credit a host-bridge flush only for a verified host-memory path, after the
+identified predecessor stops issuing writes, with independently checked
+controller-to-bridge and bridge-to-memory completion. Separately account for
+on-chip writes, the old consumer's doorbell, translations and any rearm
+before takeover. Keep ring and writeback backing pinned on uncertainty.
+See the [sanitized reference review](validation/build34-r3-pci-posted-write-review-20261123.json).
+
 ## Evidence required before reusing storage
 
 1. Identify the current device, service, boot and first writer before *any*
