@@ -208,7 +208,7 @@ name input, buffer and memory-write idle and cleanup-pending states. They
 do not specify read side effects, the required power/mapping state or when
 the fields prove that already issued writes have finished.
 
-Linux's [IH checkpoint wait](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.c#L155-L188)
+Linux's [IH checkpoint wait](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.c#L171-L197)
 is a consumer progress check. It samples the producer cursor, orders the
 read of the checkpoint vector, then waits for a processed timestamp or for
 the consumer to catch the producer. It does not stop the producer or attest
