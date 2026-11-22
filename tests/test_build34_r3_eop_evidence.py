@@ -1,9 +1,14 @@
 from pathlib import Path
+from struct import pack, unpack
 import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from build34_r3_eop_evidence import check, check_ih_capture
+
+
+_BAR0_MC_BASE = 0x1200000000
+_BAR0_SIZE = 4096
 
 
 def fixture():
@@ -37,11 +42,18 @@ def verify(records):
 
 def capture_fixture(ring_size=128, cursor=96):
     records = fixture()
-    for case in records:
+    for index, case in enumerate(records):
         normalized = case.pop("vectors")
         start = case["start_ns"]
         identity = case["before"]["identity"]
         batches = []
+        fence_offset = 16 * index
+        for name in ("before", "first_read", "final_read"):
+            case[name].update(fence_offset=fence_offset, other_fence_offset=fence_offset + 8)
+        address = _BAR0_MC_BASE + fence_offset
+        control = 0x42000000 if case["interrupt"] else 0x40000000
+        case["release_mem"] = pack("<8I", 0xC0064900, 0x06603514, control,
+                                   address & 0xFFFFFFFF, address >> 32, case["target"], 0, 0)
 
         def batch(begin, end, read, write, *entries):
             batches.append(dict(identity=identity.copy(), begin_ns=start + begin, end_ns=start + end,
@@ -60,8 +72,9 @@ def capture_fixture(ring_size=128, cursor=96):
     return records
 
 
-def verify_capture(records, ring_size=128):
-    return check_ih_capture(records, ring_size_bytes=ring_size, observe_budget_ns=100, cleanup_budget_ns=30)
+def verify_capture(records, ring_size=128, *, bar0_base=_BAR0_MC_BASE, bar0_size=_BAR0_SIZE):
+    return check_ih_capture(records, ring_size_bytes=ring_size, bar0_mc_base=bar0_base,
+                            bar0_size_bytes=bar0_size, observe_budget_ns=100, cleanup_budget_ns=30)
 
 
 class RouteEvidence(unittest.TestCase):
@@ -184,7 +197,7 @@ class RawIHCapture(unittest.TestCase):
             with self.subTest(ring_size=ring_size, offset=offset):
                 records = capture_fixture(ring_size, offset)
                 result = verify_capture(records, ring_size)
-                self.assertEqual(result, dict(verify(fixture()), raw_ih_capture_checked=True))
+                self.assertEqual(result, dict(verify(fixture()), raw_ih_capture_checked=True, release_mem_checked=True))
                 self.assertNotIn("vectors", records[1])
                 self.assertEqual(len(records[1]["ih_capture"][1]["entries"][0]), 32)
 
@@ -279,6 +292,60 @@ class RawIHCapture(unittest.TestCase):
         records[1]["first_read"]["payload_ok"] = False
         with self.assertRaisesRegex(ValueError, "no fresh fence and verified payload"):
             verify_capture(records)
+
+    def test_requires_raw_release_bytes_in_little_endian(self):
+        packet = capture_fixture()[1]["release_mem"]
+        for invalid in (packet[:-1], packet + b"\0", bytearray(packet), pack(">8I", *unpack("<8I", packet))):
+            with self.subTest(kind=type(invalid), length=len(invalid)), self.assertRaisesRegex(ValueError, "RELEASE_MEM"):
+                records = capture_fixture()
+                records[1]["release_mem"] = invalid
+                verify_capture(records)
+        records = capture_fixture()
+        del records[1]["release_mem"]
+        with self.assertRaisesRegex(ValueError, "raw route case"):
+            verify_capture(records)
+
+    def test_refuses_changed_header_cache_data_mode_and_interrupt_mode(self):
+        for case_index, word, mask in ((0, 2, 0x02000000), (1, 2, 0x02000000), (1, 2, 0x03000000),
+                                       (3, 2, 0x60000000), (3, 2, 0x00010000), (1, 1, 1 << 25),
+                                       (1, 0, 1 << 16), (3, 7, 1)):
+            with self.subTest(case=case_index, word=word, mask=mask), self.assertRaisesRegex(ValueError, "control"):
+                records = capture_fixture()
+                case = records[case_index]
+                words = list(unpack("<8I", case["release_mem"]))
+                words[word] ^= mask
+                case["release_mem"] = pack("<8I", *words)
+                verify_capture(records)
+
+    def test_refuses_other_address_or_data_even_when_fence_and_vector_match(self):
+        for word, mask, message in ((3, 8, "target"), (4, 1, "target"), (5, 1, "data"), (6, 1, "data")):
+            with self.subTest(word=word), self.assertRaisesRegex(ValueError, f"RELEASE_MEM {message}"):
+                records = capture_fixture()
+                case = records[3]
+                words = list(unpack("<8I", case["release_mem"]))
+                words[word] ^= mask
+                case["release_mem"] = pack("<8I", *words)
+                verify_capture(records)
+
+    def test_requires_stable_distinct_aligned_fence_slots_in_bar(self):
+        for sample, changes, message in (
+            ("first_read", dict(fence_offset=32), "changed during"),
+            ("final_read", dict(other_fence_offset=8), "changed during"),
+            ("before", dict(other_fence_offset=16), "aliased"),
+            ("before", dict(fence_offset=20), "unaligned"),
+            ("first_read", dict(fence_offset=_BAR0_SIZE), "invalid fence_offset"),
+            ("final_read", dict(other_fence_offset=-8), "invalid other_fence_offset"),
+        ):
+            with self.subTest(sample=sample, changes=changes), self.assertRaisesRegex(ValueError, message):
+                records = capture_fixture()
+                records[1][sample].update(changes)
+                verify_capture(records)
+
+    def test_rejects_unknown_unaligned_or_overflowing_aperture(self):
+        for base, size in ((0, _BAR0_SIZE), (True, _BAR0_SIZE), (_BAR0_MC_BASE + 4, _BAR0_SIZE),
+                           (_BAR0_MC_BASE, _BAR0_SIZE - 4), (_BAR0_MC_BASE, 8), ((1 << 64) - 8, 16)):
+            with self.subTest(base=base, size=size), self.assertRaisesRegex(ValueError, "BAR0"):
+                verify_capture(capture_fixture(), bar0_base=base, bar0_size=size)
 
 
 if __name__ == "__main__":

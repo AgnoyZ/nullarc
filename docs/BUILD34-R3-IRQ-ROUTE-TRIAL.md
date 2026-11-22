@@ -128,8 +128,8 @@ and extra EOPs. Unlike the Linux recovery path, the validator cannot clear
 overflow or salvage a partially overwritten window. The first independent
 BAR0 fence/payload gate is unchanged. Only this path reports
 `raw_ih_capture_checked`; both report `hardware_attested: false`.
-`make test` now runs 18 synthetic tests, including seven for raw capture.
-See the [offline capture record](validation/build34-r3-ih-capture-offline-20261122.json).
+The [initial offline capture record](validation/build34-r3-ih-capture-offline-20261122.json)
+covers 18 synthetic tests before the packet check below.
 
 An empty ring or stable writeback bracket can neither detect every unobserved
 overwrite nor prove device ordering. A separate collector must prove actual
@@ -139,6 +139,33 @@ does not provide a runtime collector, MMIO read, registration, doorbell write
 or GPU submission. It returns no vector bytes, addresses or cursor values.
 Rollback is to omit the raw capture entry and its tests; the normalized
 checker remains unchanged.
+
+### Bind the captured fence packet to each observation
+
+The raw path also requires the exact eight little-endian `RELEASE_MEM`
+dwords captured at submission and both actual BAR0 fence offsets in every
+sample. It keeps build34's cache/event word and 64-bit data mode fixed.
+The control must request no interrupt, and the EOP case must request an
+interrupt after write confirmation. Both require an untagged legacy context.
+The packet's full MC address must equal the admitted BAR0 MC base plus the
+sampled fence offset, and its low dword must match the fresh trial target
+with a zero high dword for this narrow trial. The peer slot cannot alias it;
+both slots must be aligned, fit within the aperture and stay fixed within
+each case. A matching `recipe_sha256` alone cannot satisfy these checks.
+
+The pinned Linux [fence emitter](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L5685-L5717)
+uses those two interrupt selections. AMD PAL's
+[MIT-licensed packet layout](https://github.com/GPUOpen-Drivers/pal/blob/29f5d822b6d450dc669a47d2fa709c0b76dfff33/src/core/hw/gfxip/gfx9/chip/gfx9_plus_merged_f32_me_pm4_packets.h#L2636-L2733)
+identifies the latter as interrupt after write confirmation. These field
+meanings were reviewed without importing source or binaries. Confirmation
+does not attest CPU-visible BAR0 data, payload coherence or a safe IH handoff.
+The collector still has to prove the aperture, the captured packet and both
+independent read addresses, ordered first-read visibility and the enclosing
+ownership interval. It must keep raw bytes and addresses private. The
+normalized checker remains useful for fixtures and cannot replace raw
+capture. The follow-up [offline record](validation/build34-r3-eop-release-mem-offline-20261123.json)
+covers 23 synthetic tests. Rollback is to omit the packet validation
+follow-up; no live configuration was changed.
 
 ## IH ownership review
 

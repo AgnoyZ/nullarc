@@ -240,8 +240,10 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    The [offline EOP route checker](BUILD34-R3-IRQ-ROUTE-TRIAL.md#offline-route-and-first-read-evidence)
    records the expected legacy GFX and Compute identities, checks paired
    controls and requires fresh, same-generation fence and payload on the first
-   independent post-event read. Exclusive IH ownership and old-writer drain
-   still gate live collection and event binding.
+   independent post-event read. Its [raw packet check](BUILD34-R3-IRQ-ROUTE-TRIAL.md#bind-the-captured-fence-packet-to-each-observation)
+   ties the captured `RELEASE_MEM` to the BAR0 slot, target and interrupt
+   mode. Exclusive IH ownership and old-writer drain still gate live
+   collection and event binding.
    The [direct-child follow-up](BUILD34-R3-IRQ-ROUTE-TRIAL.md#follow-up-direct-child-attribution)
    identifies `AMDSupport` and `PhxDeviceControl`. The attached AMD support
    service and its bundle's PCI IRQ code must be accounted for before claiming

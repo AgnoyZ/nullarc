@@ -11,6 +11,12 @@ _RINGS = {"gfx": 0x00, "compute": 0x04}
 _U32_MAX = (1 << 32) - 1
 _U64_MAX = (1 << 64) - 1
 _ENTRY = Struct("<8I")
+_RELEASE_MEM = Struct("<8I")
+_RELEASE_HEADER = 0xC0064900
+_RELEASE_EVENT = 0x06603514
+_RELEASE_DATA64 = 2 << 29
+_RELEASE_INT_AFTER_CONFIRM = 2 << 24
+_FENCE_BYTES = 8
 _IH_OFFSET = 0x3FFFC
 _IH_OVERFLOW = 1
 _IH_FULL_OR_AT_RISK = 0xC0000
@@ -18,6 +24,7 @@ _MES_QUEUE_FLAG = 0x1000000
 _MAX_BATCHES = 64
 _CASE_FIELDS = ("queue interrupt recipe_sha256 target before first_read final_read start_ns submit_ns "
                 "close_ns cleanup_end_ns lost overflow fault")
+_SAMPLE_FIELDS = "identity begin_ns end_ns fence other_fence payload_ok"
 
 
 def _fields(record, names, label):
@@ -39,7 +46,7 @@ def _identity(record):
 
 
 def _sample(record):
-    _fields(record, "identity begin_ns end_ns fence other_fence payload_ok", "fence sample")
+    _fields(record, _SAMPLE_FIELDS, "fence sample")
     _identity(record["identity"])
     begin = _integer(record["begin_ns"], "sample start")
     _integer(record["end_ns"], "sample end", low=begin)
@@ -83,8 +90,7 @@ def _cursor(value, ring_size, *, writeback=False):
     return value
 
 
-def _capture_vectors(record, ring_size):
-    batches = record["ih_capture"]
+def _capture_vectors(record, batches, ring_size):
     if type(batches) is not list or not 2 <= len(batches) <= _MAX_BATCHES:
         raise ValueError("require a bounded, bracketed IH capture")
     _sample(record["before"])
@@ -124,26 +130,63 @@ def _capture_vectors(record, ring_size):
     return vectors
 
 
-def check_ih_capture(records, *, ring_size_bytes, observe_budget_ns, cleanup_budget_ns):
+def _release_samples(record, bar0_mc_base, bar0_size):
+    samples = {}
+    offsets = None
+    offset_fields = ("fence_offset", "other_fence_offset")
+    for name in ("before", "first_read", "final_read"):
+        sample = record[name]
+        _fields(sample, _SAMPLE_FIELDS + " " + " ".join(offset_fields), "raw fence sample")
+        pair = tuple(_integer(sample[field], field, low=0, high=bar0_size - _FENCE_BYTES)
+                     for field in offset_fields)
+        if pair[0] == pair[1] or any(offset % _FENCE_BYTES for offset in pair):
+            raise ValueError("unaligned or aliased BAR0 fence slots")
+        if offsets is not None and pair != offsets:
+            raise ValueError("BAR0 fence slots changed during route case")
+        offsets = pair
+        samples[name] = {field: value for field, value in sample.items() if field not in offset_fields}
+
+    packet = record["release_mem"]
+    if type(packet) is not bytes or len(packet) != _RELEASE_MEM.size:
+        raise ValueError("require 32 captured RELEASE_MEM bytes")
+    header, event, control, address_lo, address_hi, data_lo, data_hi, context = _RELEASE_MEM.unpack(packet)
+    expected_control = _RELEASE_DATA64 | (_RELEASE_INT_AFTER_CONFIRM if record["interrupt"] is True else 0)
+    if (header, event, control, context) != (_RELEASE_HEADER, _RELEASE_EVENT, expected_control, 0):
+        raise ValueError("unexpected RELEASE_MEM header, event, control or context")
+    if (address_lo | (address_hi << 32)) != bar0_mc_base + offsets[0]:
+        raise ValueError("RELEASE_MEM target does not match BAR0 fence slot")
+    if data_hi or data_lo != record["target"]:
+        raise ValueError("RELEASE_MEM data does not match trial target")
+    return samples
+
+
+def check_ih_capture(records, *, ring_size_bytes, bar0_mc_base, bar0_size_bytes,
+                     observe_budget_ns, cleanup_budget_ns):
     """Validate private primary-ring snapshots, without reading or acknowledging hardware.
 
-    Each batch describes one stable writeback interval and all entries between
-    its read cursor and writeback. The collector must attest visibility,
-    ownership, actual reads, no flag clearing and complete capture separately.
+    Bind the captured tail packet to the BAR0 fence offsets on the admitted
+    aperture. The collector must attest the packet and read provenance,
+    mapping, visibility, ownership, no flag clearing and complete capture.
     """
     ring_size = _integer(ring_size_bytes, "IH ring size", low=2 * _ENTRY.size, high=_IH_OFFSET + 4)
     if ring_size & (ring_size - 1):
         raise ValueError("IH ring size must be a power of two")
+    mc_base = _integer(bar0_mc_base, "BAR0 MC base")
+    bar0_size = _integer(bar0_size_bytes, "BAR0 size", low=2 * _FENCE_BYTES,
+                         high=_U64_MAX - mc_base + 1)
+    if mc_base % _FENCE_BYTES or bar0_size % _FENCE_BYTES:
+        raise ValueError("unaligned BAR0 aperture")
     if type(records) is not list or len(records) != len(_CASES):
         raise ValueError("expected exactly four ordered route cases")
     normalized = []
     for record in records:
-        _fields(record, _CASE_FIELDS + " ih_capture", "raw route case")
-        item = {name: value for name, value in record.items() if name != "ih_capture"}
-        item["vectors"] = _capture_vectors(record, ring_size)
+        _fields(record, _CASE_FIELDS + " ih_capture release_mem", "raw route case")
+        item = {name: value for name, value in record.items() if name not in ("ih_capture", "release_mem")}
+        item.update(_release_samples(record, mc_base, bar0_size))
+        item["vectors"] = _capture_vectors(item, record["ih_capture"], ring_size)
         normalized.append(item)
     result = check(normalized, observe_budget_ns=observe_budget_ns, cleanup_budget_ns=cleanup_budget_ns)
-    return dict(result, raw_ih_capture_checked=True)
+    return dict(result, raw_ih_capture_checked=True, release_mem_checked=True)
 
 
 def check(records, *, observe_budget_ns, cleanup_budget_ns):
