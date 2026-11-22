@@ -23,7 +23,7 @@ continues to use its existing waits. No event backend is bound.
    Do not read a named interrupt property, call
    `getInterruptType`, or construct a provider-backed event source. Public XNU
    [registers the ISR during source initialization](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOInterruptEventSource.cpp#L72-L144);
-   the public PCI [registration path can enable MSI/MSI-X](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L104-L123)
+   the public PCI [registration path can enable MSI/MSI-X](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L98-L134)
    before the source itself is enabled. These public revisions describe the
    APIs and are not loaded-image attestations.
 2. **Prove ownership separately.** Before changing any PCI interrupt or IH
@@ -325,6 +325,43 @@ cleanup, establish a checked unregister and source-specific no-future-callback
 boundary separately from queued work, the admitted deferred worker and AMD
 device DMA. The source-only worker gate verifies only admitted CPU copies;
 it cannot cover an interrupt or work item that has not tried to enter it.
+
+### Checked PCI teardown still needs a separate deadline
+
+The macOS `26.7.2 (25G332)` x86_64 KDK IOPCIFamily reference matches the
+loaded bundle identifier and image UUID, and its file hash matches the
+previously pinned KPI provider. Matching metadata does not attest the live
+Radeon controller dispatch or loaded executable bytes. Comparing five
+controller routine bodies and their relevant virtual dispatch entries with
+the pinned Apple source gives these constraints:
+
+- [Disable](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L216-L231)
+  sets a software flag and, outside interrupt context, can spin on the
+  vector-active flag without a timeout. In interrupt context it skips that
+  wait. The [dispatcher](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L848-L872)
+  checks registration and hardware-disable state before calling the target;
+  the software flag alone is not an admitted no-future-callback boundary.
+- [Unregister](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L137-L173)
+  can enter that same disable path while holding the vector lock. It also
+  returns success if the vector was already unregistered. The
+  [hardware mask helper](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L899-L910)
+  conditionally writes the MSI-X table and has no checked readback there.
+  None of these operations checks the AMD IH writeback or DMA engine.
+- [Enable can synchronously call the target](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L912-L928)
+  when the controller marked an interrupt pending while hard disabled. The
+  future adapter must pin and initialize callback context before operations
+  that can dispatch. The ISR may signal deferred work only; delivery still
+  needs the independently admitted route, not merely a successful enable.
+
+Do not invoke this disable/unregister path in the ISR or synchronously under
+the GPU, client or deferred-work locks. A separately retained cleanup worker
+can keep an unbounded provider call out of the synchronous stop path, but an
+observer reaching its deadline does not cancel a stuck provider call or
+prove the target can be freed. Keep callback context and affected resources
+pinned when provider completion, queued work or device drain is uncertain.
+Require an independently bounded, source-specific teardown contract before
+admitting the live trial. See the
+[sanitized static review](validation/build34-r3-ih-pci-teardown-review-20261123.json).
 
 Stop on the first timeout, contradictory sample, unexpected traffic, GPU
 fault, ownership loss or power/queue transition. Close trial admission first,
