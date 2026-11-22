@@ -4,6 +4,7 @@
 #include <Protocol/LoadedImage.h>
 
 #define PHX34_MAX_OPEN_ENTRIES 64
+#define PHX34_MAX_PATH_BYTES 256
 
 typedef struct {
     EFI_OPEN_PROTOCOL_INFORMATION_ENTRY *Entries;
@@ -23,6 +24,12 @@ static EFI_GUID pci_io = EFI_PCI_IO_PROTOCOL_GUID;
 static EFI_GUID device_path = EFI_DEVICE_PATH_PROTOCOL_GUID;
 static EFI_GUID driver_binding = EFI_DRIVER_BINDING_PROTOCOL_GUID;
 static EFI_GUID loaded_image = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+
+static EFI_STATUS
+strict_status(EFI_STATUS status)
+{
+    return status == EFI_SUCCESS || EFI_ERROR(status) ? status : EFI_PROTOCOL_ERROR;
+}
 
 static EFI_STATUS
 check_target(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *target)
@@ -195,5 +202,129 @@ Phx34AttributePciManager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET
         attribution->ImageHandle = image.Handle;
         attribution->OpenEntryCount = first.Count;
     }
-    return status == EFI_SUCCESS || EFI_ERROR(status) ? status : EFI_PROTOCOL_ERROR;
+    return strict_status(status);
+}
+
+static BOOLEAN
+node_is(CONST UINT8 *node, UINT8 type, UINT8 subtype, UINTN length)
+{
+    return node[0] == type && node[1] == subtype &&
+           ((UINTN)node[2] | ((UINTN)node[3] << 8)) == length;
+}
+
+static BOOLEAN
+valid_pci_path(CONST PHX34_PREBOOT_PCI_IDENTITY *identity)
+{
+    UINTN root_size = sizeof(ACPI_HID_DEVICE_PATH);
+    UINTN pci_size = sizeof(PCI_DEVICE_PATH);
+    UINTN end_size = sizeof(EFI_DEVICE_PATH_PROTOCOL);
+    UINTN bytes = identity->DevicePathBytes;
+    CONST UINT8 *path = identity->DevicePath;
+    if (bytes < root_size + pci_size + end_size || (bytes - root_size - end_size) % pci_size != 0 ||
+        !node_is(path, ACPI_DEVICE_PATH, ACPI_DP, root_size))
+        return FALSE;
+
+    UINTN end = bytes - end_size;
+    for (UINTN offset = root_size; offset < end; offset += pci_size) {
+        CONST UINT8 *node = path + offset;
+        if (!node_is(node, HARDWARE_DEVICE_PATH, HW_PCI_DP, pci_size) ||
+            node[OFFSET_OF(PCI_DEVICE_PATH, Device)] > 31 || node[OFFSET_OF(PCI_DEVICE_PATH, Function)] > 7)
+            return FALSE;
+    }
+    CONST UINT8 *endpoint = path + end - pci_size;
+    return endpoint[OFFSET_OF(PCI_DEVICE_PATH, Device)] == identity->Device &&
+           endpoint[OFFSET_OF(PCI_DEVICE_PATH, Function)] == identity->Function &&
+           node_is(path + end, END_DEVICE_PATH_TYPE, END_ENTIRE_DEVICE_PATH_SUBTYPE, end_size);
+}
+
+static BOOLEAN
+same_path(CONST UINT8 *expected, CONST UINT8 *actual, UINTN bytes)
+{
+    for (UINTN index = 0; index < bytes; ++index) {
+        if (expected[index] != actual[index])
+            return FALSE;
+    }
+    return TRUE;
+}
+
+static EFI_STATUS
+resolve_target(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_IDENTITY *identity,
+               PHX34_PREBOOT_PCI_TARGET *target)
+{
+    UINT8 path[PHX34_MAX_PATH_BYTES];
+    UINTN bytes = identity->DevicePathBytes;
+    for (UINTN index = 0; index < bytes; ++index)
+        path[index] = identity->DevicePath[index];
+
+    EFI_DEVICE_PATH_PROTOCOL *remaining = (EFI_DEVICE_PATH_PROTOCOL *)path;
+    EFI_HANDLE controller = NULL;
+    EFI_STATUS status = boot->LocateDevicePath(&pci_io, &remaining, &controller);
+    if (status != EFI_SUCCESS)
+        return status;
+    if (controller == NULL || (UINT8 *)remaining != path + bytes - sizeof(*remaining) ||
+        !same_path(identity->DevicePath, path, bytes))
+        return EFI_NO_MAPPING;
+
+    VOID *path_interface = NULL;
+    status = boot->HandleProtocol(controller, &device_path, &path_interface);
+    if (status != EFI_SUCCESS)
+        return status;
+    if (path_interface == NULL || !same_path(identity->DevicePath, path_interface, bytes))
+        return EFI_NO_MAPPING;
+
+    VOID *pci_interface = NULL;
+    status = boot->HandleProtocol(controller, &pci_io, &pci_interface);
+    if (status != EFI_SUCCESS)
+        return status;
+    EFI_PCI_IO_PROTOCOL *pci = pci_interface;
+    if (pci == NULL || pci->GetLocation != identity->ReadLocation)
+        return EFI_UNSUPPORTED;
+
+    UINTN segment = MAX_UINTN, bus = MAX_UINTN, device = MAX_UINTN, function = MAX_UINTN;
+    status = identity->ReadLocation(pci, &segment, &bus, &device, &function);
+    if (status != EFI_SUCCESS)
+        return status;
+    if (segment != identity->Segment || bus != identity->Bus ||
+        device != identity->Device || function != identity->Function)
+        return EFI_NO_MAPPING;
+    *target = (PHX34_PREBOOT_PCI_TARGET){controller, path_interface, pci};
+    return EFI_SUCCESS;
+}
+
+EFI_STATUS EFIAPI
+Phx34AttributePciManagerAtLocation(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_IDENTITY *identity,
+                                   PHX34_PREBOOT_PCI_ATTRIBUTION *attribution)
+{
+    if (attribution == NULL)
+        return EFI_INVALID_PARAMETER;
+    *attribution = (PHX34_PREBOOT_PCI_ATTRIBUTION){0};
+    if (boot == NULL || boot->LocateDevicePath == NULL || boot->HandleProtocol == NULL ||
+        boot->OpenProtocolInformation == NULL || boot->FreePool == NULL || identity == NULL)
+        return EFI_INVALID_PARAMETER;
+    PHX34_PREBOOT_PCI_IDENTITY expected = *identity;
+    if (expected.DevicePath == NULL || expected.DevicePathBytes > PHX34_MAX_PATH_BYTES ||
+        expected.ReadLocation == NULL || expected.Segment > 65535 || expected.Bus > 255 ||
+        expected.Device > 31 || expected.Function > 7)
+        return EFI_INVALID_PARAMETER;
+
+    UINT8 path[PHX34_MAX_PATH_BYTES];
+    for (UINTN index = 0; index < expected.DevicePathBytes; ++index)
+        path[index] = expected.DevicePath[index];
+    expected.DevicePath = path;
+    if (!valid_pci_path(&expected))
+        return EFI_INVALID_PARAMETER;
+
+    PHX34_PREBOOT_PCI_TARGET first = {0}, last = {0};
+    PHX34_PREBOOT_PCI_ATTRIBUTION result = {0};
+    EFI_STATUS status = resolve_target(boot, &expected, &first);
+    if (status == EFI_SUCCESS)
+        status = Phx34AttributePciManager(boot, &first, &result);
+    if (status == EFI_SUCCESS)
+        status = resolve_target(boot, &expected, &last);
+    if (status == EFI_SUCCESS &&
+        (first.Controller != last.Controller || first.DevicePath != last.DevicePath || first.PciIo != last.PciIo))
+        status = EFI_NO_MAPPING;
+    if (status == EFI_SUCCESS)
+        *attribution = result;
+    return strict_status(status);
 }

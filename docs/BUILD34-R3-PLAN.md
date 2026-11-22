@@ -68,9 +68,11 @@ Neither an OpenCore console GOP match nor UEFI protocol exclusivity is an IH
 handoff. No preboot sample was collected, and any candidate predecessor still
 needs an independent device stop and completed-write boundary.
 The [offline PCI protocol adapter](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#offline-pci-protocol-attribution-adapter)
-checks two real EFI ABI metadata calls in a CPU fixture. It has no EFI entry
-or admitted target selection and still needs a firmware-environment test and
-separately authorized attribution capture.
+checks two real EFI ABI metadata calls in a CPU fixture. Its [exact target
+selector](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#bind-attribution-to-the-complete-pci-path-and-location)
+also brackets them with full-path and admitted cached-location checks. No EFI
+entry, platform accessor attestation, firmware runtime test, or authorized
+capture is in place.
 
 ## Execution order
 

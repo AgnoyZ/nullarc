@@ -404,6 +404,33 @@ No firmware executable, live acquisition, EFI change, or device drain is
 established. Rollback is to omit this isolated source and test target.
 See the [sanitized offline result](validation/build34-r3-preboot-pci-adapter-offline-20261123.json).
 
+### Bind attribution to the complete PCI path and location
+
+`Phx34AttributePciManagerAtLocation` resolves a sealed, single-instance
+ACPI HID root plus PCI nodes and end marker. It validates node lengths and
+endpoint device/function and caps the path at 256 bytes before calling
+firmware. The pinned DXE [`LocateDevicePath`](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Core/Dxe/Hand/Locate.c#L489-L555)
+can return a best *prefix*. Require its remainder to point to the end node
+in the exact unmodified call buffer, then compare the installed path with
+the sealed path. Unrecognized path forms, including multi-instance paths,
+refuse rather than falling back to a prefix or the console handle.
+
+The caller must supply independently established location, device-path,
+PCI I/O provenance and lifetime, and the identity of the verified cached
+`GetLocation` implementation. Do not derive the expected implementation by
+blindly trusting the selected interface's method pointer. The adapter calls
+only that matching location accessor, requires all four values to match the
+scope, and repeats the path, location and interface checks after the two
+manager snapshots before publishing. It issues no PCI config or MMIO reads,
+driver connections, or device commands itself. These checks assume trusted
+boot services and valid, live installed path storage; equality is not image
+attestation, device fencing, or a guarantee against unsampled changes.
+
+The same opt-in target now runs the selector and attribution together in the
+x86-64 CPU fixture. There is still no linked EFI program or firmware runtime
+test. Revert only this selector stage to recover the earlier handle-only
+adapter. See the [sanitized result](validation/build34-r3-preboot-pci-selection-offline-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

@@ -11,6 +11,16 @@ typedef struct {
 } PHX34_PREBOOT_PCI_TARGET;
 
 typedef struct {
+    CONST UINT8 *DevicePath;
+    UINTN DevicePathBytes;
+    UINTN Segment;
+    UINTN Bus;
+    UINTN Device;
+    UINTN Function;
+    EFI_PCI_IO_PROTOCOL_GET_LOCATION ReadLocation;
+} PHX34_PREBOOT_PCI_IDENTITY;
+
+typedef struct {
     EFI_HANDLE BindingHandle;
     EFI_HANDLE ImageHandle;
     UINTN OpenEntryCount;
@@ -19,5 +29,9 @@ typedef struct {
 EFI_STATUS EFIAPI
 Phx34AttributePciManager(EFI_BOOT_SERVICES *Boot, CONST PHX34_PREBOOT_PCI_TARGET *Target,
                          PHX34_PREBOOT_PCI_ATTRIBUTION *Attribution);
+
+EFI_STATUS EFIAPI
+Phx34AttributePciManagerAtLocation(EFI_BOOT_SERVICES *Boot, CONST PHX34_PREBOOT_PCI_IDENTITY *Identity,
+                                   PHX34_PREBOOT_PCI_ATTRIBUTION *Attribution);
 
 #endif
