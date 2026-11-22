@@ -1,0 +1,22 @@
+{
+  "status": "passive-pci-child-attribution-only",
+  "observation_date": "2026-11-22",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "pci": "1002:1900",
+  "matching_iokit_service_plane_samples": 2,
+  "direct_child_classes": ["AMDSupport", "NMXAccel", "PhxAMDFB", "PhxBringup", "PhxDeviceControl"],
+  "amd_support_pci_display_personality_confirmed": true,
+  "amd_support_and_agdc_loaded_identifiers_match_kdk": true,
+  "amd_support_reference_has_pci_interrupt_path": true,
+  "active_isr_proved": false,
+  "ih_consumer_ownership_proved": false,
+  "old_writer_drain_proved": false,
+  "bar0_fence_visibility_proved": false,
+  "interrupt_registered": false,
+  "device_opened": false,
+  "raw_registry_saved": false,
+  "raw_image_identifiers_saved": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}

@@ -156,6 +156,38 @@ review located explicit reset objects on other devices and resources; it
 did not establish a GPU reset or complete runtime namespace. The ownership
 and drain gate remains open.
 
+### Follow-up: direct child attribution
+
+On November 22, two targeted IOKit IOService-plane enumerations matched the
+same five direct children of the Radeon provider. The two previously
+unattributed entries were `AMDSupport` and `PhxDeviceControl`. The check used
+only the PCI vendor/device properties, class lookups and in-memory identity
+comparison. It did not resolve an interrupt index or open a device client.
+
+- `AMDSupport` matches the installed Apple bundle's PCI display-class
+  personality for AMD devices. The loaded bundle and the x86_64 KDK reference
+  for `25G332` reported the same image identifier. That reference contains
+  interrupt registration imports and `AtiFbInterruptManager` entry points
+  for installing and stopping PCI interrupts. This is a concrete competing
+  path to account for. A loaded bundle and attached support service do not
+  show that its interrupt manager was instantiated, that it accesses this
+  APU's IH ring, or that it has released its old writes.
+- [`PhxDeviceControl`](../src/phxaccel/accel/phxagdc.cpp#L43) is the
+  PhxAccel display-capability shim. It attaches on the same PCI provider and
+  calls the inherited `AppleGraphicsDeviceControl` start path. Its own vendor
+  replies are not an EOP consumer; the subclass's visible code does not prove
+  what its base class or another client has registered.
+
+The [sanitized record](validation/build34-r3-ih-child-attribution-20261122.json)
+separates registry facts from static capability. Resolving the AMDSupport
+path now requires ring and PCI callback ownership for this particular
+provider, not a bundle-wide search for interrupt methods. It still requires
+the predecessor's documented or verified stop/drain boundary; neither a
+negative instance lookup nor a dormant host callback excludes old firmware or
+device writes. Leave the existing services attached and preserve the display
+path while investigating. No candidate, device operation or rollback action
+was needed for this read-only review.
+
 ## Stop, rollback and later acceptance
 
 Keep callbacks bounded: the interrupt context only signals deferred work.

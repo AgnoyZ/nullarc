@@ -239,6 +239,10 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    controls and requires fresh, same-generation fence and payload on the first
    independent post-event read. Exclusive IH ownership and old-writer drain
    still gate live collection and event binding.
+   The [direct-child follow-up](BUILD34-R3-IRQ-ROUTE-TRIAL.md#follow-up-direct-child-attribution)
+   identifies `AMDSupport` and `PhxDeviceControl`. The attached AMD support
+   service and its bundle's PCI IRQ code must be accounted for before claiming
+   the route; they do not prove an active IH consumer or a handoff.
 6. Freeze and compile the complete native integration. Prepare a concrete
    source/ABI-matched candidate with fresh rollback/recovery controls before
    requesting any still-required installation/GPU/power authorization.
@@ -315,3 +319,30 @@ All 172 production inputs were unchanged. No runtime selector or collector
 endpoint is exposed, and the native reader and event backend remain unbound.
 Coherent device observation, exclusive queue ownership and old-writer drain
 are still required before this evidence can be collected on the GPU.
+
+## NullMoth comparison and performance gate
+
+[NullMoth's NVK event path](BUILD34-EXACT-EVENT-WAIT.md#nullmoth-reference)
+already has a live RM source, bounded sleep, exact channel/semaphore rechecks
+and polling fallback. Build34 has source-only equivalents for the exact wait
+and fallback, but no bound AMD source, independently validated BAR0 fence
+reader or loaded Mesa/native receipt session. Its accepted desktop path still
+uses legacy waits. The mapping and PCI observer boots do not change that.
+
+On its RTX 5060 Laptop test, NullMoth reports short-compute process CPU time
+falling from 0.612 to 0.286 ms with app event waits, while elapsed time rises
+from 0.607 to 0.734 ms. Neither is a Radeon result or a desktop FPS result.
+For the 780M, first qualify the exact loaded pair and lifecycle/correctness.
+Then compare the same qualified exact path in bounded-poll and event-wait
+modes, alternating the order of repeated runs on the same machine, OS build,
+display mode, scene and load. Keep the completion contract, driver/runtime
+images, workload and benchmark interval fixed. A separate legacy-to-exact
+comparison measures the combined protocol change, not just notification.
+
+Seal the finite performance and stability durations and acceptance limits
+before execution. Record correctness, delivered frame rate and frame-time
+tails, process and WindowServer CPU, submit-to-exact-wait latency, event and
+fallback counts, timeouts and faults. Report each arm and its duration,
+including interrupted runs. Complete the stated-duration desktop run and
+the separately scoped teardown cases before accepting R3. No controlled
+matching 780M A/B evidence is available yet.
