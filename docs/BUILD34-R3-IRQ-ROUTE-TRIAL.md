@@ -315,6 +315,17 @@ retirement watermark. Publish only classified outcomes and counts. Do not
 publish vector words, capability offsets/values, interrupt indices, addresses
 or registry IDs.
 
+The pinned XNU [interrupt-source unregistration and disable paths](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOInterruptEventSource.cpp#L190-L269)
+call the provider without retaining its unregister or disable result. The
+public IOPCIFamily [MSI registration path](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L98-L134)
+also enables device MSI during registration. Consequently the wrapper's
+disabled state or destruction is not a checked receipt for an admitted PCI
+vector. Resolve ownership before constructing a provider-backed source. For
+cleanup, establish a checked unregister and source-specific no-future-callback
+boundary separately from queued work, the admitted deferred worker and AMD
+device DMA. The source-only worker gate verifies only admitted CPU copies;
+it cannot cover an interrupt or work item that has not tried to enter it.
+
 Stop on the first timeout, contradictory sample, unexpected traffic, GPU
 fault, ownership loss or power/queue transition. Close trial admission first,
 mask only the source the trial owns and stop generation, then verify pending

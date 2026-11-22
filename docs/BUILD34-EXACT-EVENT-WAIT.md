@@ -218,6 +218,18 @@ writeback samples alone do not rule out an unobserved overwrite. The result
 is a wake mask or a rejection, never an IH read-pointer acknowledgment or
 permission to consume entries or reuse the ring.
 
+The deferred entry admits one capture worker at a time under the route and
+service gates. It keeps both leases across the bounded copy, which runs outside
+`gpuLock` and must not hold a client lock, acknowledge IH or mutate the device.
+It rechecks the route after the copy before accepting the bytes. Concurrent
+entry returns busy without invoking the copier. A failed copy on a still-live
+route declares stream loss; a late result after revocation is discarded.
+Revocation closes the worker gate before signaling sleepers. While holding
+`gpuLock`, a cleanup owner can check that the gate is closed and that the last
+admitted worker has left for this exact retained route. It must not spin or
+wait under the lock. A drained worker gate is not an ISR unregister receipt,
+a queued-work cancellation fence, or an AMD device-write drain.
+
 A recognized vector changes only the matching wake stamp. It cannot write a
 fence, advance the prefix, or release resources. Queue invalidation revokes
 delivery and wakes sleepers; instead of clearing the route, it preserves the
@@ -241,19 +253,21 @@ service and route, incorrect peer generation, wrong-queue wake, loss while
 enrolled, sleep/stop wakeup, and refused rearm after modeled queue readoption.
 It also tests partial processing of a 33-entry backlog, ring wrap, wrapped
 replay, unstable or flagged writeback, cursor gaps, wrong counts and wake
-coalescing. ASan/UBSan and TSan each passed 33 closed and 608 modeled checks;
-18 fault variants were rejected, including premature rearm. Both complete native
-sources compile to nonloadable objects with the same 381 imports; the 172
-protected production inputs are unchanged. The
-[batch-ingress record](validation/build34-r3-ih-batch-ingress-offline-20261123.json)
-supersedes the behavior in the
+coalescing. The [worker-drain record](validation/build34-r3-ih-worker-drain-offline-20261123.json)
+adds a paused copy crossing revocation, copy failure, rejection of a second
+worker and refusal to claim drain before the first worker exits. ASan/UBSan
+and TSan each passed 33 closed and 756 modeled checks, and 23 broken variants
+were rejected. Both complete native sources compile to nonloadable objects
+with the same 381 imports; the 172 protected production inputs are unchanged.
+Earlier CPU results are in the
+[batch-ingress record](validation/build34-r3-ih-batch-ingress-offline-20261123.json),
 [retirement-hold record](validation/build34-r3-ih-retirement-offline-20261123.json)
 and the
 [original ingress record](validation/build34-r3-ih-ingress-offline-20261123.json).
 
 ```sh
 nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_ih_ingress.py \
-  --out build/build34-r3-ih-batch-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
+  --out build/build34-r3-ih-worker-new-private --sdk "$KERNEL_SDK" --kdk "$KDK"
 ```
 
 Native admission is hard false and no delivery operations are installed.

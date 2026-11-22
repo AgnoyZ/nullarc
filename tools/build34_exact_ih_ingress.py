@@ -10,8 +10,11 @@ OPEN = 'bool PhxBringup::openExactIHRoute('
 CLOSE = 'void PhxBringup::closeExactIHRouteLocked('
 LOSE = 'bool PhxBringup::loseExactIHRoute('
 MATCH = 'bool PhxBringup::exactIHRouteMatchesLocked('
-DELIVER = 'int PhxBringup::notifyExactIH('
+DELIVER = 'int PhxBringup::notifyExactIHLocked('
 CURSOR = 'bool PhxBringup::validExactIHCursor('
+LIVE = 'bool PhxBringup::exactIHRouteLiveLocked('
+COLLECT = 'int PhxBringup::collectExactIH('
+WORKER_DRAIN = 'bool PhxBringup::exactIHWorkerDrainedLocked('
 
 TOKEN = '''    struct ExactIHRoute {
         uint64_t service, epoch, generation[2];
@@ -25,9 +28,10 @@ DECLARATIONS = TOKEN + '''    ExactIHRoute exactIHRoute{};
         uint32_t read, before, after, count;
         uint8_t entries[kExactIHBatchEntries][kExactIHEntryBytes];
     };
-    enum ExactIHRejection : int { kExactIHStale = -1, kExactIHInvalid = -2 };
+    enum ExactIHRejection : int { kExactIHStale = -1, kExactIHInvalid = -2, kExactIHBusy = -3 };
     enum class ExactIHState : uint8_t { Empty, Active, Retiring, Lost };
     ExactIHState exactIHState{ExactIHState::Empty};
+    phx34_exact::CallbackGate<1> exactIHWorker;
     uint32_t exactIHRingSize{0}, exactIHNext{0};
     uint64_t exactIHBatchOrdinal{0};
     uint64_t exactIHLastEpoch{0};
@@ -35,9 +39,12 @@ DECLARATIONS = TOKEN + '''    ExactIHRoute exactIHRoute{};
     static bool validExactIHCursor(uint32_t, uint32_t);
     bool openExactIHRoute(ExactIHRoute &, uint32_t ringSize, uint32_t cursor);
     bool exactIHRouteMatchesLocked(const ExactIHRoute &) const;
+    bool exactIHRouteLiveLocked(const ExactIHRoute &) const;
     void closeExactIHRouteLocked();
     bool loseExactIHRoute(const ExactIHRoute &);
-    int notifyExactIH(const ExactIHRoute &, const ExactIHBatch &);
+    bool exactIHWorkerDrainedLocked(const ExactIHRoute &) const;
+    int collectExactIH(const ExactIHRoute &, bool (*capture)(void *, ExactIHBatch &), void *);
+    int notifyExactIHLocked(const ExactIHRoute &, const ExactIHBatch &);
 '''
 METHODS = '''bool PhxBringup::exactIHIngressAdmitted() const {
     return false;
@@ -77,8 +84,15 @@ bool PhxBringup::exactIHRouteMatchesLocked(const ExactIHRoute &route) const {
         route.generation[0] == exactIHRoute.generation[0] && route.generation[1] == exactIHRoute.generation[1];
 }
 
+bool PhxBringup::exactIHRouteLiveLocked(const ExactIHRoute &route) const {
+    return exactIHRouteMatchesLocked(route) && exactIHState == ExactIHState::Active &&
+        !exactCallbacks.closed() && !exactStopped && !isSleeping && exactQueueLive[0] && exactQueueLive[1] &&
+        route.generation[0] == exactQueueGeneration[0] && route.generation[1] == exactQueueGeneration[1];
+}
+
 void PhxBringup::closeExactIHRouteLocked() {
     if (exactIHState != ExactIHState::Active) return;
+    exactIHWorker.close();
     exactIHState = ExactIHState::Retiring;
     for (uint32_t queue = 0; queue < 2; ++queue) {
         if (exactEventSerial[queue] < UINT64_MAX) ++exactEventSerial[queue];
@@ -100,17 +114,39 @@ bool PhxBringup::loseExactIHRoute(const ExactIHRoute &route) {
     return current;
 }
 
-int PhxBringup::notifyExactIH(const ExactIHRoute &route, const ExactIHBatch &batch) {
+bool PhxBringup::exactIHWorkerDrainedLocked(const ExactIHRoute &route) const {
+    return exactIHRouteMatchesLocked(route) && exactIHWorker.drained();
+}
+
+int PhxBringup::collectExactIH(const ExactIHRoute &route, bool (*capture)(void *, ExactIHBatch &), void *context) {
     phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
-    if (!callback || !gpuLock) return kExactIHStale;
+    if (!callback || !gpuLock || !capture) return kExactIHStale;
     IOLockLock(gpuLock);
-    if (!exactIHRouteMatchesLocked(route) || exactIHState != ExactIHState::Active ||
-        exactCallbacks.closed() || exactStopped || isSleeping ||
-        !exactQueueLive[0] || !exactQueueLive[1] ||
-        route.generation[0] != exactQueueGeneration[0] || route.generation[1] != exactQueueGeneration[1]) {
+    if (!exactIHRouteLiveLocked(route)) {
         IOLockUnlock(gpuLock);
         return kExactIHStale;
     }
+    decltype(exactIHWorker)::Lease worker(exactIHWorker);
+    IOLockUnlock(gpuLock);
+    if (!worker) return kExactIHBusy;
+    ExactIHBatch batch{};
+    const bool copied = capture(context, batch);
+    IOLockLock(gpuLock);
+    int result = kExactIHStale;
+    if (exactIHRouteLiveLocked(route)) {
+        if (copied) {
+            result = notifyExactIHLocked(route, batch);
+        } else {
+            closeExactIHRouteLocked();
+            exactIHState = ExactIHState::Lost;
+            result = kExactIHInvalid;
+        }
+    }
+    IOLockUnlock(gpuLock);
+    return result;
+}
+
+int PhxBringup::notifyExactIHLocked(const ExactIHRoute &route, const ExactIHBatch &batch) {
     const uint32_t distance = (batch.before - batch.read) & (exactIHRingSize - 1);
     const uint32_t available = distance / kExactIHEntryBytes;
     const uint32_t expected = available < kExactIHBatchEntries ? available : kExactIHBatchEntries;
@@ -119,7 +155,6 @@ int PhxBringup::notifyExactIH(const ExactIHRoute &route, const ExactIHBatch &bat
         batch.count != expected) {
         closeExactIHRouteLocked();
         exactIHState = ExactIHState::Lost;
-        IOLockUnlock(gpuLock);
         return kExactIHInvalid;
     }
     exactIHNext = (batch.read + batch.count * kExactIHEntryBytes) & (exactIHRingSize - 1);
@@ -138,7 +173,6 @@ int PhxBringup::notifyExactIH(const ExactIHRoute &route, const ExactIHBatch &bat
             queueMask |= bit;
         }
     }
-    IOLockUnlock(gpuLock);
     return queueMask;
 }
 

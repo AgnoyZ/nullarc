@@ -9,6 +9,15 @@ static constexpr int Stale = PhxBringup::kExactIHStale;
 static constexpr uint32_t RingBytes = 128, StartCursor = 96;
 static constexpr Vector gfx{0x14, 0xb5, 0x80};
 
+static int deliverCopy(PhxBringup &gpu, const Route &route, const Batch &batch) {
+    const Batch *input = &batch;
+    return gpu.collectExactIH(route, [](void *context, Batch &output) {
+        CHECK(!gpuHeld && !clientHeld);
+        output = **static_cast<const Batch **>(context);
+        return true;
+    }, &input);
+}
+
 struct IHStream {
     uint32_t cursor = StartCursor, size = RingBytes;
     uint64_t ordinal = 1;
@@ -28,7 +37,7 @@ struct IHStream {
 
     int deliver(PhxBringup &gpu, const Route &route, std::initializer_list<Vector> vectors) {
         const auto batch = capture(vectors);
-        const int result = gpu.notifyExactIH(route, batch);
+        const int result = deliverCopy(gpu, route, batch);
         if (result >= 0) {
             cursor = batch.after;
             ++ordinal;
@@ -90,7 +99,7 @@ int main() {
     CHECK(stream.deliver(gpu, stale, {gfx}) == Stale && !gpu.loseExactIHRoute(stale));
     stale = route;
     stale.epoch++;
-    CHECK(gpu.notifyExactIH(stale, {}) == Stale && !gpu.loseExactIHRoute(stale));
+    CHECK(deliverCopy(gpu, stale, {}) == Stale && !gpu.loseExactIHRoute(stale));
     CHECK(gpu.lock.wakeCount[0] == 1 && gpu.lock.wakeCount[1] == 1);
 
     gpu.lock.block = true;
@@ -168,7 +177,7 @@ int main() {
     std::thread stoppingWaiter([&] { cancelled = stopped.client.wait(0, 1000000); });
     stopped.waitForPark(0);
     stopped.gpu.exactCallbacks.close();
-    CHECK(stopped.gpu.notifyExactIH(stopping, {}) == Stale);
+    CHECK(deliverCopy(stopped.gpu, stopping, {}) == Stale);
     IOLockLock(stopped.gpu.gpuLock);
     stopped.gpu.exactStopped = true;
     stopped.gpu.invalidateExactQueues();
@@ -193,7 +202,7 @@ int main() {
     CHECK(batching.gpu.lock.wakeCount[0] == 1 && batching.gpu.lock.wakeCount[1] == 1);
     CHECK(combined.deliver(batching.gpu, batched, {Vector{}}) == 0);
     CHECK(combined.cursor == StartCursor);
-    CHECK(batching.gpu.notifyExactIH(batched, firstBatch) == Invalid);
+    CHECK(deliverCopy(batching.gpu, batched, firstBatch) == Invalid);
     CHECK(batching.gpu.exactIHBatchOrdinal == 2 && batching.gpu.exactIHState == RouteState::Lost);
     CHECK(batching.gpu.lock.wakeCount[0] == 2 && batching.gpu.lock.wakeCount[1] == 2);
 
@@ -207,7 +216,7 @@ int main() {
     chunk.count = 32;
     chunk.before = chunk.after = 1024;
     for (unsigned index = 0; index < gfx.size(); ++index) chunk.entries[31][index] = gfx[index];
-    CHECK(split.gpu.notifyExactIH(segmented, chunk) == 2);
+    CHECK(deliverCopy(split.gpu, segmented, chunk) == 2);
     CHECK(split.gpu.exactIHNext == 992 && split.gpu.exactIHBatchOrdinal == 2);
     backlog.cursor = 992;
     backlog.ordinal = 3;
@@ -230,12 +239,63 @@ int main() {
         if (kind == 'c') bad.count = 0;
         if (kind == 'g') ++bad.ordinal;
         if (kind == 'l') { bad.count = 33; bad.before = bad.after = bad.read + 33 * 32; }
-        CHECK(malformed.gpu.notifyExactIH(token, bad) == Invalid);
+        CHECK(deliverCopy(malformed.gpu, token, bad) == Invalid);
         CHECK(malformed.gpu.exactIHState == RouteState::Lost && malformed.gpu.exactIHNext == input.cursor &&
               malformed.gpu.exactIHBatchOrdinal == 0);
         CHECK(malformed.gpu.lock.wakeCount[0] == 1 && malformed.gpu.lock.wakeCount[1] == 1);
-        CHECK(malformed.gpu.notifyExactIH(token, input.capture({gfx})) == Stale);
+        CHECK(deliverCopy(malformed.gpu, token, input.capture({gfx})) == Stale);
         CHECK(!malformed.gpu.openExactIHRoute(duplicate, input.size, input.cursor));
+    }
+
+    for (bool copyingFails : {false, true}) {
+        Trial racing;
+        racing.gpu.modeledIHAdmission = true;
+        Route running{};
+        CHECK(racing.gpu.openExactIHRoute(running, RingBytes, StartCursor));
+        CHECK(racing.gpu.collectExactIH(running, nullptr, nullptr) == Stale);
+        struct PausedCopy {
+            std::mutex mutex;
+            std::condition_variable changed;
+            bool entered = false, resume = false, fail = false;
+        } capture;
+        capture.fail = copyingFails;
+        const auto copy = +[](void *context, Batch &target) {
+            CHECK(!gpuHeld && !clientHeld);
+            auto &paused = *static_cast<PausedCopy *>(context);
+            std::unique_lock<std::mutex> held(paused.mutex);
+            paused.entered = true;
+            paused.changed.notify_all();
+            CHECK(paused.changed.wait_for(held, std::chrono::seconds(4), [&] { return paused.resume; }));
+            target = IHStream{}.capture({gfx});
+            return !paused.fail;
+        };
+        int result = Stale;
+        std::thread worker([&] { result = racing.gpu.collectExactIH(running, copy, &capture); });
+        {
+            std::unique_lock<std::mutex> held(capture.mutex);
+            CHECK(capture.changed.wait_for(held, std::chrono::seconds(4), [&] { return capture.entered; }));
+        }
+        CHECK(deliverCopy(racing.gpu, running, {}) == PhxBringup::kExactIHBusy);
+        IOLockLock(racing.gpu.gpuLock);
+        CHECK(!racing.gpu.exactIHWorkerDrainedLocked(running));
+        if (!copyingFails) racing.gpu.invalidateExactQueues();
+        CHECK(!racing.gpu.exactIHWorkerDrainedLocked(running));
+        IOLockUnlock(racing.gpu.gpuLock);
+        if (!copyingFails) CHECK(deliverCopy(racing.gpu, running, {}) == Stale);
+        {
+            std::lock_guard<std::mutex> held(capture.mutex);
+            capture.resume = true;
+            capture.changed.notify_all();
+        }
+        worker.join();
+        CHECK(result == (copyingFails ? Invalid : Stale));
+        IOLockLock(racing.gpu.gpuLock);
+        CHECK(racing.gpu.exactIHWorkerDrainedLocked(running) && !racing.gpu.exactIHWorkerDrainedLocked({}));
+        CHECK(racing.gpu.exactIHBatchOrdinal == 0 && racing.gpu.exactIHWorker.active() == 0);
+        CHECK(racing.gpu.exactIHState == (copyingFails ? RouteState::Lost : RouteState::Retiring));
+        CHECK(racing.gpu.lock.wakeCount[0] == 1 && racing.gpu.lock.wakeCount[1] == 1);
+        IOLockUnlock(racing.gpu.gpuLock);
+        CHECK(!racing.gpu.openExactIHRoute(duplicate, RingBytes, StartCursor));
     }
 #endif
     std::printf("PASS IH ingress: %u checks; modeled=%d\n", checks.load(), MODELED_IH);

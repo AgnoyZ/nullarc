@@ -10,7 +10,8 @@ from unittest.mock import patch
 import build34_native_object_check as native_objects
 from build34_exact_event_iokit import DECLARATIONS as IOKIT_DECLARATIONS, FIELDS_AT, SLEEP, WAKE
 from build34_exact_event_wait import AVAILABLE, ENTRY, FIELDS, INVALIDATE, PARK, SNAPSHOT, WAIT
-from build34_exact_ih_ingress import ADMIT, CLOSE, CURSOR, DECLARATIONS, DELIVER, LOSE, MATCH, OPEN, previous_stage, stage, stage_header
+from build34_exact_ih_ingress import (ADMIT, CLOSE, COLLECT, CURSOR, DECLARATIONS, DELIVER, LIVE, LOSE, MATCH, OPEN,
+                                     WORKER_DRAIN, previous_stage, stage, stage_header)
 from build34_exact_submit import once
 from test_build34_exact_event_iokit import DOUBLES
 from test_build34_exact_open import BASE, EXTRA, FACTORY_RECORD, KDK_RECORD, PROTECTED, git
@@ -20,7 +21,8 @@ REFERENCE = 'docs/validation/build34-r3-exact-open-offline-20261122.json'
 BASE_FIXTURE = 'tests/test_build34_exact_event_wait.cpp'
 FIXTURE = 'tests/test_build34_exact_ih_ingress.cpp'
 OWNERSHIP = 'tools/build34_exact_ownership.h'
-METHODS = (AVAILABLE, SNAPSHOT, PARK, SLEEP, WAKE, ADMIT, CURSOR, OPEN, MATCH, CLOSE, LOSE, DELIVER, INVALIDATE, WAIT)
+METHODS = (AVAILABLE, SNAPSHOT, PARK, SLEEP, WAKE, ADMIT, CURSOR, OPEN, MATCH, LIVE, CLOSE, LOSE, WORKER_DRAIN,
+           COLLECT, DELIVER, INVALIDATE, WAIT)
 
 
 def test(out, sdk, kdk):
@@ -84,12 +86,15 @@ def test(out, sdk, kdk):
             raise RuntimeError(label + ' failed; inspect private diagnostics')
         return process.stdout.decode()
 
-    def exercise(label, source, sanitizer, modeled, broken=False):
+    def exercise(label, source, sanitizer, modeled, broken=False, fixture_fields=fields):
         methods = [method(source, signature) for signature in METHODS]
         if modeled:
             index = METHODS.index(ADMIT)
             methods[index] = once(methods[index], 'return false;', 'return modeledIHAdmission;')
-        fixture = once(base, '// PHX34_EVENT_METHODS', DOUBLES + '\n'.join(methods)) + inputs[FIXTURE].decode()
+        fixture = once(base, '// PHX34_EVENT_METHODS', DOUBLES + '\n'.join(methods))
+        if fixture_fields != fields:
+            fixture = once(fixture, fields, fixture_fields)
+        fixture += inputs[FIXTURE].decode()
         code, binary = out / (label + '.cpp'), out / label
         code.write_text(fixture)
         run([compiler, '--driver-mode=g++', '-std=c++17', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
@@ -120,7 +125,8 @@ def test(out, sdk, kdk):
                                     'exactIHState != ExactIHState::Active && exactIHState != ExactIHState::Retiring &&', True),
         'rearm-before-old-route-drain': ('exactIHState == ExactIHState::Empty &&',
                                          'exactIHState != ExactIHState::Active && exactIHState != ExactIHState::Lost &&', True),
-        'admit-batch-from-nonactive-route': (' || exactIHState != ExactIHState::Active', '', True),
+        'admit-batch-from-nonactive-route': ('return exactIHRouteMatchesLocked(route) && exactIHState == ExactIHState::Active &&',
+                                            'return exactIHRouteMatchesLocked(route) &&', True),
         'ignore-loss-during-retirement': ('(exactIHState == ExactIHState::Active || exactIHState == ExactIHState::Retiring)',
                                           'exactIHState == ExactIHState::Active', True),
         'erase-retiring-identity': ('exactIHState = ExactIHState::Retiring;',
@@ -133,9 +139,16 @@ def test(out, sdk, kdk):
         'jump-over-partial-batch': ('exactIHNext = (batch.read + batch.count * kExactIHEntryBytes) & (exactIHRingSize - 1);',
                                     'exactIHNext = batch.before;', True),
         'wake-twice-for-same-queue': ('!(queueMask & bit) && ', '', True),
+        'skip-post-copy-route-validation': ('if (exactIHRouteLiveLocked(route)) {', 'if (true) {', True),
+        'declare-worker-drained-at-close': ('exactIHWorker.drained()', 'exactIHWorker.closed()', True),
+        'omit-worker-gate-close': ('    exactIHWorker.close();\n', '', True),
+        'drain-other-route': ('exactIHRouteMatchesLocked(route) && exactIHWorker.drained()',
+                              '(static_cast<void>(route), exactIHWorker.drained())', True),
     }
     for label, (old, new, modeled) in mutations.items():
         exercise(label, once(proposed, old, new), 'address,undefined', modeled, True)
+    exercise('allow-concurrent-IH-workers', proposed, 'address,undefined', True, True,
+             once(fields, 'CallbackGate<1> exactIHWorker', 'CallbackGate<2> exactIHWorker'))
     with patch.object(native_objects, 'HEADERS', header_names):
         native = native_objects.check(out / 'native', inputs, previous, proposed, ownership, sdk, kdk,
                                       reference['native_import_count'],
@@ -144,10 +157,11 @@ def test(out, sdk, kdk):
     git('diff', '--quiet', BASE, '--', *PROTECTED)
     if any((ROOT / name).read_bytes() != blob for name, blob in inputs.items()):
         raise ValueError('Inputs changed during verification')
-    result = dict(status='passed-offline-IH-batch-ingress', build=34, checks=counts,
-                  rejected_mutants=list(mutations), staged_source_sha256=sha(proposed.encode()),
+    result = dict(status='passed-offline-IH-worker-drain', build=34, checks=counts,
+                  rejected_mutants=[*mutations, 'allow-concurrent-IH-workers'], staged_source_sha256=sha(proposed.encode()),
                   previous_source_sha256=sha(previous.encode()), protected_production_inputs=len(production),
                   max_entries_per_batch=32, native_ring_consumer_bound=False,
+                  max_concurrent_capture_workers=1, worker_drain_is_not_device_or_ISR_drain=True,
                   hold_rearm_until_old_route_drain=True, old_writer_drain_proved=False,
                   native_event_backend_bound=False, native_open_admitted=False, IH_accessed=False,
                   ISR_registered=False, GPU_executed=False, R3_complete=False, **native)
