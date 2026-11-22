@@ -1,0 +1,32 @@
+{
+  "status": "passed-offline-IH-workloop-turn-drain",
+  "build": 34,
+  "prior_workloop_commit": "cbf4a5d865d4cc12bbfd38c8bf352e90e76decff",
+  "checks": {
+    "asan_ubsan": {"closed": 8, "modeled": 385},
+    "tsan": {"closed": 8, "modeled": 385}
+  },
+  "rejected_mutants": 12,
+  "in_flight_copy_mutant_detected_at_remove_entry": true,
+  "previous_workloop_source_sha256": "831ddddbf97c6b9f169faec8f79ecb4b95bfd7b704f4457eb360bf0b045fc707",
+  "staged_source_sha256": "b2a66a3e97150be14c3dfafbc5209c81160204e2c3732fbaf8d6f3e437ad5b20",
+  "native_object_sha256": "72fe24ae30993253613458367d3754df9ff2b1222846be0ba801520cb6d9b36e",
+  "native_object_only": true,
+  "native_import_count": 406,
+  "native_import_set_unchanged_from_prior_workloop": true,
+  "all_native_imports_have_existing_declared_KDK_provider": true,
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_build": "25G332",
+  "protected_production_inputs": 172,
+  "default_make_test_passed": true,
+  "default_firmware_fixture_tests_skipped": true,
+  "copier_turn_drained_before_workloop_removal": true,
+  "native_teardown_deadline_proved": false,
+  "native_event_backend_bound": false,
+  "native_open_admitted": false,
+  "old_writer_drain_proved": false,
+  "IH_accessed": false,
+  "ISR_registered": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}

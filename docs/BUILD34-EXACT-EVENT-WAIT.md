@@ -388,17 +388,24 @@ bounded copy and posts a fresh work bit for a pending or partial batch; it
 returns false so the workloop releases its gate between passes. A copied
 vector only requests a validated fence recheck.
 
-`closeKicks` never attempts removal. The external cleanup caller must hold
-an independent source reference, hold no GPU or client locks, and wait or
-reschedule at its own deadline. `detach` rejects self-removal and returns
-busy while any wake is in flight. A single caller claims removal, revokes
-the route, and requests checked removal of the exact source. Only success
-with a null attachment readback releases the attachment pin. Failure or
-contradiction retains the pin and refuses retry. There is no synchronous
-stop/sleep callsite; the existing queue invalidation path makes queued work
-inert. A cleanup timeout does not cancel removal, release the provider pin,
-or establish DMA drain. A future adapter must also prove native gate
-behavior, copy lifetime and bounded underlying scheduling.
+`closeAdmission` closes both wake calls and admission to new copier turns;
+it never attempts removal. The external cleanup caller must hold an
+independent source reference and no GPU or client locks. `detach` rejects
+self-removal and returns busy while any wake is in flight. A single caller
+claims removal and revokes the route. If an admitted turn is still copying
+or reposting, it returns busy before calling `removeEventSource`, retaining
+the attachment and all pins. The caller can retry at its own deadline;
+neither admission gate reopens. Once both are drained, removal still
+requires success and a null attachment readback before releasing the
+attachment pin. Failure or contradiction retains the pin and refuses retry.
+
+This separates a paused copier from a potentially blocking workloop call;
+it does not bound native IOKit removal or prove that a closed source's
+`checkForWork` is never invoked again. Such a call cannot admit a turn.
+There is no synchronous stop/sleep callsite; queue invalidation still makes
+queued work inert. A cleanup timeout cannot cancel a removal already in
+progress, release the provider pin, establish ISR drain or prove device DMA
+drain. Keep those release conditions independent.
 
 Run the isolated checks with a fresh ignored output:
 
@@ -411,7 +418,7 @@ The adapter remains staged. No IRQ provider, IH reader, MMIO, native event
 backend, or Mesa transport binding is installed by this transform. Omit it
 to roll back the experiment.
 
-The [offline result](validation/build34-r3-ih-workloop-offline-20261123.json)
+The [original offline result](validation/build34-r3-ih-workloop-offline-20261123.json)
 records 8 closed and 377 modeled checks under each of ASan/UBSan and TSan.
 All nine injected defects failed. The fixture covers an inline hint during
 arming, a 33-entry split, stale queued work after sleep or stop, wake versus
@@ -420,3 +427,12 @@ removal and both error and misleading-success readbacks. The complete staged
 x86_64 source compiles to a nonloadable object. Its 25 additional imports are
 exactly the allowlisted IOKit/libkern symbols; all 406 resolve through the
 existing declared KDK providers. The 172 production inputs remain unchanged.
+
+The [copier-drain follow-up](validation/build34-r3-ih-workloop-turn-drain-offline-20261123.json)
+pauses an admitted copy while closing the route, confirms that cleanup does
+not enter IOKit removal or release the pins, then retries successfully once
+the copier exits. A separately paused removal still has only one owner;
+queued turns remain inert. The no-drain-check variant fails at entry to the
+remove call rather than on a barrier timeout. ASan/UBSan and TSan each passed
+8 closed and 385 modeled checks; 12 fault variants were rejected. The
+complete nonloadable staged source still resolves the same 406 imports.

@@ -148,6 +148,13 @@ def test(out, sdk, kdk):
                                  '(void)earlier; signalWorkAvailable();', True),
         'remove-with-kick-in-flight': ('if (__atomic_load_n(&kicks, __ATOMIC_ACQUIRE) != kKickClosed)',
                                        'if (!(__atomic_load_n(&kicks, __ATOMIC_ACQUIRE) & kKickClosed))', True),
+        'remove-with-copy-in-flight': ('    if (!turns.drained()) {\n'
+                                       '        setAttachment(Attachment::Attached);\n'
+                                       '        return kIOReturnBusy;\n'
+                                       '    }\n', '', True),
+        'no-copier-turn-lease': ('    decltype(turns)::Lease turn(turns);\n    if (turn && accepting()) {',
+                                 '    if (accepting()) {', True),
+        'leave-copier-turn-admission-open': ('    turns.close();\n', '', True),
         'remove-from-worker': ('    if (loop->onThread() || loop->inGate()) return kIOReturnNotPermitted;\n', '', True),
         'ignore-remove-status': ('removed == kIOReturnSuccess && !getWorkLoop()', '!getWorkLoop()', True),
         'ignore-attachment-readback': ('removed == kIOReturnSuccess && !getWorkLoop()', 'removed == kIOReturnSuccess', True),
@@ -167,6 +174,7 @@ def test(out, sdk, kdk):
                   rejected_mutants=list(mutations), previous_source_sha256=sha(previous.encode()),
                   staged_source_sha256=sha(proposed.encode()), protected_production_inputs=len(production),
                   staged_providerless_scheduler=True, native_irq_scheduler_bound=False,
+                  copier_turn_drained_before_workloop_removal=True,
                   native_event_backend_bound=False, native_teardown_deadline_proved=False,
                   native_open_admitted=False, old_writer_drain_proved=False,
                   IH_accessed=False, ISR_registered=False, GPU_executed=False, R3_complete=False, **native)

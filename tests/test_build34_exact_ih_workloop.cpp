@@ -190,7 +190,7 @@ int main() {
     CHECK(source->detach() == kIOReturnBusy && loop->removeCount == 0);
 
     beforeKick = [&] {
-        source->closeKicks();
+        source->closeAdmission();
         CHECK(source->detach() == kIOReturnSuccess);
     };
     source->hint();
@@ -211,7 +211,7 @@ int main() {
         source->hint();
     });
     wake.wait();
-    source->closeKicks();
+    source->closeAdmission();
     CHECK(source->detach() == kIOReturnBusy && loop->removeCount == 0);
     wake.resume();
     interrupt.join();
@@ -236,7 +236,7 @@ int main() {
         source->hint();
         CHECK(loop->turn() && !pending.calls && loop->wakeCount == 1);
         CHECK(invalidated.gpu.exactIHState == PhxBringup::ExactIHState::Retiring);
-        source->closeKicks();
+        source->closeAdmission();
         CHECK(source->detach() == kIOReturnSuccess);
         releaseCaller(invalidated, pending, source);
     }
@@ -253,7 +253,15 @@ int main() {
     std::thread worker([&] { CHECK(loop->turn()); });
     copy.wait();
     source->hint();
-    source->closeKicks();
+    source->closeAdmission();
+    beforeRemove = [&] { CHECK(false); };
+    CHECK(source->detach() == kIOReturnBusy && loop->removeCount == 0 && source->references == 3);
+    CHECK(beforeRemove);
+    beforeRemove = {};
+    CHECK(copying.gpu.exactIHState == PhxBringup::ExactIHState::Lost);
+    CHECK(paused.references == 2 && copying.gpu.exactIHBatchOrdinal == 0);
+    copy.resume();
+    worker.join();
     IOReturn detached = kIOReturnError;
     std::thread cleanup([&] {
         beforeRemove = [&] { removal.arrive(); };
@@ -261,10 +269,8 @@ int main() {
     });
     removal.wait();
     CHECK(source->detach() == kIOReturnNotReady && source->references == 3 && loop->removeCount == 1);
-    CHECK(copying.gpu.exactIHState == PhxBringup::ExactIHState::Lost);
+    CHECK(loop->turn(true) && paused.calls == 1);
     removal.resume();
-    copy.resume();
-    worker.join();
     cleanup.join();
     CHECK(detached == kIOReturnSuccess && !source->getWorkLoop() && paused.calls == 1);
     CHECK(copying.gpu.exactIHBatchOrdinal == 0 && loop->wakeCount == 1);
@@ -279,7 +285,7 @@ int main() {
         loop = source->getWorkLoop();
         loop->falseSuccess = falseSuccess;
         loop->failRemoveAfterUnlink = !falseSuccess;
-        source->closeKicks();
+        source->closeAdmission();
         CHECK(source->detach() == (falseSuccess ? kIOReturnNotReady : kIOReturnError));
         CHECK(source->references == (falseSuccess ? 3 : 2));
         CHECK(source->detach() == kIOReturnNotReady && loop->removeCount == 1);

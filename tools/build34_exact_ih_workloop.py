@@ -12,7 +12,7 @@ public:
     static PhxExactIHWorkSource *prepare(PhxBringup *, uint32_t, uint32_t, Capture, OSObject *);
     bool activate();
     void hint();
-    void closeKicks();
+    void closeAdmission();
     IOReturn detach();
 
 protected:
@@ -25,6 +25,7 @@ private:
     static constexpr uint64_t kKickClosed = 1ull << 63;
     static_assert(__atomic_always_lock_free(sizeof(uint64_t), nullptr), "IH kick admission requires lock-free atomics");
     alignas(uint64_t) uint64_t kicks{0};
+    phx34_exact::CallbackGate<1> turns;
     PhxBringup *gpu{nullptr};
     IOWorkLoop *loop{nullptr};
     OSObject *captureOwner{nullptr};
@@ -64,7 +65,7 @@ PhxExactIHWorkSource *PhxExactIHWorkSource::prepare(PhxBringup *gpu, uint32_t ri
     source->retain();
     const IOReturn attached = source->loop->addEventSource(source);
     if (attached != kIOReturnSuccess || source->getWorkLoop() != source->loop) {
-        source->closeKicks();
+        source->closeAdmission();
         gpu->loseExactIHRoute(source->route);
         if (attached != kIOReturnSuccess && !source->getWorkLoop()) source->release();
         else source->setAttachment(Attachment::Held);
@@ -97,12 +98,14 @@ void PhxExactIHWorkSource::hint() {
     if (accepting() && gpu->signalExactIH(route)) kick();
 }
 
-void PhxExactIHWorkSource::closeKicks() {
+void PhxExactIHWorkSource::closeAdmission() {
     __atomic_fetch_or(&kicks, kKickClosed, __ATOMIC_ACQ_REL);
+    turns.close();
 }
 
 bool PhxExactIHWorkSource::checkForWork() {
-    if (accepting()) {
+    decltype(turns)::Lease turn(turns);
+    if (turn && accepting()) {
         bool wake = false;
         gpu->collectExactIH(route, capture, captureOwner, wake);
         if (wake) kick();
@@ -117,6 +120,10 @@ IOReturn PhxExactIHWorkSource::detach() {
     if (!__atomic_compare_exchange(&attachment, &attached, &removing, false,
                                     __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) return kIOReturnNotReady;
     gpu->loseExactIHRoute(route);
+    if (!turns.drained()) {
+        setAttachment(Attachment::Attached);
+        return kIOReturnBusy;
+    }
     const IOReturn removed = getWorkLoop() == loop ? loop->removeEventSource(this) : kIOReturnNotAttached;
     const bool detached = removed == kIOReturnSuccess && !getWorkLoop();
     setAttachment(detached ? Attachment::Detached : Attachment::Held);
