@@ -322,6 +322,55 @@ for a native fence visibility test. No EFI, NVRAM, driver or power changes,
 new GPU submissions, or device operations were performed for this review.
 See the [sanitized record](validation/build34-r3-firmware-handoff-20261121.json).
 
+### Attribute preboot protocol clients to the PCI function
+
+Identify a candidate firmware predecessor on the exact Radeon PCI handle,
+not from the console GOP interface. The pinned OpenCore 1.0.8
+[console lookup hook](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcConsoleLib/ConsoleGop.c#L40-L57)
+can return the selected GOP for another handle. The
+[console setup](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcConsoleLib/ConsoleGop.c#L183-L216)
+can also install an existing GOP interface on the console handle. This
+reference does not establish which paths the installed loader used. It does
+show why a console handle, a matching framebuffer and a GOP interface
+address cannot identify the PCI driver binding. Similarly, EDK II's
+[GraphicsConsole start](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsole.c#L402-L412)
+opens GOP `BY_DRIVER`; that makes it a consumer of GOP, not the Radeon
+function's managing driver.
+
+UEFI 2.11 [`OpenProtocolInformation`](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-openprotocolinformation)
+gives a concrete attribution lead: get the current open entries for
+`EFI_PCI_IO_PROTOCOL` on the admitted PCI handle, separately from those for
+GOP. In the pinned EDK II [implementation](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Core/Dxe/Hand/Handle.c#L1438-L1525),
+this copies agent, controller, attributes and count from that protocol's open
+list under the database lock. It does not call the managing driver. An
+attribution-only observation would need to:
+
+1. Resolve one PCI handle against an independently admitted device path and
+   segment/bus/device/function, not vendor/device ID or console handle alone.
+   The EDK II [`GetLocation`](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Bus/Pci/PciBusDxe/PciIo.c#L1245-L1267)
+   reference returns cached fields. Verify the actual accessor contract
+   before use rather than reading PCI config to identify the handle.
+2. Distinguish `BY_DRIVER` on that PCI I/O instance from `BY_CHILD_CONTROLLER`,
+   GOP consumers and incidental lookups. Resolve the managing agent through
+   its [`EFI_DRIVER_BINDING_PROTOCOL`](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdePkg/Include/Protocol/DriverBinding.h#L175-L190)
+   to the loaded image; the binding handle need not equal the image handle.
+   Reject incomplete or changing observations and unresolvable agents.
+3. Collect and release the protocol metadata before the final memory-map
+   acquisition. The reference allocates an output buffer; do not insert this
+   into the exit callback or final memory-map/exit interval. Publish only
+   classified outcomes and counts, not handles, paths or firmware contents.
+
+Do not try to acquire the protocol to test ownership: the EDK II
+[`EXCLUSIVE` branch](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Core/Dxe/Hand/Handle.c#L1217-L1253)
+can disconnect the current managing driver. A proposed observation must not
+connect or disconnect drivers, call GOP methods, access registers or change
+EFI. A unique tracked agent would identify a firmware driver to investigate,
+not the IH owner. An empty list cannot rule out a prior binding, access
+outside that protocol, firmware-internal writers or writes after the sample.
+No preboot capture was made; the production gate still requires a separate
+stop and completed-write boundary before any storage reuse. See the
+[sanitized source review](validation/build34-r3-preboot-pci-attribution-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

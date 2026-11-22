@@ -62,6 +62,11 @@ also rejects a same-queue vector unless it matches the submitted packet's
 independently sealed context. The references show this field's use with MES
 tags, not nonzero untagged echo on the two live legacy queues. A match alone
 cannot rule out replay of the same context or supply ownership and drain.
+For the unknown firmware predecessor, [preboot PCI protocol attribution](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#attribute-preboot-protocol-clients-to-the-pci-function)
+identifies a metadata-only lead for the exact function's managing driver.
+Neither an OpenCore console GOP match nor UEFI protocol exclusivity is an IH
+handoff. No preboot sample was collected, and any candidate predecessor still
+needs an independent device stop and completed-write boundary.
 
 ## Execution order
 

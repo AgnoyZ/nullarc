@@ -1,0 +1,29 @@
+{
+  "status": "source-review-only-preboot-pci-protocol-attribution",
+  "kernel_build_scope": 34,
+  "parent": "c3680952141d40ceb0f5bfa8aa32f933ee9adc91",
+  "references": {
+    "uefi_specification": "2.11",
+    "edk2": "46548b1adac82211d8d11da12dd914f41e7aa775",
+    "opencore_1_0_8": "6fe4d15cb66596d99d8cfedce69d8fc6dad71886"
+  },
+  "reference_findings": {
+    "console_gop_can_be_routed_or_aliased": true,
+    "gop_by_driver_consumer_is_not_pci_io_manager": true,
+    "pci_location_accessor_returns_cached_fields_in_reference": true,
+    "open_information_copies_protocol_scoped_entries_and_allocates": true,
+    "driver_binding_handle_can_differ_from_image_handle": true,
+    "exclusive_open_can_disconnect_existing_manager": true
+  },
+  "installed_firmware_accessor_attested": false,
+  "preboot_metadata_collected": false,
+  "predecessor_identified_on_target": false,
+  "ih_owner_attested": false,
+  "old_writer_drain_proved": false,
+  "driver_binding_changed": false,
+  "efi_changed": false,
+  "mmio_accessed": false,
+  "interrupt_registered": false,
+  "gpu_executed": false,
+  "r3_accepted": false
+}
