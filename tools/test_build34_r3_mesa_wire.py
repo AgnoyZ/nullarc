@@ -9,7 +9,11 @@ import shlex
 import subprocess
 import sys
 
-from build34_exact_dispatch_mode import DISPATCH, MODE_GATE, previous_stage, stage as dispatch_stage
+from build34_exact_overlap_snapshot import DECLARATIONS, GLOBAL
+from build34_exact_progress_wire import (
+    DISPATCH, PREFIX as NATIVE_PREFIX, PREFIX_DECL, PROGRESS, PROGRESS_DECL,
+    previous_stage, stage as progress_stage, stage_header as progress_header,
+)
 from build34_exact_submit import once
 from test_build34_exact_ownership import DRIVER, ROOT, method, sha
 from test_build34_exact_transport import DRM, KEXT, PATCH, PREFIX, SHAPE_PATCHES
@@ -34,24 +38,29 @@ def test(mesa, out):
     native_case = 'tools/test_build34_exact_submit_receipt.py'
     transport_record = 'docs/validation/build34-r3-transport-offline-20261121.json'
     native_record = 'docs/validation/build34-r3-submit-receipt-offline-20261121.json'
-    mapping_record = 'docs/validation/build34-r3-vm-ready-offline-20261122.json'
+    dispatch_record = 'docs/validation/build34-r3-mesa-dispatch-offline-20261122.json'
     adapter = 'tools/build34_r3_mesa_wire.c'
     fixture = 'tests/test_build34_r3_mesa_wire.cpp'
     native_evidence = json.loads((ROOT / native_record).read_text())
     mesa_evidence = json.loads((ROOT / transport_record).read_text())
     patches = [*SHAPE_PATCHES, PATCH]
     paths = [adapter, 'tools/build34_r3_mesa_wire.h', 'tools/test_build34_r3_mesa_wire.py', fixture,
-             'tools/build34_exact_dispatch_mode.py', mapping_record, transport_record, native_record,
+             'tools/build34_exact_dispatch_mode.py', 'tools/build34_exact_progress_wire.py',
+             'tools/build34_exact_progress_wire.h', 'tools/build34_exact_fence32.h', dispatch_record,
+             transport_record, native_record,
              *patches, *native_evidence['input_sha256']]
     inputs = {name: (ROOT / name).read_bytes() for name in paths}
     pinned = {**native_evidence['input_sha256'], **{name: mesa_evidence['input_sha256'][name] for name in patches}}
     if any(sha(inputs[name]) != digest for name, digest in pinned.items()):
         raise ValueError('Previously reviewed inputs changed')
     driver = inputs[DRIVER].decode()
-    before, after = previous_stage(driver), dispatch_stage(driver)
-    if (sha(before.encode()) != json.loads(inputs[mapping_record])['staged_sha256'] or
-            once(after, MODE_GATE, '') != before):
-        raise ValueError('Composed mode gate changed source outside the dispatch delta')
+    before, after = previous_stage(driver), progress_stage(driver)
+    restored = once(after, method(after, DISPATCH), method(before, DISPATCH))
+    restored = once(restored, method(after, NATIVE_PREFIX) + '\n' + method(after, PROGRESS) + '\n', '')
+    for addition in ('#include "build34_exact_progress_wire.h"\n', PREFIX_DECL, PROGRESS_DECL):
+        restored = once(restored, addition, '')
+    if sha(before.encode()) != json.loads(inputs[dispatch_record])['staged_dispatch_source_sha256'] or restored != before:
+        raise ValueError('Unexpected progress wire predecessor or out-of-scope delta')
     out.mkdir(parents=True, mode=0o700)
     frozen, closure, native = out / 'frozen', out / 'mesa', out / 'native-private'
     stage(inputs, frozen)
@@ -83,14 +92,37 @@ def test(mesa, out):
     paired_native = native / 'paired-native-receipt.h'
     generated_native = (native / 'submit-receipt.cpp').read_text()
     generated_native = once(generated_native, 'int main() {\n', 'void previous_receipt_suite() {\n')
+    native_headers = native / 'source/src/phxbringup'
+    ownership = native_headers / 'build34_exact_ownership.h'
+    ownership.write_text(progress_header(ownership.read_text()))
     binding = (native / 'submit-binding-CPU-only.h').read_text()
     paired_binding = native / 'paired-native-binding.h'
-    paired_binding.write_text(once(binding, '    bool hello=false;\n', '    bool hello=false, boCleanupFault=false;\n'
-                                    '    uint32_t legacyState=2;\n'))
+    binding = once(binding, '    bool hello=false;\n', '    bool hello=false, boCleanupFault=false;\n'
+                   '    uint32_t legacyState=2;\n' + PROGRESS_DECL)
+    binding = once(binding, '    bool exactAdmissionClosed() const;\n',
+                   '    bool exactAdmissionClosed() const;\n' + PREFIX_DECL + DECLARATIONS +
+                   '    bool exactVMFault=false, exactQueueAdopted[2]{true,true};\n'
+                   '    phx34_exact::FenceWindow32 exactFenceWindow[2];\n'
+                   '    bool (*exactDwordReader)(const volatile uint32_t *, uint32_t *)=nullptr;\n'
+                   '    bool readExactFence32(uint32_t, uint64_t *);\n'
+                   '    struct VmCtx { bool busy=false; uint64_t queueSequence[2]{}, queueGeneration[2]{}, newest=0; };\n'
+                   '    static constexpr unsigned kMaxCtx=2;\n'
+                   '    VmCtx vm[kMaxCtx];\n'
+                   '    bool vmWorkCurrent(const VmCtx &) const;\n')
+    binding = once(binding, '#include "build34_exact_callbacks.h"',
+                   '#include "build34_exact_callbacks.h"\n#include "build34_exact_fence32.h"')
+    binding = once(binding, '    exactQueueSubmitted[actualQueue] = seq;',
+                   '    if (exactDwordReader) CHECK(exactFenceWindow[actualQueue].submit(exactQueueGeneration[actualQueue], seq));\n'
+                   '    exactQueueSubmitted[actualQueue] = seq;')
+    binding = once(binding, 'CHECK(ms==1 && !gpuHeld); testTicks+=1000000;',
+                   'CHECK(ms==1 && !gpuHeld); event("poll-sleep"); testTicks+=1000000;')
+    paired_binding.write_text(binding)
     generated_native = once(generated_native, '#include "submit-binding-CPU-only.h"',
-                            '#include "paired-native-binding.h"')
-    paired_native.write_text(once(generated_native, method(generated_native, DISPATCH), method(after, DISPATCH)))
-    native_headers = native / 'source/src/phxbringup'
+                            '#include "paired-native-binding.h"\n#include "build34_exact_progress_wire.h"\n'
+                            'static constexpr unsigned PHX_KEXT_BUILD = 34;')
+    generated_native = once(generated_native, method(generated_native, DISPATCH), method(after, DISPATCH))
+    signatures = [NATIVE_PREFIX, PROGRESS, GLOBAL, 'bool PhxBringup::readExactFence32(', 'bool PhxBringup::vmWorkCurrent(']
+    paired_native.write_text(generated_native + '\n'.join(method(after, sig) for sig in signatures))
     includes = ['-I' + str(path) for path in [native, native_headers, frozen / 'tools',
                 native / 'frozen/src/phxbringup', *(closure / name for name in ('include', 'include/darwin', 'src', 'src/amd', PREFIX))]]
     allowed = {str(path.resolve()) for root in (frozen, closure, native_headers, native / 'frozen')
@@ -138,10 +170,11 @@ def test(mesa, out):
                   asan_ubsan_checks=checks['memory'], tsan_checks=checks['thread'],
                   frozen_Mesa_inputs=len(mesa_source), protected_production_inputs=len(names),
                   staged_native_submit_source_sha256=native_evidence['staged_driver_sha256'],
-                  staged_dispatch_source_sha256=sha(after.encode()),
+                  staged_progress_source_sha256=sha(after.encode()),
                   staged_Mesa_transport_sha256=sha(mesa_staged[KEXT]),
                   native_regression_groups=native_result['groups'],
-                  fixture_prefix_only=True, native_session_negotiated=False, iokit_opened=False,
+                  actual_checked_prefix_in_cpu_fixture=True, session_discovered_in_cpu_fixture=True,
+                  native_mode_admitted=False, iokit_opened=False,
                   production_exact_capability_enabled=False, installed=False, loaded=False,
                   GPU_executed=False, R3_complete=False)
     (out / 'result-private.json').write_text(json.dumps(report, indent=2) + '\n')

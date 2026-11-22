@@ -11,22 +11,31 @@ struct Bridge {
     PhxBringup device;
     IOAccelPhxNativeClient client;
     const uint64_t owner;
-    unsigned submits = 0, waits = 0, acks = 0, prefixes = 0;
+    unsigned submits = 0, waits = 0, acks = 0, prefixes = 0, sessions = 0;
     uint32_t corruptSelector = 0;
     unsigned corruption = 0;
-    bool badPrefix = false;
     phx34_mesa_wire wire;
     acd_exact_backend backend;
     acd_kext *transport;
 
+    static bool readDword(const volatile uint32_t *value, uint32_t *out) {
+        CHECK(clientHeld && gpuHeld);
+        std::memcpy(out, const_cast<const uint32_t *>(value), sizeof(*out));
+        event("prefix-dword");
+        return true;
+    }
+
     static int call(void *context, uint32_t selector, const void *input, size_t inputSize,
                     void *output, size_t *outputSize) {
         auto &bridge = *static_cast<Bridge *>(context);
-        CHECK(*outputSize == 64 && inputSize == (selector == 66 ? 2112 : 64));
+        const bool progress = selector == PHX34_R3_SEL_SESSION || selector == PHX34_R3_SEL_PREFIX;
+        CHECK(*outputSize == (progress ? 48 : 64) && inputSize == (progress ? 32 : selector == 66 ? 2112 : 64));
         switch (selector) {
         case 66: ++bridge.submits; break;
         case 64: ++bridge.waits; break;
         case 65: ++bridge.acks; break;
+        case PHX34_R3_SEL_PREFIX: ++bridge.prefixes; break;
+        case PHX34_R3_SEL_SESSION: ++bridge.sessions; break;
         default: CHECK(false);
         }
         IOExternalMethodArguments args;
@@ -47,6 +56,23 @@ struct Bridge {
         default: CHECK(status == kIOReturnSuccess);
         }
         if (bridge.corruptSelector == selector) {
+            if (progress) {
+                auto &reply = *static_cast<phx34_r3_progress_reply *>(output);
+                switch (bridge.corruption) {
+                case 0: return 0x10000003;
+                case 1: --*outputSize; break;
+                case 2: ++reply.version; break;
+                case 3: --reply.size; break;
+                case 4: ++reply.build; break;
+                case 5: ++reply.flags; break;
+                case 6: ++reply.target; break;
+                case 7: reply.owner = selector == PHX34_R3_SEL_PREFIX ? reply.owner + 1 : 0; break;
+                case 8: reply.retired = UINT64_MAX; break;
+                case 9: ++reply.reserved; break;
+                default: CHECK(false);
+                }
+                return 0;
+            }
             auto &reply = *static_cast<phx34_r3_reply *>(output);
             switch (bridge.corruption) {
             case 0: return 0x10000003;
@@ -69,19 +95,18 @@ struct Bridge {
         return 0;
     }
 
-    static int prefix(void *context, uint64_t target, uint64_t timeout, acd_exact_snapshot *out) {
-        auto &bridge = *static_cast<Bridge *>(context);
-        CHECK(timeout <= N48N_WAIT_CAP_NS && (target || !timeout));
-        ++bridge.prefixes;
-        *out = {bridge.owner + bridge.badPrefix, bridge.device.gpuRetired()};
-        return 0;
-    }
-
-    Bridge() : owner((setup(client, device), ownerID(client))), wire{owner, this, call, prefix} {
+    explicit Bridge(bool negotiate = true) : owner((setup(client, device), ownerID(client))), wire{0, this, call} {
+        testTicks = 10000000;
+        device.exactDwordReader = readDword;
+        for (unsigned queue = 0; queue < 2; ++queue)
+            CHECK(device.exactFenceWindow[queue].seed(device.exactQueueGeneration[queue], device.gSeq));
         const acd_kext_ops ops{.call = nullptr};
         transport = acd_kext_create(&ops, nullptr);
-        CHECK(transport && phx34_mesa_wire_backend(&wire, &backend) == 0);
-        CHECK(acd_kext_set_exact_backend(transport, &backend) == 0);
+        CHECK(transport);
+        if (negotiate) {
+            CHECK(phx34_mesa_wire_backend(&wire, &backend) == 0 && backend.owner == owner);
+            CHECK(acd_kext_set_exact_backend(transport, &backend) == 0);
+        }
     }
 
     ~Bridge() { acd_kext_destroy(transport); }
@@ -164,7 +189,8 @@ static void uncertain_replies() {
     uint64_t sequence = 0;
     CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == 0);
     bridge.device.setFence(1, sequence);
-    bridge.badPrefix = true;
+    bridge.corruptSelector = PHX34_R3_SEL_PREFIX;
+    bridge.corruption = 7;
     bool busy = true;
     CHECK(acd_kext_wait_seq(bridge.transport, sequence, 0, &busy, nullptr) == -EPROTO && busy);
     CHECK(bridge.prefixes == 1 && !bridge.acks && bridge.client.exactRegistry.occupied() == 1);
@@ -187,7 +213,8 @@ static void sequence_modes() {
     CHECK(legacy.start(&legacyDevice));
     legacy.hello = true;
     Request legacyRequest;
-    for (uint32_t selector : {PHX34_R3_SEL_SUBMIT_RECEIPT, PHX34_R3_SEL_WAIT_RECEIPT, PHX34_R3_SEL_ACK_RECEIPT})
+    for (uint32_t selector : {PHX34_R3_SEL_SUBMIT_RECEIPT, PHX34_R3_SEL_WAIT_RECEIPT, PHX34_R3_SEL_ACK_RECEIPT,
+                              PHX34_R3_SEL_SESSION, PHX34_R3_SEL_PREFIX})
         CHECK(legacy.externalMethod(selector, &legacyRequest.a, nullptr, nullptr, nullptr) == kIOReturnUnsupported);
     CHECK(legacyRequest.a.scalarOutput[0] == sentinel && legacyDevice.gSeq == 99);
     CHECK(legacy.externalMethod(PHXN_SEL_WAITSEQ, &legacyRequest.a, nullptr, nullptr, nullptr) == 123);
@@ -195,11 +222,134 @@ static void sequence_modes() {
     CHECK(legacyRequest.a.scalarOutput[0] == 100 && legacyDevice.gSeq == 100);
 }
 
+static void checked_progress() {
+    reset();
+    Bridge bridge;
+    CHECK(bridge.sessions == 1 && !bridge.prefixes && !packetWrites);
+    CHECK(phx34_mesa_wire_backend(&bridge.wire, &bridge.backend) == -EBUSY && bridge.sessions == 1);
+    uint64_t compute = 0, gfx = 0;
+    CHECK(bridge.submit(AMDGPU_HW_IP_COMPUTE, &compute) == 0);
+    CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &gfx) == 0);
+    bridge.device.setFence(1, gfx);
+    acd_wait_status snapshot{};
+    bool busy = false;
+    unsigned sleeps = 0;
+    eventHook = [&](const char *name) {
+        if (!std::strcmp(name, "poll-sleep")) {
+            CHECK(!clientHeld && !gpuHeld);
+            ++sleeps;
+        }
+    };
+    CHECK(acd_kext_wait_seq(bridge.transport, N48N_SEQ_LAST, 2000000, &busy, &snapshot) == 0 && busy);
+    CHECK(snapshot.retired == 99 && sleeps == 2 && !bridge.acks && !bridge.waits);
+    eventHook = {};
+    bridge.device.setFence(0, compute);
+    CHECK(acd_kext_wait_seq(bridge.transport, N48N_SEQ_LAST, 1, &busy, &snapshot) == 0 && !busy);
+    CHECK(snapshot.retired == gfx && bridge.acks == 2 && !bridge.waits);
+    CHECK(bridge.prefixes == 2 && !bridge.client.exactRegistry.occupied());
+}
+
+static void invalid_progress() {
+    for (uint32_t selector : {PHX34_R3_SEL_SESSION, PHX34_R3_SEL_PREFIX}) {
+        for (unsigned fault = 0; fault != 10; ++fault) {
+            reset();
+            Bridge bridge(selector != PHX34_R3_SEL_SESSION);
+            bridge.corruptSelector = selector;
+            bridge.corruption = fault;
+            if (selector == PHX34_R3_SEL_SESSION) {
+                acd_exact_backend untouched{};
+                untouched.owner = UINT64_MAX;
+                CHECK(phx34_mesa_wire_backend(&bridge.wire, &untouched) < 0);
+                CHECK(!bridge.wire.owner && untouched.owner == UINT64_MAX && !bridge.submits);
+            } else {
+                acd_exact_snapshot untouched{UINT64_MAX, UINT64_MAX};
+                CHECK(bridge.backend.wait_prefix(bridge.backend.ctx, 0, 0, &untouched) < 0);
+                CHECK(untouched.owner == UINT64_MAX && untouched.retired == UINT64_MAX);
+            }
+        }
+    }
+    for (unsigned fault = 0; fault != 7; ++fault) {
+        reset();
+        Bridge bridge(false);
+        switch (fault) {
+        case 0: bridge.client.hello = false; break;
+        case 1: bridge.device.exactDwordReader = nullptr; break;
+        case 2: bridge.device.exactQueueAdopted[1] = false; break;
+        case 3: ++bridge.device.exactQueueGeneration[1]; break;
+        case 4: bridge.device.isSleeping = true; break;
+        case 5: bridge.device.exactVMFault = true; break;
+        case 6: bridge.device.exactCallbacks.close(); break;
+        }
+        acd_exact_backend untouched{};
+        untouched.owner = UINT64_MAX;
+        CHECK(phx34_mesa_wire_backend(&bridge.wire, &untouched) == -ENODEV);
+        CHECK(!bridge.wire.owner && untouched.owner == UINT64_MAX);
+    }
+    reset();
+    Bridge bridge;
+    phx34_r3_progress_request request{PHX34_R3_WIRE_VERSION, sizeof(request), bridge.owner + 1, 0, 0};
+    phx34_r3_progress_reply reply{};
+    reply.owner = UINT64_MAX;
+    size_t size = sizeof(reply);
+    CHECK(static_cast<uint32_t>(Bridge::call(&bridge, PHX34_R3_SEL_PREFIX, &request, sizeof(request), &reply, &size)) ==
+          ACD_KR_NOT_FOUND && reply.owner == UINT64_MAX);
+    request.owner = bridge.owner;
+    request.target = 1;
+    CHECK(static_cast<uint32_t>(Bridge::call(&bridge, PHX34_R3_SEL_PREFIX, &request, sizeof(request), &reply, &size)) ==
+          ACD_KR_BAD_ARGUMENT && reply.owner == UINT64_MAX);
+    request.target = 0;
+    eventHook = [&](const char *name) {
+        if (!std::strcmp(name, "prefix-dword")) bridge.client.exactClientCallbacks.close();
+    };
+    CHECK(static_cast<uint32_t>(Bridge::call(&bridge, PHX34_R3_SEL_PREFIX, &request, sizeof(request), &reply, &size)) ==
+          ACD_KR_NOT_READY && reply.owner == UINT64_MAX);
+    eventHook = {};
+}
+
+static void zero_and_queue_loss() {
+    reset();
+    Bridge zero(false);
+    zero.device.gSeq = 0;
+    for (unsigned queue = 0; queue < 2; ++queue) {
+        zero.device.exactQueueSubmitted[queue] = 0;
+        zero.device.setFence(queue, 0);
+        zero.device.exactFenceWindow[queue].invalidate();
+        CHECK(zero.device.exactFenceWindow[queue].seed(++zero.device.exactQueueGeneration[queue], 0));
+    }
+    CHECK(phx34_mesa_wire_backend(&zero.wire, &zero.backend) == 0 && zero.backend.owner == zero.owner);
+    acd_exact_snapshot observation{UINT64_MAX, UINT64_MAX};
+    CHECK(zero.backend.wait_prefix(zero.backend.ctx, 0, 0, &observation) == 0);
+    CHECK(observation.owner == zero.owner && !observation.retired);
+
+    reset();
+    Bridge loss;
+    uint64_t sequence = 0;
+    CHECK(loss.submit(AMDGPU_HW_IP_GFX, &sequence) == 0);
+    unsigned sleeps = 0;
+    eventHook = [&](const char *name) {
+        if (!std::strcmp(name, "poll-sleep")) {
+            CHECK(!clientHeld && !gpuHeld);
+            loss.device.exactQueueLive[0] = false;
+            ++sleeps;
+        }
+    };
+    bool busy = false;
+    acd_wait_status status{UINT64_MAX, UINT64_MAX};
+    CHECK(acd_kext_wait_seq(loss.transport, N48N_SEQ_LAST, 2000000, &busy, &status) == -ENODEV);
+    eventHook = {};
+    CHECK(sleeps == 1 && status.retired == UINT64_MAX && !loss.acks);
+    CHECK(loss.client.exactRegistry.occupied() == 1);
+    CHECK(loss.submit(AMDGPU_HW_IP_GFX, &sequence) == -ECANCELED && loss.submits == 1);
+}
+
 int main() {
     paired_round_trip();
     full_receipts();
     uncertain_replies();
     sequence_modes();
+    checked_progress();
+    invalid_progress();
+    zero_and_queue_loss();
     std::printf("PASS staged Mesa/native wire: %llu checks; GPU_executed=false\n",
                 static_cast<unsigned long long>(checks.load()));
 }

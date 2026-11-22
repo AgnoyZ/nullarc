@@ -172,3 +172,33 @@ prove wrong-mode requests do not reach sequence handlers, and a legacy
 client still reaches both legacy routes. ASan/UBSan and TSan each pass
 5,765 checks. See the [dispatch pairing record](validation/build34-r3-mesa-dispatch-offline-20261122.json).
 Omit the transform to roll it back.
+
+### Bound-session query and checked prefix
+
+The [progress wire stage](../tools/build34_exact_progress_wire.py) replaces
+the injected prefix callback and owner value in the CPU pairing. The Mesa
+adapter uses the same call interface for submit, wait, ACK, prefix (67) and
+session query (68). Both new selectors require the exact-client dispatch
+mode and use a 32-byte request and a 48-byte reply. The session query checks
+that an already bound client can read progress, then returns its owner,
+build and capability flags. It does not negotiate or admit an exact client.
+
+The independent prefix path calls `exactGlobalRetiredLocked` under the
+service callback lease and GPU lock. It requires valid fence observations
+from both adopted queues. A valid zero prefix is a successful reply; an
+invalid observation is an error, not a zero prefix. If a positive-budget
+prefix wait has not reached its target, it checks elapsed time and retries
+with neither the client nor GPU lock held during the polling sleep. A valid
+below-target reply at the deadline means pending. The extra snapshot after
+an exact wait is independent of that wait's receipt and can stay below an
+unfinished earlier submission on the other queue.
+
+The paired CPU run passes 7,886 checks each under ASan/UBSan and TSan, with
+30 pinned Mesa inputs and all 172 protected production inputs unchanged.
+It covers a legal zero prefix, failed reads, stale identity, malformed
+progress replies, unlocked polling and queue loss during sleep. See the
+[progress pairing record](validation/build34-r3-mesa-progress-offline-20261122.json).
+The reader uses CPU storage and lifecycle state is modeled. No IOKit
+connection, trusted BAR0 read, AMD event or production exact capability is
+enabled. The CPU-fence refusal and legacy runtime behavior remain. Rollback
+is to omit this isolated stage and use the preceding adapter and runner.

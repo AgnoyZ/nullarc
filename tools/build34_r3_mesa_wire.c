@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "build34_r3_mesa_wire.h"
+#include "build34_exact_progress_wire.h"
 #include "build34_exact_submit_wire.h"
 
 #include <errno.h>
@@ -116,19 +117,31 @@ wire_receipt(const struct phx34_mesa_wire *wire, uint32_t selector, const struct
 }
 
 static int
-wire_prefix(void *context, uint64_t target, uint64_t timeout_ns, struct acd_exact_snapshot *out)
+wire_progress(const struct phx34_mesa_wire *wire, uint32_t selector, uint64_t target,
+              uint64_t timeout_ns, struct acd_exact_snapshot *out)
 {
-   const struct phx34_mesa_wire *wire = context;
    if (target == UINT64_MAX || timeout_ns > PHXN_WAIT_CAP_NS || (!target && timeout_ns))
       return -EINVAL;
-   struct acd_exact_snapshot snapshot = {0};
-   int result = wire->wait_prefix(wire->ctx, target, timeout_ns, &snapshot);
+   const struct phx34_r3_progress_request request = {.version = PHX34_R3_WIRE_VERSION,
+      .size = sizeof(request), .owner = wire->owner, .target = target, .timeout_ns = timeout_ns};
+   struct phx34_r3_progress_reply reply = {0};
+   size_t output_size = sizeof(reply);
+   int result = wire->call(wire->ctx, selector, &request, sizeof(request), &reply, &output_size);
    if (result)
-      return result;
-   if (snapshot.owner != wire->owner || snapshot.retired == UINT64_MAX)
+      return acd_kr_to_errno(selector, result);
+   if (output_size != sizeof(reply) || reply.version != PHX34_R3_WIRE_VERSION ||
+       reply.size != sizeof(reply) || reply.build != PHX34_R3_PROGRESS_BUILD ||
+       reply.flags != PHX34_R3_PROGRESS_FLAGS || reply.target != target || reply.reserved ||
+       !valid_id(reply.owner) || (wire->owner && reply.owner != wire->owner) || reply.retired == UINT64_MAX)
       return -EPROTO;
-   *out = snapshot;
+   *out = (struct acd_exact_snapshot){.owner = reply.owner, .retired = reply.retired};
    return 0;
+}
+
+static int
+wire_prefix(void *context, uint64_t target, uint64_t timeout_ns, struct acd_exact_snapshot *out)
+{
+   return wire_progress(context, PHX34_R3_SEL_PREFIX, target, timeout_ns, out);
 }
 
 static int
@@ -161,8 +174,15 @@ wire_ack(void *context, const struct acd_exact_receipt *receipt)
 int
 phx34_mesa_wire_backend(struct phx34_mesa_wire *wire, struct acd_exact_backend *out)
 {
-   if (!wire || !out || !valid_id(wire->owner) || !wire->call || !wire->wait_prefix)
+   if (!wire || !out || !wire->call)
       return -EINVAL;
+   if (wire->owner)
+      return -EBUSY;
+   struct acd_exact_snapshot snapshot;
+   int result = wire_progress(wire, PHX34_R3_SEL_SESSION, 0, 0, &snapshot);
+   if (result)
+      return result;
+   wire->owner = snapshot.owner;
    *out = (struct acd_exact_backend){.ctx = wire, .owner = wire->owner, .submit = wire_submit,
       .wait = wire_wait, .ack = wire_ack, .wait_prefix = wire_prefix};
    return 0;

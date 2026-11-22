@@ -9,8 +9,6 @@ struct phx34_mesa_wire {
    void *ctx;
    int (*call)(void *ctx, uint32_t selector, const void *input, size_t input_size,
                void *output, size_t *output_size);
-   int (*wait_prefix)(void *ctx, uint64_t target, uint64_t timeout_ns,
-                      struct acd_exact_snapshot *out);
 };
 
 int phx34_mesa_wire_backend(struct phx34_mesa_wire *wire, struct acd_exact_backend *out);
