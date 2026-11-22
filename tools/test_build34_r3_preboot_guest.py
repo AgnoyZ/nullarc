@@ -88,8 +88,9 @@ def main():
                     "-m", "256", "-smp", "1", "-display", "none", "-monitor", "none", "-serial", "stdio",
                     "-nic", "none", "-no-reboot", "-drive", f"if=pflash,format=raw,readonly=on,file={code}",
                     "-drive", f"if=pflash,format=raw,file={variables}", "-drive",
-                    f"if=virtio,format=raw,readonly=on,file=fat:ro:{esp}"])
-        print("PASS isolated UEFI guest attribution, refusal and cleanup (synthetic PCI protocols)")
+                    f"if=none,id=bootdisk,format=raw,readonly=on,file=fat:ro:{esp}", "-device",
+                    "virtio-blk-pci,drive=bootdisk,addr=0x5,disable-modern=on"])
+        print("PASS isolated UEFI guest attribution, refusal and cleanup (synthetic and emulated PCI)")
         print(f"guest_application_sha256={digest}")
 
 

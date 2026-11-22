@@ -21,7 +21,7 @@ static const EFI_GUID path_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
 static const EFI_GUID binding_guid = EFI_DRIVER_BINDING_PROTOCOL_GUID;
 static const EFI_GUID image_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 
-static UINT8 controller, manager, image, child, console, image_memory, root_handle, other_root_handle;
+static UINT8 controller, manager, image, child, console, image_memory, root_handle, other_root_handle, other_controller;
 static EFI_DEVICE_PATH_PROTOCOL device_path, other_path;
 static EFI_PCI_IO_PROTOCOL pci, other_pci;
 static EFI_DRIVER_BINDING_PROTOCOL binding;
@@ -42,6 +42,14 @@ typedef enum {
 
 static LOCATION_SCENARIO location_scenario;
 static UINTN location_reads, locate_calls, root_locates, root_io_reads;
+
+typedef enum {
+    PATH_OK, PATH_NULL_ACCESSOR, PATH_NO_SERVICE, PATH_BAD_SEAL, PATH_UNKNOWN_SEGMENT, PATH_NO_PCI_HANDLES,
+    PATH_OVERSIZED_HANDLES, PATH_PARTIAL_HANDLE, PATH_NULL_HANDLE, PATH_PREFIX_ONLY, PATH_DUP_ROOT,
+    PATH_DUP_ENDPOINT, PATH_LATE_DUP_ENDPOINT, PATH_LATE_ENDPOINT_REPLACED, PATH_LATE_ROOT_REPLACED
+} PATH_SCENARIO;
+
+static PATH_SCENARIO path_scenario;
 
 typedef struct {
     ACPI_HID_DEVICE_PATH Root;
@@ -81,6 +89,12 @@ lookup(EFI_HANDLE handle, EFI_GUID *guid, VOID **interface)
             *interface = root_locates == 2 && location_scenario == ROOT_LATE_PATH ? &other_root_path : &root_path;
             return EFI_SUCCESS;
         }
+        if (handle == &child || handle == &other_controller) {
+            *interface = handle == &child ? &prefix.Root.Header : published_path;
+            return EFI_SUCCESS;
+        }
+        if (handle == &console)
+            return EFI_UNSUPPORTED;
         CHECK(handle == &controller);
         ++path_reads;
         *interface = change_path && path_reads == 2 ? &other_path : published_path;
@@ -169,6 +183,7 @@ reset(void)
     location_reads = locate_calls = root_locates = root_io_reads = 0;
     target_reads_at_sample = 1;
     location_scenario = LOCATION_OK;
+    path_scenario = PATH_OK;
     published_path = &device_path;
     change_path = change_pci = alias_buffer = change_image = empty_base = missing_binding = fail_release = FALSE;
 }
@@ -297,6 +312,86 @@ get_location(EFI_PCI_IO_PROTOCOL *interface, UINTN *segment, UINTN *bus, UINTN *
     return EFI_SUCCESS;
 }
 
+static EFI_STATUS EFIAPI
+enumerate_handles(EFI_LOCATE_SEARCH_TYPE search, EFI_GUID *guid, VOID *key, UINTN *size, EFI_HANDLE *handles)
+{
+    CHECK(search == ByProtocol && key == NULL && *size == 256 * sizeof(*handles));
+    if (memcmp(guid, &root_guid, sizeof(*guid)) == 0) {
+        CHECK(++root_locates <= 2);
+        handles[0] = &root_handle;
+        if (path_scenario == PATH_DUP_ROOT) {
+            handles[1] = &other_root_handle;
+            *size = 2 * sizeof(*handles);
+        } else {
+            *size = sizeof(*handles);
+        }
+        return EFI_SUCCESS;
+    }
+    CHECK(memcmp(guid, &pci_guid, sizeof(*guid)) == 0 && ++locate_calls <= 2);
+    CHECK(root_locates == 1 && root_io_reads == 1);
+    if (path_scenario == PATH_NO_PCI_HANDLES)
+        return EFI_NOT_FOUND;
+    if (path_scenario == PATH_OVERSIZED_HANDLES) {
+        *size += sizeof(*handles);
+        return EFI_BUFFER_TOO_SMALL;
+    }
+    handles[0] = &child;
+    handles[1] = &console;
+    handles[2] = path_scenario == PATH_NULL_HANDLE ? NULL : &controller;
+    *size = (path_scenario == PATH_PREFIX_ONLY ? 2 : 3) * sizeof(*handles);
+    if (path_scenario == PATH_PARTIAL_HANDLE)
+        --*size;
+    if (path_scenario == PATH_DUP_ENDPOINT || (path_scenario == PATH_LATE_DUP_ENDPOINT && locate_calls == 2)) {
+        handles[3] = &other_controller;
+        *size += sizeof(*handles);
+    }
+    return EFI_SUCCESS;
+}
+
+static void
+exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots)
+{
+    reset();
+    path_scenario = scenario;
+    target_reads_at_sample = 2;
+    sealed_path = installed_path = valid_path;
+    published_path = &installed_path.Root.Header;
+    prefix.Root = valid_path.Root;
+    prefix.Bridge = valid_path.Bridge;
+    prefix.End = valid_path.End;
+    root_path = other_root_path = (struct ROOT_PATH){valid_path.Root, valid_path.End};
+    root_io = other_root_io = (EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL){.SegmentNumber = 2};
+    pci.GetLocation = other_pci.GetLocation = get_location;
+    EFI_BOOT_SERVICES boot = {.HandleProtocol = lookup, .OpenProtocolInformation = open_information,
+                              .FreePool = release_buffer, .LocateHandle = enumerate_handles};
+    PHX34_PREBOOT_PCI_PATH_IDENTITY identity = {(const UINT8 *)&sealed_path, sizeof(sealed_path), 2};
+    PHX34_PREBOOT_PCI_PATH_OBSERVATION observation = {{&console, &console, 123}};
+
+    switch (scenario) {
+    case PATH_NULL_ACCESSOR: pci.GetLocation = NULL; break;
+    case PATH_NO_SERVICE: boot.LocateHandle = NULL; break;
+    case PATH_BAD_SEAL: sealed_path.End.SubType = END_INSTANCE_DEVICE_PATH_SUBTYPE; break;
+    case PATH_UNKNOWN_SEGMENT: ++identity.Segment; break;
+    case PATH_LATE_ENDPOINT_REPLACED: location_scenario = LATE_PCI_REPLACED; break;
+    case PATH_LATE_ROOT_REPLACED: location_scenario = ROOT_LATE_IO; break;
+    default: break;
+    }
+
+    EFI_STATUS actual = Phx34ObservePciManagerAtPath(&boot, &identity, &observation);
+    if (actual != expected)
+        fprintf(stderr, "path scenario %u returned %#llx, expected %#llx\n",
+                (unsigned)scenario, (unsigned long long)actual, (unsigned long long)expected);
+    CHECK(actual == expected && location_reads == 0 && open_reads == snapshots && releases == snapshots);
+    CHECK(allocations[0] == NULL && allocations[1] == NULL);
+    CONST PHX34_PREBOOT_PCI_ATTRIBUTION *candidate = &observation.Candidate;
+    if (expected == EFI_SUCCESS) {
+        CHECK(candidate->BindingHandle == &manager && candidate->ImageHandle == &image && candidate->OpenEntryCount == 3);
+        CHECK(locate_calls == 2 && root_locates == 2 && root_io_reads == 2 && pci_reads == 4);
+    } else {
+        CHECK(candidate->BindingHandle == NULL && candidate->ImageHandle == NULL && candidate->OpenEntryCount == 0);
+    }
+}
+
 static void
 exercise_location(LOCATION_SCENARIO scenario, EFI_STATUS expected, UINTN locates, UINTN reads, UINTN snapshots)
 {
@@ -406,5 +501,17 @@ int main(void)
         exercise_location(locations[index].scenario, locations[index].expected, locations[index].locates,
                           locations[index].reads, locations[index].snapshots);
     printf("PASS %zu exact preboot PCI selection scenarios (CPU fixture only)\n", sizeof(locations) / sizeof(*locations));
+    CONST struct { PATH_SCENARIO scenario; EFI_STATUS expected; UINTN snapshots; } paths[] = {
+        {PATH_OK, EFI_SUCCESS, 2}, {PATH_NULL_ACCESSOR, EFI_SUCCESS, 2}, {PATH_NO_SERVICE, EFI_INVALID_PARAMETER, 0},
+        {PATH_BAD_SEAL, EFI_INVALID_PARAMETER, 0}, {PATH_UNKNOWN_SEGMENT, EFI_NO_MAPPING, 0},
+        {PATH_NO_PCI_HANDLES, EFI_NOT_FOUND, 0}, {PATH_OVERSIZED_HANDLES, EFI_BUFFER_TOO_SMALL, 0},
+        {PATH_PARTIAL_HANDLE, EFI_COMPROMISED_DATA, 0}, {PATH_NULL_HANDLE, EFI_COMPROMISED_DATA, 0},
+        {PATH_PREFIX_ONLY, EFI_NOT_FOUND, 0}, {PATH_DUP_ROOT, EFI_NO_MAPPING, 0}, {PATH_DUP_ENDPOINT, EFI_NO_MAPPING, 0},
+        {PATH_LATE_DUP_ENDPOINT, EFI_NO_MAPPING, 2}, {PATH_LATE_ENDPOINT_REPLACED, EFI_NO_MAPPING, 2},
+        {PATH_LATE_ROOT_REPLACED, EFI_NO_MAPPING, 2}
+    };
+    for (UINTN index = 0; index < sizeof(paths) / sizeof(*paths); ++index)
+        exercise_path(paths[index].scenario, paths[index].expected, paths[index].snapshots);
+    printf("PASS %zu preboot path-only observation scenarios (CPU fixture only)\n", sizeof(paths) / sizeof(*paths));
     return EXIT_SUCCESS;
 }

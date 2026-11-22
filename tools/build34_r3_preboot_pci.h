@@ -26,6 +26,16 @@ typedef struct {
     UINTN OpenEntryCount;
 } PHX34_PREBOOT_PCI_ATTRIBUTION;
 
+typedef struct {
+    CONST UINT8 *DevicePath;
+    UINTN DevicePathBytes;
+    UINTN Segment;
+} PHX34_PREBOOT_PCI_PATH_IDENTITY;
+
+typedef struct {
+    PHX34_PREBOOT_PCI_ATTRIBUTION Candidate;
+} PHX34_PREBOOT_PCI_PATH_OBSERVATION;
+
 EFI_STATUS EFIAPI
 Phx34AttributePciManager(EFI_BOOT_SERVICES *Boot, CONST PHX34_PREBOOT_PCI_TARGET *Target,
                          PHX34_PREBOOT_PCI_ATTRIBUTION *Attribution);
@@ -33,5 +43,9 @@ Phx34AttributePciManager(EFI_BOOT_SERVICES *Boot, CONST PHX34_PREBOOT_PCI_TARGET
 EFI_STATUS EFIAPI
 Phx34AttributePciManagerAtLocation(EFI_BOOT_SERVICES *Boot, CONST PHX34_PREBOOT_PCI_IDENTITY *Identity,
                                    PHX34_PREBOOT_PCI_ATTRIBUTION *Attribution);
+
+EFI_STATUS EFIAPI
+Phx34ObservePciManagerAtPath(EFI_BOOT_SERVICES *Boot, CONST PHX34_PREBOOT_PCI_PATH_IDENTITY *Identity,
+                            PHX34_PREBOOT_PCI_PATH_OBSERVATION *Observation);
 
 #endif

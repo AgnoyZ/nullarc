@@ -82,8 +82,11 @@ and isolated OVMF tests passed, but both observations can share the same
 firmware state. The [cached MCFG cross-check](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#corroborate-the-segment-candidate-with-cached-acpi-mcfg)
 found one ACPI segment window covering the matching host bridge and downstream
 buses. It does not bind the firmware root UID to that window, attest preboot
-numbering or admit the accessor. Neither physical preboot attribution nor
-device drain is proved.
+numbering or admit the accessor. A separate [path-only candidate observation](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#observe-a-candidate-manager-without-invoking-the-location-accessor)
+now finds the expected firmware driver for an OVMF-enumerated emulated PCI
+device without calling the endpoint's location accessor. This removes that
+call from the candidate observation, not the need for independent target
+provenance. Neither physical preboot attribution nor device drain is proved.
 
 ## Execution order
 

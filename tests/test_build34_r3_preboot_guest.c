@@ -1,6 +1,7 @@
 #include "build34_r3_preboot_pci.h"
 
 #include <Protocol/DriverBinding.h>
+#include <Protocol/LoadedImage.h>
 #include <Protocol/PciRootBridgeIo.h>
 
 typedef struct {
@@ -26,15 +27,22 @@ static GUEST_PATH fixture_path = {
     {END_DEVICE_PATH_TYPE, END_ENTIRE_DEVICE_PATH_SUBTYPE, {sizeof(EFI_DEVICE_PATH_PROTOCOL), 0}}
 };
 
+static const GUEST_PATH boot_disk_path = {
+    {{ACPI_DEVICE_PATH, ACPI_DP, {sizeof(ACPI_HID_DEVICE_PATH), 0}}, EISA_PNP_ID(0x0A03), 0},
+    {{HARDWARE_DEVICE_PATH, HW_PCI_DP, {sizeof(PCI_DEVICE_PATH), 0}}, 0, 5},
+    {END_DEVICE_PATH_TYPE, END_ENTIRE_DEVICE_PATH_SUBTYPE, {sizeof(EFI_DEVICE_PATH_PROTOCOL), 0}}
+};
+static const EFI_GUID virtio_pci_file = {0x83dd3b39, 0x7caf, 0x4fac, {0xa5, 0x42, 0xe0, 0x50, 0xb7, 0x67, 0xe3, 0xa7}};
 static EFI_GUID path_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
 static EFI_GUID pci_guid = EFI_PCI_IO_PROTOCOL_GUID;
 static EFI_GUID root_guid = EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_GUID;
 static EFI_GUID binding_guid = EFI_DRIVER_BINDING_PROTOCOL_GUID;
+static EFI_GUID image_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 static GUEST_ROOT_PATH fixture_root_path;
 static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL fixture_root_io = {.SegmentNumber = 0x5233};
 static EFI_PCI_IO_PROTOCOL fixture_pci;
 static EFI_DRIVER_BINDING_PROTOCOL fixture_binding;
-static UINTN location_reads;
+static UINTN location_reads, rejected_locations;
 static VOID *volatile relocation_anchor = &fixture_path;
 
 static EFI_STATUS EFIAPI
@@ -58,6 +66,7 @@ reject_location(EFI_PCI_IO_PROTOCOL *protocol, UINTN *segment, UINTN *bus, UINTN
     (void)bus;
     (void)device;
     (void)function;
+    ++rejected_locations;
     return EFI_ABORTED;
 }
 
@@ -65,6 +74,32 @@ static BOOLEAN
 empty_attribution(CONST PHX34_PREBOOT_PCI_ATTRIBUTION *attribution)
 {
     return attribution->BindingHandle == NULL && attribution->ImageHandle == NULL && attribution->OpenEntryCount == 0;
+}
+
+static UINTN
+check_boot_disk(EFI_BOOT_SERVICES *boot, EFI_HANDLE image)
+{
+    PHX34_PREBOOT_PCI_PATH_IDENTITY identity = {(CONST UINT8 *)&boot_disk_path, sizeof(boot_disk_path), 0};
+    PHX34_PREBOOT_PCI_PATH_OBSERVATION observation;
+    if (Phx34ObservePciManagerAtPath(boot, &identity, &observation) != EFI_SUCCESS ||
+        observation.Candidate.BindingHandle == NULL || observation.Candidate.ImageHandle == image)
+        return 17;
+    VOID *interface = NULL;
+    if (boot->HandleProtocol(observation.Candidate.ImageHandle, &image_guid, &interface) != EFI_SUCCESS ||
+        interface == NULL)
+        return 18;
+    CONST EFI_LOADED_IMAGE_PROTOCOL *loaded = interface;
+    CONST EFI_DEVICE_PATH_PROTOCOL *path = loaded->FilePath;
+    if (path == NULL || path->Type != MEDIA_DEVICE_PATH || path->SubType != MEDIA_PIWG_FW_FILE_DP ||
+        path->Length[0] != sizeof(MEDIA_FW_VOL_FILEPATH_DEVICE_PATH) || path->Length[1] != 0)
+        return 19;
+    CONST UINT8 *file = (CONST UINT8 *)path + OFFSET_OF(MEDIA_FW_VOL_FILEPATH_DEVICE_PATH, FvFileName);
+    CONST UINT8 *expected = (CONST UINT8 *)&virtio_pci_file;
+    for (UINTN index = 0; index < sizeof(virtio_pci_file); ++index) {
+        if (file[index] != expected[index])
+            return 20;
+    }
+    return 0;
 }
 
 static UINTN
@@ -86,6 +121,15 @@ check_attribution(EFI_BOOT_SERVICES *boot, EFI_HANDLE image, EFI_HANDLE controll
         attribution.BindingHandle != manager || attribution.ImageHandle != image || attribution.OpenEntryCount < 1 ||
         location_reads != 3)
         return 5;
+
+    PHX34_PREBOOT_PCI_PATH_IDENTITY path = {identity.DevicePath, identity.DevicePathBytes, identity.Segment};
+    PHX34_PREBOOT_PCI_PATH_OBSERVATION observation;
+    fixture_pci.GetLocation = reject_location;
+    EFI_STATUS observed = Phx34ObservePciManagerAtPath(boot, &path, &observation);
+    fixture_pci.GetLocation = fixture_location;
+    if (observed != EFI_SUCCESS || observation.Candidate.BindingHandle != manager ||
+        observation.Candidate.ImageHandle != image || rejected_locations != 0 || location_reads != 3)
+        return 21;
 
     PHX34_PREBOOT_PCI_IDENTITY wrong = identity;
     wrong.Bus++;
@@ -134,18 +178,21 @@ EfiMain(EFI_HANDLE image, EFI_SYSTEM_TABLE *system)
     fixture_pci.GetLocation = fixture_location;
     fixture_binding.ImageHandle = image;
     fixture_root_path = (GUEST_ROOT_PATH){fixture_path.Root, fixture_path.End};
-    if (boot->InstallMultipleProtocolInterfaces(&root, &path_guid, &fixture_root_path,
-                                               &root_guid, &fixture_root_io, NULL) != EFI_SUCCESS) {
-        failure = 15;
-    } else if (boot->InstallMultipleProtocolInterfaces(&controller, &path_guid, &fixture_path,
-                                                      &pci_guid, &fixture_pci, NULL) != EFI_SUCCESS) {
-        failure = 1;
-    } else if (boot->InstallProtocolInterface(&manager, &binding_guid, EFI_NATIVE_INTERFACE,
-                                              &fixture_binding) != EFI_SUCCESS) {
-        failure = 2;
-    } else {
-        fixture_binding.DriverBindingHandle = manager;
-        failure = check_attribution(boot, image, controller, manager, &opened);
+    failure = check_boot_disk(boot, image);
+    if (failure == 0) {
+        if (boot->InstallMultipleProtocolInterfaces(&root, &path_guid, &fixture_root_path,
+                                                   &root_guid, &fixture_root_io, NULL) != EFI_SUCCESS) {
+            failure = 15;
+        } else if (boot->InstallMultipleProtocolInterfaces(&controller, &path_guid, &fixture_path,
+                                                          &pci_guid, &fixture_pci, NULL) != EFI_SUCCESS) {
+            failure = 1;
+        } else if (boot->InstallProtocolInterface(&manager, &binding_guid, EFI_NATIVE_INTERFACE,
+                                                  &fixture_binding) != EFI_SUCCESS) {
+            failure = 2;
+        } else {
+            fixture_binding.DriverBindingHandle = manager;
+            failure = check_attribution(boot, image, controller, manager, &opened);
+        }
     }
 
     if (opened && boot->CloseProtocol(controller, &pci_guid, manager, controller) != EFI_SUCCESS)

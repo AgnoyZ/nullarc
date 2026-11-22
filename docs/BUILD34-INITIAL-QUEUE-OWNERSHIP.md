@@ -555,6 +555,44 @@ AML method, ECAM access, PCI configuration read or MMIO is requested. The
 default invocation still does not query ACPI. Rollback is to omit this mode.
 See the [sanitized result](validation/build34-r3-preboot-mcfg-20261123.json).
 
+### Observe a candidate manager without invoking the location accessor
+
+`Phx34ObservePciManagerAtPath` is separate from the location-qualified API.
+It takes an independently reviewed complete PCI device path and expected
+root segment, but no bus number or callback. It requires exactly one root
+and one endpoint with the respective published paths. The pinned DXE
+[`LocateDevicePath`](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/MdeModulePkg/Core/Dxe/Hand/Locate.c#L500-L554)
+chooses a best match, so this route instead enumerates each protocol using
+`LocateHandle(ByProtocol)` into a fixed 256-handle buffer. It compares the
+full path including the final end node. It refuses a size overflow, missing
+match, duplicate or substituted root/endpoint. It repeats the checks after
+the existing two open-list and binding/image observations. The cap bounds
+adapter memory and work, not the firmware's internal scan or latency.
+
+This path does not dereference the endpoint's method table, call `GetLocation`,
+read PCI configuration or invoke a root bridge method. It still assumes
+trusted Boot Services and valid published, live protocol storage. Firmware
+`HandleProtocol` can change protocol-open bookkeeping; the adapter does not
+claim a device or perform an exclusive open. Its result is a **candidate**
+manager, not a BDF, vendor/device ID, loaded-image digest, or ownership token.
+The existing location-qualified API still requires the admitted accessor and
+exact BDF. Neither route may be used to infer the installed firmware path from
+the macOS topology alone. Any physical preboot observation needs its own
+identity review, authorization and rollback scope.
+
+The updated QEMU fixture observes a Virtio boot disk at an explicit emulated
+PCI slot. OVMF enumerates and binds it normally. The candidate must resolve
+to the loaded firmware-volume file matching the pinned
+[`VirtioPciDeviceDxe` module GUID](https://github.com/tianocore/edk2/blob/46548b1adac82211d8d11da12dd914f41e7aa775/OvmfPkg/VirtioPciDeviceDxe/VirtioPciDeviceDxe.inf#L13-L15),
+not to the guest test application. A separate synthetic device with a
+rejecting accessor proves the metadata path does not call it. Both fresh
+isolated runs passed with the same guest image. The ASan/UBSan fixture passed
+33 attribution, 41 location and 15 path-only cases, including duplicate
+paths arising after the first scan. The emulated result does not identify the
+physical Radeon manager, still less the IH owner or any device-write drain.
+Revert this isolated API and fixture change to return to the location-only
+selector. See the [sanitized result](validation/build34-r3-preboot-path-observation-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes
