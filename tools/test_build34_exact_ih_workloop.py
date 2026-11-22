@@ -13,7 +13,8 @@ from build34_exact_event_wait import ENTRY, FIELDS, WAIT
 from build34_exact_ih_ingress import ADMIT, CLOSE, DECLARATIONS
 from build34_exact_ih_workloop import ADMISSION_FIELDS, CLOSE_WORK, ROUTE_ADMISSION, SOURCE, STOP, STOP_ADMISSION
 from build34_exact_ih_workloop import BOUNDED_POLL, POLL, POLL_DECL, POLL_METHOD, PRIOR_POLL
-from build34_exact_ih_workloop import previous_stage, stage, stage_header, stage_lifecycle
+from build34_exact_ih_workloop import PREPARE_CHECKED_PUBLISH, PREPARE_ENTRY, PREPARE_LEASE, PREPARE_PUBLISH, checked_adapter
+from build34_exact_ih_workloop import previous_stage, stage, stage_bounded_poll, stage_header, stage_lifecycle
 from build34_exact_submit import once
 from test_build34_exact_event_iokit import DOUBLES
 from test_build34_exact_ih_ingress import BASE_FIXTURE, METHODS, OWNERSHIP
@@ -22,6 +23,7 @@ from test_build34_exact_ownership import DRIVER, ROOT, method, sha
 
 REFERENCE = 'docs/validation/build34-r3-ih-signal-handoff-offline-20261123.json'
 LIFECYCLE = 'docs/validation/build34-r3-ih-workloop-lifecycle-offline-20261123.json'
+POLL_REFERENCE = 'docs/validation/build34-r3-ih-poll-deadline-offline-20261123.json'
 FIXTURE = 'tests/test_build34_exact_ih_workloop.cpp'
 GATE = 'build34_exact_callbacks.h'
 POWER = 'IOReturn PhxBringup::setPowerState('
@@ -90,31 +92,34 @@ def test(out, sdk, kdk):
     header_names = native_objects.HEADERS + EXTRA
     inputs = {name: (ROOT / name).read_bytes() for name in {
         *production, *('tools/' + name for name in header_names), OWNERSHIP,
-        REFERENCE, LIFECYCLE, FACTORY_RECORD, KDK_RECORD, BASE_FIXTURE, FIXTURE,
+        REFERENCE, LIFECYCLE, POLL_REFERENCE, FACTORY_RECORD, KDK_RECORD, BASE_FIXTURE, FIXTURE,
         'tools/build34_exact_ih_workloop.py', 'tools/test_build34_exact_ih_workloop.py', 'tools/build34_native_object_check.py',
     }}
     reference = json.loads(inputs[REFERENCE])
     original = inputs[DRIVER].decode()
-    ingress, previous, proposed = previous_stage(original), stage_lifecycle(original), stage(original)
+    ingress, lifecycle, previous, proposed = (transform(original) for transform in
+                                               (previous_stage, stage_lifecycle, stage_bounded_poll, stage))
+    adapter = checked_adapter(SOURCE)
     if (sha(ingress.encode()) != reference['staged_source_sha256'] or
-            sha(previous.encode()) != json.loads(inputs[LIFECYCLE])['staged_source_sha256']):
-        raise ValueError('Prior staged IH or lifecycle source drift')
+            sha(lifecycle.encode()) != json.loads(inputs[LIFECYCLE])['staged_source_sha256'] or
+            sha(previous.encode()) != json.loads(inputs[POLL_REFERENCE])['staged_source_sha256']):
+        raise ValueError('Prior staged IH, lifecycle or poll source drift')
     if method(proposed, ADMIT) != 'bool PhxBringup::exactIHIngressAdmitted() const {\n    return false;\n}\n':
         raise ValueError('Native IH admission must remain disabled')
     if any(re.search(name + r'\s*=', proposed) or proposed.count(name + '{nullptr}') != 1
            for name in ('exactDwordReader', 'exactFenceReader', 'exactEventOps')):
         raise ValueError('Unexpected native binding')
-    unchanged = (*(signature for signature in METHODS if signature != WAIT), 'bool PhxBringup::start(', STOP,
+    unchanged = (*METHODS, POLL, 'bool PhxBringup::start(', STOP,
                  POWER, SEAL, 'bool PhxBringup::exactNativeOpenAdmitted(', 'IOReturn IOAccelPhxNativeClient::externalMethod(')
     if any(method(previous, signature) != method(proposed, signature) for signature in unchanged):
         raise ValueError('Unexpected lifecycle, transport or IH ingress change')
     for signature, anchor in ((STOP, STOP_ADMISSION), (CLOSE, ROUTE_ADMISSION)):
-        if method(previous, signature) != once(method(ingress, signature), anchor, anchor + CLOSE_WORK):
+        if method(lifecycle, signature) != once(method(ingress, signature), anchor, anchor + CLOSE_WORK):
             raise ValueError('Workloop admission must close without changing other lifecycle behavior')
-    reverted = once(once(once(proposed, POLL_DECL, ''), POLL_METHOD, ''), BOUNDED_POLL, PRIOR_POLL)
-    if reverted != previous:
-        raise ValueError('Unexpected change outside bounded polling')
-    if proposed.count(SOURCE) != 1 or proposed.count('PhxExactIHWorkSource::prepare(') != 1:
+    reverted = once(once(once(previous, POLL_DECL, ''), POLL_METHOD, ''), BOUNDED_POLL, PRIOR_POLL)
+    if reverted != lifecycle or once(proposed, adapter, SOURCE) != previous:
+        raise ValueError('Unexpected change outside bounded polling or workloop preparation')
+    if proposed.count(adapter) != 1 or proposed.count('PhxExactIHWorkSource::prepare(') != 1:
         raise ValueError('Workloop source must remain unbound')
     ownership = stage_header(inputs[OWNERSHIP].decode())
     out.mkdir(mode=0o700)
@@ -187,7 +192,7 @@ def test(out, sdk, kdk):
                 raise ValueError('Incomplete workloop fixture')
             return int(parsed[1])
 
-    counts = {label: {mode: exercise(label + '-' + mode, SOURCE, sanitizer, mode == 'modeled')
+    counts = {label: {mode: exercise(label + '-' + mode, adapter, sanitizer, mode == 'modeled')
                       for mode in ('closed', 'modeled')}
               for label, sanitizer in [('asan_ubsan', 'address,undefined'), ('tsan', 'thread')]}
     if counts['asan_ubsan'] != counts['tsan']:
@@ -213,11 +218,11 @@ def test(out, sdk, kdk):
         'forget-ambiguous-hold': ('    if (detached) release();', '    release();', True),
     }
     for label, (old, new, modeled) in mutations.items():
-        exercise(label, once(SOURCE, old, new), 'address,undefined', modeled, True)
+        exercise(label, once(adapter, old, new), 'address,undefined', modeled, True)
     lifecycle_mutants = {'leave-work-admission-open-on-stop': STOP, 'leave-work-admission-open-on-route-loss': CLOSE}
     for label, signature in lifecycle_mutants.items():
-        exercise(label, SOURCE, 'address,undefined', True, True, skip_close=signature)
-    exercise('leave-copier-turn-admission-open', SOURCE, 'address,undefined', True, True,
+        exercise(label, adapter, 'address,undefined', True, True, skip_close=signature)
+    exercise('leave-copier-turn-admission-open', adapter, 'address,undefined', True, True,
              admission=once(ADMISSION_FIELDS, '        exactIHTurns.close();\n', ''))
     poll_mutants = {
         'fixed-ms-poll': (BOUNDED_POLL, PRIOR_POLL),
@@ -231,7 +236,15 @@ def test(out, sdk, kdk):
     poll_method = method(proposed, POLL)
     for label, (old, new) in poll_mutants.items():
         broken = once(proposed, old, new) if old == BOUNDED_POLL else once(proposed, poll_method, once(poll_method, old, new))
-        exercise(label, SOURCE, 'address,undefined', False, True, driver=broken)
+        exercise(label, adapter, 'address,undefined', False, True, driver=broken)
+    prepare_mutants = {
+        'publish-revoked-preparation': (PREPARE_CHECKED_PUBLISH, PREPARE_PUBLISH),
+        'omit-prepare-service-lease': (PREPARE_LEASE, PREPARE_ENTRY),
+        'release-ambiguous-prepare-pin': ('        if (source->detach() == kIOReturnBusy) source->setAttachment(Attachment::Held);',
+                                          '        if (source->detach() != kIOReturnSuccess) source->release();'),
+    }
+    for label, (old, new) in prepare_mutants.items():
+        exercise(label, once(adapter, old, new), 'address,undefined', True, True)
     with patch.object(native_objects, 'HEADERS', header_names):
         native = native_objects.check(out / 'native', inputs, previous, proposed, ownership, sdk, kdk,
                                       reference['native_import_count'] + len(ADDED_IMPORTS),
@@ -241,13 +254,15 @@ def test(out, sdk, kdk):
     if any((ROOT / name).read_bytes() != blob for name, blob in inputs.items()):
         raise ValueError('Inputs changed during verification')
     result = dict(status='passed-offline-IH-providerless-workloop', build=34, checks=counts,
-                  rejected_mutants=[*mutations, *lifecycle_mutants, 'leave-copier-turn-admission-open', *poll_mutants],
+                  rejected_mutants=[*mutations, *lifecycle_mutants, 'leave-copier-turn-admission-open', *poll_mutants,
+                                    *prepare_mutants],
                   previous_source_sha256=sha(previous.encode()),
                   staged_source_sha256=sha(proposed.encode()), protected_production_inputs=len(production),
                   staged_providerless_scheduler=True, native_irq_scheduler_bound=False,
                   copier_turn_drained_before_workloop_removal=True,
                   lifecycle_closes_work_admission_without_removal=True,
                   fallback_poll_clips_to_remaining_budget=True,
+                  observed_revocation_refuses_prepare_publication=True,
                   native_event_backend_bound=False, native_teardown_deadline_proved=False,
                   native_open_admitted=False, old_writer_drain_proved=False,
                   IH_accessed=False, ISR_registered=False, GPU_executed=False, R3_complete=False, **native)

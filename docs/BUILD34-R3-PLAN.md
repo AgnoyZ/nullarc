@@ -271,6 +271,9 @@ that same one-shot route. It does not bind a BAR0 reader or attest visibility.
    admitted copy; it returns busy and keeps the context pinned. This is not
    bound to a provider. Prove native scheduling and teardown, IH ownership,
    old device-writer drain, and order of event delivery versus the BAR0 read.
+   The [preparation check](BUILD34-EXACT-EVENT-WAIT.md#reject-revoked-preparation)
+   refuses to publish an attached source after observed lifecycle loss.
+   A future provider register/enable still needs separate lifetime admission.
    The [one-shot evidence checker](BUILD34-R3-IRQ-ROUTE-TRIAL.md#one-shot-route-and-actual-isr-trace)
    matches the current non-rearming route: it rejects copied vectors without
    same-source ISR records and checks slot/peer and IH cursor continuity across

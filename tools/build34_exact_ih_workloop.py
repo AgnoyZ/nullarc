@@ -44,6 +44,21 @@ POLL_METHOD = '''void PhxBringup::pauseExactPoll(const phx34_exact::Receipt &rec
 '''
 PRIOR_POLL = '            IOSleep(1);\n'
 BOUNDED_POLL = '            owner->pauseExactPoll(receipt, exactClientCallbacks, start, timeout);\n'
+PREPARE_ENTRY = '    if (!gpu || !capture || !captureOwner || !gpu->exactIHIngressAdmitted()) return nullptr;\n'
+PREPARE_LEASE = '''    if (!gpu || !capture || !captureOwner) return nullptr;
+    phx34_exact::CallbackGate<>::Lease preparing(gpu->exactCallbacks);
+    if (!preparing || !gpu->exactIHIngressAdmitted()) return nullptr;
+'''
+PREPARE_PUBLISH = '    source->setAttachment(Attachment::Attached);\n    return source;\n'
+PREPARE_CHECKED_PUBLISH = '''    source->setAttachment(Attachment::Attached);
+    if (gpu->exactCallbacks.closed() || !source->accepting()) {
+        source->closeAdmission();
+        if (source->detach() == kIOReturnBusy) source->setAttachment(Attachment::Held);
+        source->release();
+        return nullptr;
+    }
+    return source;
+'''
 ADMISSION_FIELDS = '''    friend class PhxExactIHWorkSource;
     static constexpr uint64_t kExactIHKickClosed = 1ull << 63;
     static_assert(__atomic_always_lock_free(sizeof(uint64_t), nullptr), "IH kick admission requires lock-free atomics");
@@ -198,9 +213,17 @@ def stage_lifecycle(source):
     return once(source, ANCHOR, ANCHOR + SOURCE)
 
 
-def stage(source):
+def stage_bounded_poll(source):
     source = stage_lifecycle(source)
     source = once(source, ENTRY, ENTRY + POLL_DECL)
     source = once(source, POLL_AT, POLL_METHOD + POLL_AT)
     wait = method(source, WAIT)
     return once(source, wait, once(wait, PRIOR_POLL, BOUNDED_POLL))
+
+
+def checked_adapter(adapter):
+    return once(once(adapter, PREPARE_ENTRY, PREPARE_LEASE), PREPARE_PUBLISH, PREPARE_CHECKED_PUBLISH)
+
+
+def stage(source):
+    return once(stage_bounded_poll(source), SOURCE, checked_adapter(SOURCE))

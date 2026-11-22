@@ -4,6 +4,8 @@ static constexpr IOReturn kIOReturnSuccess = 0, kIOReturnBusy = -1, kIOReturnNot
 class IOWorkLoop;
 static thread_local IOWorkLoop *heldLoop;
 static thread_local std::function<void()> beforeKick, duringWake, beforeRemove;
+class IOEventSource;
+[[maybe_unused]] static thread_local std::function<void(IOEventSource *)> beforeAddReturn;
 static thread_local bool failAttach;
 static std::atomic<unsigned> loopsCreated{0}, loopsFreed{0};
 
@@ -33,13 +35,16 @@ public:
     IOReturn addEventSource(IOEventSource *incoming) {
         CHECK(!gpuHeld && !clientHeld && !heldLoop && !source);
         if (failAttach) return kIOReturnError;
-        std::lock_guard<std::mutex> lock(gate);
-        source = incoming;
-        source->retain();
-        source->attached = this;
-        heldLoop = this;
-        CHECK(!source->checkForWork());
-        heldLoop = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(gate);
+            source = incoming;
+            source->retain();
+            source->attached = this;
+            heldLoop = this;
+            CHECK(!source->checkForWork());
+            heldLoop = nullptr;
+        }
+        if (beforeAddReturn) std::exchange(beforeAddReturn, {})(incoming);
         return kIOReturnSuccess;
     }
 
@@ -195,6 +200,61 @@ int main() {
     CHECK(rejected.gpu.exactIHState == PhxBringup::ExactIHState::Lost);
     CHECK(capture.references == 1 && rejected.gpu.references == 1);
 
+    enum class Invalidation { Queue, Sleep, Stop };
+    for (auto trigger : {Invalidation::Queue, Invalidation::Sleep, Invalidation::Stop}) {
+        Trial preparing;
+        Capture abandoned;
+        preparing.gpu.modeledIHAdmission = true;
+        const unsigned freedBefore = loopsFreed;
+        const unsigned createdBefore = loopsCreated;
+        Barrier added;
+        Source *published = nullptr;
+        std::thread starter([&] {
+            beforeAddReturn = [&](IOEventSource *) { added.arrive(); };
+            published = prepare(preparing, abandoned);
+        });
+        added.wait();
+        CHECK(preparing.gpu.exactCallbacks.active() == 1 && abandoned.references == 2);
+        if (trigger == Invalidation::Stop) {
+            preparing.gpu.stop(nullptr);
+            CHECK(!preparing.gpu.exactStopped && preparing.gpu.hangDrainRequests == 1);
+        } else if (trigger == Invalidation::Sleep) {
+            CHECK(preparing.gpu.setPowerState(0, nullptr) == IOPMAckImplied);
+            CHECK(preparing.gpu.setPowerState(1, nullptr) == IOPMAckImplied);
+        } else {
+            IOLockLock(preparing.gpu.gpuLock);
+            preparing.gpu.invalidateExactQueues();
+            IOLockUnlock(preparing.gpu.gpuLock);
+        }
+        added.resume();
+        starter.join();
+        CHECK(!published && !abandoned.calls && abandoned.references == 1);
+        CHECK(loopsFreed == freedBefore + 1 && loopsCreated == createdBefore + 1);
+        if (trigger == Invalidation::Stop) {
+            CHECK(preparing.gpu.exactCallbacks.drained());
+            preparing.gpu.sealStoppedQueues();
+            CHECK(preparing.gpu.exactStopped && preparing.gpu.references == 2);
+            preparing.gpu.release();
+        }
+        CHECK(preparing.gpu.references == 1);
+    }
+
+    Trial failedCleanup;
+    Capture retained;
+    failedCleanup.gpu.modeledIHAdmission = true;
+    Source *kept = nullptr;
+    beforeAddReturn = [&](IOEventSource *incoming) {
+        kept = static_cast<Source *>(incoming);
+        kept->retain();
+        incoming->getWorkLoop()->failRemoveAfterUnlink = true;
+        CHECK(failedCleanup.gpu.setPowerState(0, nullptr) == IOPMAckImplied);
+    };
+    CHECK(!prepare(failedCleanup, retained));
+    CHECK(kept && !kept->getWorkLoop() && kept->references == 2 && retained.references == 2);
+    CHECK(!kept->activate() && kept->detach() == kIOReturnNotReady);
+    kept->release();
+    releaseCaller(failedCleanup, retained, kept);
+
     Trial arming;
     arming.gpu.modeledIHAdmission = true;
     capture.producer = 33 * 32;
@@ -253,7 +313,6 @@ int main() {
     CHECK(source->detach() == kIOReturnSuccess && loop->removeCount == 1);
     releaseCaller(waking, scheduled, source);
 
-    enum class Invalidation { Queue, Sleep, Stop };
     for (auto trigger : {Invalidation::Queue, Invalidation::Sleep, Invalidation::Stop}) {
         Trial invalidated;
         Capture pending;

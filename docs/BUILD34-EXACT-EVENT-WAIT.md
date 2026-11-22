@@ -488,3 +488,36 @@ The workloop transform remains unreachable on the native path. This change
 does not require IH delivery to poll, and does not establish native BAR0
 visibility, a live timeout or a measured latency improvement. For offline
 rollback, use the previous `stage_lifecycle` transform.
+
+### Reject revoked preparation
+
+`prepare` now holds a service callback lease across creation, workloop
+add, and the final publication check. The previous adapter could return a
+source even if stop, sleep or queue invalidation revoked its arming route
+before `addEventSource` returned. A successful add and the matching pointer
+readback still matter; they no longer suffice if callback or work admission
+has closed. The stop path closes admission immediately and can defer queue
+sealing until this preparation lease leaves.
+
+If preparation observes revocation after a confirmed add, it refuses to
+return a source to the caller, closes admission, and uses the independent
+checked detach from the preparing caller. It holds neither the GPU nor the
+client lock while calling IOKit. On busy or uncertain removal it keeps the
+attachment pin, service, workloop and copy owner quarantined rather than
+returning them as ready or freeing them. This does not add a guaranteed
+cleanup deadline or an automatic retry after an uncertain remove.
+
+The final check rules out revocation already observed during preparation;
+it is not an atomic admission for future provider registration. A later
+binding still needs its own retained provider-operation context, checked
+register/enable and unregister, and no-future-callback evidence for the
+admitted route. No provider operations are added by this stage. For offline
+rollback to the bounded poll without this check, use `stage_bounded_poll`.
+
+The [offline result](validation/build34-r3-ih-prepare-revocation-offline-20261123.json)
+pauses add after linking and races it with stop, sleep/wake or queue
+invalidation. It also injects a failed removal after unlinking. The failed
+cleanup does not publish a caller handle or release the attachment pin.
+ASan/UBSan and TSan each pass 148 closed and 846 modeled checks; 21 failure
+variants are rejected. Both complete sources compile to nonloadable objects
+with the same 406 imports. The 172 protected production inputs still match.
