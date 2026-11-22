@@ -59,9 +59,9 @@ continues to use its existing waits. No event backend is bound.
    loss or overflow, or a mismatch between writeback, payload and the trial's
    queue. One CPU interrupt may cover multiple IH entries; it is not a
    submission ID. Linux v6.12 distinguishes the
-   [legacy and MES-tagged paths](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L5800-L5850),
-   [orders IH pointer and vector reads](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.c#L193-L223),
-   and handles [ring overwrite](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L407-L435).
+   [legacy and MES-tagged paths](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L6231-L6259),
+   [orders IH pointer and vector reads](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ih.c#L208-L231),
+   and handles [ring overwrite](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L434-L471).
    These are reference semantics. No Linux or Apple implementation code is
    copied. Visibility of IH entries does not imply visibility through BAR0.
 
@@ -228,7 +228,11 @@ establishes the effective BAR0 mapping/cache policy, the actual access order
 and the absence of other writes to these test slots. The captured workload
 must independently match the presealed challenge; a matching data snapshot
 does not prove that the GPU wrote it or that a sample was really the first
-read. `raw_bar0_samples_checked` reports only record consistency. Retain raw
+read. Seal one mapping and accessor for the control and EOP arms. The
+[NBIO/HDP source audit](BUILD34-FENCE-READER.md#interrupt-transport-does-not-synchronize-bar0)
+does not support inserting a new flush or dummy read after the event to make
+the first fence read pass. Keep any later diagnostic read separate.
+`raw_bar0_samples_checked` reports only record consistency. Retain raw
 data privately. This change installs no collector and does not prove cache
 coherence, IH ownership or DMA drain. See the
 [sanitized offline result](validation/build34-r3-one-shot-bar0-evidence-offline-20261123.json).

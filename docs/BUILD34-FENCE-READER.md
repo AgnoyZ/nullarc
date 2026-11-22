@@ -109,6 +109,38 @@ across `0x00000000ffffffff -> 0x0000000100000000`, an intermediate high-new,
 low-old value can be larger than work that has actually completed. Bounding
 it by a later submitted value does not necessarily detect that case.
 
+## Interrupt transport does not synchronize BAR0
+
+The pinned Linux [NBIO 7.7 IH setup](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/nbio_v7_7.c#L169-L190)
+programs a dummy page address and selects the hardware default for the IH
+dummy read: disabled with MSI, enabled without MSI. It also selects snooped
+IH requests. The [IH v6 init](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L324-L334)
+calls that helper before enabling the ring. None of those settings attest
+the fence or payload access through this host's framebuffer aperture. The
+[PCI MSI ordering rationale](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/Documentation/PCI/msi-howto.rst#L47-L56)
+concerns data writes ordered ahead of an interrupt-generating PCI write.
+Do not extend it to on-chip GPU writes, HDP state, or CPU cache lines for
+BAR0 without evidence of the actual data and ordering paths.
+
+Keep these HDP paths separate:
+
+| Reference path | What it establishes and what it does not |
+| --- | --- |
+| [Build34 `hdpFlush`](../src/phxbringup/PhxBringup.cpp#L489), called by [submit](../src/phxbringup/PhxBringup.cpp#L935), and [Linux HDP v6 flush](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/hdp_v6_0.c#L34-L41) | Both use a remapped HDP flush control. Build34 also does a GRBM readback and uses this sequence for host writes before the doorbell. Neither gives this waiter a checked device-to-CPU cache-visibility or old-writer-drain receipt. |
+| [GFX11 ring HDP request and done](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L5577-L5604) | The CP emits a pipe-specific register wait using the NBIO request and done registers. The generic [IB scheduler](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_ib.c#L230-L278) calls flush before the IBs and invalidate before fence emission. Neither call name is evidence of a device-wide drain or a fresh result tied to the target CPU reader. |
+| [Linux HDP wrapper selection](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c#L6386-L6413) | Both wrappers return without an HDP operation on a non-passthrough x86_64 APU. The [HDP v6 operations](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/hdp_v6_0.c#L150-L154) also have no invalidate callback. This is the Linux contract for its own mapping and submission path, not permission to remove build34's existing host-write barriers or add a guessed invalidate. |
+
+For the first [one-shot visibility trial](BUILD34-R3-IRQ-ROUTE-TRIAL.md#check-complete-first-read-bar0-data),
+retain the existing pre-doorbell path in both arms. Do not add a post-event
+HDP flush, dummy read, alternate mapping or retry before capturing the first
+fence read. Those changes measure a different observer and can hide the
+first failure. If an explicitly ordered accessor is required for the
+effective mapping, seal that accessor before the trial and use it in both
+arms; do not choose one after seeing a stale sample. A later diagnostic
+read must not replace that observation. A GPU completion, transport ordering,
+and a CPU-visible fence and payload remain three different observations.
+No device registers were read or changed for this source review.
+
 ## Tested reconstruction primitive
 
 The original [FenceWindow32](../tools/build34_exact_fence32.h) does **not**
