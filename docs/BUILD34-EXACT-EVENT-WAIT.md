@@ -567,3 +567,34 @@ cases include revocation before registration, sleep during registration,
 stop during enable and concurrent retirement. All 29 broken variants fail;
 the complete before/after nonloadable objects retain the same 406 imports.
 All 172 protected production inputs still match.
+
+### Drain admitted software work before provider retirement
+
+The preceding provider stage tests that the workloop turn gate is closed,
+not that its admitted turn has exited. Its retirement callback can therefore
+run while a copier is still executing. It can also overlap an admitted
+`signalWorkAvailable` call that has yet to return. Blocking workloop detach
+later does not prevent either overlap at provider retirement.
+
+The `stage_quiescent_provider` derivation keeps the existing provider-call
+drain check and also requires the copier turn gate to be drained and the
+wake counter to be closed with no admitted signal in flight. It returns
+busy without calling the provider or dropping references until both are
+true. Gate close is one-way; after close a new kick cannot call the loop.
+The retirement owner still runs outside workloop and GPU locks. After
+software quiescence it must obtain the distinct checked unregister and
+no-future/in-flight callback result before detaching. Uncertain provider
+retirement retains the existing pins and leaves rearm closed.
+
+The CPU runner pauses an admitted copy across stop and a separately
+admitted wake across sleep. Each must keep the provider and source pinned,
+refuse unregister and detach, then allow checked cleanup only after the
+blocked operation returns. The old close-only guard and a variant that
+ignores the live kick are rejected as negative controls. ASan/UBSan and
+TSan each pass 148 closed and 1,428 modeled checks. All 31 negative controls
+are rejected, and both complete nonloadable objects retain the same 406
+imports. This is software ordering, not a native provider deadline, IH
+ownership, old-writer drain,
+or permission to free DMA storage. The native route and reader stay unbound.
+Rollback is to use the prior `stage_provider` derivation.
+See the [sanitized result](validation/build34-r3-ih-provider-quiescence-offline-20261123.json).

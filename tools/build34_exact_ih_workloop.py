@@ -288,6 +288,10 @@ IOReturn PhxExactIHWorkSource::retireProvider() {
 PROVIDER_DETACH_CHECK = '''    const auto provider = getProvider();
     if (provider != Provider::Unbound && provider != Provider::Retired) return kIOReturnBusy;
 '''
+PROVIDER_RETIRE_ADMISSION = '    if (!gpu->exactIHProviderCalls.drained() || !gpu->exactIHTurns.closed()) return kIOReturnBusy;\n'
+PROVIDER_QUIESCENT_RETIRE_ADMISSION = '''    if (!gpu->exactIHProviderCalls.drained() || !gpu->exactIHTurns.drained() ||
+        __atomic_load_n(&gpu->exactIHKicks, __ATOMIC_ACQUIRE) != kKickClosed) return kIOReturnBusy;
+'''
 
 
 def stage_lifecycle(source):
@@ -334,3 +338,7 @@ def stage_provider(source):
     adapter = checked_adapter(SOURCE)
     return once(once(stage(source), ADMISSION_FIELDS, PROVIDER_ADMISSION_FIELDS),
                 adapter, provider_adapter(adapter))
+
+
+def stage_quiescent_provider(source):
+    return once(stage_provider(source), PROVIDER_RETIRE_ADMISSION, PROVIDER_QUIESCENT_RETIRE_ADMISSION)

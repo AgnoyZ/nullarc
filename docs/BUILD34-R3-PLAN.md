@@ -328,6 +328,11 @@ preboot identity, IH ownership or old-writer drain.
    The [preparation check](BUILD34-EXACT-EVENT-WAIT.md#reject-revoked-preparation)
    refuses to publish an attached source after observed lifecycle loss.
    A future provider register/enable still needs separate lifetime admission.
+   The [provider retirement follow-up](BUILD34-EXACT-EVENT-WAIT.md#drain-admitted-software-work-before-provider-retirement)
+   closes an offline overlap between unregister and an admitted IH copy or
+   scheduled wake. The staged cleanup returns busy without invoking the provider
+   until those CPU operations drain; native callback drain and AMD device drain
+   remain separate.
    The [one-shot evidence checker](BUILD34-R3-IRQ-ROUTE-TRIAL.md#one-shot-route-and-actual-isr-trace)
    matches the current non-rearming route: it rejects copied vectors without
    same-source ISR records and checks slot/peer and IH cursor continuity across

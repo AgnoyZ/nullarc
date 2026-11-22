@@ -15,6 +15,7 @@ from build34_exact_ih_workloop import ADMISSION_FIELDS, CLOSE_WORK, ROUTE_ADMISS
 from build34_exact_ih_workloop import BOUNDED_POLL, POLL, POLL_DECL, POLL_METHOD, PRIOR_POLL
 from build34_exact_ih_workloop import PREPARE_CHECKED_PUBLISH, PREPARE_ENTRY, PREPARE_LEASE, PREPARE_PUBLISH, checked_adapter
 from build34_exact_ih_workloop import PROVIDER_ADMISSION_FIELDS, PROVIDER_DETACH_CHECK, provider_adapter, stage_provider
+from build34_exact_ih_workloop import PROVIDER_QUIESCENT_RETIRE_ADMISSION, PROVIDER_RETIRE_ADMISSION, stage_quiescent_provider
 from build34_exact_ih_workloop import previous_stage, stage, stage_bounded_poll, stage_header, stage_lifecycle
 from build34_exact_submit import once
 from test_build34_exact_event_iokit import DOUBLES
@@ -26,6 +27,7 @@ REFERENCE = 'docs/validation/build34-r3-ih-signal-handoff-offline-20261123.json'
 LIFECYCLE = 'docs/validation/build34-r3-ih-workloop-lifecycle-offline-20261123.json'
 POLL_REFERENCE = 'docs/validation/build34-r3-ih-poll-deadline-offline-20261123.json'
 PREPARE_REFERENCE = 'docs/validation/build34-r3-ih-prepare-revocation-offline-20261123.json'
+PROVIDER_REFERENCE = 'docs/validation/build34-r3-ih-provider-calls-offline-20261123.json'
 FIXTURE = 'tests/test_build34_exact_ih_workloop.cpp'
 GATE = 'build34_exact_callbacks.h'
 POWER = 'IOReturn PhxBringup::setPowerState('
@@ -94,20 +96,23 @@ def test(out, sdk, kdk):
     header_names = native_objects.HEADERS + EXTRA
     inputs = {name: (ROOT / name).read_bytes() for name in {
         *production, *('tools/' + name for name in header_names), OWNERSHIP,
-        REFERENCE, LIFECYCLE, POLL_REFERENCE, PREPARE_REFERENCE, FACTORY_RECORD, KDK_RECORD, BASE_FIXTURE, FIXTURE,
+        REFERENCE, LIFECYCLE, POLL_REFERENCE, PREPARE_REFERENCE, PROVIDER_REFERENCE,
+        FACTORY_RECORD, KDK_RECORD, BASE_FIXTURE, FIXTURE,
         'tools/build34_exact_ih_workloop.py', 'tools/test_build34_exact_ih_workloop.py', 'tools/build34_native_object_check.py',
     }}
     reference = json.loads(inputs[REFERENCE])
     original = inputs[DRIVER].decode()
-    ingress, lifecycle, poll, previous, proposed = (transform(original) for transform in
-        (previous_stage, stage_lifecycle, stage_bounded_poll, stage, stage_provider))
+    ingress, lifecycle, poll, prepared_source, previous, proposed = (transform(original) for transform in
+        (previous_stage, stage_lifecycle, stage_bounded_poll, stage, stage_provider, stage_quiescent_provider))
     prepared = checked_adapter(SOURCE)
-    adapter = provider_adapter(prepared)
+    provider = provider_adapter(prepared)
+    adapter = once(provider, PROVIDER_RETIRE_ADMISSION, PROVIDER_QUIESCENT_RETIRE_ADMISSION)
     if (sha(ingress.encode()) != reference['staged_source_sha256'] or
             sha(lifecycle.encode()) != json.loads(inputs[LIFECYCLE])['staged_source_sha256'] or
             sha(poll.encode()) != json.loads(inputs[POLL_REFERENCE])['staged_source_sha256'] or
-            sha(previous.encode()) != json.loads(inputs[PREPARE_REFERENCE])['staged_source_sha256']):
-        raise ValueError('Prior staged IH, lifecycle, poll or preparation source drift')
+            sha(prepared_source.encode()) != json.loads(inputs[PREPARE_REFERENCE])['staged_source_sha256'] or
+            sha(previous.encode()) != json.loads(inputs[PROVIDER_REFERENCE])['staged_source_sha256']):
+        raise ValueError('Prior staged IH, lifecycle, poll, preparation or provider source drift')
     if method(proposed, ADMIT) != 'bool PhxBringup::exactIHIngressAdmitted() const {\n    return false;\n}\n':
         raise ValueError('Native IH admission must remain disabled')
     if any(re.search(name + r'\s*=', proposed) or proposed.count(name + '{nullptr}') != 1
@@ -121,8 +126,9 @@ def test(out, sdk, kdk):
         if method(lifecycle, signature) != once(method(ingress, signature), anchor, anchor + CLOSE_WORK):
             raise ValueError('Workloop admission must close without changing other lifecycle behavior')
     reverted = once(once(once(poll, POLL_DECL, ''), POLL_METHOD, ''), BOUNDED_POLL, PRIOR_POLL)
-    if (reverted != lifecycle or once(previous, prepared, SOURCE) != poll or
-            once(once(proposed, adapter, prepared), PROVIDER_ADMISSION_FIELDS, ADMISSION_FIELDS) != previous):
+    if (reverted != lifecycle or once(prepared_source, prepared, SOURCE) != poll or
+            once(once(previous, provider, prepared), PROVIDER_ADMISSION_FIELDS, ADMISSION_FIELDS) != prepared_source or
+            once(proposed, adapter, provider) != previous):
         raise ValueError('Unexpected change outside the isolated workloop derivation')
     if proposed.count(adapter) != 1 or any(proposed.count(signature) != 2 for signature in (
             'armProvider(', 'retireProvider(')) or proposed.count('PhxExactIHWorkSource::prepare(') != 1:
@@ -277,6 +283,13 @@ def test(out, sdk, kdk):
         exercise(label, once(adapter, old, new), 'address,undefined', True, True)
     exercise('leave-provider-admission-open', adapter, 'address,undefined', True, True,
              admission=once(PROVIDER_ADMISSION_FIELDS, '        exactIHProviderCalls.close();\n', ''))
+    quiescence_mutants = {
+        'previous-provider-retirement-overlaps-copy': PROVIDER_RETIRE_ADMISSION,
+        'provider-retirement-overlaps-scheduled-kick':
+            '    if (!gpu->exactIHProviderCalls.drained() || !gpu->exactIHTurns.drained()) return kIOReturnBusy;\n',
+    }
+    for label, guard in quiescence_mutants.items():
+        exercise(label, once(adapter, PROVIDER_QUIESCENT_RETIRE_ADMISSION, guard), 'address,undefined', True, True)
     with patch.object(native_objects, 'HEADERS', header_names):
         native = native_objects.check(out / 'native', inputs, previous, proposed, ownership, sdk, kdk,
                                       reference['native_import_count'] + len(ADDED_IMPORTS),
@@ -285,9 +298,9 @@ def test(out, sdk, kdk):
     git('diff', '--quiet', BASE, '--', *PROTECTED)
     if any((ROOT / name).read_bytes() != blob for name, blob in inputs.items()):
         raise ValueError('Inputs changed during verification')
-    result = dict(status='passed-offline-IH-provider-call-lifecycle', build=34, checks=counts,
+    result = dict(status='passed-offline-IH-provider-software-quiescence', build=34, checks=counts,
                   rejected_mutants=[*mutations, *lifecycle_mutants, 'leave-copier-turn-admission-open', *poll_mutants,
-                                    *prepare_mutants, *provider_mutants, 'leave-provider-admission-open'],
+                                    *prepare_mutants, *provider_mutants, 'leave-provider-admission-open', *quiescence_mutants],
                   previous_source_sha256=sha(previous.encode()),
                   staged_source_sha256=sha(proposed.encode()), protected_production_inputs=len(production),
                   staged_providerless_scheduler=True, native_irq_scheduler_bound=False,
@@ -296,6 +309,7 @@ def test(out, sdk, kdk):
                   fallback_poll_clips_to_remaining_budget=True,
                   observed_revocation_refuses_prepare_publication=True,
                   register_and_enable_admitted_separately=True, attempted_provider_pins_retained=True,
+                  admitted_workloop_copy_and_kick_drained_before_unregister=True,
                   simulated_unregister_and_callback_drain_required_before_detach=True,
                   native_provider_ops_bound=False,
                   native_event_backend_bound=False, native_teardown_deadline_proved=False,

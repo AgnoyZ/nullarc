@@ -208,7 +208,52 @@ static void invalidateProviderTrial(Trial &trial, bool stop) {
     }
 }
 
+static void exerciseProviderQuiescence(bool pauseCopy) {
+    Trial trial;
+    Capture capture;
+    ProviderDouble provider;
+    Barrier paused;
+    trial.gpu.modeledIHAdmission = true;
+    auto *source = prepare(trial, capture);
+    CHECK(source && source->armProvider(ProviderDouble::ops, &provider));
+    auto *loop = source->getWorkLoop();
+    if (pauseCopy) capture.pause = &paused;
+    else CHECK(loop->turn() && capture.calls == 1);
+
+    std::thread active([&] {
+        if (pauseCopy) CHECK(loop->turn());
+        else {
+            duringWake = [&] { paused.arrive(); };
+            source->hint();
+        }
+    });
+    paused.wait();
+    invalidateProviderTrial(trial, pauseCopy);
+    CHECK(trial.gpu.exactIHProviderCalls.drained() && trial.gpu.exactIHTurns.closed());
+    CHECK(trial.gpu.exactIHTurns.active() == unsigned(pauseCopy));
+    CHECK(source->retireProvider() == kIOReturnBusy && provider.removals == 0);
+    CHECK(source->detach() == kIOReturnBusy && loop->removeCount == 0);
+    CHECK(source->references == 4 && provider.references == 2 && capture.references == 2);
+    paused.resume();
+    active.join();
+
+    CHECK(trial.gpu.exactIHTurns.drained());
+    CHECK(provider.removals == 0 && trial.gpu.exactIHBatchOrdinal == unsigned(!pauseCopy));
+    CHECK(source->retireProvider() == kIOReturnSuccess && provider.removals == 1);
+    CHECK(source->detach() == kIOReturnSuccess && loop->removeCount == 1);
+    if (pauseCopy) {
+        CHECK(trial.gpu.exactCallbacks.drained());
+        trial.gpu.sealStoppedQueues();
+        CHECK(trial.gpu.exactStopped && trial.gpu.references == 3);
+        trial.gpu.release();
+    }
+    releaseCaller(trial, capture, source);
+}
+
 static void exerciseProvider() {
+    exerciseProviderQuiescence(true);
+    exerciseProviderQuiescence(false);
+
     Trial denied;
     Capture deniedCapture;
     ProviderDouble neverCalled;
