@@ -82,6 +82,46 @@ boundary. A PSP command acknowledgment must not be substituted for the
 separate IH writer and doorbell handoff. No PSP command, register access,
 firmware operation or allocation change was performed for this review.
 
+### PMFW unload is not an IH handoff
+
+A follow-up pins Linux at `81493c1dd1b1ebecb2843a7815973a5bd9a37e5a`.
+The [GFX11+ APU teardown rationale](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c#L2912-L2928)
+describes PMFW resetting and powering down GC after an MP1 unload request.
+The condition there skips an explicit ASIC reset on GFX11+; it neither
+issues that request nor verifies that GC reset happened.
+
+- [MP1 13.0.4 selects the APU callback table](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c#L788-L791),
+  whose [setup marks `is_apu`](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_4_ppt.c#L1143-L1156).
+  The generic [`smu_reset_mp1_state`](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c#L2170-L2181)
+  `PP_MP1_STATE_UNLOAD` path expressly excludes APUs. The separate
+  [13.0.4 features callback](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/pm/swsmu/smu13/smu_v13_0_4_ppt.c#L227-L248)
+  can send `PrepareMp1ForUnload` when disabling features outside S0ix.
+  In S4 it first requires a successful Mode 2 response. Do not equate
+  the generic unload helper with that callback.
+- [SMU finalization](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c#L2183-L2214)
+  skips the DPM cleanup when PM is disabled. The [DPM path](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/pm/swsmu/amdgpu_smu.c#L2093-L2140)
+  bypasses the features callback for GFX11+ APU reset/S0ix and skips it
+  with SCPM enabled. If the callback returns an error, the path logs it
+  and then overwrites its result with the RLC notification result. The
+  [IP wrapper](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c#L2829-L2848)
+  clears software hardware-active state even after a finalizer error.
+  Neither a successful higher-level return nor that flag attests that the
+  MP1 preparation ran, much less that it completed.
+- The rationale concerns GC, not the separate IH on OSSSYS. At the same
+  revision, the [IH shutdown path](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L415-L422)
+  disables the rings and delays; the [idle and reset hooks](https://github.com/torvalds/linux/blob/81493c1dd1b1ebecb2843a7815973a5bd9a37e5a/drivers/gpu/drm/amd/amdgpu/ih_v6_0.c#L641-L674)
+  do not return a completed-write receipt. Even a separately verified GC
+  reset does not identify inherited IH storage, close the consumer doorbell
+  path, or certify completion of earlier ring or writeback DMA.
+
+Do not use Linux unload success, the GC default-off comment, or a mailbox
+response as admission to retake the current IH ring. A predecessor handoff
+would still need to identify the exact ring, writeback, translations and
+consumers, and provide a checked device-side stop/completed-write boundary
+without dropping unrelated traffic. This review adds no SMU command or
+power/reset experiment. See the
+[sanitized source review](validation/build34-r3-mp1-unload-review-20261123.json).
+
 ## Ordering gap in build34
 
 The production `PhxBringup::start()` enables PCI bus mastering and memory

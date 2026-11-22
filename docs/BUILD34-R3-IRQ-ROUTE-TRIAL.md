@@ -331,7 +331,9 @@ found no advertised standard PCIe FLR in cached metadata and no verified
 GPU-only bridge reset or platform handoff. The current exposed ACPI table
 review located explicit reset objects on other devices and resources; it
 did not establish a GPU reset or complete runtime namespace. The ownership
-and drain gate remains open.
+and drain gate remains open. The [MP1 unload review](BUILD34-INITIAL-QUEUE-OWNERSHIP.md#pmfw-unload-is-not-an-ih-handoff)
+also rules out inferring IH drain from the Linux GC power-down rationale or
+from a successful higher-level finalizer result.
 
 ### Follow-up: ring-full handling and translated DMA drain
 
