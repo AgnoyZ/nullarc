@@ -188,6 +188,45 @@ device writes. Leave the existing services attached and preserve the display
 path while investigating. No candidate, device operation or rollback action
 was needed for this read-only review.
 
+### Follow-up: Apple manager stop is not an IH handoff
+
+On November 22, 2026, two targeted `IOServiceMatching` samples found one
+`AMDSupport`, one `PhxBringup` and no published `ATIController` service.
+Two `ioclasscount` samples independently reported one `AMDSupport` and zero
+instances counted for both `ATIController` and `AtiFbInterruptManager`.
+The current loaded-kext inventory contained `AMDSupport` but no separate
+Apple AMD controller kext. These are current snapshots, not history or a
+complete census of other interrupt consumers and hardware writers.
+
+The loaded AMDSupport and IOPCIFamily identifiers match the x86_64 references
+from the OS-build-matching KDK. Offline disassembly, relocation and vtable
+checks distinguish the two Apple paths:
+
+- The direct `AMDSupport` service's `start` calls the `IOService` base start,
+  then sets a version property and registers the service. That method does
+  not instantiate `AtiFbInterruptManager`. The manager's separate `init`
+  takes an `ATIController` and obtains its register service, interrupt list
+  and PCI device. Its PCI installation path attempts registration and
+  enablement on that device; the mere presence of the code in the loaded
+  bundle is not evidence those calls occurred on the Radeon.
+- `ATIController::stop` calls `AtiFbInterruptManager::stopInterrupts` when
+  it has a manager. The reviewed manager method clears its software flags,
+  disables and unregisters its remembered PCI source when present, and
+  invalidates that source field. It does not check IH producer idle, ring
+  writeback completion or memory visibility. The public
+  [IOPCIFamily unregister reference](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/IOPCIMessagedInterruptController.cpp#L135-L172)
+  describes PCI vector/MSI teardown, not AMD on-chip DMA drain. Neither
+  method is an admitted stop/drain endpoint for build34.
+
+This narrows the live competing-owner hypothesis without establishing that
+no predecessor programmed the hardware. Do not detach the support service
+or invoke the Apple stop path to simulate a handoff. The next evidence needed
+is coverage of the firmware/platform writers and any other consumers, with
+a device-side stop and completed-write boundary for the selected storage.
+No device client, PCI interrupt query, MMIO access, registration or power
+action was requested. See the
+[sanitized record](validation/build34-r3-ih-apple-stop-review-20261122.json).
+
 ## Stop, rollback and later acceptance
 
 Keep callbacks bounded: the interrupt context only signals deferred work.
