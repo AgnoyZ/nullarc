@@ -229,6 +229,8 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    The [checked unmap stage](BUILD34-VM-LIFETIME.md#follow-up-checked-unmap-walk)
    separates a missing branch from a failed software table lookup and
    retains BO backing on a late walk failure, even after a partial clear.
+   The [native submit mapping admission stage](BUILD34-VM-LIFETIME.md#follow-up-native-submit-mapping-admission)
+   next refuses an unmaterialized logical mapping before native dispatch.
    The actual caller tests use CPU doubles; no native release is admitted.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.

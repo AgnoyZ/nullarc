@@ -257,3 +257,48 @@ This is a narrow software walk check, not a complete hierarchy validation,
 proof of GPU visibility or fresh ACK, old-writer drain, or native BO release
 admission. All 172 production inputs are unchanged. Do not build or deploy
 a kernel candidate from this experiment; rollback is to leave it unapplied.
+
+## Follow-up: native submit mapping admission
+
+On November 22, 2026, the same queue-readiness transition exposed another
+old-path admission gap. CPU fixtures could create GEM_VA maps while no GPU
+queue was ready, then submit after readiness changed without materializing
+those logical mappings. The old path still dispatched a native packet; its
+software IB-range check consulted only the logical map records, so it could
+not distinguish a resident GPU mapping from an unmaterialized one. This is
+a CPU-modeled gap, not behavior observed on macOS or the 780M.
+
+The [isolated transform](../tools/build34_exact_vm_ready.py) derives the
+checked-unmap stage and records whether each accepted map was materialized
+at GEM_VA time. Mapping still materializes whenever a client VM already
+exists or the GPU is ready; otherwise it remains logical and sets a sticky
+client flag. Before either native submit path can dispatch, the new
+admission helper rejects `kIOReturnNotReady` if any retained map is not
+materialized. It never mutates maps or requests unmap/remap itself. Logical
+cleanup remains available through the checked GEM_VA/BOFREE paths. Once a
+client remaps after readiness, or removes the stale records through unmap
+and BOFREE, admission can succeed without changing the request protocol.
+
+The [CPU runner](../tools/test_build34_exact_vm_ready.py) freezes the 172
+production inputs and reuses the prior unmap fixture prefix. Seven scenarios
+cover resident, typed-resident and mock submission, plus legacy and typed
+logical-executable and logical-data cases. The before binaries first
+reproduce four old native dispatches with the expected `NotReady` assertion,
+then the staged ASan/UBSan and TSan binaries pass all scenarios. Each
+sanitizer reports **8,010 checks**. The refusal asserts untouched outputs,
+unchanged VM identity and sequence state, no exact exposure or registry
+reservation, no sticky cleanup fault, no flush or packet write, and no
+service sequence change. Recovery retests successful dispatch after checked
+logical unmap/remap, or after unmap plus BOFREE of the stale data owner.
+See the [sanitized evidence](validation/build34-r3-vm-ready-offline-20261122.json).
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_vm_ready.py \
+  --out build/build34-r3-vm-ready-new-private
+```
+
+This is an admission-control CPU result only. It does not prove live mapper
+identity, GPU page-walk visibility, native ACK freshness, old-writer drain,
+or resource lifetime, and it does not authorize building, installing or
+loading a kernel candidate. All 172 production inputs remain unchanged;
+rollback is to leave the transform unapplied.

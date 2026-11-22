@@ -1,0 +1,31 @@
+{
+  "status": "passed-staged-vm-ready-CPU-only",
+  "kernel_build": 34,
+  "host_macOS_version": "26.7.2",
+  "host_macOS_build": "25G332",
+  "checks_per_sanitizer": 8010,
+  "scenarios": 7,
+  "asan_ubsan": true,
+  "tsan": true,
+  "predecessor_sha256": "5c24adfef29acce41682123296a73e449a554163198ce73f6bcda32ec14136e2",
+  "staged_sha256": "195ff8da87df73a82748da4cef13a9d30e4d6d08573a0658b433c5a7cfe621e5",
+  "old_native_dispatches_reproduced": [
+    "logical-executable",
+    "typed-logical-executable",
+    "logical-data",
+    "typed-logical-data"
+  ],
+  "actual_GEM_VA_and_submit_handlers_tested": true,
+  "refusal_preserved_outputs_metadata_and_packet_writes": true,
+  "recovery_after_logical_unmap_or_bofree_retested": true,
+  "production_inputs_unchanged": 172,
+  "default_make_j1_test_passed": true,
+  "native_ACK_freshness_GPU_visibility_or_old_writer_drain_proved": false,
+  "kernel_candidate_built": false,
+  "installed": false,
+  "loaded": false,
+  "GPU_executed": false,
+  "power_action_requested": false,
+  "R3_complete": false,
+  "R4_R6_started": false
+}
