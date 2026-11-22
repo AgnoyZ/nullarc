@@ -199,8 +199,39 @@ Passing the offline checker is not hardware attestation. Equal cursors,
 matching ISR counts and timestamps cannot prove no unobserved DMA, exclusive
 IH ownership, the true loaded images or cache visibility. Keep source tokens,
 cursors, packet words and raw trace data private. No collection code, IRQ
-provider or device access was added. See the
-[sanitized test record](validation/build34-r3-one-shot-irq-evidence-offline-20261123.json).
+provider or device access was added. See the original
+[sanitized ISR test record](validation/build34-r3-one-shot-irq-evidence-offline-20261123.json).
+
+### Check complete first-read BAR0 data
+
+The one-shot path no longer takes a caller-supplied `payload_ok` or a
+low-dword-only fence read. Each pre-submit, first-read and closing sample
+records both raw eight-byte little-endian fence reads and the raw guarded
+payload from its sealed BAR0 offset. The current fence starts with a nonzero
+high dword and a fresh low-dword seed. The first and closing reads must
+match the packet's full 64-bit result, including the zero high dword. The
+peer's full 64-bit value must stay unchanged, also across windows when it
+is not the submitting queue.
+
+The guarded range covers all 256 payload dwords and two 64-byte guards. It
+must fit the admitted aperture and not overlap either fence. Seal all four
+seed/result byte pairs and both guard patterns before enabling the route.
+The cases cannot reuse a seed or result, and every result dword must differ
+from its seed. Verify the entire seeded region before submit and the entire
+expected result and unchanged guards in both post-submit samples. Retain a
+failed first read even if the closing sample succeeds. The historical
+multi-route entries keep their old format; they cannot substitute for this
+one-shot check.
+
+The same-generation samples still need an independent collector that
+establishes the effective BAR0 mapping/cache policy, the actual access order
+and the absence of other writes to these test slots. The captured workload
+must independently match the presealed challenge; a matching data snapshot
+does not prove that the GPU wrote it or that a sample was really the first
+read. `raw_bar0_samples_checked` reports only record consistency. Retain raw
+data privately. This change installs no collector and does not prove cache
+coherence, IH ownership or DMA drain. See the
+[sanitized offline result](validation/build34-r3-one-shot-bar0-evidence-offline-20261123.json).
 
 ## IH ownership review
 

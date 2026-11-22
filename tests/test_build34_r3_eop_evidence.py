@@ -93,14 +93,26 @@ def one_shot_fixture():
     scope = dict(identity=identity.copy(), initial_read_cursor=cursor, ring_size_bytes=ring_size,
                  bar0_mc_base=_BAR0_MC_BASE, bar0_size_bytes=_BAR0_SIZE, irq_source_token=28,
                  gfx_fence_offset=16, compute_fence_offset=32, observe_budget_ns=100, cleanup_budget_ns=30,
-                 terminal_deadline_ns=1760)
+                 terminal_deadline_ns=1760, payload_region_offset=128,
+                 payload_guard_before=bytes([0xA5]) * 64, payload_guard_after=bytes([0x5A]) * 64,
+                 payload_challenges=[dict(seed=bytes([2 * index]) * 1024, result=bytes([2 * index + 1]) * 1024)
+                                     for index in range(len(records))])
     for index, case in enumerate(records):
         queue = case["queue"]
         is_gfx = queue == "gfx"
         rewrite_fence_slots(case, 16 if is_gfx else 32, 32 if is_gfx else 16)
         for name in ("before", "first_read", "final_read"):
-            case[name]["identity"] = identity.copy()
-            case[name]["other_fence"] = 7 if is_gfx else records[1]["target"]
+            sample = case[name]
+            sample["identity"] = identity.copy()
+            value = sample.pop("fence")
+            sample.pop("payload_ok")
+            sample.pop("other_fence")
+            before = name == "before"
+            payload = scope["payload_challenges"][index]["seed" if before else "result"]
+            sample.update(fence_data=pack("<2I", value, 0xDEADBEEF if before else 0),
+                          other_fence_data=pack("<Q", 7 if is_gfx else records[1]["target"]),
+                          payload_region_offset=scope["payload_region_offset"],
+                          payload_region=scope["payload_guard_before"] + payload + scope["payload_guard_after"])
         case["isr_dispatches"] = [dict(identity=identity.copy(), source_token=scope["irq_source_token"],
                                        ordinal=1 + index // 2, seen_ns=case["start_ns"] + 34)] if case["interrupt"] else []
         for batch in case["ih_capture"]:
@@ -125,6 +137,7 @@ class OneShotIrqDelivery(unittest.TestCase):
         self.assertIs(result["single_route_checked"], True)
         self.assertIs(result["isr_dispatch_checked"], True)
         self.assertIs(result["release_mem_checked"], True)
+        self.assertIs(result["raw_bar0_samples_checked"], True)
         self.assertIs(result["hardware_attested"], False)
         self.assertIs(result["old_writer_drain_proved"], False)
         self.assertEqual(records[1]["ih_capture"][-1]["read_cursor"], 0)
@@ -205,8 +218,71 @@ class OneShotIrqDelivery(unittest.TestCase):
             with self.subTest(case=index), self.assertRaisesRegex(ValueError, "peer fence changed between"):
                 records, scope = one_shot_fixture()
                 for name in ("before", "first_read", "final_read"):
-                    records[index][name]["other_fence"] += 1
+                    sample = records[index][name]
+                    sample["other_fence_data"] = pack("<Q", unpack("<Q", sample["other_fence_data"])[0] + (1 << 32))
                 verify_one_shot(records, scope)
+
+    def test_requires_high_dword_overwrite_on_first_and_final_read(self):
+        for name in ("first_read", "final_read"):
+            with self.subTest(sample=name), self.assertRaisesRegex(ValueError, "full fence"):
+                records, scope = one_shot_fixture()
+                case = records[1]
+                case[name]["fence_data"] = pack("<2I", case["target"], 0xDEADBEEF)
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        before = records[1]["before"]
+        before["fence_data"] = before["fence_data"][:4] + bytes(4)
+        with self.assertRaisesRegex(ValueError, "poison the high dword"):
+            verify_one_shot(records, scope)
+
+    def test_requires_complete_raw_reads_and_full_peer_stability(self):
+        for field, data, message in (("fence_data", bytes(4), "fence read byte count"),
+                                     ("other_fence_data", bytes(4), "peer fence read byte count"),
+                                     ("other_fence_data", pack("<2I", 7, 1), "other queue full fence changed"),
+                                     ("payload_region", bytes(1024), "payload sample byte count"),
+                                     ("payload_ok", True, "one-shot BAR0 sample fields")):
+            with self.subTest(field=field, message=message), self.assertRaisesRegex(ValueError, message):
+                records, scope = one_shot_fixture()
+                records[1]["first_read"][field] = data
+                verify_one_shot(records, scope)
+
+    def test_rejects_stale_payload_and_both_guard_corruptions(self):
+        for name, offset in (("before", 64), ("first_read", 63), ("first_read", 1087),
+                             ("final_read", 1088), ("final_read", 1151)):
+            with self.subTest(sample=name, offset=offset), self.assertRaisesRegex(ValueError, "payload or guard mismatch"):
+                records, scope = one_shot_fixture()
+                sample = records[3][name]
+                data = bytearray(sample["payload_region"])
+                data[offset] ^= 1
+                sample["payload_region"] = bytes(data)
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        records[3]["first_read"]["payload_region"] = records[3]["before"]["payload_region"]
+        with self.assertRaisesRegex(ValueError, "first_read payload or guard mismatch"):
+            verify_one_shot(records, scope)
+
+    def test_checks_payload_offset_extent_and_fence_disjointness(self):
+        for offset, message in ((129, "unaligned or overlapping"), (16, "unaligned or overlapping"),
+                                (4096 - 1152 + 4, "invalid BAR0 guarded payload offset")):
+            with self.subTest(offset=offset), self.assertRaisesRegex(ValueError, message):
+                records, scope = one_shot_fixture()
+                scope["payload_region_offset"] = offset
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        records[1]["first_read"]["payload_region_offset"] += 4
+        with self.assertRaisesRegex(ValueError, "not from the admitted offset"):
+            verify_one_shot(records, scope)
+
+    def test_sealed_payload_challenges_cannot_alias_or_leave_a_dword_untouched(self):
+        records, scope = one_shot_fixture()
+        scope["payload_challenges"][1]["result"] = scope["payload_challenges"][0]["seed"]
+        with self.assertRaisesRegex(ValueError, "reused payload seed or result"):
+            verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        challenge = scope["payload_challenges"][1]
+        challenge["result"] = challenge["seed"][:4] + challenge["result"][4:]
+        with self.assertRaisesRegex(ValueError, "does not replace every seeded dword"):
+            verify_one_shot(records, scope)
 
     def test_terminal_counter_detects_unreported_irq_and_requires_bounded_same_route_sample(self):
         records, scope = one_shot_fixture()

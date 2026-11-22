@@ -51,6 +51,9 @@ found a documented host-IOMMU page-reuse boundary, conditional on successful
 revocation of all matching translations. It is not a primary IH producer
 stop, an old-consumer doorbell drain, or proof of either route on the build34
 host. The ownership gate stays open before any live event binding.
+The [first-read evidence check](BUILD34-R3-IRQ-ROUTE-TRIAL.md#check-complete-first-read-bar0-data)
+now requires full 64-bit fence samples and the sealed guarded payload on
+that same one-shot route. It does not bind a BAR0 reader or attest visibility.
 
 ## Execution order
 

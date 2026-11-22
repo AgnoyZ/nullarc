@@ -17,6 +17,9 @@ _RELEASE_EVENT = 0x06603514
 _RELEASE_DATA64 = 2 << 29
 _RELEASE_INT_AFTER_CONFIRM = 2 << 24
 _FENCE_BYTES = 8
+_PAYLOAD_BYTES = 256 * 4
+_GUARD_BYTES = 64
+_REGION_BYTES = _PAYLOAD_BYTES + 2 * _GUARD_BYTES
 _IH_OFFSET = 0x3FFFC
 _IH_OVERFLOW = 1
 _IH_FULL_OR_AT_RISK = 0xC0000
@@ -198,6 +201,68 @@ def check_ih_capture(records, *, ring_size_bytes, bar0_mc_base, bar0_size_bytes,
     return dict(result, raw_ih_capture_checked=True, release_mem_checked=True)
 
 
+def _bytes(value, size, label):
+    if type(value) is not bytes or len(value) != size:
+        raise ValueError(f"invalid {label} byte count")
+    return value
+
+
+def _payload_scope(scope, offsets, aperture_size):
+    start = _integer(scope["payload_region_offset"], "BAR0 guarded payload offset",
+                     low=0, high=aperture_size - _REGION_BYTES)
+    if start % 4 or any(start < fence + _FENCE_BYTES and fence < start + _REGION_BYTES
+                        for fence in offsets.values()):
+        raise ValueError("unaligned or overlapping guarded BAR0 payload")
+    prefix = _bytes(scope["payload_guard_before"], _GUARD_BYTES, "leading guard")
+    suffix = _bytes(scope["payload_guard_after"], _GUARD_BYTES, "trailing guard")
+    challenges = scope["payload_challenges"]
+    if type(challenges) is not list or len(challenges) != len(_CASES):
+        raise ValueError("require one sealed payload challenge per route case")
+    seen = set()
+    regions = []
+    for challenge in challenges:
+        _fields(challenge, "seed result", "payload challenge")
+        seed = _bytes(challenge["seed"], _PAYLOAD_BYTES, "payload seed")
+        result = _bytes(challenge["result"], _PAYLOAD_BYTES, "payload result")
+        if seed == result or seed in seen or result in seen:
+            raise ValueError("reused payload seed or result")
+        if any(seed[word:word + 4] == result[word:word + 4] for word in range(0, _PAYLOAD_BYTES, 4)):
+            raise ValueError("payload challenge does not replace every seeded dword")
+        seen.update((seed, result))
+        regions.append((prefix + seed + suffix, prefix + result + suffix))
+    return start, regions
+
+
+def _raw_bar0_case(record, payload_offset, regions):
+    case = record.copy()
+    peer_value = None
+    for name, region in zip(("before", "first_read", "final_read"), (regions[0], regions[1], regions[1])):
+        sample = record[name]
+        _fields(sample, "identity begin_ns end_ns fence_offset other_fence_offset fence_data other_fence_data "
+                "payload_region_offset payload_region", "one-shot BAR0 sample")
+        offset = _integer(sample["payload_region_offset"], "sampled BAR0 guarded payload offset", low=0)
+        if offset != payload_offset:
+            raise ValueError("BAR0 payload sample not from the admitted offset")
+        if _bytes(sample["payload_region"], _REGION_BYTES, "guarded payload sample") != region:
+            raise ValueError(f"BAR0 {name} payload or guard mismatch")
+        fence = int.from_bytes(_bytes(sample["fence_data"], _FENCE_BYTES, "fence read"), "little")
+        peer = int.from_bytes(_bytes(sample["other_fence_data"], _FENCE_BYTES, "peer fence read"), "little")
+        if name == "before":
+            if fence <= _U32_MAX:
+                raise ValueError("BAR0 pre-submit fence must poison the high dword")
+            peer_value = peer
+        elif fence != record["target"]:
+            raise ValueError(f"BAR0 {name} full fence does not match the submitted target")
+        if peer != peer_value:
+            raise ValueError("other queue full fence changed")
+        case[name] = {field: sample[field] for field in (
+            "identity", "begin_ns", "end_ns", "fence_offset", "other_fence_offset",
+        )}
+        case[name].update(fence=fence & _U32_MAX, other_fence=peer & _U32_MAX,
+                          payload_ok=name != "before")
+    return case, peer_value
+
+
 def check_one_shot_irq_delivery(records, *, scope, terminal):
     """Correlate private ISR, IH and fence traces on one admitted, non-rearmed route.
 
@@ -206,7 +271,7 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
     """
     _fields(scope, "identity irq_source_token initial_read_cursor ring_size_bytes bar0_mc_base "
             "bar0_size_bytes gfx_fence_offset compute_fence_offset observe_budget_ns cleanup_budget_ns "
-            "terminal_deadline_ns",
+            "terminal_deadline_ns payload_region_offset payload_guard_before payload_guard_after payload_challenges",
             "single-route scope")
     identity = _identity(scope["identity"])
     irq_token = _integer(scope["irq_source_token"], "admitted IRQ source token")
@@ -216,13 +281,14 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
                                low=0, high=bar0_size - _FENCE_BYTES) for queue in _RINGS}
     if len(set(offsets.values())) != 2 or any(offset % _FENCE_BYTES for offset in offsets.values()):
         raise ValueError("invalid admitted BAR0 fence pair")
+    payload_offset, payload_regions = _payload_scope(scope, offsets, bar0_size)
     if type(records) is not list or len(records) != len(_CASES):
         raise ValueError("expected exactly four ordered route cases")
 
     normalized = []
     next_dispatch = 1
     prior_fences = {}
-    for record, (queue, interrupt) in zip(records, _CASES):
+    for record, (queue, interrupt), regions in zip(records, _CASES, payload_regions):
         _fields(record, _CASE_FIELDS + " ih_capture release_mem isr_dispatches", "single-route case")
         if record["queue"] != queue or record["interrupt"] is not interrupt:
             raise ValueError("expected control then EOP for GFX, then Compute")
@@ -242,12 +308,12 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
             dispatch_ns = _integer(dispatch["seen_ns"], "ISR dispatch time",
                                     low=_integer(record["submit_ns"], "submission time") + 1)
 
-        item, pair, cursor = _normalize_capture(record, ring_size, mc_base, bar0_size,
+        raw_case, peer_value = _raw_bar0_case(record, payload_offset, regions)
+        item, pair, cursor = _normalize_capture(raw_case, ring_size, mc_base, bar0_size,
                                                 start_cursor=cursor, dispatch_ns=dispatch_ns)
         peer = "compute" if queue == "gfx" else "gfx"
         if pair != (offsets[queue], offsets[peer]):
             raise ValueError("BAR0 fence slots do not match the admitted queue pair")
-        peer_value = item["before"]["other_fence"]
         if prior_fences.setdefault(peer, peer_value) != peer_value:
             raise ValueError("peer fence changed between route cases")
         prior_fences[queue] = item["target"]
@@ -264,7 +330,7 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
     _integer(terminal["seen_ns"], "terminal sample time", low=normalized[-1]["cleanup_end_ns"],
              high=_integer(scope["terminal_deadline_ns"], "terminal deadline"))
     return dict(result, raw_ih_capture_checked=True, release_mem_checked=True, isr_dispatch_checked=True,
-                single_route_checked=True, old_writer_drain_proved=False)
+                raw_bar0_samples_checked=True, single_route_checked=True, old_writer_drain_proved=False)
 
 
 def check(records, *, observe_budget_ns, cleanup_budget_ns):
