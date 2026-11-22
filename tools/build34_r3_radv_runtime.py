@@ -23,6 +23,8 @@ from upstream34_layout.radv_ib_tail_runtime import (
 DARWIN = 'src/amd/common/darwin/'
 COMMON_MESON = 'src/amd/common/meson.build'
 RADV_MESON = 'src/amd/vulkan/meson.build'
+RADV_CS = 'src/amd/vulkan/winsys/amdgpu/radv_amdgpu_cs.c'
+RADV_CS_BASE_SHA256 = '7ab9313d4f746c06893433b07ac12312a2807f14082018641c5ee74540e4d516'
 ENTRY_RECORD = ROOT / 'docs/validation/build34-r3-radv-exact-entry-offline-20261122.json'
 TRANSPORT_RECORD = ROOT / 'docs/validation/build34-r3-transport-offline-20261121.json'
 ADAPTER = 'build34_r3_mesa_wire.c'
@@ -58,7 +60,27 @@ def production_snapshot():
     return {name: digest(ROOT / name) for name in names}
 
 
-def stage_full_source(baseline, destination, prior, reviewed):
+def stage_exact_cs(path):
+    if digest(path) != RADV_CS_BASE_SHA256:
+        raise ValueError('Unreviewed RADV CS source')
+    source = path.read_text()
+    source = once(source, '#include "ac_linux_drm.h"\n', '''#include "ac_linux_drm.h"
+#ifdef HAVE_AMDGPU_DARWIN
+#include "build34_r3_radv_entry.h"
+#endif
+''')
+    source = once(source, '   bool has_user_fence = radv_amdgpu_cs_has_user_fence(request);\n',
+                  '''   bool has_user_fence = radv_amdgpu_cs_has_user_fence(request);
+#ifdef HAVE_AMDGPU_DARWIN
+   struct phx_topology exact_profile;
+   if (has_user_fence && !ac_drm_darwin_exact_profile(ctx->ws->dev, &exact_profile))
+      has_user_fence = false;
+#endif
+''')
+    path.write_text(source)
+
+
+def stage_full_source(baseline, destination, prior, reviewed, exact_cs):
     expected = json.loads(TRANSPORT_RECORD.read_text())['staged_Mesa_sha256']
     expected.update(reviewed['entry_staged_source_sha256'])
     for field in ('iokit', 'drm', 'sync'):
@@ -97,18 +119,24 @@ def stage_full_source(baseline, destination, prior, reviewed):
     radv = once(path.read_text(), '    inc_util, inc_virtio_gpu\n',
                 '    inc_util, inc_virtio_gpu, inc_r3_darwin\n')
     path.write_text(radv)
-    staged = inventory(destination)
     allowed = (set(overlay) - {WINSYS}) | set(new) | {COMMON_MESON, RADV_MESON}
+    if exact_cs:
+        stage_exact_cs(destination / RADV_CS)
+        allowed.add(RADV_CS)
+    staged = inventory(destination)
     if {name for name in original.keys() | staged.keys() if original.get(name) != staged.get(name)} != allowed:
         raise ValueError('Unexpected full-source delta')
     return original, staged, sorted(allowed)
 
 
-def verify_link(source, native, ninja, env):
+def verify_link(source, native, ninja, env, exact_cs):
     commands = json.loads((native / 'compile_commands.json').read_text())
     link = subprocess.check_output([ninja, '-C', native, '-t', 'commands', TARGET], env=env, text=True, timeout=30)
     used = {}
-    for relative, headers in COMPILED.items():
+    reviewed_units = dict(COMPILED)
+    if exact_cs:
+        reviewed_units[RADV_CS] = [DARWIN + 'build34_r3_radv_entry.h']
+    for relative, headers in reviewed_units.items():
         path = source / relative
         rows = [row for row in commands if (Path(row['directory']) / row['file']).resolve() == path]
         if len(rows) != 1:
@@ -144,7 +172,7 @@ def verify_link(source, native, ninja, env):
     return used, sorted(imports), deps[1:]
 
 
-def build(baseline, entry, output, tool_dirs):
+def build(baseline, entry, output, tool_dirs, exact_cs=False):
     if platform.system() != 'Darwin' or platform.machine() != 'x86_64':
         raise ValueError('Native x86_64 macOS required')
     baseline, entry, output = (Path(path).resolve() for path in (baseline, entry, output))
@@ -165,7 +193,7 @@ def build(baseline, entry, output, tool_dirs):
     frozen_inputs = {str(path.relative_to(ROOT)): digest(path) for path in inputs}
     output.mkdir(parents=True, mode=0o700)
     source, native = output / 'mesa', output / 'native'
-    copied, staged, changed = stage_full_source(baseline, source, entry, reviewed)
+    copied, staged, changed = stage_full_source(baseline, source, entry, reviewed, exact_cs)
     if copied != original:
         raise RuntimeError('Baseline source copy drift')
 
@@ -189,7 +217,7 @@ def build(baseline, entry, output, tool_dirs):
     logged(meson_command(tools['meson'], source, native), output / 'configure.log', env)
     print('Compiling/linking three build jobs; the library will not be loaded.', flush=True)
     logged([tools['ninja'], '-C', native, '-j', '3', TARGET], output / 'compile.log', env, 1800)
-    units, imports, deps = verify_link(source, native, tools['ninja'], env)
+    units, imports, deps = verify_link(source, native, tools['ninja'], env, exact_cs)
     if inventory(baseline) != original or inventory(source) != staged or any(
             digest(ROOT / name) != expected for name, expected in frozen_inputs.items()):
         raise RuntimeError('Source or recipe changed during compilation')
@@ -205,6 +233,8 @@ def build(baseline, entry, output, tool_dirs):
                   compiler=subprocess.check_output(['/usr/bin/clang', '--version'], text=True, timeout=15).splitlines()[0],
                   native_mode_admitted=False, installed=False, loaded=False, binary_uploaded=False,
                   real_IOKit_called=False, GPU_executed=False, R3_complete=False)
+    if exact_cs:
+        report['exact_cs_omits_legacy_fence_chunk'] = True
     (output / 'result-private.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report))
 
@@ -215,5 +245,6 @@ if __name__ == '__main__':
     parser.add_argument('--entry-evidence', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--toolchain-bin', action='append', type=Path, required=True)
+    parser.add_argument('--exact-cs', action='store_true', help='Derive the separate staged exact-CS variant')
     args = parser.parse_args()
-    build(args.mesa_source, args.entry_evidence, args.out, args.toolchain_bin)
+    build(args.mesa_source, args.entry_evidence, args.out, args.toolchain_bin, args.exact_cs)

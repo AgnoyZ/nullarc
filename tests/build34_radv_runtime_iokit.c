@@ -8,11 +8,16 @@
 #include "navi48_native_abi.h"
 
 #ifdef PHX34_CPU_R3
+#include "build34_radv_runtime_cpu.h"
 #include "build34_exact_open_wire.h"
 #include "build34_exact_progress_wire.h"
-enum { CPU_OK, CPU_OPEN_REFUSED, CPU_SESSION_CAPS, CPU_SESSION_SHORT };
+#include "build34_exact_submit_wire.h"
 static unsigned scenario, attempts, sessions, hellos, releases, matches;
 static unsigned match_token;
+static struct cpu_exact_trace trace;
+static struct phx34_r3_reply receipt;
+static int need_prefix;
+static const uint64_t owner = 0x10000000bull, first_sequence = 0x200000005ull;
 const mach_port_t kIOMainPortDefault = MACH_PORT_NULL;
 #define IOKIT_API(mock, symbol) symbol
 #define IOKIT_LINKAGE
@@ -21,7 +26,14 @@ const mach_port_t kIOMainPortDefault = MACH_PORT_NULL;
 #define IOKIT_LINKAGE static
 #endif
 
-struct cpu_bo { void *data; uint64_t size; unsigned maps; };
+struct cpu_bo {
+   void *data;
+   uint64_t size;
+   unsigned maps;
+#ifdef PHX34_CPU_R3
+   uint64_t va, va_size;
+#endif
+};
 static struct cpu_bo bos[N48N_MAX_BOS];
 static unsigned opens, closes, creates, calls, blocked, next_handle = 1;
 static unsigned contexts;
@@ -45,11 +57,23 @@ unsigned phx34_cpu_blocked(void) { return blocked; }
 void phx34_cpu_arm(void) { require(!armed && blocked == 1 && !opens && !calls); armed = 1; blocked = 0; }
 
 #ifdef PHX34_CPU_R3
-void phx34_cpu_select(unsigned value) { require(!armed && value <= CPU_SESSION_SHORT); scenario = value; }
+void phx34_cpu_select(unsigned value) { require(!armed && value <= CPU_EXACT_SUBMIT); scenario = value; }
 unsigned phx34_cpu_attempts(void) { return attempts; }
 unsigned phx34_cpu_sessions(void) { return sessions; }
 unsigned phx34_cpu_hellos(void) { return hellos; }
 unsigned phx34_cpu_releases(void) { return releases; }
+const struct cpu_exact_trace *phx34_cpu_exact_trace(void) { return &trace; }
+
+static int mapped_ib(const struct phxn_cs_ib *ib)
+{
+   for (unsigned handle = 1; handle < next_handle; ++handle) {
+      const struct cpu_bo *bo = &bos[handle];
+      if (bo->maps && bo->va_size && ib->va_start >= bo->va && ib->ib_bytes <= bo->va_size &&
+          ib->va_start - bo->va <= bo->va_size - ib->ib_bytes)
+         return 1;
+   }
+   return 0;
+}
 
 CFMutableDictionaryRef IOServiceMatching(const char *name)
 {
@@ -106,6 +130,9 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_release, IOObjectRelease)(io_object_t 
 IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_close, IOServiceClose)(io_connect_t connection)
 {
    require(armed && connection == 0x789a && opens == closes + 1 && !contexts);
+#ifdef PHX34_CPU_R3
+   require(!need_prefix && trace.submits == trace.acks);
+#endif
    for (unsigned h = 1; h < next_handle; ++h) {
       require(!bos[h].maps); free(bos[h].data); allocated -= bos[h].size; bos[h] = (struct cpu_bo){0};
    }
@@ -143,11 +170,91 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
       const struct phx34_r3_progress_reply reply = {
          .version = PHX34_R3_WIRE_VERSION, .size = sizeof(reply), .build = PHX34_R3_PROGRESS_BUILD,
          .flags = scenario == CPU_SESSION_CAPS ? PHX34_R3_CAP_EXACT_RECEIPTS : PHX34_R3_PROGRESS_FLAGS,
-         .owner = 11,
+         .owner = owner,
       };
       if (scenario == CPU_SESSION_SHORT)
          --*result_size;
       memcpy(result, &reply, *result_size);
+      return KERN_SUCCESS;
+   }
+   case PHX34_R3_SEL_SUBMIT_RECEIPT: {
+      require(scenario == CPU_EXACT_SUBMIT && sessions == 1 && hellos == 2 && contexts == 1 && !trace.submits);
+      require(!input && !input_count && !output && !output_count && structure &&
+              structure_size == sizeof(struct phx34_r3_submit_request) && result && result_size &&
+              *result_size == sizeof(receipt));
+      const struct phx34_r3_submit_request *request = structure;
+      const struct phxn_cs_in *submit = &request->submit;
+      require(request->version == PHX34_R3_WIRE_VERSION && request->size == sizeof(*request) &&
+              request->owner == owner && !request->reserved[0] && !request->reserved[1] &&
+              submit->abi == PHXN_ABI_VERSION && submit->ctx_id == 1 && submit->num_ibs &&
+              submit->num_ibs <= PHXN_MAX_IBS && !submit->reserved && !submit->flags &&
+              !submit->fence_handle && !submit->fence_offset);
+      const struct phxn_cs_ib zero = {0};
+      const uint32_t supported_ib_flags = N48N_IB_FLAG_PREAMBLE | N48N_IB_FLAG_PREEMPT |
+                                          N48N_IB_FLAG_TC_WB_NOT_INVALIDATE;
+      for (unsigned index = 0; index < PHXN_MAX_IBS; ++index) {
+         const struct phxn_cs_ib *ib = &request->ibs[index];
+         if (index >= submit->num_ibs) {
+            require(!memcmp(ib, &zero, sizeof(zero)));
+            continue;
+         }
+         require(!ib->_pad && !(ib->flags & ~supported_ib_flags) && ib->ip_type == 1 && !ib->ip_instance && !ib->ring &&
+                 ib->ib_bytes && !(ib->ib_bytes & 3) && ib->ib_bytes <= 0xfffffu * 4 &&
+                 !(ib->va_start & 3) && mapped_ib(ib));
+      }
+      receipt = (struct phx34_r3_reply){.version = PHX34_R3_WIRE_VERSION, .size = sizeof(receipt),
+         .status = PHX34_R3_REPLY_SUBMITTED, .owner = owner, .serial = 0x300000019ull,
+         .sequence = first_sequence, .generation = 0x400000023ull, .slot = 63, .queue = 1};
+      ++trace.submits;
+      memcpy(result, &receipt, sizeof(receipt));
+      return KERN_SUCCESS;
+   }
+   case PHX34_R3_SEL_WAIT_RECEIPT:
+   case PHX34_R3_SEL_ACK_RECEIPT: {
+      require(scenario == CPU_EXACT_SUBMIT && trace.submits == 1 && !trace.acks && !need_prefix);
+      require(!input && !input_count && !output && !output_count && structure &&
+              structure_size == sizeof(struct phx34_r3_request) && result && result_size &&
+              *result_size == sizeof(receipt));
+      const struct phx34_r3_request *request = structure;
+      require(request->version == PHX34_R3_WIRE_VERSION && request->size == sizeof(*request) &&
+              request->owner == receipt.owner && request->serial == receipt.serial &&
+              request->sequence == receipt.sequence && request->generation == receipt.generation &&
+              request->slot == receipt.slot && request->queue == receipt.queue && !request->reserved &&
+              request->timeout_ns <= 20000000ull);
+      struct phx34_r3_reply reply = receipt;
+      if (sel == PHX34_R3_SEL_ACK_RECEIPT) {
+         require(trace.zero_polls && trace.positive_waits == 1 && !request->timeout_ns);
+         ++trace.acks;
+         reply.status = PHX34_R3_REPLY_ACKED;
+      } else {
+         require(!trace.positive_waits && trace.zero_polls < 8);
+         if (request->timeout_ns) {
+            require(trace.zero_polls);
+            ++trace.positive_waits;
+         } else {
+            ++trace.zero_polls;
+         }
+         reply.status = request->timeout_ns ? PHX34_R3_REPLY_COMPLETE : PHX34_R3_REPLY_PENDING;
+         need_prefix = 1;
+      }
+      memcpy(result, &reply, sizeof(reply));
+      return KERN_SUCCESS;
+   }
+   case PHX34_R3_SEL_PREFIX: {
+      require(scenario == CPU_EXACT_SUBMIT && need_prefix && !trace.acks);
+      require(!input && !input_count && !output && !output_count && structure &&
+              structure_size == sizeof(struct phx34_r3_progress_request) && result && result_size &&
+              *result_size == sizeof(struct phx34_r3_progress_reply));
+      const struct phx34_r3_progress_request *request = structure;
+      require(request->version == PHX34_R3_WIRE_VERSION && request->size == sizeof(*request) &&
+              request->owner == owner && !request->target && !request->timeout_ns);
+      const struct phx34_r3_progress_reply reply = {
+         .version = PHX34_R3_WIRE_VERSION, .size = sizeof(reply), .build = PHX34_R3_PROGRESS_BUILD,
+         .flags = PHX34_R3_PROGRESS_FLAGS, .owner = owner, .retired = first_sequence - 2,
+      };
+      need_prefix = 0;
+      ++trace.prefixes;
+      memcpy(result, &reply, sizeof(reply));
       return KERN_SUCCESS;
    }
 #endif
@@ -191,7 +298,28 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
       free(b->data); allocated -= b->size; *b = (struct cpu_bo){0}; return KERN_SUCCESS;
    }
    case N48N_SEL_GEMVA:
-      require(structure && structure_size == sizeof(struct n48n_gem_va)); return KERN_SUCCESS;
+      require(structure && structure_size == sizeof(struct n48n_gem_va));
+#ifdef PHX34_CPU_R3
+      if (scenario == CPU_EXACT_SUBMIT) {
+         const struct n48n_gem_va *request = structure;
+         require(request->handle && request->handle < next_handle && !request->_pad &&
+                 !request->vm_timeline_point && !request->vm_timeline_syncobj_out &&
+                 !request->num_syncobj_handles && !request->input_fence_syncobj_handles);
+         struct cpu_bo *bo = &bos[request->handle];
+         require(bo->data && request->map_size && request->map_size <= bo->size &&
+                 request->offset_in_bo <= bo->size - request->map_size && request->va_address);
+         if (request->operation == N48N_VA_OP_MAP) {
+            require(!bo->va_size);
+            bo->va = request->va_address;
+            bo->va_size = request->map_size;
+         } else {
+            require(request->operation == N48N_VA_OP_UNMAP && bo->va == request->va_address &&
+                    bo->va_size == request->map_size);
+            bo->va_size = 0;
+         }
+      }
+#endif
+      return KERN_SUCCESS;
    case N48N_SEL_CTX: {
       require(structure_size == sizeof(struct n48n_ctx) && result_size && *result_size == sizeof(struct n48n_ctx));
       const struct n48n_ctx *in = structure; struct n48n_ctx out = {0};
@@ -201,7 +329,7 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
       memcpy(result, &out, sizeof(out)); return KERN_SUCCESS;
    }
    default:
-      fprintf(stderr, "REFUSED CPU fixture selector %u; no native dispatch or wait is modeled\n", sel);
+      fprintf(stderr, "REFUSED unexpected CPU fixture selector %u\n", sel);
       require(0); return kIOReturnNotPermitted;
    }
 }

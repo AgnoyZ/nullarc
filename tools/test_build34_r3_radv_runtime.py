@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the pinned full R3 Vulkan lifecycle with no system IOKit dependency."""
+"""Exercise pinned full R3 Vulkan entrypoints with no system IOKit dependency."""
 
 import argparse
 import json
@@ -14,8 +14,10 @@ from build34_r3_radv_runtime import DARWIN, ROOT, TARGET, digest, inventory, inv
 
 
 LINK_RECORD = ROOT / 'docs/validation/build34-r3-radv-full-link-offline-20261123.json'
+EXACT_CS_LINK_RECORD = ROOT / 'docs/validation/build34-r3-radv-exact-cs-link-offline-20261123.json'
 FIXTURE_LIBRARY = ROOT / 'tests/build34_radv_runtime_iokit.c'
 FIXTURE_MAIN = ROOT / 'tests/test_build34_radv_runtime_enumeration.c'
+FIXTURE_HEADER = ROOT / 'tests/build34_radv_runtime_cpu.h'
 IOKIT = '/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit'
 STUB = '@loader_path/libcpu_iokit.dylib'
 
@@ -42,13 +44,14 @@ def text_section(path):
     return result.partition(marker)[2]
 
 
-def test(runtime, output):
+def test(runtime, output, exact_cs=False):
     runtime, output = Path(runtime).resolve(), Path(output).resolve()
     if (ROOT / 'build' not in output.parents or output.exists() or not output.name.endswith('-private') or
             output == runtime or runtime in output.parents or output in runtime.parents):
         raise ValueError('Use a fresh separate ignored worktree output ending -private')
     subprocess.run(['/usr/bin/git', 'check-ignore', '-q', str(output)], cwd=ROOT, check=True, timeout=15)
-    recorded = json.loads(LINK_RECORD.read_text())
+    link_record = EXACT_CS_LINK_RECORD if exact_cs else LINK_RECORD
+    recorded = json.loads(link_record.read_text())
     library = runtime / 'native' / TARGET
     if (json.loads((runtime / 'result-private.json').read_text()) != recorded or
             digest(library) != recorded['library_sha256']):
@@ -64,7 +67,8 @@ def test(runtime, output):
     if re.search(r'\(undefined\).*? _dl(?:open|sym)\s', symbols(library)):
         raise ValueError('Unexpected library dynamic-loading entry point')
     protected = production_snapshot()
-    inputs = {path: digest(path) for path in (Path(__file__).resolve(), LINK_RECORD, FIXTURE_LIBRARY, FIXTURE_MAIN)}
+    inputs = {path: digest(path) for path in (Path(__file__).resolve(), link_record, FIXTURE_LIBRARY,
+                                             FIXTURE_MAIN, FIXTURE_HEADER)}
     output.mkdir(mode=0o700, parents=True)
 
     def run(args, label, *, timeout=90):
@@ -79,7 +83,7 @@ def test(runtime, output):
            'LANG': 'C', 'LC_ALL': 'C', 'MESA_SHADER_CACHE_DISABLE': 'true'}
     cc = ['/usr/bin/xcrun', 'clang', '-arch', 'x86_64', '-std=c11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
           '-DPHX34_CPU_R3=1', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']
-    cc.extend('-I' + str(mesa / name) for name in ('include', 'include/darwin', DARWIN))
+    cc.extend('-I' + str(mesa / name) for name in ('include', 'include/darwin', DARWIN, DARWIN + 'r3/phxbringup'))
     stub = output / 'libcpu_iokit.dylib'
     executable = output / 'cpu-radv-r3-lifecycle'
     run([*cc, '-MMD', '-MF', 'stub.d', '-dynamiclib', FIXTURE_LIBRARY, '-Wl,-install_name,' + STUB,
@@ -89,7 +93,8 @@ def test(runtime, output):
         args = shlex.split((output / depfile).read_text().replace('\\\n', ' ').split(':', 1)[1])
         for name in args:
             path = Path(name).resolve()
-            if path not in inputs and digest(path) != manifest[path.relative_to(mesa).as_posix()]['sha256']:
+            expected_hash = inputs[path] if path in inputs else manifest[path.relative_to(mesa).as_posix()]['sha256']
+            if digest(path) != expected_hash:
                 raise ValueError('CPU fixture compiled with unreviewed header')
     exported = subprocess.check_output(['/usr/bin/nm', '-gU', stub], text=True, timeout=20)
     if not expected <= {line.split()[-1] for line in exported.splitlines() if line.split()}:
@@ -107,15 +112,21 @@ def test(runtime, output):
         raise ValueError('Test-copy substitution or compiled text does not match')
 
     results = {}
-    for index, name in enumerate(('success', 'open_refused', 'missing_capability', 'short_session_reply')):
-        results[name] = json.loads(run([executable, copy, str(index)], name))
-        if (results[name]['scenario'] != index or results[name]['GPU_executed'] or results[name]['native_submits'] or
-                results[name]['physical_devices'] != (index == 0) or results[name]['open_attempts'] != 1):
+    scenarios = [(0, 'success'), (1, 'open_refused'), (2, 'missing_capability'), (3, 'short_session_reply')]
+    scenarios.append((5, 'exact_submit') if exact_cs else (4, 'submit_refused'))
+    for index, name in scenarios:
+        result = results[name] = json.loads(run([executable, copy, str(index)], name))
+        if (result['scenario'] != index or result['GPU_executed'] or result['native_submits'] or
+                result['physical_devices'] != (index in (0, 4, 5)) or result['open_attempts'] != 1 or
+                any(result[key] != (index == 5) for key in ('modeled_exact_submits', 'positive_waits', 'exact_acks')) or
+                (index == 5 and (result['zero_polls'] < 2 or result['prefix_snapshots'] != result['zero_polls'] + 1)) or
+                (index != 5 and (result['zero_polls'] or result['prefix_snapshots']))):
             raise ValueError('Incomplete or unexpected Vulkan lifecycle evidence')
     if (digest(library) != recorded['library_sha256'] or inventory(mesa) != manifest or
             production_snapshot() != protected or any(digest(path) != sha for path, sha in inputs.items())):
         raise ValueError('Source, library or fixture changed during verification')
-    report = dict(status='passed-full-RADV-R3-CPU-lifecycle', kernel_build=34,
+    status = 'passed-full-RADV-R3-CPU-exact-submit' if exact_cs else 'passed-full-RADV-R3-CPU-submit-refusal'
+    report = dict(status=status, kernel_build=34,
                   linked_library_sha256=recorded['library_sha256'], staged_inventory_sha256=inventory_digest(manifest),
                   retargeted_test_copy_only=True, executable_text_identical=True, system_IOKit_linked=False,
                   all_nine_IOKit_imports_modeled=True, fixture_ASan_UBSan=True, runtime_sanitized=False,
@@ -130,5 +141,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--exact-cs', action='store_true', help='Verify the separately pinned staged exact-CS variant')
     args = parser.parse_args()
-    test(args.runtime, args.out)
+    test(args.runtime, args.out, args.exact_cs)

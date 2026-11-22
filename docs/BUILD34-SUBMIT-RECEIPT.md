@@ -429,8 +429,8 @@ in a private copy with a test dylib. It verifies identical executable text
 and checks that all eight IOKit functions and `kIOMainPortDefault` resolve
 against the substitute. The test copy is ad hoc signed only to load into the
 host process. The original library is unchanged, and neither the runner nor
-the substitute links system IOKit. The substitute refuses unexpected
-selectors, including submit and wait.
+the substitute links system IOKit. The original lifecycle run refused all
+submit and wait selectors; the follow-up below models only the exact ones.
 
 Actual Vulkan enumeration, dedicated-compute logical-device creation and
 destruction reused one modeled `N48R` session. `vkDestroyDevice` did not close
@@ -451,3 +451,50 @@ GPU submission, install or upload occurred. Omit the runner to skip this
 private verification; no live rollback is needed. Real owning-task
 admission, native teardown, IH ownership/drain, fence visibility and GPU
 acceptance remain unproven.
+
+## Full Vulkan exact-submit on CPU
+
+The original full link was not submit-ready. A recorded primary command
+buffer on the dedicated Compute queue reached `vkQueueSubmit`, which returned
+`VK_ERROR_DEVICE_LOST` before any submit selector. RADV's winsys unconditionally
+added its internal legacy `AMDGPU_CHUNK_ID_FENCE` for that IP. The exact wire
+rejects that CPU user-fence request with `EOPNOTSUPP`; it is distinct from the
+Vulkan `VkFence` backed by the sync provider.
+
+The optional `--exact-cs` link derives the same reviewed Mesa source with one
+additional translation unit changed, `radv_amdgpu_cs.c`. Only a successfully
+negotiated Darwin exact profile omits the winsys-generated legacy chunk.
+The transport still refuses explicit CPU user-fence requests; Linux and
+non-exact paths keep their existing chunk logic. The pinned baseline and its
+MIT notices, the original full link, and all 172 production inputs are
+unchanged. See the
+[link record](validation/build34-r3-radv-exact-cs-link-offline-20261123.json).
+
+The same Vulkan command and `VkFence` succeeded against the retargeted
+variant. The substitute checked one exact submit, live modeled IB ranges,
+zero unused records and the full 64-bit owner/sequence/serial/generation
+identity. Pending status and a zero-budget `VK_TIMEOUT` preceded a positive
+wait with a wire budget capped at 20 ms. Each wait was followed by a separate
+zero-target prefix snapshot. The modeled prefix stayed two sequences behind
+the target even when the exact wait completed; the caller still observed
+completion, issued one ACK, and answered a late fence query locally. The
+three open/session refusal cases still published no device or fallback.
+See the [A/B CPU record](validation/build34-r3-radv-exact-cs-cpu-20261123.json).
+
+Append `--exact-cs` to the full link recipe above with a separate private
+output directory, then use the associated pinned artifact:
+
+```sh
+python3 -B tools/test_build34_r3_radv_runtime.py \
+  --runtime "$R3_RADV_EXACT_CS_LINK_OUT" --exact-cs \
+  --out build/build34-r3-radv-exact-cs-cpu-new-private
+```
+
+This executes actual full-library Vulkan API code with a CPU-only substitute;
+it does not execute its IBs, test actual positive-timeout expiry, prove
+dual-queue progress, or exercise real MIG, BAR0, EOP/ISR, or native resource
+drain. The sanitizers instrument the fixture, not RADV. No driver, runtime or
+settings were installed, no binary was uploaded, and no live rollback is
+needed. Omit `--exact-cs` to retain the original lifecycle and submit-refusal
+control. The next hardware gate remains exclusive IH ownership and
+independent old-writer drain, not this successful CPU wait.
