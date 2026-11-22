@@ -226,6 +226,10 @@ metadata or a drained CPU gate never independently authorizes BO/VMID release.
    next tests the actual software walker with CPU allocator doubles and
    refuses invalid new chunk backing before clearing or publishing it.
    It does not establish live mapper identity or GPU page-walk visibility.
+   The [checked unmap stage](BUILD34-VM-LIFETIME.md#follow-up-checked-unmap-walk)
+   separates a missing branch from a failed software table lookup and
+   retains BO backing on a late walk failure, even after a partial clear.
+   The actual caller tests use CPU doubles; no native release is admitted.
 5. Add a safe completion notification path and measured bounded fallback,
    preserving lock order, cancellation and shutdown safety.
 6. Freeze and compile the complete native integration. Prepare a concrete

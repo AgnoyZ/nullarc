@@ -212,3 +212,48 @@ does not establish the live mapper address, GPU page walk or cache visibility,
 native ACK freshness, or old-writer drain. It does not build or admit a
 kernel candidate. All 172 production inputs are unchanged; rollback is to
 leave the transform unapplied.
+
+## Follow-up: checked unmap walk
+
+On November 22, 2026, a CPU fixture reproduced false unmap success in the
+staged software walker. In a two-page mapping across table chunks, it
+cleared the first leaf and skipped a second leaf whose table was no longer
+resolvable through the CPU descriptor. The modeled second leaf remained
+present. The actual staged BOFREE discarded the map and released backing;
+the actual staged GEM_VA UNMAP likewise discarded its map record and a later
+BOFREE then released backing. These are injected CPU-model failures, not
+observed macOS or GPU behavior.
+
+The [separate transform](../tools/build34_exact_vm_unmap.py) derives the
+checked table allocator. The no-allocation walk distinguishes a zero
+intermediate entry (a missing branch) from failure to resolve or read a
+table. This preserves cleanup of a legitimate logical-only mapping created
+before queue readiness, including after the client later allocates a VM.
+The walker does not allocate on unmap. If the walk instead fails, unmap
+returns `kIOReturnVMError` and closes the sticky service VM gate without
+requesting invalidation or claiming rollback of any earlier clears.
+The unchanged client handlers keep the map/BO records and accounting, close
+further client cleanup on uncertainty, and do not release the descriptor.
+Normal resident unmap still clears and flushes before checked invalidation.
+
+The [CPU runner](../tools/test_build34_exact_vm_unmap.py) extracts the actual
+allocator, software walker and unmap and runs them with the frozen legacy
+client fixture, including the unchanged GEM_VA and BOFREE handler bodies.
+ASan/UBSan and TSan each pass **8,212 checks** in five cases. The two old-stage
+failures require observed metadata removal and descriptor release while a
+second leaf remains. The repaired stage retains both owners and backing even
+after the fixture restores table access. See the
+[sanitized evidence](validation/build34-r3-vm-unmap-offline-20261122.json).
+
+Using the same frozen `legacy-close.cpp` as the detach test above:
+
+```sh
+nice -n 15 taskpolicy -b python3 -B tools/test_build34_exact_vm_unmap.py \
+  --out build/build34-r3-vm-unmap-new-private \
+  --legacy-fixture "$EXACT_CLOSE_OUT/legacy-close.cpp"
+```
+
+This is a narrow software walk check, not a complete hierarchy validation,
+proof of GPU visibility or fresh ACK, old-writer drain, or native BO release
+admission. All 172 production inputs are unchanged. Do not build or deploy
+a kernel candidate from this experiment; rollback is to leave it unapplied.
