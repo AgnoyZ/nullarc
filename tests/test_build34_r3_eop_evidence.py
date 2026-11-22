@@ -105,6 +105,7 @@ def one_shot_fixture():
                  gfx_fence_offset=16, compute_fence_offset=32, observe_budget_ns=100, cleanup_budget_ns=30,
                  terminal_deadline_ns=1760, payload_region_offset=128,
                  payload_guard_before=bytes([0xA5]) * 64, payload_guard_after=bytes([0x5A]) * 64,
+                 eop_context_ids=dict(gfx=0x123456, compute=0xEDCBA9),
                  payload_challenges=[dict(seed=bytes([2 * index]) * 1024, result=bytes([2 * index + 1]) * 1024)
                                      for index in range(len(records))])
     ordinal = 0
@@ -112,10 +113,12 @@ def one_shot_fixture():
         queue = case["queue"]
         is_gfx = queue == "gfx"
         rewrite_fence_slots(case, 16 if is_gfx else 32, 32 if is_gfx else 16)
+        context = pack("<I", scope["eop_context_ids"][queue])
+        release = case.pop("release_mem")[:-4] + context
         payload_address = _BAR0_MC_BASE + scope["payload_region_offset"] + 64
         case["submitted_pm4"] = (pack("<4I", 0xC1023700, 0x00100500,
                                       payload_address & 0xFFFFFFFF, payload_address >> 32) +
-                                 scope["payload_challenges"][index]["result"] + case.pop("release_mem"))
+                                 scope["payload_challenges"][index]["result"] + release)
         case.pop("recipe_sha256")
         for name in ("before", "first_read", "final_read"):
             sample = case[name]
@@ -140,6 +143,9 @@ def one_shot_fixture():
             batch["read_cursor"] = cursor
             cursor = (cursor + 32 * len(batch["entries"])) % ring_size
             batch["writeback_before"] = batch["writeback_after"] = cursor
+            if batch["entries"]:
+                entry = batch["entries"][0]
+                batch["entries"][0] = entry[:16] + context + entry[20:]
     return records, scope
 
 
@@ -158,6 +164,7 @@ class OneShotIrqDelivery(unittest.TestCase):
         self.assertIs(result["isr_dispatch_checked"], True)
         self.assertIs(result["release_mem_checked"], True)
         self.assertIs(result["submitted_pm4_checked"], True)
+        self.assertIs(result["eop_context_checked"], True)
         self.assertIs(result["raw_bar0_samples_checked"], True)
         self.assertIs(result["bar0_attempt_trace_checked"], True)
         self.assertIs(result["hardware_attested"], False)
@@ -203,6 +210,43 @@ class OneShotIrqDelivery(unittest.TestCase):
         data[-21] ^= 2
         case["submitted_pm4"] = bytes(data)
         with self.assertRaisesRegex(ValueError, "RELEASE_MEM.*control"):
+            verify_one_shot(records, scope)
+
+    def test_refuses_same_queue_vector_from_a_different_eop_context(self):
+        for case_index, wrong_context in ((1, 0), (1, 0xEDCBA9), (3, 0xEDCBA8),
+                                          (3, 0x1EDCBA9), (3, 0x80EDCBA9)):
+            with self.subTest(case=case_index, context=wrong_context), self.assertRaisesRegex(ValueError, "IH source-data context"):
+                records, scope = one_shot_fixture()
+                entries = records[case_index]["ih_capture"][1]["entries"]
+                original = entries[0]
+                entries[0] = original[:16] + pack("<I", wrong_context) + original[20:]
+                verify_one_shot(records, scope)
+
+    def test_refuses_substituted_context_even_when_packet_and_vector_agree(self):
+        for case_index in range(4):
+            with self.subTest(case=case_index), self.assertRaisesRegex(ValueError, "RELEASE_MEM interrupt context"):
+                records, scope = one_shot_fixture()
+                case = records[case_index]
+                replacement = pack("<I", 0x3344)
+                case["submitted_pm4"] = case["submitted_pm4"][:-4] + replacement
+                if case["interrupt"]:
+                    entries = case["ih_capture"][1]["entries"]
+                    original = entries[0]
+                    entries[0] = original[:16] + replacement + original[20:]
+                verify_one_shot(records, scope)
+
+    def test_requires_two_distinct_sealed_nonzero_untagged_contexts(self):
+        for value in (0, -1, True, 1 << 24, 1 << 28):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "invalid untagged EOP context"):
+                records, scope = one_shot_fixture()
+                scope["eop_context_ids"]["gfx"] = value
+                verify_one_shot(records, scope)
+        records, scope = one_shot_fixture()
+        scope["eop_context_ids"]["gfx"] = scope["eop_context_ids"]["compute"]
+        with self.assertRaisesRegex(ValueError, "reused EOP context"):
+            verify_one_shot(records, scope)
+        del scope["eop_context_ids"]
+        with self.assertRaisesRegex(ValueError, "single-route scope"):
             verify_one_shot(records, scope)
 
     def test_ih_copy_without_isr_or_irq_in_control_cannot_pass(self):
@@ -641,7 +685,8 @@ class RawIHCapture(unittest.TestCase):
         for case_index, word, mask in ((0, 2, 0x02000000), (1, 2, 0x02000000), (1, 2, 0x03000000),
                                        (3, 2, 0x60000000), (3, 2, 0x00010000), (1, 1, 1 << 25),
                                        (1, 0, 1 << 16), (3, 7, 1)):
-            with self.subTest(case=case_index, word=word, mask=mask), self.assertRaisesRegex(ValueError, "control"):
+            message = "interrupt context" if word == 7 else "control"
+            with self.subTest(case=case_index, word=word, mask=mask), self.assertRaisesRegex(ValueError, message):
                 records = capture_fixture()
                 case = records[case_index]
                 words = list(unpack("<8I", case["release_mem"]))

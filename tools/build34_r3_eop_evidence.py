@@ -79,10 +79,12 @@ def _check_vector(vector, identity, queue, submit, read):
         raise ValueError("not the expected legacy CP EOP")
 
 
-def _decode_entry(data, identity, seen_ns):
+def _decode_entry(data, identity, seen_ns, *, expected_context):
     if type(data) is not bytes or len(data) != _ENTRY.size:
         raise ValueError("IH entry must contain exactly 32 captured bytes")
     words = _ENTRY.unpack(data)
+    if expected_context is not None and words[4] != expected_context:
+        raise ValueError("IH source-data context does not match the sealed RELEASE_MEM context")
     header = words[0]
     return dict(identity=identity, seen_ns=seen_ns, client_id=header & 0xFF,
                 source_id=(header >> 8) & 0xFF, ring_id=(header >> 16) & 0xFF,
@@ -98,7 +100,7 @@ def _cursor(value, ring_size, *, writeback=False):
     return value
 
 
-def _capture_vectors(record, batches, ring_size, *, start_cursor=None, dispatch_ns=None):
+def _capture_vectors(record, batches, ring_size, *, start_cursor=None, dispatch_ns=None, expected_context=None):
     if type(batches) is not list or not 2 <= len(batches) <= _MAX_BATCHES:
         raise ValueError("require a bounded, bracketed IH capture")
     _sample(record["before"])
@@ -136,11 +138,11 @@ def _capture_vectors(record, batches, ring_size, *, start_cursor=None, dispatch_
                 raise ValueError("unexpected IH traffic outside the single-entry trial")
             if dispatch_ns is not None and dispatch_ns > begin:
                 raise ValueError("IH copy began before the captured ISR dispatch")
-            vectors.append(_decode_entry(entries[0], identity, end))
+            vectors.append(_decode_entry(entries[0], identity, end, expected_context=expected_context))
     return vectors, next_cursor
 
 
-def _release_samples(record, packet, bar0_mc_base, bar0_size):
+def _release_samples(record, packet, bar0_mc_base, bar0_size, *, expected_context):
     samples = {}
     offsets = None
     offset_fields = ("fence_offset", "other_fence_offset")
@@ -160,8 +162,10 @@ def _release_samples(record, packet, bar0_mc_base, bar0_size):
         raise ValueError("require 32 captured RELEASE_MEM bytes")
     header, event, control, address_lo, address_hi, data_lo, data_hi, context = _RELEASE_MEM.unpack(packet)
     expected_control = _RELEASE_DATA64 | (_RELEASE_INT_AFTER_CONFIRM if record["interrupt"] is True else 0)
-    if (header, event, control, context) != (_RELEASE_HEADER, _RELEASE_EVENT, expected_control, 0):
-        raise ValueError("unexpected RELEASE_MEM header, event, control or context")
+    if (header, event, control) != (_RELEASE_HEADER, _RELEASE_EVENT, expected_control):
+        raise ValueError("unexpected RELEASE_MEM header, event or control")
+    if context != expected_context:
+        raise ValueError("unexpected RELEASE_MEM interrupt context")
     if (address_lo | (address_hi << 32)) != bar0_mc_base + offsets[0]:
         raise ValueError("RELEASE_MEM target does not match BAR0 fence slot")
     if data_hi or data_lo != record["target"]:
@@ -181,12 +185,15 @@ def _geometry(ring_size_bytes, bar0_mc_base, bar0_size_bytes):
     return ring_size, mc_base, bar0_size
 
 
-def _normalize_capture(record, packet, ring_size, mc_base, bar0_size, *, start_cursor=None, dispatch_ns=None):
+def _normalize_capture(record, packet, ring_size, mc_base, bar0_size, *, start_cursor=None, dispatch_ns=None,
+                       expected_context=None):
     item = {name: record[name] for name in _CASE_FIELDS.split()}
-    samples, offsets = _release_samples(record, packet, mc_base, bar0_size)
+    samples, offsets = _release_samples(record, packet, mc_base, bar0_size,
+                                        expected_context=0 if expected_context is None else expected_context)
     item.update(samples)
     item["vectors"], next_cursor = _capture_vectors(item, record["ih_capture"], ring_size,
-                                                     start_cursor=start_cursor, dispatch_ns=dispatch_ns)
+                                                     start_cursor=start_cursor, dispatch_ns=dispatch_ns,
+                                                     expected_context=expected_context)
     return item, offsets, next_cursor
 
 
@@ -312,7 +319,8 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
     """
     _fields(scope, "identity irq_source_token bar0_access_token initial_read_cursor ring_size_bytes bar0_mc_base "
             "bar0_size_bytes gfx_fence_offset compute_fence_offset observe_budget_ns cleanup_budget_ns "
-            "terminal_deadline_ns payload_region_offset payload_guard_before payload_guard_after payload_challenges",
+            "terminal_deadline_ns payload_region_offset payload_guard_before payload_guard_after payload_challenges "
+            "eop_context_ids",
             "single-route scope")
     identity = _identity(scope["identity"])
     irq_token = _integer(scope["irq_source_token"], "admitted IRQ source token")
@@ -323,6 +331,12 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
                                low=0, high=bar0_size - _FENCE_BYTES) for queue in _RINGS}
     if len(set(offsets.values())) != 2 or any(offset % _FENCE_BYTES for offset in offsets.values()):
         raise ValueError("invalid admitted BAR0 fence pair")
+    contexts = scope["eop_context_ids"]
+    _fields(contexts, "gfx compute", "EOP context scope")
+    for context in contexts.values():
+        _integer(context, "untagged EOP context", high=_MES_QUEUE_FLAG - 1)
+    if contexts["gfx"] == contexts["compute"]:
+        raise ValueError("reused EOP context across queues")
     payload_offset, payload_regions = _payload_scope(scope, offsets, bar0_size)
     if type(records) is not list or len(records) != len(_CASES):
         raise ValueError("expected exactly four ordered route cases")
@@ -357,7 +371,8 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
         raw_case, peer_value, next_read = _raw_bar0_case(
             record, (offsets[queue], offsets[peer], payload_offset), regions, identity, access_token, next_read)
         item, _, cursor = _normalize_capture(raw_case, packet, ring_size, mc_base, bar0_size,
-                                             start_cursor=cursor, dispatch_ns=dispatch_ns)
+                                             start_cursor=cursor, dispatch_ns=dispatch_ns,
+                                             expected_context=contexts[queue])
         if prior_fences.setdefault(peer, peer_value) != peer_value:
             raise ValueError("peer fence changed between route cases")
         prior_fences[queue] = item["target"]
@@ -380,7 +395,7 @@ def check_one_shot_irq_delivery(records, *, scope, terminal):
              high=_integer(scope["terminal_deadline_ns"], "terminal deadline"))
     return dict(result, raw_ih_capture_checked=True, release_mem_checked=True, isr_dispatch_checked=True,
                 raw_bar0_samples_checked=True, bar0_attempt_trace_checked=True,
-                submitted_pm4_checked=True, single_route_checked=True,
+                submitted_pm4_checked=True, eop_context_checked=True, single_route_checked=True,
                 old_writer_drain_proved=False)
 
 

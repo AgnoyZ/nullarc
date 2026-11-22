@@ -294,6 +294,41 @@ collector. Keep raw bytes, offsets and tokens private. Rollback is to omit
 this offline checker revision; the prior format cannot qualify a new trial.
 See the [sanitized offline result](validation/build34-r3-one-shot-bar0-attempts-offline-20261123.json).
 
+### Correlate EOP source data with the submitted packet
+
+A same-queue EOP arriving in the expected time window is not enough to
+attribute it to the submitted packet. The prior one-shot checker accepted
+an unrelated nonzero source-data value in an otherwise matching raw vector.
+AMD PAL's [`RELEASE_MEM` layout](https://github.com/GPUOpen-Drivers/pal/blob/29f5d822b6d450dc669a47d2fa709c0b76dfff33/src/core/hw/gfxip/gfx9/chip/gfx9_plus_merged_f32_me_pm4_packets.h#L2775-L2789)
+defines the interrupt context in the last dword. In the pinned Linux GFX11
+[emitter](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L5700-L5717)
+and [EOP handler](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gfx_v11_0.c#L6232-L6258),
+the MES path places a tagged queue ID in that packet word and consumes it
+from `src_data[0]`, raw vector dword 4. The legacy emitter uses zero and the
+legacy handler routes by ring ID, so this reference does not demonstrate
+nonzero untagged context echo on either live build34 queue.
+
+For an independently qualified one-shot route, seal two distinct fresh
+nonzero low-24-bit contexts, one for each queue. Leave the MES tag and upper
+bits clear. Use the same context in both arms of each pair so it is not an
+extra control/treatment variable. Check the full last dword of the captured
+`RELEASE_MEM` against the sealed value, and require the full raw `src_data[0]`
+to match in the EOP arm. A substituted packet and vector cannot validate
+each other without matching the independent scope. No-interrupt controls
+still require zero ISR dispatches and zero vectors. The historical multi-route
+formats keep their zero packet context and unchanged validation.
+
+This is an offline requirement for a proposed diagnostic, not a command
+recipe for the installed driver. Establish on the qualified route whether
+both legacy queues actually echo that context with interrupt-after-confirm.
+If either does not, record the failure and establish another independent
+packet-to-vector correlation before relying on that stream. Do not relax
+the check to accept a queue-ID match. Even a matching field cannot prove
+exclusive IH ownership, old-writer drain or BAR0 visibility. The checker
+does not install a collector or generate device commands. Keep actual
+context values, PM4 and IH vectors private. See the
+[sanitized offline result](validation/build34-r3-one-shot-eop-context-offline-20261123.json).
+
 ## IH ownership review
 
 On November 21, 2026, two passive registry snapshots of the running PCI

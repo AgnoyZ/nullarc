@@ -57,6 +57,11 @@ that same one-shot route. Its [attempt trace](BUILD34-R3-IRQ-ROUTE-TRIAL.md#bind
 also checks fence-first access order, one mapping/accessor identity, both
 queue generations and a terminal count that includes failures and retries.
 It does not bind a BAR0 reader or attest visibility.
+The [EOP context check](BUILD34-R3-IRQ-ROUTE-TRIAL.md#correlate-eop-source-data-with-the-submitted-packet)
+also rejects a same-queue vector unless it matches the submitted packet's
+independently sealed context. The references show this field's use with MES
+tags, not nonzero untagged echo on the two live legacy queues. A match alone
+cannot rule out replay of the same context or supply ownership and drain.
 
 ## Execution order
 

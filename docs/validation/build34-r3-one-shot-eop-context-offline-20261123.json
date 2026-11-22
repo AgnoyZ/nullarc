@@ -1,0 +1,38 @@
+{
+  "status": "passed-offline-one-shot-eop-context-correlation",
+  "kernel_build_scope": 34,
+  "parent": "75c7de783c54f101e642e4c819bdceff46692a2d",
+  "checker_sha256": "20b1d15da8a58b5bc8cb9b66900c8c9d52165d2381c952b099f5d951795e03f5",
+  "fixture_sha256": "cee3684dda936ba599d6fa26ce19c4bf8a91573407f88d9b19c8359c0225c834",
+  "reference_sources": {
+    "amd_pal": "29f5d822b6d450dc669a47d2fa709c0b76dfff33",
+    "linux_gfx11": "adc218676eef25575469234709c2d87185ca223a"
+  },
+  "checker_test_methods": 49,
+  "one_shot_test_methods": 26,
+  "historical_test_methods_retained": 23,
+  "prior_same_queue_wrong_source_data_false_positive_reproduced": true,
+  "both_arms_bind_the_same_sealed_context_per_queue": true,
+  "full_packet_and_vector_words_checked": true,
+  "rejected_fixture_cases": [
+    "zero, wrong-queue, unrelated, MES-tagged or upper-bit-altered vector context",
+    "substituted packet context even when the vector matches the substitution",
+    "invalid, missing or shared sealed queue context"
+  ],
+  "default_make_test_passed": true,
+  "default_firmware_fixture_tests_skipped": true,
+  "protected_production_inputs_unchanged": 172,
+  "protected_production_base": "e9ee265ce005693f2928b4f981dfd097ca53fb80",
+  "live_legacy_untagged_context_echo_proved": false,
+  "same_context_replay_excluded_by_context_match_alone": false,
+  "bar0_visibility_attested": false,
+  "ih_owner_attested": false,
+  "old_writer_drain_proved": false,
+  "hardware_attested": false,
+  "live_collector_enabled": false,
+  "native_event_backend_bound": false,
+  "mmio_accessed": false,
+  "interrupt_registered": false,
+  "gpu_executed": false,
+  "r3_accepted": false
+}
