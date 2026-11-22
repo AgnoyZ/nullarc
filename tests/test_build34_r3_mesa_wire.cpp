@@ -4,7 +4,11 @@
 extern "C" {
 #include "build34_r3_mesa_wire.h"
 
+#ifdef PHX34_TEST_IOKIT
+#include "build34_r3_mesa_iokit.h"
+#else
 int acd_kext_open_iokit(struct acd_kext **) { std::abort(); }
+#endif
 }
 
 struct Bridge {
@@ -342,6 +346,123 @@ static void zero_and_queue_loss() {
     CHECK(loss.submit(AMDGPU_HW_IP_GFX, &sequence) == -ECANCELED && loss.submits == 1);
 }
 
+#ifdef PHX34_TEST_IOKIT
+struct FakeIOKit {
+    Bridge bridge{false};
+    mach_port_t port = 0x105;
+    unsigned helloCalls = 0, closes = 0, helloFault = 0, failAllocation = 0;
+    static thread_local FakeIOKit *current;
+
+    FakeIOKit() {
+        CHECK(!current);
+        current = this;
+    }
+
+    ~FakeIOKit() { current = nullptr; }
+};
+
+thread_local FakeIOKit *FakeIOKit::current = nullptr;
+
+extern "C" void *phx34_fixture_calloc(size_t count, size_t size) {
+    auto *fake = FakeIOKit::current;
+    if (fake && fake->failAllocation && --fake->failAllocation == 0)
+        return nullptr;
+    return std::calloc(count, size);
+}
+
+extern "C" kern_return_t phx34_fixture_method(mach_port_t conn, uint32_t selector, const uint64_t *scalars,
+                                              uint32_t scalarCount, const void *input, size_t inputSize,
+                                              uint64_t *scalarOut, uint32_t *scalarOutCount, void *output,
+                                              size_t *outputSize) {
+    auto *fake = FakeIOKit::current;
+    CHECK(fake && conn == 0x105 && fake->port == MACH_PORT_NULL && !fake->closes);
+    if (selector == ACD_SEL_HELLO) {
+        CHECK(++fake->helloCalls == 1);
+        CHECK(scalars && scalarCount == 2 && scalars[0] == N48N_ABI_VERSION && scalars[1] == N48N_HELLO_F_MINOR);
+        CHECK(!input && !inputSize && !output && !outputSize);
+        CHECK(scalarOut && scalarOutCount && *scalarOutCount == 4);
+        if (fake->helloFault == 1)
+            return static_cast<kern_return_t>(ACD_KR_NOT_READY);
+        if (fake->helloFault == 2)
+            *scalarOutCount = 3;
+        scalarOut[0] = (uint64_t{9} << 16) | (N48N_ABI_VERSION + (fake->helloFault == 3));
+        scalarOut[1] = PHX34_R3_PROGRESS_BUILD + (fake->helloFault == 4);
+        scalarOut[2] = N48N_MAX_IBS - (fake->helloFault == 5);
+        scalarOut[3] = PHXN_VMID + (fake->helloFault == 6);
+        return KERN_SUCCESS;
+    }
+    CHECK(fake->helloCalls == 1 && !scalars && !scalarCount && !scalarOut && !scalarOutCount);
+    return Bridge::call(&fake->bridge, selector, input, inputSize, output, outputSize);
+}
+
+extern "C" kern_return_t phx34_fixture_close(mach_port_t conn) {
+    auto *fake = FakeIOKit::current;
+    CHECK(fake && conn == 0x105 && fake->port == MACH_PORT_NULL && ++fake->closes == 1);
+    return KERN_SUCCESS;
+}
+
+static void iokit_adoption() {
+    reset();
+    FakeIOKit fake;
+    auto &bridge = fake.bridge;
+    acd_kext *adopted = bridge.transport;
+    CHECK(acd_kext_adopt_exact_iokit(&fake.port, &adopted) == -EINVAL && fake.port == 0x105);
+    adopted = nullptr;
+    mach_port_t dead = MACH_PORT_DEAD;
+    CHECK(acd_kext_adopt_exact_iokit(&dead, &adopted) == -EINVAL && dead == MACH_PORT_DEAD);
+    CHECK(acd_kext_adopt_exact_iokit(nullptr, &adopted) == -EINVAL && !adopted);
+    CHECK(acd_kext_adopt_exact_iokit(&fake.port, nullptr) == -EINVAL && fake.port == 0x105);
+    CHECK(!fake.helloCalls && !fake.closes);
+    CHECK(acd_kext_adopt_exact_iokit(&fake.port, &adopted) == 0 && adopted);
+    CHECK(fake.port == MACH_PORT_NULL && fake.helloCalls == 1 && bridge.sessions == 1 && !bridge.submits);
+    acd_kext_destroy(bridge.transport);
+    bridge.transport = adopted;
+
+    uint64_t compute = 0, gfx = 0;
+    CHECK(bridge.submit(AMDGPU_HW_IP_COMPUTE, &compute) == 0 && compute == 100);
+    CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &gfx) == 0 && gfx == 101);
+    bool busy = false;
+    acd_wait_status snapshot{};
+    CHECK(acd_kext_wait_seq(adopted, gfx, 1, &busy, &snapshot) == 0 && busy);
+    bridge.device.setFence(1, gfx);
+    CHECK(acd_kext_wait_seq(adopted, gfx, 0, &busy, &snapshot) == 0 && !busy && snapshot.retired < compute);
+    CHECK(bridge.acks == 1 && bridge.client.exactRegistry.occupied() == 1);
+    bridge.device.setFence(0, compute);
+    CHECK(acd_kext_wait_seq(adopted, 0, 0, &busy, &snapshot) == 0 && !busy && snapshot.retired == gfx);
+    CHECK(bridge.acks == 2 && !bridge.client.exactRegistry.occupied());
+    acd_kext_destroy(adopted);
+    bridge.transport = nullptr;
+    CHECK(fake.closes == 1);
+}
+
+static void iokit_adoption_errors() {
+    for (unsigned fault = 1; fault <= 11; ++fault) {
+        reset();
+        FakeIOKit fake;
+        int expected = -EPROTO;
+        if (fault <= 6) {
+            fake.helloFault = fault;
+            expected = fault == 1 ? -ENODEV : fault == 2 ? -EIO : -EPROTO;
+        } else if (fault == 7) {
+            fake.bridge.client.hello = false;
+            expected = -ENODEV;
+        } else if (fault == 8) {
+            fake.bridge.corruptSelector = PHX34_R3_SEL_SESSION;
+            fake.bridge.corruption = 5;
+        } else {
+            fake.failAllocation = fault - 8;
+            expected = -ENOMEM;
+        }
+        acd_kext *adopted = nullptr;
+        CHECK(acd_kext_adopt_exact_iokit(&fake.port, &adopted) == expected);
+        CHECK(!adopted && fake.port == MACH_PORT_NULL && fake.closes == 1);
+        CHECK(fake.helloCalls == (fault != 9 && fault != 10));
+        CHECK(fake.bridge.sessions == (fault == 7 || fault == 8 || fault == 11));
+        CHECK(!fake.bridge.submits && !fake.bridge.waits && !fake.bridge.acks && !packetWrites);
+    }
+}
+#endif
+
 int main() {
     paired_round_trip();
     full_receipts();
@@ -350,6 +471,10 @@ int main() {
     checked_progress();
     invalid_progress();
     zero_and_queue_loss();
+#ifdef PHX34_TEST_IOKIT
+    iokit_adoption();
+    iokit_adoption_errors();
+#endif
     std::printf("PASS staged Mesa/native wire: %llu checks; GPU_executed=false\n",
                 static_cast<unsigned long long>(checks.load()));
 }

@@ -202,3 +202,42 @@ The reader uses CPU storage and lifecycle state is modeled. No IOKit
 connection, trusted BAR0 read, AMD event or production exact capability is
 enabled. The CPU-fence refusal and legacy runtime behavior remain. Rollback
 is to omit this isolated stage and use the preceding adapter and runner.
+
+### Mesa IOKit connection adoption
+
+The [IOKit source stage](../tools/build34_r3_mesa_iokit.py) extends the pinned
+Mesa `ac_darwin_iokit.c`. The exact constructor takes an exclusively owned,
+already-open direct connection and an empty output slot. Invalid arguments
+leave both unchanged. After taking the connection it clears the caller's
+handle, checks the ordinary Hello contract (ABI, build 34, batch capacity
+and VMID), then queries the already-bound exact session on the same port.
+The connection context owns the wire adapter. The constructor publishes
+the transport only after the Mesa completion cache is configured, before
+any sequence traffic. A failed attempt closes the consumed handle once
+without publishing the transport, opening a different connection or
+falling back to legacy submission. Legacy matching and proxy selection do
+not invoke this constructor.
+
+The fixed struct calls go through Mesa's existing `IOConnectCallMethod`
+wrapper; none of the exact requests supply scalar arguments. The full
+staged IOKit unit compiles with the macOS SDK. Both sanitizers pass 8,466
+checks including the earlier wire suite, one full dual-queue round trip
+through the IOKit call shape, and 11 failed adoption cases (Hello/session
+refusal, malformed identity and allocation failures). The test executable
+does not link IOKit: local doubles implement the OS symbols and abort on
+device matching, opening or mapping. Hello and device state are modeled.
+See the [IOKit pairing record](validation/build34-r3-mesa-iokit-offline-20261122.json).
+
+```sh
+make -j1 test-build34-r3-mesa-iokit MESA_SOURCE="$MESA_SOURCE" \
+  R3_MESA_IOKIT_OUT=build/build34-r3-mesa-call-adopt-new-private
+```
+
+Use a fresh ignored directory as shown; the pinned predecessor's linkage
+check also scans the executable path in `otool` output. This constructor
+does not authorize opening a client or prove the identity of the loaded
+driver. Kernel admission, real MIG delivery, DRM core publication and
+quiescence of callers before closing remain required. The close callback
+does not certify GPU/resource drain. The 172 production inputs, installed
+state and production exact capability remain unchanged. Roll back this
+source-only step by omitting the IOKit transform and optional test target.

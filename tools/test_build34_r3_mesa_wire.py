@@ -15,13 +15,14 @@ from build34_exact_progress_wire import (
     previous_stage, stage as progress_stage, stage_header as progress_header,
 )
 from build34_exact_submit import once
+from build34_r3_mesa_iokit import IOKIT, IOKIT_SHA256, stage as iokit_stage
 from test_build34_exact_ownership import DRIVER, ROOT, method, sha
 from test_build34_exact_transport import DRM, KEXT, PATCH, PREFIX, SHAPE_PATCHES
 from test_build34_exact_multitarget import apply, stage
 from upstream34_layout import radv_ib_tail
 
 
-def test(mesa, out):
+def test(mesa, out, *, iokit=False):
     mesa, out = Path(mesa).resolve(), Path(out).resolve()
     if out.exists() or ROOT / 'build' not in out.parents or not out.name.endswith('-private'):
         raise ValueError('Require a fresh ignored worktree build path ending -private')
@@ -41,6 +42,7 @@ def test(mesa, out):
     dispatch_record = 'docs/validation/build34-r3-mesa-dispatch-offline-20261122.json'
     adapter = 'tools/build34_r3_mesa_wire.c'
     fixture = 'tests/test_build34_r3_mesa_wire.cpp'
+    iokit_fixture = 'tests/test_build34_r3_mesa_iokit.c'
     native_evidence = json.loads((ROOT / native_record).read_text())
     mesa_evidence = json.loads((ROOT / transport_record).read_text())
     patches = [*SHAPE_PATCHES, PATCH]
@@ -49,6 +51,14 @@ def test(mesa, out):
              'tools/build34_exact_progress_wire.h', 'tools/build34_exact_fence32.h', dispatch_record,
              transport_record, native_record,
              *patches, *native_evidence['input_sha256']]
+    if iokit:
+        paths.extend(['tools/build34_r3_mesa_iokit.py', 'tools/build34_r3_mesa_iokit.h', iokit_fixture])
+        iokit_source = (mesa / IOKIT).read_bytes()
+        if sha(iokit_source) != IOKIT_SHA256:
+            raise ValueError('Previously reviewed Mesa IOKit input changed')
+        iokit_staged = iokit_stage(iokit_source.decode()).encode()
+        if not iokit_staged.startswith(iokit_source.split(b'#include', 1)[0]):
+            raise ValueError('Original Mesa IOKit notice changed')
     inputs = {name: (ROOT / name).read_bytes() for name in paths}
     pinned = {**native_evidence['input_sha256'], **{name: mesa_evidence['input_sha256'][name] for name in patches}}
     if any(sha(inputs[name]) != digest for name, digest in pinned.items()):
@@ -83,6 +93,9 @@ def test(mesa, out):
         raise ValueError('Mesa staged closure differs from reviewed 0007 result')
     if b'const struct acd_sync_backend be = {.wait_seq = acd_backend_wait_seq, .ctx = c->kext};' not in mesa_staged[DRM]:
         raise ValueError('Production Mesa exact capability must stay off')
+    if iokit:
+        stage({IOKIT: iokit_source}, out / 'iokit-baseline')
+        (closure / IOKIT).write_bytes(iokit_staged)
 
     native_result = json.loads(run([sys.executable, '-B', ROOT / native_case, '--out', native],
                                    'native-regressions', cwd=ROOT, timeout=360))
@@ -129,24 +142,35 @@ def test(mesa, out):
                for path in root.rglob('*') if path.is_file() and '.git' not in path.relative_to(root).parts}
     allowed |= {str(paired_native), str(paired_binding)}
     checks = {}
+    sources = [closure / KEXT, frozen / adapter, frozen / fixture,
+               native / 'frozen/tests/test_build34_exact_submit_peer.c',
+               native / 'frozen/tests/test_build34_exact_receipt_peer.c']
+    if iokit:
+        sources.extend([closure / IOKIT, frozen / iokit_fixture])
     for label, sanitizer in [('memory', 'address,undefined'), ('thread', 'thread')]:
         flags = ['-O1', '-g', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                  '-fno-omit-frame-pointer', '-fno-sanitize-recover=all', '-fsanitize=' + sanitizer]
         objects = []
-        for source in (closure / KEXT, frozen / adapter, frozen / fixture,
-                       native / 'frozen/tests/test_build34_exact_submit_peer.c',
-                       native / 'frozen/tests/test_build34_exact_receipt_peer.c'):
+        for source in sources:
             obj = out / (label + '-' + source.stem + '.o')
             dep = obj.with_suffix('.d')
             cpp = source.suffix == '.cpp'
             cc = 'clang++' if cpp else 'clang'
             standard = '-std=c++20' if cpp else '-std=gnu11'
             extra = ['-Wno-missing-field-initializers', '-Wno-deprecated-volatile'] if cpp else []
+            if iokit and source == frozen / fixture:
+                extra.append('-DPHX34_TEST_IOKIT=1')
+            if iokit and source in (closure / KEXT, closure / IOKIT):
+                extra.append('-Dcalloc=phx34_fixture_calloc')
             run(['/usr/bin/xcrun', cc, standard, *flags, *includes, *extra,
                  '-MMD', '-MF', dep, '-c', source, '-o', obj], obj.stem + '-compile')
             deps = shlex.split(dep.read_text().replace('\\\n', ' ').split(':', 1)[1])
             if not deps or any(str(Path(name).resolve()) not in allowed for name in deps):
                 raise ValueError('Unfrozen compilation dependency')
+            if iokit and source == closure / IOKIT:
+                imports = run(['/usr/bin/nm', '-u', obj], obj.stem + '-imports')
+                if any(symbol not in imports.split() for symbol in ('_IOConnectCallMethod', '_IOServiceClose')):
+                    raise ValueError('Incomplete IOKit transport compile')
             objects.append(obj)
         binary = out / (label + '-CPU-only')
         run(['/usr/bin/xcrun', 'clang++', *flags, '-Wl,-dead_strip', *objects, '-o', binary], label + '-link')
@@ -164,6 +188,10 @@ def test(mesa, out):
         raise ValueError('Frozen input drift')
     if any((closure / name).read_bytes() != data for name, data in mesa_staged.items()):
         raise ValueError('Staged Mesa input drift')
+    if iokit and ((mesa / IOKIT).read_bytes() != iokit_source or
+                  (out / 'iokit-baseline' / IOKIT).read_bytes() != iokit_source or
+                  (closure / IOKIT).read_bytes() != iokit_staged):
+        raise ValueError('Mesa IOKit input drift')
     if protected != {name: sha((ROOT / name).read_bytes()) for name in names}:
         raise ValueError('Production input drift')
     report = dict(status='passed-CPU-only-paired-Mesa-native-receipt-wire', kernel_build=34,
@@ -177,6 +205,12 @@ def test(mesa, out):
                   native_mode_admitted=False, iokit_opened=False,
                   production_exact_capability_enabled=False, installed=False, loaded=False,
                   GPU_executed=False, R3_complete=False)
+    if iokit:
+        report.update(status='passed-CPU-only-staged-Mesa-IOKit-call-transport',
+                      iokit_source_sha256=IOKIT_SHA256, staged_iokit_source_sha256=sha(iokit_staged),
+                      actual_iokit_transport_compiled=True, iokit_symbols_test_doubles=True,
+                      real_IOKit_called=False, native_hello_modeled=True,
+                      drm_core_adopted=False, native_session_opened=False)
     (out / 'result-private.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report))
 
@@ -185,5 +219,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mesa-source', required=True, type=Path)
     parser.add_argument('--out', required=True, type=Path)
+    parser.add_argument('--iokit', action='store_true')
     args = parser.parse_args()
-    test(args.mesa_source, args.out)
+    test(args.mesa_source, args.out, iokit=args.iokit)
