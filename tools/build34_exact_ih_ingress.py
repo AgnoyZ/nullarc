@@ -9,12 +9,14 @@ ADMIT = 'bool PhxBringup::exactIHIngressAdmitted('
 OPEN = 'bool PhxBringup::openExactIHRoute('
 CLOSE = 'void PhxBringup::closeExactIHRouteLocked('
 LOSE = 'bool PhxBringup::loseExactIHRoute('
-MATCH = 'bool PhxBringup::exactIHRouteMatchesLocked('
+MATCH = 'bool PhxBringup::exactIHRouteMatches('
 DELIVER = 'int PhxBringup::notifyExactIHLocked('
 CURSOR = 'bool PhxBringup::validExactIHCursor('
 LIVE = 'bool PhxBringup::exactIHRouteLiveLocked('
 COLLECT = 'int PhxBringup::collectExactIH('
 WORKER_DRAIN = 'bool PhxBringup::exactIHWorkerDrainedLocked('
+ACTIVATE = 'bool PhxBringup::activateExactIHRoute('
+SIGNAL = 'bool PhxBringup::signalExactIH('
 
 TOKEN = '''    struct ExactIHRoute {
         uint64_t service, epoch, generation[2];
@@ -28,9 +30,14 @@ DECLARATIONS = TOKEN + '''    ExactIHRoute exactIHRoute{};
         uint32_t read, before, after, count;
         uint8_t entries[kExactIHBatchEntries][kExactIHEntryBytes];
     };
-    enum ExactIHRejection : int { kExactIHStale = -1, kExactIHInvalid = -2, kExactIHBusy = -3 };
-    enum class ExactIHState : uint8_t { Empty, Active, Retiring, Lost };
+    enum ExactIHRejection : int { kExactIHStale = -1, kExactIHInvalid = -2, kExactIHBusy = -3, kExactIHIdle = -4 };
+    enum class ExactIHState : uint8_t { Empty, Arming, Active, Retiring, Lost };
     ExactIHState exactIHState{ExactIHState::Empty};
+    enum ExactIHSignal : uint32_t {
+        kIHPublished = 1, kIHEnabled = 2, kIHPending = 4, kIHClosed = 8, kIHCollecting = 16
+    };
+    static_assert(__atomic_always_lock_free(sizeof(uint32_t), nullptr), "IH signal path requires lock-free atomics");
+    alignas(uint32_t) uint32_t exactIHSignals{0};
     phx34_exact::CallbackGate<1> exactIHWorker;
     uint32_t exactIHRingSize{0}, exactIHNext{0};
     uint64_t exactIHBatchOrdinal{0};
@@ -38,12 +45,14 @@ DECLARATIONS = TOKEN + '''    ExactIHRoute exactIHRoute{};
     bool exactIHIngressAdmitted() const;
     static bool validExactIHCursor(uint32_t, uint32_t);
     bool openExactIHRoute(ExactIHRoute &, uint32_t ringSize, uint32_t cursor);
-    bool exactIHRouteMatchesLocked(const ExactIHRoute &) const;
+    bool activateExactIHRoute(const ExactIHRoute &, bool &kick);
+    bool signalExactIH(const ExactIHRoute &);
+    bool exactIHRouteMatches(const ExactIHRoute &) const;
     bool exactIHRouteLiveLocked(const ExactIHRoute &) const;
     void closeExactIHRouteLocked();
     bool loseExactIHRoute(const ExactIHRoute &);
     bool exactIHWorkerDrainedLocked(const ExactIHRoute &) const;
-    int collectExactIH(const ExactIHRoute &, bool (*capture)(void *, ExactIHBatch &), void *);
+    int collectExactIH(const ExactIHRoute &, bool (*capture)(void *, ExactIHBatch &), void *, bool &kick);
     int notifyExactIHLocked(const ExactIHRoute &, const ExactIHBatch &);
 '''
 METHODS = '''bool PhxBringup::exactIHIngressAdmitted() const {
@@ -72,26 +81,52 @@ bool PhxBringup::openExactIHRoute(ExactIHRoute &out, uint32_t ringSize, uint32_t
         exactIHRoute = {service, ++exactIHLastEpoch, {exactQueueGeneration[0], exactQueueGeneration[1]}};
         exactIHRingSize = ringSize;
         exactIHNext = cursor;
-        exactIHState = ExactIHState::Active;
+        exactIHState = ExactIHState::Arming;
         out = exactIHRoute;
+        __atomic_store_n(&exactIHSignals, kIHPublished, __ATOMIC_RELEASE);
     }
     IOLockUnlock(gpuLock);
     return ready;
 }
 
-bool PhxBringup::exactIHRouteMatchesLocked(const ExactIHRoute &route) const {
+bool PhxBringup::exactIHRouteMatches(const ExactIHRoute &route) const {
     return exactIHRoute.epoch && route.epoch == exactIHRoute.epoch && route.service == exactIHRoute.service &&
         route.generation[0] == exactIHRoute.generation[0] && route.generation[1] == exactIHRoute.generation[1];
 }
 
+bool PhxBringup::activateExactIHRoute(const ExactIHRoute &route, bool &kick) {
+    kick = false;
+    phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
+    if (!callback || !gpuLock) return false;
+    IOLockLock(gpuLock);
+    const bool ready = exactIHState == ExactIHState::Arming && exactIHRouteMatches(route) &&
+        !exactCallbacks.closed() && !exactStopped && !isSleeping && exactQueueLive[0] && exactQueueLive[1] &&
+        route.generation[0] == exactQueueGeneration[0] && route.generation[1] == exactQueueGeneration[1];
+    if (ready) {
+        exactIHState = ExactIHState::Active;
+        kick = (__atomic_fetch_or(&exactIHSignals, kIHEnabled, __ATOMIC_ACQ_REL) & kIHPending) != 0;
+    }
+    IOLockUnlock(gpuLock);
+    return ready;
+}
+
+bool PhxBringup::signalExactIH(const ExactIHRoute &route) {
+    const uint32_t observed = __atomic_load_n(&exactIHSignals, __ATOMIC_ACQUIRE);
+    if ((observed & (kIHPublished | kIHClosed)) != kIHPublished || exactCallbacks.closed() ||
+        !exactIHRouteMatches(route)) return false;
+    const uint32_t previous = __atomic_fetch_or(&exactIHSignals, kIHPending, __ATOMIC_ACQ_REL);
+    return (previous & (kIHEnabled | kIHPending | kIHClosed | kIHCollecting)) == kIHEnabled;
+}
+
 bool PhxBringup::exactIHRouteLiveLocked(const ExactIHRoute &route) const {
-    return exactIHRouteMatchesLocked(route) && exactIHState == ExactIHState::Active &&
+    return exactIHRouteMatches(route) && exactIHState == ExactIHState::Active &&
         !exactCallbacks.closed() && !exactStopped && !isSleeping && exactQueueLive[0] && exactQueueLive[1] &&
         route.generation[0] == exactQueueGeneration[0] && route.generation[1] == exactQueueGeneration[1];
 }
 
 void PhxBringup::closeExactIHRouteLocked() {
-    if (exactIHState != ExactIHState::Active) return;
+    if (exactIHState != ExactIHState::Arming && exactIHState != ExactIHState::Active) return;
+    __atomic_fetch_or(&exactIHSignals, kIHClosed, __ATOMIC_ACQ_REL);
     exactIHWorker.close();
     exactIHState = ExactIHState::Retiring;
     for (uint32_t queue = 0; queue < 2; ++queue) {
@@ -104,8 +139,8 @@ bool PhxBringup::loseExactIHRoute(const ExactIHRoute &route) {
     phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
     if (!callback || !gpuLock) return false;
     IOLockLock(gpuLock);
-    const bool current = (exactIHState == ExactIHState::Active || exactIHState == ExactIHState::Retiring) &&
-        exactIHRouteMatchesLocked(route);
+    const bool current = (exactIHState == ExactIHState::Arming || exactIHState == ExactIHState::Active ||
+        exactIHState == ExactIHState::Retiring) && exactIHRouteMatches(route);
     if (current) {
         closeExactIHRouteLocked();
         exactIHState = ExactIHState::Lost;
@@ -115,10 +150,12 @@ bool PhxBringup::loseExactIHRoute(const ExactIHRoute &route) {
 }
 
 bool PhxBringup::exactIHWorkerDrainedLocked(const ExactIHRoute &route) const {
-    return exactIHRouteMatchesLocked(route) && exactIHWorker.drained();
+    return exactIHRouteMatches(route) && exactIHWorker.drained();
 }
 
-int PhxBringup::collectExactIH(const ExactIHRoute &route, bool (*capture)(void *, ExactIHBatch &), void *context) {
+int PhxBringup::collectExactIH(const ExactIHRoute &route, bool (*capture)(void *, ExactIHBatch &), void *context,
+                              bool &kick) {
+    kick = false;
     phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
     if (!callback || !gpuLock || !capture) return kExactIHStale;
     IOLockLock(gpuLock);
@@ -126,22 +163,35 @@ int PhxBringup::collectExactIH(const ExactIHRoute &route, bool (*capture)(void *
         IOLockUnlock(gpuLock);
         return kExactIHStale;
     }
-    decltype(exactIHWorker)::Lease worker(exactIHWorker);
-    IOLockUnlock(gpuLock);
-    if (!worker) return kExactIHBusy;
-    ExactIHBatch batch{};
-    const bool copied = capture(context, batch);
-    IOLockLock(gpuLock);
-    int result = kExactIHStale;
-    if (exactIHRouteLiveLocked(route)) {
-        if (copied) {
-            result = notifyExactIHLocked(route, batch);
-        } else {
-            closeExactIHRouteLocked();
-            exactIHState = ExactIHState::Lost;
-            result = kExactIHInvalid;
+    int result = kExactIHIdle;
+    {
+        decltype(exactIHWorker)::Lease worker(exactIHWorker);
+        if (!worker) {
+            IOLockUnlock(gpuLock);
+            return kExactIHBusy;
+        }
+        __atomic_fetch_or(&exactIHSignals, kIHCollecting, __ATOMIC_ACQ_REL);
+        if (__atomic_fetch_and(&exactIHSignals, ~kIHPending, __ATOMIC_ACQ_REL) & kIHPending) {
+            IOLockUnlock(gpuLock);
+            ExactIHBatch batch{};
+            const bool copied = capture(context, batch);
+            IOLockLock(gpuLock);
+            result = kExactIHStale;
+            if (exactIHRouteLiveLocked(route)) {
+                if (copied) {
+                    result = notifyExactIHLocked(route, batch);
+                    if (result >= 0 && exactIHNext != batch.before)
+                        __atomic_fetch_or(&exactIHSignals, kIHPending, __ATOMIC_ACQ_REL);
+                } else {
+                    closeExactIHRouteLocked();
+                    exactIHState = ExactIHState::Lost;
+                    result = kExactIHInvalid;
+                }
+            }
         }
     }
+    const uint32_t previous = __atomic_fetch_and(&exactIHSignals, ~kIHCollecting, __ATOMIC_ACQ_REL);
+    kick = (previous & (kIHPending | kIHClosed)) == kIHPending && exactIHRouteLiveLocked(route);
     IOLockUnlock(gpuLock);
     return result;
 }

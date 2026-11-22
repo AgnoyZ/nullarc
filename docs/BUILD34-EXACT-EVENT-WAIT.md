@@ -235,9 +235,9 @@ fence, advance the prefix, or release resources. Queue invalidation revokes
 delivery and wakes sleepers; instead of clearing the route, it preserves the
 service, epoch and generations in `Retiring`. Fresh queue adoption does not
 make that slot empty. A matching stream-loss report while the service gate is
-open moves the active or retiring route to `Lost`. Neither state can deliver
-hints or rearm on this service instance; unrelated or relabeled reports
-cannot alter the retained route. The event path falls back to the existing
+open moves the arming, active or retiring route to `Lost`. Neither `Retiring`
+nor `Lost` can deliver hints or rearm on this service instance. Unrelated or
+relabeled reports cannot alter the retained route. The event path falls back to the existing
 bounded polling for still-valid targets, while invalidated waits fail closed.
 
 There is deliberately no transition from `Retiring` to `Empty`: software
@@ -276,3 +276,40 @@ register an ISR, or prove the decoder against this APU. The owner, ordered
 capture, loss detection and device-write drain must come from the separately
 admitted hardware route. Omit the transform for offline rollback; no live
 changes were made.
+
+### Inline signal and deferred handoff
+
+An admitted route first enters `Arming`. A release store publishes its
+immutable identity before a future provider operation that can dispatch
+inline. `signalExactIH` checks the captured identity after an acquire load,
+takes no GPU or client lock, and latches one pending hint. It does not read
+IH, wake a fence waiter or claim completion. Activation under `gpuLock` checks
+the same identity and both queue generations. Its atomic enable transition
+and the signal transition agree on which caller requests the first deferred
+kick. This lockless identity read depends on never reusing the route slot.
+
+Only the deferred collector can consume a hint, after acquiring the sole
+worker lease. A worker that finds no hint returns idle without calling the
+copier. An entry that finds the worker busy cannot clear the hint. Signals
+while the worker copies are coalesced; the worker requests another deferred
+kick if a signal arrived or the accepted batch left captured backlog. It
+releases the copy lease before handing off and does not repost after observing
+loss or revocation. Each invocation is still limited to 32 entries.
+
+A kick is a request to an unimplemented asynchronous scheduler, not evidence
+that the caller is still live or that work has been queued. Revocation can
+win after any kick decision. A future adapter must retain the service and
+immutable callback context before any provider operation that can dispatch,
+and through late kicks and queued work. The collector rejects stale callbacks
+at entry. Keep provider drain, queued-work drain, the admitted copy lease,
+and device DMA drain as separate release prerequisites. A scheduler failure
+must be handled fail closed; this step does not implement a scheduler.
+
+The [signal-handoff record](validation/build34-r3-ih-signal-handoff-offline-20261123.json)
+covers inline signals, activation racing signaling or invalidation, peer
+generation rejection, busy-worker handoff without a fresh interrupt, and a
+second capture for a partial batch. ASan/UBSan and TSan each passed 36 closed
+and 972 modeled checks; 34 fault variants were rejected. The pinned SDK/KDK
+comparison still has 381 imports, and all 172 production inputs are
+unchanged. The staged admission remains false; no ISR, native scheduler,
+paired RADV transport or live 780M completion route is established.

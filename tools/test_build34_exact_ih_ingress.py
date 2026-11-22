@@ -10,8 +10,8 @@ from unittest.mock import patch
 import build34_native_object_check as native_objects
 from build34_exact_event_iokit import DECLARATIONS as IOKIT_DECLARATIONS, FIELDS_AT, SLEEP, WAKE
 from build34_exact_event_wait import AVAILABLE, ENTRY, FIELDS, INVALIDATE, PARK, SNAPSHOT, WAIT
-from build34_exact_ih_ingress import (ADMIT, CLOSE, COLLECT, CURSOR, DECLARATIONS, DELIVER, LIVE, LOSE, MATCH, OPEN,
-                                     WORKER_DRAIN, previous_stage, stage, stage_header)
+from build34_exact_ih_ingress import (ACTIVATE, ADMIT, CLOSE, COLLECT, CURSOR, DECLARATIONS, DELIVER, LIVE, LOSE, MATCH,
+                                     OPEN, SIGNAL, WORKER_DRAIN, previous_stage, stage, stage_header)
 from build34_exact_submit import once
 from test_build34_exact_event_iokit import DOUBLES
 from test_build34_exact_open import BASE, EXTRA, FACTORY_RECORD, KDK_RECORD, PROTECTED, git
@@ -21,7 +21,7 @@ REFERENCE = 'docs/validation/build34-r3-exact-open-offline-20261122.json'
 BASE_FIXTURE = 'tests/test_build34_exact_event_wait.cpp'
 FIXTURE = 'tests/test_build34_exact_ih_ingress.cpp'
 OWNERSHIP = 'tools/build34_exact_ownership.h'
-METHODS = (AVAILABLE, SNAPSHOT, PARK, SLEEP, WAKE, ADMIT, CURSOR, OPEN, MATCH, LIVE, CLOSE, LOSE, WORKER_DRAIN,
+METHODS = (AVAILABLE, SNAPSHOT, PARK, SLEEP, WAKE, ADMIT, CURSOR, OPEN, MATCH, ACTIVATE, SIGNAL, LIVE, CLOSE, LOSE, WORKER_DRAIN,
            COLLECT, DELIVER, INVALIDATE, WAIT)
 
 
@@ -120,15 +120,15 @@ def test(out, sdk, kdk):
         'swap-native-queue-indices': ('ring == 0x04 ? 0 : 1', 'ring == 0x04 ? 1 : 0', True),
         'accept-other-service': (' && route.service == exactIHRoute.service', '', True),
         'accept-other-generation': ('route.generation[0] == exactIHRoute.generation[0] && ', '', True),
+        'accept-other-peer-generation': ('route.generation[1] == exactIHRoute.generation[1];', 'true;', True),
         'accept-old-route': (' && route.epoch == exactIHRoute.epoch', '', True),
         'rearm-after-stream-loss': ('exactIHState == ExactIHState::Empty &&',
                                     'exactIHState != ExactIHState::Active && exactIHState != ExactIHState::Retiring &&', True),
         'rearm-before-old-route-drain': ('exactIHState == ExactIHState::Empty &&',
                                          'exactIHState != ExactIHState::Active && exactIHState != ExactIHState::Lost &&', True),
-        'admit-batch-from-nonactive-route': ('return exactIHRouteMatchesLocked(route) && exactIHState == ExactIHState::Active &&',
-                                            'return exactIHRouteMatchesLocked(route) &&', True),
-        'ignore-loss-during-retirement': ('(exactIHState == ExactIHState::Active || exactIHState == ExactIHState::Retiring)',
-                                          'exactIHState == ExactIHState::Active', True),
+        'admit-batch-from-nonactive-route': ('return exactIHRouteMatches(route) && exactIHState == ExactIHState::Active &&',
+                                            'return exactIHRouteMatches(route) &&', True),
+        'ignore-loss-during-retirement': (' ||\n        exactIHState == ExactIHState::Retiring', '', True),
         'erase-retiring-identity': ('exactIHState = ExactIHState::Retiring;',
                                      'exactIHRoute = {}; exactIHState = ExactIHState::Retiring;', True),
         'accept-wrapped-replay': ('batch.ordinal != exactIHBatchOrdinal + 1 || ', '', True),
@@ -142,8 +142,20 @@ def test(out, sdk, kdk):
         'skip-post-copy-route-validation': ('if (exactIHRouteLiveLocked(route)) {', 'if (true) {', True),
         'declare-worker-drained-at-close': ('exactIHWorker.drained()', 'exactIHWorker.closed()', True),
         'omit-worker-gate-close': ('    exactIHWorker.close();\n', '', True),
-        'drain-other-route': ('exactIHRouteMatchesLocked(route) && exactIHWorker.drained()',
+        'drain-other-route': ('exactIHRouteMatches(route) && exactIHWorker.drained()',
                               '(static_cast<void>(route), exactIHWorker.drained())', True),
+        'lose-inline-signal-on-activation': ('kick = (__atomic_fetch_or(&exactIHSignals, kIHEnabled, __ATOMIC_ACQ_REL) & kIHPending) != 0;',
+                                             '__atomic_fetch_or(&exactIHSignals, kIHEnabled, __ATOMIC_ACQ_REL);', True),
+        'kick-while-arming': ('== kIHEnabled;\n}', '== (previous & kIHEnabled);\n}', True),
+        'ignore-callback-close-in-signal': ('!= kIHPublished || exactCallbacks.closed() ||', '!= kIHPublished ||', True),
+        'leave-signal-open-on-retire': ('    __atomic_fetch_or(&exactIHSignals, kIHClosed, __ATOMIC_ACQ_REL);\n', '', True),
+        'leave-worker-open-when-arming': ('exactIHState != ExactIHState::Arming && exactIHState != ExactIHState::Active',
+                                          'exactIHState != ExactIHState::Active', True),
+        'kick-while-collector-busy': ('(kIHEnabled | kIHPending | kIHClosed | kIHCollecting)', '(kIHEnabled | kIHPending | kIHClosed)', True),
+        'consume-before-worker-admission': ('if (!worker) {\n', 'if (!worker) {\n            __atomic_fetch_and(&exactIHSignals, ~kIHPending, __ATOMIC_ACQ_REL);\n', True),
+        'omit-partial-batch-repost': (' && exactIHNext != batch.before', ' && false', True),
+        'omit-worker-repost': ('&& exactIHRouteLiveLocked(route);\n', '&& false;\n', True),
+        'collect-without-signal': ('& kIHPending) {', '& (kIHPending | kIHCollecting)) {', True),
     }
     for label, (old, new, modeled) in mutations.items():
         exercise(label, once(proposed, old, new), 'address,undefined', modeled, True)
@@ -157,11 +169,13 @@ def test(out, sdk, kdk):
     git('diff', '--quiet', BASE, '--', *PROTECTED)
     if any((ROOT / name).read_bytes() != blob for name, blob in inputs.items()):
         raise ValueError('Inputs changed during verification')
-    result = dict(status='passed-offline-IH-worker-drain', build=34, checks=counts,
+    result = dict(status='passed-offline-IH-signal-handoff', build=34, checks=counts,
                   rejected_mutants=[*mutations, 'allow-concurrent-IH-workers'], staged_source_sha256=sha(proposed.encode()),
                   previous_source_sha256=sha(previous.encode()), protected_production_inputs=len(production),
                   max_entries_per_batch=32, native_ring_consumer_bound=False,
                   max_concurrent_capture_workers=1, worker_drain_is_not_device_or_ISR_drain=True,
+                  inline_signal_latched_before_activation=True, pending_signal_survives_busy=True,
+                  partial_batch_requests_deferred_kick=True, native_irq_scheduler_bound=False,
                   hold_rearm_until_old_route_drain=True, old_writer_drain_proved=False,
                   native_event_backend_bound=False, native_open_admitted=False, IH_accessed=False,
                   ISR_registered=False, GPU_executed=False, R3_complete=False, **native)

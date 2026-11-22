@@ -9,13 +9,19 @@ static constexpr int Stale = PhxBringup::kExactIHStale;
 static constexpr uint32_t RingBytes = 128, StartCursor = 96;
 static constexpr Vector gfx{0x14, 0xb5, 0x80};
 
-static int deliverCopy(PhxBringup &gpu, const Route &route, const Batch &batch) {
+static int collectCopy(PhxBringup &gpu, const Route &route, const Batch &batch, bool &kick) {
     const Batch *input = &batch;
     return gpu.collectExactIH(route, [](void *context, Batch &output) {
         CHECK(!gpuHeld && !clientHeld);
         output = **static_cast<const Batch **>(context);
         return true;
-    }, &input);
+    }, &input, kick);
+}
+
+static int deliverCopy(PhxBringup &gpu, const Route &route, const Batch &batch) {
+    gpu.signalExactIH(route);
+    bool kick = false;
+    return collectCopy(gpu, route, batch, kick);
 }
 
 struct IHStream {
@@ -48,7 +54,68 @@ struct IHStream {
 
 #if MODELED_IH
 static constexpr int Invalid = PhxBringup::kExactIHInvalid;
+static constexpr int Idle = PhxBringup::kExactIHIdle;
 static constexpr Vector compute{0x14, 0xb5, 0x04};
+
+static void openActive(PhxBringup &gpu, Route &route, uint32_t size = RingBytes, uint32_t cursor = StartCursor) {
+    CHECK(gpu.openExactIHRoute(route, size, cursor));
+    bool kick = true;
+    CHECK(gpu.activateExactIHRoute(route, kick) && !kick);
+}
+
+static void testArmingRaces() {
+    for (bool revoke : {false, true}) {
+        Trial racing;
+        PhxBringup &gpu = racing.gpu;
+        gpu.modeledIHAdmission = true;
+        Route route{};
+        CHECK(gpu.openExactIHRoute(route, RingBytes, StartCursor));
+        auto unrelated = route;
+        ++unrelated.generation[1];
+        CHECK(!gpu.signalExactIH(unrelated));
+        bool signalKick = false, activateKick = false;
+        std::atomic<bool> start{false};
+        std::thread source([&] {
+            while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+            if (revoke) {
+                IOLockLock(gpu.gpuLock);
+                gpu.invalidateExactQueues();
+                IOLockUnlock(gpu.gpuLock);
+            } else {
+                signalKick = gpu.signalExactIH(route);
+            }
+        });
+        if (revoke) CHECK(!gpu.signalExactIH(route));
+        start.store(true, std::memory_order_release);
+        const bool activated = gpu.activateExactIHRoute(route, activateKick);
+        source.join();
+        bool laterKick = true;
+        if (revoke) {
+            CHECK(activateKick == activated && gpu.exactIHState == RouteState::Retiring);
+            CHECK(!gpu.activateExactIHRoute(route, laterKick) && !laterKick);
+            CHECK(!gpu.signalExactIH(route));
+            CHECK(collectCopy(gpu, route, {}, laterKick) == Stale && !laterKick);
+        } else {
+            CHECK(activated && activateKick != signalKick && gpu.exactIHState == RouteState::Active);
+            CHECK(collectCopy(gpu, route, IHStream{}.capture({gfx}), laterKick) == 2 && !laterKick);
+            CHECK(collectCopy(gpu, route, {}, laterKick) == Idle && !laterKick);
+        }
+    }
+
+    Trial cancelled;
+    auto &gpu = cancelled.gpu;
+    gpu.modeledIHAdmission = true;
+    Route arming{};
+    CHECK(gpu.openExactIHRoute(arming, RingBytes, StartCursor));
+    CHECK(!gpu.signalExactIH(arming));
+    CHECK(gpu.loseExactIHRoute(arming) && gpu.exactIHState == RouteState::Lost);
+    bool kick = true;
+    CHECK(!gpu.activateExactIHRoute(arming, kick) && !kick);
+    CHECK(!gpu.signalExactIH(arming) && collectCopy(gpu, arming, {}, kick) == Stale && !kick);
+    IOLockLock(gpu.gpuLock);
+    CHECK(gpu.exactIHWorkerDrainedLocked(arming));
+    IOLockUnlock(gpu.gpuLock);
+}
 #endif
 
 int main() {
@@ -57,6 +124,8 @@ int main() {
     Route route{};
     IHStream stream;
     CHECK(!gpu.openExactIHRoute(route, RingBytes, StartCursor) && !route.epoch);
+    bool kick = true;
+    CHECK(!gpu.signalExactIH(route) && !gpu.activateExactIHRoute(route, kick) && !kick);
     CHECK(stream.deliver(gpu, route, {gfx}) == Stale);
     CHECK(trial.client.wait(1, 500) == Status::TimedOut && polls == 1);
     CHECK(gpu.exactIHState == RouteState::Empty);
@@ -80,7 +149,25 @@ int main() {
     Route duplicate{};
     CHECK(!gpu.openExactIHRoute(duplicate, RingBytes, StartCursor) && !duplicate.epoch);
     CHECK(route.service == gpu.serviceId && route.generation[0] == 7 && route.generation[1] == 8);
-    CHECK(stream.deliver(gpu, route, {compute}) == 1);
+    auto unrelated = route;
+    ++unrelated.epoch;
+    CHECK(gpu.exactIHState == RouteState::Arming);
+    CHECK(!gpu.signalExactIH(unrelated) && !gpu.activateExactIHRoute(unrelated, kick) && !kick);
+    IOLockLock(gpu.gpuLock);
+    CHECK(!gpu.signalExactIH(route) && !gpu.signalExactIH(route));
+    IOLockUnlock(gpu.gpuLock);
+    CHECK(collectCopy(gpu, route, stream.capture({compute}), kick) == Stale && !kick);
+    CHECK(!gpu.lock.wakeCount[0] && !gpu.lock.wakeCount[1]);
+    CHECK(gpu.activateExactIHRoute(route, kick) && kick);
+    CHECK(!gpu.activateExactIHRoute(route, kick) && !kick);
+    CHECK(!gpu.signalExactIH(route));
+    const auto firstCompute = stream.capture({compute});
+    CHECK(collectCopy(gpu, route, firstCompute, kick) == 1 && !kick);
+    stream.cursor = firstCompute.after;
+    ++stream.ordinal;
+    CHECK(gpu.lock.wakeCount[0] == 1 && !gpu.lock.wakeCount[1]);
+    CHECK(!gpu.signalExactIH(unrelated) && collectCopy(gpu, route, {}, kick) == Idle && !kick);
+    CHECK(gpu.signalExactIH(route) && !gpu.signalExactIH(route));
     CHECK(gpu.lock.wakeCount[0] == 1 && !gpu.lock.wakeCount[1]);
     CHECK(stream.deliver(gpu, route, {gfx}) == 2);
     CHECK(gpu.lock.wakeCount[0] == 1 && gpu.lock.wakeCount[1] == 1);
@@ -93,10 +180,13 @@ int main() {
     }
     Route stale = route;
     stale.service++;
-    CHECK(stream.deliver(gpu, stale, {gfx}) == Stale && !gpu.loseExactIHRoute(stale));
+    CHECK(!gpu.signalExactIH(stale) && stream.deliver(gpu, stale, {gfx}) == Stale && !gpu.loseExactIHRoute(stale));
     stale = route;
     stale.generation[0]++;
-    CHECK(stream.deliver(gpu, stale, {gfx}) == Stale && !gpu.loseExactIHRoute(stale));
+    CHECK(!gpu.signalExactIH(stale) && stream.deliver(gpu, stale, {gfx}) == Stale && !gpu.loseExactIHRoute(stale));
+    stale = route;
+    stale.generation[1]++;
+    CHECK(!gpu.signalExactIH(stale) && stream.deliver(gpu, stale, {gfx}) == Stale && !gpu.loseExactIHRoute(stale));
     stale = route;
     stale.epoch++;
     CHECK(deliverCopy(gpu, stale, {}) == Stale && !gpu.loseExactIHRoute(stale));
@@ -133,7 +223,7 @@ int main() {
     invalidated.gpu.modeledIHAdmission = true;
     invalidated.gpu.serviceId = 2;
     Route original{};
-    CHECK(invalidated.gpu.openExactIHRoute(original, RingBytes, StartCursor));
+    openActive(invalidated.gpu, original);
     IHStream invalidatingStream;
     CHECK(invalidatingStream.deliver(invalidated.gpu, route, {gfx}) == Stale);
     invalidated.gpu.lock.block = true;
@@ -147,6 +237,7 @@ int main() {
     sleeper.join();
     CHECK(lost == Status::Lost && invalidated.gpu.exactIHState == RouteState::Retiring);
     CHECK(invalidated.gpu.exactIHRoute.epoch == original.epoch);
+    CHECK(!invalidated.gpu.signalExactIH(original));
     CHECK(invalidatingStream.deliver(invalidated.gpu, original, {gfx}) == Stale &&
           !invalidated.gpu.openExactIHRoute(duplicate, RingBytes, StartCursor));
     IOLockLock(invalidated.gpu.gpuLock);
@@ -171,12 +262,13 @@ int main() {
     stopped.gpu.modeledIHAdmission = true;
     stopped.gpu.serviceId = 3;
     Route stopping{};
-    CHECK(stopped.gpu.openExactIHRoute(stopping, RingBytes, StartCursor));
+    openActive(stopped.gpu, stopping);
     stopped.gpu.lock.block = true;
     Status cancelled{};
     std::thread stoppingWaiter([&] { cancelled = stopped.client.wait(0, 1000000); });
     stopped.waitForPark(0);
     stopped.gpu.exactCallbacks.close();
+    CHECK(!stopped.gpu.signalExactIH(stopping));
     CHECK(deliverCopy(stopped.gpu, stopping, {}) == Stale);
     IOLockLock(stopped.gpu.gpuLock);
     stopped.gpu.exactStopped = true;
@@ -195,7 +287,7 @@ int main() {
     batching.gpu.modeledIHAdmission = true;
     Route batched{};
     IHStream combined;
-    CHECK(batching.gpu.openExactIHRoute(batched, RingBytes, StartCursor));
+    openActive(batching.gpu, batched);
     const auto firstBatch = combined.capture({gfx, compute, gfx});
     CHECK(combined.deliver(batching.gpu, batched, {gfx, compute, gfx}) == 3);
     CHECK(combined.cursor == 64 && batching.gpu.exactIHNext == 64);
@@ -210,17 +302,18 @@ int main() {
     split.gpu.modeledIHAdmission = true;
     Route segmented{};
     IHStream backlog{2016, 2048};
-    CHECK(split.gpu.openExactIHRoute(segmented, backlog.size, backlog.cursor));
+    openActive(split.gpu, segmented, backlog.size, backlog.cursor);
     CHECK(backlog.deliver(split.gpu, segmented, {}) == 0);
     auto chunk = backlog.capture({});
     chunk.count = 32;
     chunk.before = chunk.after = 1024;
     for (unsigned index = 0; index < gfx.size(); ++index) chunk.entries[31][index] = gfx[index];
-    CHECK(deliverCopy(split.gpu, segmented, chunk) == 2);
+    CHECK(split.gpu.signalExactIH(segmented));
+    CHECK(collectCopy(split.gpu, segmented, chunk, kick) == 2 && kick);
     CHECK(split.gpu.exactIHNext == 992 && split.gpu.exactIHBatchOrdinal == 2);
     backlog.cursor = 992;
     backlog.ordinal = 3;
-    CHECK(backlog.deliver(split.gpu, segmented, {compute}) == 1);
+    CHECK(collectCopy(split.gpu, segmented, backlog.capture({compute}), kick) == 1 && !kick);
     CHECK(split.gpu.exactIHNext == 1024 && split.gpu.lock.wakeCount[0] == 1 && split.gpu.lock.wakeCount[1] == 1);
 
     for (auto defect : {"skip", "unstable", "overflow", "near-full", "misaligned", "count", "gap", "large"}) {
@@ -228,7 +321,7 @@ int main() {
         malformed.gpu.modeledIHAdmission = true;
         const IHStream input{StartCursor, 2048};
         Route token{};
-        CHECK(malformed.gpu.openExactIHRoute(token, input.size, input.cursor));
+        openActive(malformed.gpu, token, input.size, input.cursor);
         auto bad = input.capture({gfx});
         const char kind = defect[0];
         if (kind == 's') { bad.read -= 32; bad.count = 2; }
@@ -247,18 +340,20 @@ int main() {
         CHECK(!malformed.gpu.openExactIHRoute(duplicate, input.size, input.cursor));
     }
 
-    for (bool copyingFails : {false, true}) {
+    testArmingRaces();
+
+    for (auto outcome : {RouteState::Active, RouteState::Lost, RouteState::Retiring}) {
         Trial racing;
         racing.gpu.modeledIHAdmission = true;
         Route running{};
-        CHECK(racing.gpu.openExactIHRoute(running, RingBytes, StartCursor));
-        CHECK(racing.gpu.collectExactIH(running, nullptr, nullptr) == Stale);
+        openActive(racing.gpu, running);
+        CHECK(racing.gpu.collectExactIH(running, nullptr, nullptr, kick) == Stale && !kick);
         struct PausedCopy {
             std::mutex mutex;
             std::condition_variable changed;
             bool entered = false, resume = false, fail = false;
         } capture;
-        capture.fail = copyingFails;
+        capture.fail = outcome == RouteState::Lost;
         const auto copy = +[](void *context, Batch &target) {
             CHECK(!gpuHeld && !clientHeld);
             auto &paused = *static_cast<PausedCopy *>(context);
@@ -270,30 +365,43 @@ int main() {
             return !paused.fail;
         };
         int result = Stale;
-        std::thread worker([&] { result = racing.gpu.collectExactIH(running, copy, &capture); });
+        bool workerKick = false;
+        CHECK(racing.gpu.signalExactIH(running));
+        std::thread worker([&] { result = racing.gpu.collectExactIH(running, copy, &capture, workerKick); });
         {
             std::unique_lock<std::mutex> held(capture.mutex);
             CHECK(capture.changed.wait_for(held, std::chrono::seconds(4), [&] { return capture.entered; }));
         }
-        CHECK(deliverCopy(racing.gpu, running, {}) == PhxBringup::kExactIHBusy);
+        CHECK(!racing.gpu.signalExactIH(running));
+        CHECK(collectCopy(racing.gpu, running, {}, kick) == PhxBringup::kExactIHBusy && !kick);
         IOLockLock(racing.gpu.gpuLock);
         CHECK(!racing.gpu.exactIHWorkerDrainedLocked(running));
-        if (!copyingFails) racing.gpu.invalidateExactQueues();
+        if (outcome == RouteState::Retiring) racing.gpu.invalidateExactQueues();
         CHECK(!racing.gpu.exactIHWorkerDrainedLocked(running));
         IOLockUnlock(racing.gpu.gpuLock);
-        if (!copyingFails) CHECK(deliverCopy(racing.gpu, running, {}) == Stale);
+        if (outcome == RouteState::Retiring) CHECK(collectCopy(racing.gpu, running, {}, kick) == Stale && !kick);
         {
             std::lock_guard<std::mutex> held(capture.mutex);
             capture.resume = true;
             capture.changed.notify_all();
         }
         worker.join();
-        CHECK(result == (copyingFails ? Invalid : Stale));
+        if (outcome == RouteState::Active) {
+            CHECK(result == 2 && workerKick);
+            const IHStream following{0, RingBytes, 2};
+            CHECK(collectCopy(racing.gpu, running, following.capture({compute}), kick) == 1 && !kick);
+            CHECK(collectCopy(racing.gpu, running, {}, kick) == Idle && !kick);
+            CHECK(racing.gpu.loseExactIHRoute(running));
+            CHECK(racing.gpu.exactIHBatchOrdinal == 2 && racing.gpu.lock.wakeCount[0] == 2 &&
+                  racing.gpu.lock.wakeCount[1] == 2);
+        } else {
+            CHECK(result == (outcome == RouteState::Lost ? Invalid : Stale) && !workerKick);
+            CHECK(racing.gpu.exactIHBatchOrdinal == 0 && racing.gpu.exactIHState == outcome);
+            CHECK(racing.gpu.lock.wakeCount[0] == 1 && racing.gpu.lock.wakeCount[1] == 1);
+        }
         IOLockLock(racing.gpu.gpuLock);
         CHECK(racing.gpu.exactIHWorkerDrainedLocked(running) && !racing.gpu.exactIHWorkerDrainedLocked({}));
-        CHECK(racing.gpu.exactIHBatchOrdinal == 0 && racing.gpu.exactIHWorker.active() == 0);
-        CHECK(racing.gpu.exactIHState == (copyingFails ? RouteState::Lost : RouteState::Retiring));
-        CHECK(racing.gpu.lock.wakeCount[0] == 1 && racing.gpu.lock.wakeCount[1] == 1);
+        CHECK(racing.gpu.exactIHWorker.active() == 0);
         IOLockUnlock(racing.gpu.gpuLock);
         CHECK(!racing.gpu.openExactIHRoute(duplicate, RingBytes, StartCursor));
     }
