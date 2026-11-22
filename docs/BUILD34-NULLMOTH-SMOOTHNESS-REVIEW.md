@@ -1,12 +1,14 @@
 # Build34 smoothness comparison with NullMoth
 
-November 22 R3 checkpoint: the staged Mesa/RADV receipt transport now pairs
+November 22 R3 checkpoint: the staged Mesa/RADV receipt transport pairs
 submit, exact wait, ACK, session discovery and checked global-prefix reads
-through one CPU call path. Unlike the pinned NullMoth NVK/RM event path, it
-has no admitted native session or live AMD completion event. The mapping
-observer did not prove BAR0 fence coherency and no IH ownership or old-writer
-drain boundary has been established. R3 hardware correctness, FPS, CPU,
-latency and stability remain open. See the [R3 ledger](BUILD34-R3-PLAN.md).
+through one CPU call path. The separate exact open stage checks mode, caller
+privilege and both queue generations, but deliberately refuses native opens.
+Unlike the pinned NullMoth NVK/RM event path, build34 has no native exact
+session or live AMD completion event. The mapping observer did not prove BAR0
+fence coherency and no IH ownership or old-writer drain boundary has been
+established. R3 hardware correctness, FPS, CPU, latency and stability remain
+open. See the [R3 ledger](BUILD34-R3-PLAN.md).
 
 November 20 checkpoint: R2a is loaded and its finite startup/display
 functional trial plus independent readback passed. Its observed mean copy

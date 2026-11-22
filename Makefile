@@ -377,6 +377,11 @@ test-build34-exact-factory:
 	@test -n "$(EXACT_FACTORY_OUT)" || (echo "Set EXACT_FACTORY_OUT to a fresh private worktree build path"; exit 2)
 	python3 -B tools/test_build34_exact_factory.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_FACTORY_OUT)"
 
+.PHONY: test-build34-exact-open
+test-build34-exact-open:
+	@test -n "$(KERNEL_SDK)" -a -n "$(KDK)" -a -n "$(EXACT_OPEN_OUT)" || (echo "Set KERNEL_SDK, KDK and fresh EXACT_OPEN_OUT"; exit 2)
+	python3 -B tools/test_build34_exact_open.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_OPEN_OUT)"
+
 # Passive mapping-metadata preparation only; never a kernel candidate/GPU test.
 .PHONY: test-build34-map-observation
 test-build34-map-observation:

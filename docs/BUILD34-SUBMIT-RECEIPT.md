@@ -283,3 +283,49 @@ RADV path does not call the exact initializer, and no real connection,
 production capability, kernel admission, GPU work or install is enabled.
 No protected production input changes. Omit this stage and its target to
 return to the preceding IOKit pairing.
+
+### Exact user-client open admission
+
+The [open stage](../tools/build34_exact_open.py) derives the full staged
+receipt/progress driver. It assigns exact mode from a distinct build34-only
+`N48R` user-client type, not from a selector, Hello/build field or queue-ready
+bit. The factory checks the IOKit owning task's administrator privilege before
+allocation; initialization rechecks it. Existing `N48N` startup still selects
+legacy mode. A failed `N48R` open never falls back to `N48N`.
+
+Exact open requires separate native completion admission, a bound reader,
+an active service and both live queues in their expected roles. The factory
+captures the invalidation epoch and both generations under `gpuLock`. The
+embedded client binding and final handler publication revalidate the same
+tuple. If binding fails, the client cannot return a handler or create a legacy
+registration. If readiness is lost after binding, the factory closes the
+unexposed client's callback admission before detaching and dropping its
+initial reference. The existing close protocol retains uncertain registration,
+provider and resource pins. No new teardown proof is inferred from a refused
+open. The provider stop gate closes independently of `gpuLock`; the final
+check does not prove an atomic native IOKit/MIG handoff with stop.
+
+Native admission deliberately returns false. The device reader and event
+adapter remain null. Tests separately exercise that refusal and an explicit
+CPU-only positive model of the admission prerequisite. Each sanitizer passes
+259 checks, including eight threaded stop, sleep and generation-change
+cases. Seven broken variants are rejected. Two complete x86_64 nonloadable
+`MH_OBJECT` files compile against the pinned SDK; all 381 unchanged imports
+resolve through the six existing declared providers in the matching KDK.
+Compared with the older 376-import factory stage, the five imports already
+in the progress predecessor come from checked overlap identity, HQD sampling
+and the unbound IOKit wait adapter. See the
+[open evidence](validation/build34-r3-exact-open-offline-20261122.json).
+
+```sh
+make -j1 test-build34-exact-open KERNEL_SDK="$KERNEL_SDK" KDK="$KDK" \
+  EXACT_OPEN_OUT=build/build34-r3-exact-open-new-private
+```
+
+No IOKit client was opened; no ISR, runtime entrypoint or GPU work was
+enabled. The 172 production inputs remain unchanged. Omit the open transform
+and optional test target to return to the prior staged driver. Before a
+native session, prove external queue ownership/drain, coherent fence reads,
+real caller privilege and MIG delivery, RADV pairing and teardown. The
+offline administrator policy is not proof that the intended production RADV
+callers qualify or should gain raw diagnostic privileges.

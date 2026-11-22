@@ -1,0 +1,36 @@
+{
+  "status": "passed-offline-exact-open-admission",
+  "kernel_build": 34,
+  "previous_source_sha256": "aa8bf169b0ce14ecc4f2c6438582c2a6c6fc7de2d39878b43a040f5ce9bd80b7",
+  "staged_source_sha256": "01a782a991e8f7457b37eb593efe03deaa309f88d12856647590df1a599354eb",
+  "checks": {
+    "asan_ubsan": {"closed": 13, "modeled": 246},
+    "tsan": {"closed": 13, "modeled": 246}
+  },
+  "threaded_scenarios_per_sanitizer": 8,
+  "rejected_mutants": [
+    "native-gate-bypass",
+    "reader-optional",
+    "permission-from-security-cookie",
+    "request-loses-mode",
+    "bind-accepts-a-different-generation",
+    "publish-accepts-a-different-generation",
+    "unexposed-registration-not-closed"
+  ],
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "native_object_only": true,
+  "native_import_count": 381,
+  "native_import_set_unchanged": true,
+  "all_native_imports_have_existing_declared_KDK_provider": true,
+  "protected_production_inputs": 172,
+  "default_make_test_passed": true,
+  "default_firmware_fixture_tests_skipped": true,
+  "native_open_admitted": false,
+  "native_reader_bound": false,
+  "event_backend_bound": false,
+  "IOKit_opened": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}
