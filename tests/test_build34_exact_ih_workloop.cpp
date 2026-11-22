@@ -4,6 +4,7 @@ static constexpr IOReturn kIOReturnSuccess = 0, kIOReturnBusy = -1, kIOReturnNot
 class IOWorkLoop;
 static thread_local IOWorkLoop *heldLoop;
 static thread_local std::function<void()> beforeKick, duringWake, beforeRemove;
+static thread_local std::function<void()> beforeProviderGate;
 class IOEventSource;
 [[maybe_unused]] static thread_local std::function<void(IOEventSource *)> beforeAddReturn;
 static thread_local bool failAttach;
@@ -156,6 +157,178 @@ static Source *prepare(Trial &trial, Capture &capture) {
     source->release();
     CHECK(trial.gpu.references == 1 && capture.references == 1);
 }
+
+#if MODELED_IH
+struct ProviderDouble final : OSObject {
+    unsigned registrations = 0, enables = 0, removals = 0;
+    IOReturn registerResult = kIOReturnSuccess, enableResult = kIOReturnSuccess;
+    Source::ProviderRetirement retirement{kIOReturnSuccess, true};
+    Barrier *registerBarrier{nullptr}, *enableBarrier{nullptr}, *retireBarrier{nullptr};
+
+    static ProviderDouble &checkedContext(OSObject *context, Source *source) {
+        auto &provider = *static_cast<ProviderDouble *>(context);
+        CHECK(!gpuHeld && !clientHeld && !heldLoop && provider.references == 2 && source->references == 4);
+        return provider;
+    }
+    static IOReturn registerTarget(OSObject *context, Source *source) {
+        auto &provider = checkedContext(context, source);
+        CHECK(++provider.registrations == 1);
+        source->hint();
+        CHECK(source->getWorkLoop()->wakeCount == 0);
+        if (provider.registerBarrier) provider.registerBarrier->arrive();
+        return provider.registerResult;
+    }
+    static IOReturn enableTarget(OSObject *context, Source *source) {
+        auto &provider = checkedContext(context, source);
+        CHECK(provider.registrations == 1 && ++provider.enables == 1);
+        source->hint();
+        CHECK(source->getWorkLoop()->wakeCount == 0);
+        if (provider.enableBarrier) provider.enableBarrier->arrive();
+        return provider.enableResult;
+    }
+    static Source::ProviderRetirement unregisterAndDrain(OSObject *context, Source *source) {
+        auto &provider = checkedContext(context, source);
+        CHECK(provider.registrations == 1 && ++provider.removals == 1);
+        const unsigned wakes = source->getWorkLoop()->wakeCount;
+        source->hint();
+        CHECK(source->getWorkLoop()->wakeCount == wakes);
+        if (provider.retireBarrier) provider.retireBarrier->arrive();
+        return provider.retirement;
+    }
+    static constexpr Source::ProviderOps ops{registerTarget, enableTarget, unregisterAndDrain};
+};
+
+static void invalidateProviderTrial(Trial &trial, bool stop) {
+    if (stop) {
+        trial.gpu.stop(nullptr);
+        CHECK(!trial.gpu.exactStopped && trial.gpu.hangDrainRequests == 1);
+    } else {
+        CHECK(trial.gpu.setPowerState(0, nullptr) == IOPMAckImplied);
+        CHECK(trial.gpu.setPowerState(1, nullptr) == IOPMAckImplied);
+    }
+}
+
+static void exerciseProvider() {
+    Trial denied;
+    Capture deniedCapture;
+    ProviderDouble neverCalled;
+    denied.gpu.modeledIHAdmission = true;
+    auto *source = prepare(denied, deniedCapture);
+    CHECK(source);
+    CHECK(!source->armProvider({ProviderDouble::registerTarget, nullptr, ProviderDouble::unregisterAndDrain},
+                               &neverCalled));
+    beforeProviderGate = [&] {
+        IOLockLock(denied.gpu.gpuLock);
+        denied.gpu.invalidateExactQueues();
+        IOLockUnlock(denied.gpu.gpuLock);
+        CHECK(source->retireProvider() == kIOReturnBusy && source->detach() == kIOReturnBusy);
+    };
+    CHECK(!source->armProvider(ProviderDouble::ops, &neverCalled));
+    CHECK(!beforeProviderGate && !neverCalled.registrations && neverCalled.references == 1);
+    CHECK(!source->armProvider(ProviderDouble::ops, &neverCalled));
+    CHECK(source->retireProvider() == kIOReturnNotReady && source->detach() == kIOReturnSuccess);
+    releaseCaller(denied, deniedCapture, source);
+
+    for (bool stop : {false, true}) {
+        Trial racing;
+        Capture pending;
+        ProviderDouble provider;
+        Barrier paused;
+        racing.gpu.modeledIHAdmission = true;
+        source = prepare(racing, pending);
+        CHECK(source);
+        auto *loop = source->getWorkLoop();
+        if (stop) provider.enableBarrier = &paused;
+        else provider.registerBarrier = &paused;
+        bool armed = true;
+        std::thread armer([&] { armed = source->armProvider(ProviderDouble::ops, &provider); });
+        paused.wait();
+        CHECK(racing.gpu.exactIHProviderCalls.active() == 1 && racing.gpu.exactCallbacks.active() == 1);
+        CHECK(!source->armProvider(ProviderDouble::ops, &provider));
+        CHECK(loop->turn(true) && !pending.calls);
+        invalidateProviderTrial(racing, stop);
+        CHECK(racing.gpu.exactIHProviderCalls.closed() && !racing.gpu.exactIHProviderCalls.drained());
+        CHECK(source->retireProvider() == kIOReturnBusy && source->detach() == kIOReturnBusy);
+        CHECK(!provider.removals && provider.references == 2 && source->references == 4);
+        paused.resume();
+        armer.join();
+        CHECK(!armed && provider.registrations == 1 && provider.enables == unsigned(stop));
+        CHECK(!loop->wakeCount && racing.gpu.exactIHProviderCalls.drained());
+        CHECK(source->detach() == kIOReturnBusy);
+        CHECK(source->retireProvider() == kIOReturnSuccess && provider.references == 1);
+        CHECK(source->retireProvider() == kIOReturnNotReady && source->detach() == kIOReturnSuccess);
+        if (stop) {
+            CHECK(racing.gpu.exactCallbacks.drained());
+            racing.gpu.sealStoppedQueues();
+            CHECK(racing.gpu.exactStopped && racing.gpu.references == 3);
+            racing.gpu.release();
+        }
+        releaseCaller(racing, pending, source);
+    }
+
+    for (bool registrationFails : {false, true}) {
+        Trial partial;
+        Capture dormant;
+        ProviderDouble provider;
+        if (registrationFails) provider.registerResult = kIOReturnError;
+        else provider.enableResult = kIOReturnError;
+        partial.gpu.modeledIHAdmission = true;
+        source = prepare(partial, dormant);
+        CHECK(source && !source->armProvider(ProviderDouble::ops, &provider));
+        CHECK(provider.registrations == 1 && provider.enables == unsigned(!registrationFails));
+        CHECK(partial.gpu.exactIHProviderCalls.drained() && !source->getWorkLoop()->wakeCount);
+        CHECK(source->references == 4 && provider.references == 2 && source->detach() == kIOReturnBusy);
+        CHECK(source->retireProvider() == kIOReturnSuccess && provider.removals == 1 && provider.references == 1);
+        CHECK(source->detach() == kIOReturnSuccess);
+        releaseCaller(partial, dormant, source);
+    }
+
+    Trial healthy;
+    Capture bound;
+    ProviderDouble provider;
+    Barrier retiring;
+    provider.retireBarrier = &retiring;
+    healthy.gpu.modeledIHAdmission = true;
+    source = prepare(healthy, bound);
+    CHECK(source && source->armProvider(ProviderDouble::ops, &provider));
+    auto *loop = source->getWorkLoop();
+    CHECK(provider.registrations == 1 && provider.enables == 1 && !bound.calls);
+    CHECK(loop->wakeCount == 1 && loop->turn() && bound.calls == 1 && !loop->turn());
+    CHECK(!source->armProvider(ProviderDouble::ops, &provider));
+    CHECK(source->retireProvider() == kIOReturnBusy && !provider.removals);
+    source->closeAdmission();
+    IOReturn retired = kIOReturnError;
+    std::thread remover([&] { retired = source->retireProvider(); });
+    retiring.wait();
+    CHECK(source->retireProvider() == kIOReturnBusy && source->detach() == kIOReturnBusy);
+    CHECK(provider.references == 2 && provider.removals == 1 && !loop->removeCount);
+    retiring.resume();
+    remover.join();
+    CHECK(retired == kIOReturnSuccess && provider.references == 1 && source->references == 3);
+    CHECK(source->detach() == kIOReturnSuccess && loop->removeCount == 1);
+    releaseCaller(healthy, bound, source);
+
+    for (bool reportsError : {false, true}) {
+        Trial uncertain;
+        Capture pinned;
+        ProviderDouble held;
+        held.retirement = reportsError ? Source::ProviderRetirement{kIOReturnError, true} :
+                                         Source::ProviderRetirement{kIOReturnSuccess, false};
+        uncertain.gpu.modeledIHAdmission = true;
+        source = prepare(uncertain, pinned);
+        CHECK(source && source->armProvider(ProviderDouble::ops, &held));
+        source->closeAdmission();
+        CHECK(source->retireProvider() == (reportsError ? kIOReturnError : kIOReturnNotReady));
+        CHECK(source->retireProvider() == kIOReturnNotReady && source->detach() == kIOReturnBusy);
+        CHECK(held.references == 2 && source->references == 4 && held.removals == 1);
+        CHECK(source->getWorkLoop()->removeEventSource(source) == kIOReturnSuccess);
+        source->release();
+        source->release();
+        held.release();
+        releaseCaller(uncertain, pinned, source);
+    }
+}
+#endif
 
 int main() {
     Trial closed;
@@ -430,6 +603,7 @@ int main() {
         source->release();
         releaseCaller(uncertain, pinned, source);
     }
+    exerciseProvider();
 #endif
     CHECK(loopsCreated == loopsFreed);
     std::printf("PASS IH workloop: %u checks; modeled=%d\n", checks.load(), MODELED_IH);

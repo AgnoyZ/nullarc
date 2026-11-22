@@ -1,0 +1,49 @@
+{
+  "status": "passed-offline-IH-provider-call-lifecycle",
+  "build": 34,
+  "parent": "7564a3d2c0c8bcaf96aeef19b43af1e9f984e703",
+  "checks": {
+    "asan_ubsan": {"closed": 148, "modeled": 1277},
+    "tsan": {"closed": 148, "modeled": 1277}
+  },
+  "rejected_mutants": 29,
+  "new_provider_mutants_rejected": [
+    "register-after-revocation",
+    "enable-after-revocation",
+    "unretained-provider-context",
+    "unretained-callback-target",
+    "detach-before-provider-retirement",
+    "ignore-provider-callback-drain",
+    "ignore-provider-unregister-status",
+    "leave-provider-admission-open"
+  ],
+  "previous_source_sha256": "63dd8d9acad565ed91009ced883938280d9394234c0a9b5089635f2bb561e514",
+  "staged_source_sha256": "ced6195b854b4fd4d9c76d72ffce9dfd91effe8cdf3a272b3b2eb8a872835941",
+  "native_object_sha256": {
+    "previous": "409ffc9705fb5e5e2891013b013786f28f6e8922862e2433181c39a8836c0e77",
+    "proposed": "c05ddd5a26c163a1f5bac2f91384ecac421d787330b0c547b4d785df7e815dc6"
+  },
+  "actual_complete_native_translation_units_compiled": true,
+  "native_object_only": true,
+  "native_import_count": 406,
+  "native_import_set_unchanged": true,
+  "all_native_imports_have_existing_declared_KDK_provider": true,
+  "sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "os_build": "25G332",
+  "protected_production_inputs": 172,
+  "protected_production_base": "e9ee265ce005693f2928b4f981dfd097ca53fb80",
+  "default_make_test_passed": true,
+  "default_firmware_fixture_tests_skipped": true,
+  "register_and_enable_admitted_separately": true,
+  "attempted_provider_pins_retained": true,
+  "simulated_unregister_and_callback_drain_required_before_detach": true,
+  "native_provider_ops_bound": false,
+  "native_event_backend_bound": false,
+  "native_teardown_deadline_proved": false,
+  "native_open_admitted": false,
+  "old_writer_drain_proved": false,
+  "IH_accessed": false,
+  "ISR_registered": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}

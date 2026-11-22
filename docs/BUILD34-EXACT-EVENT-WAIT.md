@@ -521,3 +521,49 @@ cleanup does not publish a caller handle or release the attachment pin.
 ASan/UBSan and TSan each pass 148 closed and 846 modeled checks; 21 failure
 variants are rejected. Both complete sources compile to nonloadable objects
 with the same 406 imports. The 172 protected production inputs still match.
+
+### Stage provider calls and checked retirement
+
+The next offline transform, `stage_provider`, keeps attachment, provider
+registration and provider retirement separate. The caller holds an independent
+source reference and enters from a setup or cleanup thread with no GPU, client
+or workloop lock held. One owner can attempt registration. Before it enters
+the provider, it retains both the callback target and provider context. Inline
+hints during registration or enable are latched while the route is arming;
+only checked success of both calls can activate it. The activation method is
+private in this derivation.
+
+Register and enable acquire separate leases on a one-way provider-call gate.
+Stop, sleep and queue invalidation close the gate through the existing work
+admission hook. A call that won admission before close may still be running;
+closing does not cancel it. A second call that loses admission cannot enter
+the provider. The service callback lease spans both attempts and final route
+activation. Failed or revoked attempts do not authorize rearm. Even an error
+from register or enable can leave a partial registration, so both references
+stay pinned after the first provider call.
+
+Once the call gate is closed and drained, one independent cleanup caller
+may invoke the paired retirement callback. The staged adapter requires both
+successful unregister status and a separate no-future/in-flight callback
+drain result before releasing the provider pins. Concurrent or unresolved
+cleanup prevents workloop detach. A failed or contradictory retirement is
+terminal for that source and retains both pins. Detach still separately
+checks the wake/copy gates and IOKit removal. An external DMA backing owner
+must keep affected device storage pinned until the AMD writer boundary is
+proved; provider and CPU drain never authorize release of device storage.
+
+The fixture supplies fake provider results, not a native drain receipt. The
+adapter does not make a stalled provider call bounded, cancel it at a deadline,
+or perform cleanup inside stop or the ISR. No provider implementation is
+installed. Before binding, independently prove the route and ownership,
+the unregister/callback contract on the actual provider, and a bounded
+teardown path. The [PCI teardown review](BUILD34-R3-IRQ-ROUTE-TRIAL.md#checked-pci-teardown-still-needs-a-separate-deadline)
+still forbids inferring that contract from a generic PCI API return. Rollback
+is to use the previous `stage` transform.
+
+The [sanitized offline result](validation/build34-r3-ih-provider-calls-offline-20261123.json)
+records 148 closed and 1,277 modeled checks under each sanitizer. The race
+cases include revocation before registration, sleep during registration,
+stop during enable and concurrent retirement. All 29 broken variants fail;
+the complete before/after nonloadable objects retain the same 406 imports.
+All 172 protected production inputs still match.

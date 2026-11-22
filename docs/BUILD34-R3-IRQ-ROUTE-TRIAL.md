@@ -516,6 +516,10 @@ pinned when provider completion, queued work or device drain is uncertain.
 Require an independently bounded, source-specific teardown contract before
 admitting the live trial. See the
 [sanitized static review](validation/build34-r3-ih-pci-teardown-review-20261123.json).
+The [offline provider-call adapter](BUILD34-EXACT-EVENT-WAIT.md#stage-provider-calls-and-checked-retirement)
+separates registration and enable admission, keeps the callback context
+pinned after uncertain calls, and prevents workloop detach before checked
+provider retirement. No real provider or callback-drain result is bound.
 
 Stop on the first timeout, contradictory sample, unexpected traffic, GPU
 fault, ownership loss or power/queue transition. Close trial admission first,

@@ -200,6 +200,95 @@ void PhxExactIHWorkSource::free() {
 }
 '''
 
+PROVIDER_ADMISSION_FIELDS = once(
+    ADMISSION_FIELDS, '    void closeExactIHWorkAdmission() {\n',
+    '    phx34_exact::CallbackGate<1> exactIHProviderCalls;\n'
+    '    void closeExactIHWorkAdmission() {\n'
+    '        exactIHProviderCalls.close();\n',
+)
+PROVIDER_INTERFACE = '''    struct ProviderRetirement { IOReturn status; bool callbacksDrained; };
+    struct ProviderOps {
+        IOReturn (*registerTarget)(OSObject *, PhxExactIHWorkSource *);
+        IOReturn (*enableTarget)(OSObject *, PhxExactIHWorkSource *);
+        ProviderRetirement (*unregisterAndDrain)(OSObject *, PhxExactIHWorkSource *);
+    };
+    bool armProvider(ProviderOps, OSObject *);
+    IOReturn retireProvider();
+'''
+PROVIDER_STATE = '''    enum class Provider : uint32_t { Unbound, Arming, Attempted, Retiring, Retired, Held };
+    Provider providerState{Provider::Unbound};
+    OSObject *providerOwner{nullptr};
+    decltype(ProviderOps::unregisterAndDrain) unregisterAndDrain{nullptr};
+    bool claimProvider(Provider expected, Provider desired) {
+        return __atomic_compare_exchange(&providerState, &expected, &desired, false,
+                                         __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+    }
+    void setProvider(Provider state) { __atomic_store(&providerState, &state, __ATOMIC_RELEASE); }
+    Provider getProvider() const {
+        Provider state;
+        __atomic_load(&providerState, &state, __ATOMIC_ACQUIRE);
+        return state;
+    }
+'''
+PROVIDER_METHODS = '''bool PhxExactIHWorkSource::armProvider(ProviderOps ops, OSObject *context) {
+    if (!context || !ops.registerTarget || !ops.enableTarget || !ops.unregisterAndDrain ||
+        loop->onThread() || loop->inGate()) return false;
+    phx34_exact::CallbackGate<>::Lease callback(gpu->exactCallbacks);
+    if (!callback || !accepting() || !claimProvider(Provider::Unbound, Provider::Arming)) return false;
+    IOReturn registered;
+    using ProviderLease = decltype(gpu->exactIHProviderCalls)::Lease;
+    {
+        ProviderLease registering(gpu->exactIHProviderCalls);
+        if (!registering || gpu->exactCallbacks.closed() || !accepting()) {
+            setProvider(Provider::Retired);
+            return false;
+        }
+        retain();
+        context->retain();
+        providerOwner = context;
+        unregisterAndDrain = ops.unregisterAndDrain;
+        registered = ops.registerTarget(context, this);
+    }
+    bool enabled = false;
+    if (registered == kIOReturnSuccess) {
+        ProviderLease enabling(gpu->exactIHProviderCalls);
+        if (enabling && !gpu->exactCallbacks.closed() && accepting())
+            enabled = ops.enableTarget(context, this) == kIOReturnSuccess;
+    }
+    const bool active = enabled && activate();
+    if (!active) {
+        closeAdmission();
+        gpu->loseExactIHRoute(route);
+    }
+    setProvider(Provider::Attempted);
+    return active && accepting();
+}
+
+IOReturn PhxExactIHWorkSource::retireProvider() {
+    if (loop->onThread() || loop->inGate()) return kIOReturnNotPermitted;
+    if (!gpu->exactIHProviderCalls.drained() || !gpu->exactIHTurns.closed()) return kIOReturnBusy;
+    if (!claimProvider(Provider::Attempted, Provider::Retiring)) {
+        const auto state = getProvider();
+        return state == Provider::Arming || state == Provider::Retiring ? kIOReturnBusy : kIOReturnNotReady;
+    }
+    const ProviderRetirement retired = unregisterAndDrain(providerOwner, this);
+    if (retired.status != kIOReturnSuccess || !retired.callbacksDrained) {
+        setProvider(Provider::Held);
+        return retired.status == kIOReturnSuccess ? kIOReturnNotReady : retired.status;
+    }
+    providerOwner->release();
+    providerOwner = nullptr;
+    unregisterAndDrain = nullptr;
+    setProvider(Provider::Retired);
+    release();
+    return kIOReturnSuccess;
+}
+
+'''
+PROVIDER_DETACH_CHECK = '''    const auto provider = getProvider();
+    if (provider != Provider::Unbound && provider != Provider::Retired) return kIOReturnBusy;
+'''
+
 
 def stage_lifecycle(source):
     source = previous_stage(source)
@@ -227,3 +316,21 @@ def checked_adapter(adapter):
 
 def stage(source):
     return once(stage_bounded_poll(source), SOURCE, checked_adapter(SOURCE))
+
+
+def provider_adapter(adapter):
+    adapter = once(adapter, '    bool activate();\n', '')
+    adapter = once(adapter, '    IOReturn detach();\n', PROVIDER_INTERFACE + '    IOReturn detach();\n')
+    adapter = once(adapter, '    Attachment attachment{Attachment::Preparing};\n',
+                   '    Attachment attachment{Attachment::Preparing};\n    bool activate();\n' + PROVIDER_STATE)
+    adapter = once(adapter, 'IOReturn PhxExactIHWorkSource::detach() {\n',
+                   PROVIDER_METHODS + 'IOReturn PhxExactIHWorkSource::detach() {\n')
+    return once(adapter, '    Attachment attached = Attachment::Attached, removing = Attachment::Removing;\n',
+                PROVIDER_DETACH_CHECK +
+                '    Attachment attached = Attachment::Attached, removing = Attachment::Removing;\n')
+
+
+def stage_provider(source):
+    adapter = checked_adapter(SOURCE)
+    return once(once(stage(source), ADMISSION_FIELDS, PROVIDER_ADMISSION_FIELDS),
+                adapter, provider_adapter(adapter))
