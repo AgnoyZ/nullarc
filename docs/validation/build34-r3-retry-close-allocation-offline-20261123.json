@@ -1,0 +1,41 @@
+{
+  "status": "passed-CPU-only-build34-R3-retry-close-allocation",
+  "kernel_build": 34,
+  "source_predecessor": "26223289ddc3fb61780d239f5703be1051d53a69",
+  "paired_ASan_UBSan_checks": 39357,
+  "paired_TSan_checks": 39357,
+  "paired_staged_transport_sha256": "c29bb8eb58435cfd4fc7c84bd45cd7cfca3a0f437395a584f4c68b69d082b7f5",
+  "paired_staged_drm_sha256": "440ffc458014dba4515c700f21ad13584c45faa7a1f1982f7362ba5a230912cb",
+  "paired_staged_sync_sha256": "241c94a14bb21ee1f4df934069c83fadf004a72a3ceb971f892a9152700ea2f8",
+  "competing_waiter": {
+    "native_receipt_slots_filled": 64,
+    "pinned_compute_sequence": 100,
+    "recovery_wait_and_ack_gfx_sequence": 102,
+    "publish_after_one_byte_identical_retry_sequence": 165,
+    "global_prefix_stays_behind_compute_during_recovery": true,
+    "close_refuses_new_opens_and_drains_retained_provider_callback": true,
+    "provider_wait_canceled_and_connection_closed_once": true,
+    "uncompleted_new_gfx_receipt_not_acked": true
+  },
+  "timeline_allocation_failure": {
+    "allocator_site": "acd_sync_cs_attach: timeline realloc",
+    "drm_return": "-EIO",
+    "modeled_publications": 1,
+    "modeled_publication_separately_completed_and_acked": true,
+    "failed_output_unsubmitted_after_completion": true,
+    "injected_in_full_vulkan_runtime": false
+  },
+  "full_vulkan_scenarios_passed": 16,
+  "prior_full_vulkan_control_scenarios_passed": 14,
+  "no_progress_winsys_errors_observed": ["-EAGAIN", "-ETIMEDOUT"],
+  "no_progress_acks": 0,
+  "no_progress_resends": 0,
+  "default_make_test_passed": true,
+  "default_firmware_fixtures_skipped": true,
+  "protected_production_inputs": 172,
+  "real_IOKit_called": false,
+  "native_mode_admitted": false,
+  "installed": false,
+  "GPU_executed": false,
+  "R3_complete": false
+}

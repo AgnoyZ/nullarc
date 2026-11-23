@@ -145,8 +145,12 @@ preboot identity, IH ownership or old-writer drain.
    [bounded retry](BUILD34-SUBMIT-RECEIPT.md#one-retry-after-an-acknowledged-receipt)
    requires a new ACK before resending the same batch once. An actual
    full-library Vulkan caller with substituted IOKit verifies recovery and
-   the no-progress, late-ACK and uncertain-reply controls. Native integration
-   still needs real snapshot/visibility and lifecycle evidence.
+   the no-progress, late-ACK and uncertain-reply controls. The [pressure and
+   close regressions](BUILD34-SUBMIT-RECEIPT.md#competing-waiter-close-and-output-allocation-on-cpu)
+   exercise one eligible GFX ACK while a Compute waiter owns an old receipt,
+   the ensuing provider-callback drain, and the actual DRM timeline allocation
+   failure after publication. Native integration still needs real
+   snapshot/visibility and lifecycle evidence.
    Staged receipt wait/ACK now validate complete owner/slot/serial/sequence/
    queue/generation requests at the actual pre-lock dispatch entry; see
    [the experimental wire contract](BUILD34-RECEIPT-WIRE.md). This is only

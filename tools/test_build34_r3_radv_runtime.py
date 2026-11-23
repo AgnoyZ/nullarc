@@ -158,10 +158,12 @@ def test(runtime, output, exact_cs=False, submit_retry=False):
         if index in (7, 8, 9, 11, 12, 13, 14, 15):
             expected_error = -(errno.EPROTO if expected_short else errno.ETIMEDOUT if index == 14 else
                                errno.EIO if submit_retry and index in (7, 8, 15) else errno.EAGAIN)
-            diagnostic = f'see dmesg for more information ({expected_error}).'
-            if (output / (name + '.stderr')).read_text().count(diagnostic) != 1:
+            allowed_errors = {expected_error, -errno.ETIMEDOUT} if index == 11 else {expected_error}
+            diagnostics = re.findall(r'see dmesg for more information \((-\d+)\)\.',
+                                     (output / (name + '.stderr')).read_text())
+            if len(diagnostics) != 1 or int(diagnostics[0]) not in allowed_errors:
                 raise ValueError('Unexpected RADV winsys submit error')
-            result['observed_winsys_errno'] = expected_error
+            result['observed_winsys_errno'] = int(diagnostics[0])
     if (digest(library) != recorded['library_sha256'] or inventory(mesa) != manifest or
             production_snapshot() != protected or any(digest(path) != sha for path, sha in inputs.items())):
         raise ValueError('Source, library or fixture changed during verification')

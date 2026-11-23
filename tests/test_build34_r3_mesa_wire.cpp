@@ -439,6 +439,13 @@ struct FakeIOKit {
     bool drm = false;
     Pause *waitPause = nullptr;
 #endif
+#ifdef PHX34_TEST_SUBMIT_RETRY
+    unsigned timelineAllocationFailures = 0;
+    bool failTimelineAllocation = false;
+    phx34_r3_submit_request refusedSubmit{};
+    unsigned capacityReplies = 0, retries = 0;
+    uint64_t recoveryTarget = 0;
+#endif
 #ifdef PHX34_TEST_RADV_ENTRY
     bool radvProfile = false;
     unsigned topologyCalls = 0;
@@ -494,6 +501,20 @@ extern "C" void *phx34_fixture_calloc(size_t count, size_t size) {
         return nullptr;
     return std::calloc(count, size);
 }
+
+#ifdef PHX34_TEST_SUBMIT_RETRY
+extern "C" void *phx34_fixture_sync_realloc(void *pointer, size_t size) {
+    auto *fake = FakeIOKit::current;
+    if (fake && fake->failTimelineAllocation && fake->bridge.submits != 0) {
+        CHECK(!pointer && size && fake->bridge.device.gSeq == 100 &&
+              fake->bridge.client.exactRegistry.occupied() == 1);
+        fake->failTimelineAllocation = false;
+        ++fake->timelineAllocationFailures;
+        return nullptr;
+    }
+    return std::realloc(pointer, size);
+}
+#endif
 
 extern "C" kern_return_t phx34_fixture_method(mach_port_t conn, uint32_t selector, const uint64_t *scalars,
                                               uint32_t scalarCount, const void *input, size_t inputSize,
@@ -561,7 +582,26 @@ extern "C" kern_return_t phx34_fixture_method(mach_port_t conn, uint32_t selecto
 #else
     CHECK(fake->helloCalls == 1 && !scalars && !scalarCount && !scalarOut && !scalarOutCount);
 #endif
-    return Bridge::call(&fake->bridge, selector, input, inputSize, output, outputSize);
+#ifdef PHX34_TEST_SUBMIT_RETRY
+    if (selector == PHX34_R3_SEL_WAIT_RECEIPT && fake->capacityReplies && !fake->retries) {
+        CHECK(!fake->recoveryTarget && inputSize == sizeof(phx34_r3_request));
+        fake->recoveryTarget = static_cast<const phx34_r3_request *>(input)->sequence;
+    }
+#endif
+    const int result = Bridge::call(&fake->bridge, selector, input, inputSize, output, outputSize);
+#ifdef PHX34_TEST_SUBMIT_RETRY
+    if (!result && selector == PHX34_R3_SEL_SUBMIT_RECEIPT) {
+        const auto &reply = *static_cast<const phx34_r3_reply *>(output);
+        if (reply.status == PHX34_R3_REPLY_RECEIPT_FULL) {
+            CHECK(++fake->capacityReplies == 1);
+            std::memcpy(&fake->refusedSubmit, input, inputSize);
+        } else if (fake->capacityReplies) {
+            CHECK(++fake->retries == 1 && reply.status == PHX34_R3_REPLY_SUBMITTED &&
+                  !std::memcmp(&fake->refusedSubmit, input, inputSize));
+        }
+    }
+#endif
+    return result;
 }
 
 extern "C" kern_return_t phx34_fixture_close(mach_port_t conn) {
@@ -648,20 +688,34 @@ static uint32_t drm_signal_handle(util_sync_provider *provider) {
     return handle;
 }
 
-static uint64_t drm_submit(acd_device_handle device, uint32_t engine, uint32_t signal) {
+static int drm_submit_cs(acd_device_handle device, uint32_t engine, uint32_t signal, uint64_t point,
+                         uint64_t *sequence) {
     drm_amdgpu_cs_chunk_ib ib{.va_start = 0x20000, .ib_bytes = 4, .ip_type = engine};
-    drm_amdgpu_cs_chunk_sem sem{.handle = signal};
+    drm_amdgpu_cs_chunk_sem binary{.handle = signal};
+    drm_amdgpu_cs_chunk_syncobj timeline{.handle = signal, .point = point};
+    const drm_amdgpu_cs_chunk output = point ?
+        drm_amdgpu_cs_chunk{AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL, sizeof(timeline) / 4,
+                            reinterpret_cast<uintptr_t>(&timeline)} :
+        drm_amdgpu_cs_chunk{AMDGPU_CHUNK_ID_SYNCOBJ_OUT, sizeof(binary) / 4, reinterpret_cast<uintptr_t>(&binary)};
     drm_amdgpu_cs_chunk chunks[] = {
         {AMDGPU_CHUNK_ID_IB, sizeof(ib) / 4, reinterpret_cast<uintptr_t>(&ib)},
-        {AMDGPU_CHUNK_ID_SYNCOBJ_OUT, sizeof(sem) / 4, reinterpret_cast<uintptr_t>(&sem)},
+        output,
     };
     uint64_t pointers[] = {reinterpret_cast<uintptr_t>(&chunks[0]), reinterpret_cast<uintptr_t>(&chunks[1])};
     drm_amdgpu_cs args{.in = {.ctx_id = 1, .num_chunks = 2, .chunks = reinterpret_cast<uintptr_t>(pointers)}};
-    CHECK(acd_ioctl(device, DRM_AMDGPU_CS, &args, sizeof(args)) == 0);
-    return args.out.handle;
+    const int result = acd_ioctl(device, DRM_AMDGPU_CS, &args, sizeof(args));
+    if (!result)
+        *sequence = args.out.handle;
+    return result;
 }
 
-static void drm_publish_and_drain() {
+static uint64_t drm_submit(acd_device_handle device, uint32_t engine, uint32_t signal) {
+    uint64_t sequence = 0;
+    CHECK(drm_submit_cs(device, engine, signal, 0, &sequence) == 0);
+    return sequence;
+}
+
+static void drm_publish_and_drain(bool pressure = false) {
     reset();
     FakeIOKit fake;
     fake.drm = true;
@@ -705,17 +759,45 @@ static void drm_publish_and_drain() {
     CHECK(waiter->wait(waiter, &gfxHandle, 1, 0, 0, nullptr) == 0);
     CHECK(waiter->wait(waiter, &computeHandle, 1, 0, 0, nullptr) == -1 && errno == ETIME);
     CHECK(fake.bridge.acks == 1 && fake.bridge.client.exactRegistry.occupied() == 1);
+#ifdef PHX34_TEST_SUBMIT_RETRY
+    if (pressure) {
+        for (uint64_t expected = 102; expected <= 164; ++expected) {
+            const uint64_t actual = drm_submit(secondary, AMDGPU_HW_IP_GFX, gfxHandle);
+            CHECK(actual == expected);
+            fake.bridge.device.setFence(1, actual);
+        }
+        CHECK(fake.bridge.client.exactRegistry.occupied() == 64);
+    }
+#endif
     drm_drop(primary);
     CHECK(!fake.closes);
 
     Pause pause;
-    fake.waitPause = &pause;
+    if (!pressure)
+        fake.waitPause = &pause;
     bool canceled = false;
     std::thread waitThread([&] {
         FakeIOKit::current = &fake;
+        if (pressure)
+            eventHook = [&](const char *name) {
+                if (!std::strcmp(name, "poll-sleep")) {
+                    CHECK(!clientHeld && !gpuHeld);
+                    pause.arrive();
+                }
+            };
         canceled = waiter->wait(waiter, &computeHandle, 1, INT64_MAX, 0, nullptr) == -1 && errno == ECANCELED;
+        eventHook = {};
     });
     pause.wait();
+#ifdef PHX34_TEST_SUBMIT_RETRY
+    if (pressure) {
+        const unsigned waits = fake.bridge.waits;
+        CHECK(drm_submit(secondary, AMDGPU_HW_IP_GFX, gfxHandle) == 165);
+        CHECK(fake.capacityReplies == 1 && fake.retries == 1 && fake.bridge.submits == 67);
+        CHECK(fake.bridge.waits == waits + 1 && fake.recoveryTarget == 102 && fake.bridge.acks == 2);
+        CHECK(fake.bridge.device.gSeq == 165 && fake.bridge.client.exactRegistry.occupied() == 64);
+    }
+#endif
     std::thread closeThread([&] {
         FakeIOKit::current = &fake;
         drm_drop(secondary);
@@ -735,11 +817,45 @@ static void drm_publish_and_drain() {
     waitThread.join();
     closeThread.join();
     CHECK(canceled && fake.closes == 1);
+#ifdef PHX34_TEST_SUBMIT_RETRY
+    if (pressure)
+        CHECK(fake.bridge.acks == 65 && fake.bridge.client.exactRegistry.occupied() == 1);
+#endif
     CHECK(waiter->wait(waiter, &gfxHandle, 1, 0, 0, nullptr) == -1 && errno == ECANCELED);
     CHECK(acd_device_initialize_exact_iokit(nullptr, &major, &minor, &replacement) == -ENODEV && !replacement);
     waiter->finalize(waiter);
     observer->finalize(observer);
 }
+
+#ifdef PHX34_TEST_SUBMIT_RETRY
+static void drm_postpublication_allocation_failure() {
+    reset();
+    FakeIOKit fake;
+    fake.drm = true;
+    acd_device_handle device = nullptr;
+    uint32_t major = 0, minor = 0;
+    CHECK(acd_device_initialize_exact_iokit(&fake.port, &major, &minor, &device) == 0 && device);
+    auto *provider = acd_device_get_sync_provider(device);
+    uint32_t handle = drm_signal_handle(provider);
+    uint64_t point = 7, completed = UINT64_MAX, sequence = UINT64_MAX;
+    fake.failTimelineAllocation = true;
+    CHECK(drm_submit_cs(device, AMDGPU_HW_IP_GFX, handle, point, &sequence) == -EIO);
+    CHECK(!fake.failTimelineAllocation && fake.timelineAllocationFailures == 1);
+    CHECK(fake.bridge.submits == 1 && sequence == UINT64_MAX && packetWrites);
+    CHECK(!fake.capacityReplies && !fake.retries && !fake.bridge.waits && !fake.bridge.acks);
+    CHECK(provider->query(provider, &handle, &completed, 1, 0) == 0 && !completed);
+
+    fake.bridge.device.setFence(1, 100);
+    bool busy = true;
+    CHECK(acd_kext_wait_seq(acd_device_kext(device, nullptr), 100, 0, &busy, nullptr) == 0 && !busy);
+    CHECK(fake.bridge.acks == 1 && !fake.bridge.client.exactRegistry.occupied());
+    CHECK(provider->query(provider, &handle, &completed, 1, 0) == 0 && !completed);
+    CHECK(provider->timeline_wait(provider, &handle, &point, 1, 0, 0, nullptr) == -1 && errno == ETIME);
+    CHECK(fake.bridge.submits == 1 && fake.bridge.waits == 1);
+    drm_drop(device);
+    CHECK(fake.closes == 1);
+}
+#endif
 
 static void drm_initial_clone_failure() {
     reset();
@@ -878,6 +994,10 @@ int main() {
     unsetenv("RADV_DARWIN_MOCK");
     unsetenv("RADV_DARWIN_HOST_BO");
     drm_publish_and_drain();
+#ifdef PHX34_TEST_SUBMIT_RETRY
+    drm_publish_and_drain(true);
+    drm_postpublication_allocation_failure();
+#endif
     drm_initial_clone_failure();
 #ifdef PHX34_TEST_EXACT_OPEN
     exact_open_errors();

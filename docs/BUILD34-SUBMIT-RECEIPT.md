@@ -666,7 +666,32 @@ python3 -B tools/test_build34_r3_radv_runtime.py --runtime "$R3_RADV_RETRY_LINK_
   --exact-cs --submit-retry --out build/build34-r3-submit-retry-vulkan-new-private
 ```
 
-Still needed: pressure recovery with competing native waiters and teardown,
-postpublication allocation-failure injection, actual exact loaded images,
-and the hardware gates in the R3 ledger. The CPU suite exercises modeled
-pressure and protocol ordering, not device timing or performance.
+### Competing waiter, close and output allocation on CPU
+
+The paired retry regression holds the oldest Compute wait inside the staged
+native handler with both locks released and all 64 receipts occupied. The
+refused GFX submit reclaims just the eligible GFX receipt at sequence 102 and
+resends the same wire bytes once. The incomplete Compute receipt still blocks
+global retirement. The last device handle is dropped only after submit
+returns, while the retained provider clone is still inside the wait callback.
+Close excludes new opens, keeps the transport alive until the callback
+returns, cancels the provider wait and closes IOKit once in the fixture.
+The remaining uncompleted GFX receipt is not ACKed. This does not exercise
+concurrent use of a device handle being destroyed or actual kernel drain.
+
+In a separate case, only the sync-provider test object substitutes `realloc`.
+After the staged native handler publishes sequence 100, the first output
+timeline allocation in `acd_sync_cs_attach` fails. The exact DRM ioctl
+returns `-EIO` and does not return a sequence or attach the output. The test
+then completes and ACKs the published receipt separately; the failed output
+point remains unsubmitted. This reaches the actual postpublication allocation
+site at the DRM boundary. The full RADV controls do not inject there: they
+separately verify caller behavior for raw OOM and uncertain publication.
+
+ASan/UBSan and TSan each pass 39,357 paired checks. The pinned full Vulkan
+runtime reruns all 16 cases with substituted IOKit. With no progress its host
+clock can report `-EAGAIN` before the 20 ms deadline or `-ETIMEDOUT` when the
+deadline expires; both must produce zero ACKs and zero resends. See the
+[validation record](validation/build34-r3-retry-close-allocation-offline-20261123.json).
+No production changes, native admission, GPU execution or R3 hardware
+acceptance are implied.

@@ -318,6 +318,8 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
                 extra.append('-DPHX34_TEST_RADV_ENTRY=1')
             if drm and source in (closure / DRM, closure / sync):
                 extra.append('-Dcalloc=phx34_fixture_calloc')
+            if submit_retry and source == closure / sync:
+                extra.append('-Drealloc=phx34_fixture_sync_realloc')
             if drm and source == closure / vamgr:
                 extra.append('-Dlibdrm_container_of(ptr,sample,member)=((void *)((char *)(ptr) - '
                              '__builtin_offsetof(__typeof__(*(sample)), member)))')
