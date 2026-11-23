@@ -1,0 +1,34 @@
+{
+  "status": "passed-stage-specific-preboot-capture-offline",
+  "kernel_build_scope": 34,
+  "parent": "87f8573",
+  "previous_physical_classification_owner_reported": "V1 NOT_FOUND",
+  "previous_usb_file_matches_fixed_image_by_readback": true,
+  "previous_physical_failure_stage_known": false,
+  "previous_loaded_image_bytes_attested": false,
+  "asan_ubsan_cases": {
+    "attribution": 33,
+    "location": 41,
+    "path_only": 39,
+    "capture_entry": 16
+  },
+  "edk2_compile_headers": "46548b1adac82211d8d11da12dd914f41e7aa775",
+  "ovmf_code_sha256": "33090cc07675baa5190d9f1e84bf5176b33bcbfa9bacac522961150cdb6dbb2a",
+  "ovmf_vars_template_sha256": "5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e",
+  "ovmf_capture": {
+    "matching_virtio_target": "FV",
+    "wrong_segment": "NO_MAPPING ROOT",
+    "missing_endpoint": "NOT_FOUND ENDPOINT"
+  },
+  "ovmf_attribution_regression_passed": true,
+  "default_make_test_passed": true,
+  "default_firmware_fixture_tests_skipped": true,
+  "physical_v2_image_built": false,
+  "physical_v2_trial_authorized": false,
+  "physical_v2_capture_ran": false,
+  "usb_efi_nvram_or_startup_changed": false,
+  "gpu_executed": false,
+  "ih_owner_attested": false,
+  "old_writer_drain_proved": false,
+  "r3_accepted": false
+}

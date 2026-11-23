@@ -791,6 +791,49 @@ retained or written to the USB disk. Rollback is to revert this reporting-only
 change. Do not overwrite or retry the existing physical USB scope; a further
 one-shot observation requires fresh admission.
 
+### Report the failing preboot observation stage
+
+The owner subsequently reported `PHX34_PREBOOT_CAPTURE_V1 NOT_FOUND`
+from the physical USB launch. Read-only postboot comparison matched the USB
+fallback file to the fixed capture image from `87f8573`. This identifies
+the file on disk, not a digest of the instance executed by firmware. The
+line confirms the collector ran and returned no locator; the failing stage
+cannot be recovered from the V1 result. The separate macOS cached-path and
+static ACPI checks still passed and do not establish live UEFI handle identity.
+
+The V2 collector prints one `PHX34_PREBOOT_CAPTURE_V2` line. Failures
+retain their `NOT_FOUND`, `NO_MAPPING` or `REFUSED` classification and
+append one stage:
+
+| Stage | Check that did not complete |
+| --- | --- |
+| `INPUT` | Required inputs, boot services or sealed path validation |
+| `ROOT` | First exact root bridge and segment lookup |
+| `ENDPOINT` | First exact endpoint lookup or initial protocol identity check |
+| `OPEN_RECORDS` | First PCI I/O open-information sample and manager selection |
+| `IMAGE` | First binding, loaded image or FV-origin check, or self-image refusal |
+| `RECHECK` | Later open-information, image, endpoint or root consistency check |
+| `CLEANUP` | Boot Services buffer release |
+
+For example, `NOT_FOUND OPEN_RECORDS` need not mean a successful sample
+with no `BY_DRIVER` record: `OpenProtocolInformation` can itself return
+the same status. Treat each stage as a coarse location, not a unique cause.
+Failures still publish no candidate or locator. `FV` and `NO_FV` retain
+their meaning and the entry still returns the console write result. The
+target, selection criteria, sampling order and access boundary are unchanged.
+No fallback discovery, driver binding operation or device access was added.
+
+The 33 attribution, 41 location, 39 path-only and 16 capture reporting cases
+passed with ASan/UBSan. Isolated OVMF returned the expected Virtio FV locator,
+`NO_MAPPING ROOT` with a wrong segment and `NOT_FOUND ENDPOINT` with an absent
+target. The default OVMF attribution fixture and `make test` passed (missing
+firmware fixtures skipped). No V2 physical image was built or staged. Keep
+the USB and internal boot route unchanged; a further one-shot USB observation
+requires a separately admitted image and fresh authorization. Revert this
+change to recover the V1 diagnostic contract. Neither version supplies IH
+ownership, old-writer drain or R3 hardware acceptance. See the
+[sanitized record](validation/build34-r3-preboot-capture-stages-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

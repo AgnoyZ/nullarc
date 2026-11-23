@@ -37,9 +37,21 @@ typedef struct {
     EFI_GUID FileGuid;
 } PHX34_PREBOOT_FIRMWARE_FILE;
 
+typedef enum {
+    Phx34PrebootStageNone,
+    Phx34PrebootStageInput,
+    Phx34PrebootStageRoot,
+    Phx34PrebootStageEndpoint,
+    Phx34PrebootStageOpenRecords,
+    Phx34PrebootStageImage,
+    Phx34PrebootStageRecheck,
+    Phx34PrebootStageCleanup,
+} PHX34_PREBOOT_FAILURE_STAGE;
+
 typedef struct {
     PHX34_PREBOOT_PCI_ATTRIBUTION Candidate;
     PHX34_PREBOOT_FIRMWARE_FILE FirmwareFile;
+    PHX34_PREBOOT_FAILURE_STAGE FailureStage;
 } PHX34_PREBOOT_PCI_PATH_OBSERVATION;
 
 EFI_STATUS EFIAPI

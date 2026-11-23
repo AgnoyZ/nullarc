@@ -13,7 +13,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 PASS = b"PHX34_PREBOOT_GUEST_PASS"
 FAIL = re.compile(rb"PHX34_PREBOOT_GUEST_FAIL ([0-9]{2})")
-CAPTURE_PREFIX = b"PHX34_PREBOOT_CAPTURE_V1 "
+CAPTURE_PREFIX = b"PHX34_PREBOOT_CAPTURE_V2 "
 VIRTIO_CAPTURE = CAPTURE_PREFIX + b"FV 83dd3b39-7caf-4fac-a542-e050b767e3a7"
 
 
@@ -46,7 +46,7 @@ def boot_guest(command, expected):
                         raise SystemExit(f"UEFI guest check {match[1].decode('ascii')} failed")
                     if line == expected:
                         return
-                    if line.startswith(CAPTURE_PREFIX):
+                    if line.startswith(b"PHX34_PREBOOT_CAPTURE_"):
                         raise SystemExit("UEFI guest capture did not match the sealed expected result")
             raise SystemExit("UEFI guest did not report a complete result within the output and time limits")
         finally:
@@ -101,11 +101,13 @@ def main():
 
     if args.capture:
         sources = ("tools/build34_r3_preboot_capture.c", "tests/build34_r3_preboot_capture_target.c")
-        good = run_fixture(args, sources, ("-DPHX34_CAPTURE_FIXTURE_SEGMENT=0",), VIRTIO_CAPTURE)
-        refused = run_fixture(args, sources, ("-DPHX34_CAPTURE_FIXTURE_SEGMENT=1",), CAPTURE_PREFIX + b"NO_MAPPING")
-        print("PASS isolated UEFI capture, exact Virtio firmware-file locator and wrong-segment refusal")
-        print(f"guest_capture_sha256={good}")
-        print(f"guest_refusal_sha256={refused}")
+        cases = (("capture", 0, 5, VIRTIO_CAPTURE),
+                 ("wrong_segment", 1, 5, CAPTURE_PREFIX + b"NO_MAPPING ROOT"),
+                 ("missing_endpoint", 0, 6, CAPTURE_PREFIX + b"NOT_FOUND ENDPOINT"))
+        for name, segment, device, expected in cases:
+            flags = (f"-DPHX34_CAPTURE_FIXTURE_SEGMENT={segment}", f"-DPHX34_CAPTURE_FIXTURE_DEVICE={device}")
+            print(f"guest_{name}_sha256={run_fixture(args, sources, flags, expected)}")
+        print("PASS isolated UEFI capture, exact Virtio firmware-file locator, wrong segment and missing endpoint")
     else:
         digest = run_fixture(args, ("tests/test_build34_r3_preboot_guest.c",), (), PASS)
         print("PASS isolated UEFI guest attribution, refusal and cleanup (synthetic and emulated PCI)")

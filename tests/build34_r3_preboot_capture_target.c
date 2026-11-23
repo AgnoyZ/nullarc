@@ -1,7 +1,7 @@
 #include "build34_r3_preboot_pci.h"
 
-#ifndef PHX34_CAPTURE_FIXTURE_SEGMENT
-#error Supply the emulated segment explicitly
+#if !defined(PHX34_CAPTURE_FIXTURE_SEGMENT) || !defined(PHX34_CAPTURE_FIXTURE_DEVICE)
+#error Supply the emulated segment and device explicitly
 #endif
 
 static CONST struct {
@@ -10,7 +10,7 @@ static CONST struct {
     EFI_DEVICE_PATH_PROTOCOL End;
 } virtio_path = {
     .Root = {{ACPI_DEVICE_PATH, ACPI_DP, {sizeof(ACPI_HID_DEVICE_PATH), 0}}, EISA_PNP_ID(0x0A03), 0},
-    .Endpoint = {{HARDWARE_DEVICE_PATH, HW_PCI_DP, {sizeof(PCI_DEVICE_PATH), 0}}, 0, 5},
+    .Endpoint = {{HARDWARE_DEVICE_PATH, HW_PCI_DP, {sizeof(PCI_DEVICE_PATH), 0}}, 0, PHX34_CAPTURE_FIXTURE_DEVICE},
     .End = {END_DEVICE_PATH_TYPE, END_ENTIRE_DEVICE_PATH_SUBTYPE, {sizeof(EFI_DEVICE_PATH_PROTOCOL), 0}},
 };
 

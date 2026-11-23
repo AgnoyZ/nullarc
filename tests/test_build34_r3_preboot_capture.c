@@ -17,6 +17,7 @@ static UINT8 image, manager, volume;
 static EFI_BOOT_SERVICES boot;
 static EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL console;
 static EFI_STATUS observation_status, output_status;
+static PHX34_PREBOOT_FAILURE_STAGE failure_stage;
 static BOOLEAN has_fv, self_manager;
 static const CHAR16 *expected_line;
 static size_t expected_bytes;
@@ -33,6 +34,7 @@ Phx34ObservePciManagerAtPath(EFI_BOOT_SERVICES *services, CONST PHX34_PREBOOT_PC
         .Candidate = {.ImageHandle = self_manager ? &image : &manager},
         .FirmwareFile = {.VolumeHandle = has_fv ? &volume : NULL,
                          .FileGuid = {0x12345678, 0x4321, 0xabcd, {1, 2, 3, 4, 5, 6, 7, 8}}},
+        .FailureStage = failure_stage,
     };
     return observation_status;
 }
@@ -56,29 +58,37 @@ int main(void)
     console.OutputString = output_line;
     CHECK(EfiMain(NULL, &system) == EFI_INVALID_PARAMETER && observes == 0 && outputs == 0);
 
-    const CHAR16 fv[] = L"PHX34_PREBOOT_CAPTURE_V1 FV 12345678-4321-abcd-0102-030405060708\r\n";
-    const CHAR16 no_fv[] = L"PHX34_PREBOOT_CAPTURE_V1 NO_FV\r\n";
-    const CHAR16 not_found[] = L"PHX34_PREBOOT_CAPTURE_V1 NOT_FOUND\r\n";
-    const CHAR16 no_mapping[] = L"PHX34_PREBOOT_CAPTURE_V1 NO_MAPPING\r\n";
-    const CHAR16 refused[] = L"PHX34_PREBOOT_CAPTURE_V1 REFUSED\r\n";
+#define LINE(result) L"PHX34_PREBOOT_CAPTURE_V2 " result L"\r\n"
+#define CASE(status, output, stage, volume, self, result) \
+    {status, output, Phx34PrebootStage##stage, volume, self, LINE(result), sizeof(LINE(result))}
     const struct {
         EFI_STATUS observation, output;
+        PHX34_PREBOOT_FAILURE_STAGE stage;
         BOOLEAN volume, self;
         const CHAR16 *line;
         size_t bytes;
     } cases[] = {
-        {EFI_SUCCESS, EFI_SUCCESS, TRUE, FALSE, fv, sizeof(fv)},
-        {EFI_SUCCESS, EFI_SUCCESS, FALSE, FALSE, no_fv, sizeof(no_fv)},
-        {EFI_NOT_FOUND, EFI_SUCCESS, FALSE, FALSE, not_found, sizeof(not_found)},
-        {EFI_NO_MAPPING, EFI_SUCCESS, FALSE, FALSE, no_mapping, sizeof(no_mapping)},
-        {EFI_COMPROMISED_DATA, EFI_SUCCESS, FALSE, FALSE, refused, sizeof(refused)},
-        {EFI_SUCCESS, EFI_SUCCESS, TRUE, TRUE, refused, sizeof(refused)},
-        {EFI_NOT_FOUND, EFI_DEVICE_ERROR, FALSE, FALSE, not_found, sizeof(not_found)},
-        {EFI_SUCCESS, EFI_WARN_UNKNOWN_GLYPH, TRUE, FALSE, fv, sizeof(fv)},
+        CASE(EFI_SUCCESS, EFI_SUCCESS, None, TRUE, FALSE, L"FV 12345678-4321-abcd-0102-030405060708"),
+        CASE(EFI_SUCCESS, EFI_SUCCESS, None, FALSE, FALSE, L"NO_FV"),
+        CASE(EFI_NOT_FOUND, EFI_SUCCESS, Root, FALSE, FALSE, L"NOT_FOUND ROOT"),
+        CASE(EFI_NOT_FOUND, EFI_SUCCESS, Endpoint, FALSE, FALSE, L"NOT_FOUND ENDPOINT"),
+        CASE(EFI_NOT_FOUND, EFI_SUCCESS, OpenRecords, FALSE, FALSE, L"NOT_FOUND OPEN_RECORDS"),
+        CASE(EFI_NOT_FOUND, EFI_SUCCESS, Image, TRUE, FALSE, L"NOT_FOUND IMAGE"),
+        CASE(EFI_NOT_FOUND, EFI_SUCCESS, Recheck, TRUE, FALSE, L"NOT_FOUND RECHECK"),
+        CASE(EFI_NO_MAPPING, EFI_SUCCESS, Root, FALSE, FALSE, L"NO_MAPPING ROOT"),
+        CASE(EFI_INVALID_PARAMETER, EFI_SUCCESS, Input, FALSE, FALSE, L"REFUSED INPUT"),
+        CASE(EFI_DEVICE_ERROR, EFI_SUCCESS, Cleanup, TRUE, FALSE, L"REFUSED CLEANUP"),
+        CASE(EFI_COMPROMISED_DATA, EFI_SUCCESS, None, TRUE, FALSE, L"REFUSED UNKNOWN"),
+        CASE(EFI_SUCCESS, EFI_SUCCESS, None, TRUE, TRUE, L"REFUSED IMAGE"),
+        CASE(EFI_NOT_FOUND, EFI_DEVICE_ERROR, Endpoint, FALSE, FALSE, L"NOT_FOUND ENDPOINT"),
+        CASE(EFI_SUCCESS, EFI_WARN_UNKNOWN_GLYPH, None, TRUE, FALSE, L"FV 12345678-4321-abcd-0102-030405060708"),
     };
+#undef CASE
+#undef LINE
     for (size_t index = 0; index < sizeof(cases) / sizeof(*cases); ++index) {
         observation_status = cases[index].observation;
         output_status = cases[index].output;
+        failure_stage = cases[index].stage;
         has_fv = cases[index].volume;
         self_manager = cases[index].self;
         expected_line = cases[index].line;
@@ -86,6 +96,7 @@ int main(void)
         observes = outputs = 0;
         CHECK(EfiMain(&image, &system) == output_status && observes == 1 && outputs == 1);
     }
-    puts("PASS 10 preboot capture reporting and EFI exit scenarios (CPU fixture only)");
+    printf("PASS %zu preboot capture reporting and EFI exit scenarios (CPU fixture only)\n",
+           sizeof(cases) / sizeof(*cases) + 2);
     return EXIT_SUCCESS;
 }

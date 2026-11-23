@@ -55,6 +55,7 @@ typedef enum {
     PATH_OK, PATH_NULL_ACCESSOR, PATH_NO_SERVICE, PATH_BAD_SEAL, PATH_UNKNOWN_SEGMENT, PATH_NO_PCI_HANDLES,
     PATH_OVERSIZED_HANDLES, PATH_PARTIAL_HANDLE, PATH_NULL_HANDLE, PATH_PREFIX_ONLY, PATH_DUP_ROOT,
     PATH_DUP_ENDPOINT, PATH_LATE_DUP_ENDPOINT, PATH_LATE_ENDPOINT_REPLACED, PATH_LATE_ROOT_REPLACED,
+    PATH_NO_ROOT_MATCH, PATH_NO_MANAGER, PATH_IMAGE_NOT_FOUND, PATH_LATE_OPEN_FAILED, PATH_FREE_FAILED,
     PATH_FV_OK, PATH_OTHER_ORIGIN, PATH_FV_BAD_REVISION, PATH_FV_BAD_NODE, PATH_FV_NO_END, PATH_FV_ZERO_GUID,
     PATH_FV_NO_HANDLE, PATH_FV_IMAGE_HANDLE, PATH_FV_MISSING, PATH_FV_NULL, PATH_FV_WARNING, PATH_FV_LATE_GUID,
     PATH_FV_LATE_PATH, PATH_FV_LATE_VOLUME, PATH_FV_LATE_INTERFACE, PATH_FV_LATE_NON_FV,
@@ -148,6 +149,8 @@ lookup(EFI_HANDLE handle, EFI_GUID *guid, VOID **interface)
     } else if (memcmp(guid, &image_guid, sizeof(*guid)) == 0) {
         CHECK(handle == binding.ImageHandle);
         ++image_reads;
+        if (path_scenario == PATH_IMAGE_NOT_FOUND)
+            return EFI_NOT_FOUND;
         loaded_image.ImageSize = change_image && image_reads == 2 ? 8192 : 4096;
         loaded_image.ImageBase = empty_base ? NULL : &image_memory;
         if (image_reads == 2) {
@@ -403,7 +406,8 @@ enumerate_handles(EFI_LOCATE_SEARCH_TYPE search, EFI_GUID *guid, VOID *key, UINT
 }
 
 static void
-exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots, UINTN expected_volume_reads)
+exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, PHX34_PREBOOT_FAILURE_STAGE stage,
+              UINTN snapshots, UINTN expected_volume_reads)
 {
     reset();
     path_scenario = scenario;
@@ -422,6 +426,7 @@ exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots, UINT
     PHX34_PREBOOT_PCI_PATH_OBSERVATION observation = {
         .Candidate = {.BindingHandle = &console, .ImageHandle = &console, .OpenEntryCount = 123},
         .FirmwareFile = {.VolumeHandle = &console, .FileGuid = valid_fv_path.File.FvFileName},
+        .FailureStage = Phx34PrebootStageCleanup,
     };
     if (scenario >= PATH_FV_OK || scenario == PATH_LATE_ROOT_REPLACED) {
         loaded_image.FilePath = &fv_path.File.Header;
@@ -435,6 +440,10 @@ exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots, UINT
     case PATH_UNKNOWN_SEGMENT: ++identity.Segment; break;
     case PATH_LATE_ENDPOINT_REPLACED: location_scenario = LATE_PCI_REPLACED; break;
     case PATH_LATE_ROOT_REPLACED: location_scenario = ROOT_LATE_IO; break;
+    case PATH_NO_ROOT_MATCH: ++root_path.Root.UID; break;
+    case PATH_NO_MANAGER: samples[0].rows[0].Attributes = EFI_OPEN_PROTOCOL_GET_PROTOCOL; break;
+    case PATH_LATE_OPEN_FAILED: samples[1].status = EFI_NOT_FOUND; break;
+    case PATH_FREE_FAILED: fail_release = TRUE; break;
     case PATH_OTHER_ORIGIN: loaded_image.FilePath = &installed_path.Root.Header; break;
     case PATH_FV_BAD_REVISION: --loaded_image.Revision; break;
     case PATH_FV_BAD_NODE: --fv_path.File.Header.Length[0]; break;
@@ -449,7 +458,8 @@ exercise_path(PATH_SCENARIO scenario, EFI_STATUS expected, UINTN snapshots, UINT
     if (actual != expected)
         fprintf(stderr, "path scenario %u returned %#llx, expected %#llx\n",
                 (unsigned)scenario, (unsigned long long)actual, (unsigned long long)expected);
-    CHECK(actual == expected && location_reads == 0 && open_reads == snapshots && releases == snapshots);
+    CHECK(actual == expected && observation.FailureStage == stage);
+    CHECK(location_reads == 0 && open_reads == snapshots && releases == (scenario == PATH_LATE_OPEN_FAILED ? 1 : snapshots));
     CHECK(volume_reads == expected_volume_reads);
     CHECK(allocations[0] == NULL && allocations[1] == NULL);
     CONST PHX34_PREBOOT_PCI_ATTRIBUTION *candidate = &observation.Candidate;
@@ -574,29 +584,58 @@ int main(void)
         exercise_location(locations[index].scenario, locations[index].expected, locations[index].locates,
                           locations[index].reads, locations[index].snapshots);
     printf("PASS %zu exact preboot PCI selection scenarios (CPU fixture only)\n", sizeof(locations) / sizeof(*locations));
-    CONST struct { PATH_SCENARIO scenario; EFI_STATUS expected; UINTN snapshots, volume_reads; } paths[] = {
-        {PATH_OK, EFI_SUCCESS, 2, 0}, {PATH_NULL_ACCESSOR, EFI_SUCCESS, 2, 0},
-        {PATH_NO_SERVICE, EFI_INVALID_PARAMETER, 0, 0}, {PATH_BAD_SEAL, EFI_INVALID_PARAMETER, 0, 0},
-        {PATH_UNKNOWN_SEGMENT, EFI_NO_MAPPING, 0, 0}, {PATH_NO_PCI_HANDLES, EFI_NOT_FOUND, 0, 0},
-        {PATH_OVERSIZED_HANDLES, EFI_BUFFER_TOO_SMALL, 0, 0}, {PATH_PARTIAL_HANDLE, EFI_COMPROMISED_DATA, 0, 0},
-        {PATH_NULL_HANDLE, EFI_COMPROMISED_DATA, 0, 0}, {PATH_PREFIX_ONLY, EFI_NOT_FOUND, 0, 0},
-        {PATH_DUP_ROOT, EFI_NO_MAPPING, 0, 0}, {PATH_DUP_ENDPOINT, EFI_NO_MAPPING, 0, 0},
-        {PATH_LATE_DUP_ENDPOINT, EFI_NO_MAPPING, 2, 0}, {PATH_LATE_ENDPOINT_REPLACED, EFI_NO_MAPPING, 2, 0},
-        {PATH_LATE_ROOT_REPLACED, EFI_NO_MAPPING, 2, 2},
-        {PATH_FV_OK, EFI_SUCCESS, 2, 2}, {PATH_OTHER_ORIGIN, EFI_SUCCESS, 2, 0},
-        {PATH_FV_BAD_REVISION, EFI_COMPROMISED_DATA, 1, 0}, {PATH_FV_BAD_NODE, EFI_COMPROMISED_DATA, 1, 0},
-        {PATH_FV_NO_END, EFI_COMPROMISED_DATA, 1, 0}, {PATH_FV_ZERO_GUID, EFI_COMPROMISED_DATA, 1, 0},
-        {PATH_FV_NO_HANDLE, EFI_COMPROMISED_DATA, 1, 0}, {PATH_FV_IMAGE_HANDLE, EFI_COMPROMISED_DATA, 1, 0},
-        {PATH_FV_MISSING, EFI_UNSUPPORTED, 1, 1}, {PATH_FV_NULL, EFI_COMPROMISED_DATA, 1, 1},
-        {PATH_FV_WARNING, EFI_PROTOCOL_ERROR, 1, 1}, {PATH_FV_LATE_GUID, EFI_COMPROMISED_DATA, 2, 2},
-        {PATH_FV_LATE_PATH, EFI_COMPROMISED_DATA, 2, 2}, {PATH_FV_LATE_VOLUME, EFI_COMPROMISED_DATA, 2, 2},
-        {PATH_FV_LATE_INTERFACE, EFI_COMPROMISED_DATA, 2, 2}, {PATH_FV_LATE_NON_FV, EFI_COMPROMISED_DATA, 2, 1},
-        {PATH_FV_CHANGED_DURING_LOOKUP, EFI_COMPROMISED_DATA, 2, 2},
-        {PATH_FV_CHANGED_GUID_DURING_LOOKUP, EFI_COMPROMISED_DATA, 2, 2},
-        {PATH_FV_CHANGED_END_DURING_LOOKUP, EFI_COMPROMISED_DATA, 2, 2},
+#define PATH_CASE(scenario, status, stage, snapshots, volume_reads) \
+    {scenario, status, Phx34PrebootStage##stage, snapshots, volume_reads}
+    CONST struct {
+        PATH_SCENARIO scenario;
+        EFI_STATUS expected;
+        PHX34_PREBOOT_FAILURE_STAGE stage;
+        UINTN snapshots, volume_reads;
+    } paths[] = {
+        PATH_CASE(PATH_OK, EFI_SUCCESS, None, 2, 0),
+        PATH_CASE(PATH_NULL_ACCESSOR, EFI_SUCCESS, None, 2, 0),
+        PATH_CASE(PATH_NO_SERVICE, EFI_INVALID_PARAMETER, Input, 0, 0),
+        PATH_CASE(PATH_BAD_SEAL, EFI_INVALID_PARAMETER, Input, 0, 0),
+        PATH_CASE(PATH_NO_ROOT_MATCH, EFI_NOT_FOUND, Root, 0, 0),
+        PATH_CASE(PATH_UNKNOWN_SEGMENT, EFI_NO_MAPPING, Root, 0, 0),
+        PATH_CASE(PATH_DUP_ROOT, EFI_NO_MAPPING, Root, 0, 0),
+        PATH_CASE(PATH_NO_PCI_HANDLES, EFI_NOT_FOUND, Endpoint, 0, 0),
+        PATH_CASE(PATH_OVERSIZED_HANDLES, EFI_BUFFER_TOO_SMALL, Endpoint, 0, 0),
+        PATH_CASE(PATH_PARTIAL_HANDLE, EFI_COMPROMISED_DATA, Endpoint, 0, 0),
+        PATH_CASE(PATH_NULL_HANDLE, EFI_COMPROMISED_DATA, Endpoint, 0, 0),
+        PATH_CASE(PATH_PREFIX_ONLY, EFI_NOT_FOUND, Endpoint, 0, 0),
+        PATH_CASE(PATH_DUP_ENDPOINT, EFI_NO_MAPPING, Endpoint, 0, 0),
+        PATH_CASE(PATH_NO_MANAGER, EFI_NOT_FOUND, OpenRecords, 1, 0),
+        PATH_CASE(PATH_IMAGE_NOT_FOUND, EFI_NOT_FOUND, Image, 1, 0),
+        PATH_CASE(PATH_LATE_OPEN_FAILED, EFI_NOT_FOUND, Recheck, 2, 0),
+        PATH_CASE(PATH_LATE_DUP_ENDPOINT, EFI_NO_MAPPING, Recheck, 2, 0),
+        PATH_CASE(PATH_LATE_ENDPOINT_REPLACED, EFI_NO_MAPPING, Recheck, 2, 0),
+        PATH_CASE(PATH_LATE_ROOT_REPLACED, EFI_NO_MAPPING, Recheck, 2, 2),
+        PATH_CASE(PATH_FREE_FAILED, EFI_DEVICE_ERROR, Cleanup, 2, 0),
+        PATH_CASE(PATH_FV_OK, EFI_SUCCESS, None, 2, 2),
+        PATH_CASE(PATH_OTHER_ORIGIN, EFI_SUCCESS, None, 2, 0),
+        PATH_CASE(PATH_FV_BAD_REVISION, EFI_COMPROMISED_DATA, Image, 1, 0),
+        PATH_CASE(PATH_FV_BAD_NODE, EFI_COMPROMISED_DATA, Image, 1, 0),
+        PATH_CASE(PATH_FV_NO_END, EFI_COMPROMISED_DATA, Image, 1, 0),
+        PATH_CASE(PATH_FV_ZERO_GUID, EFI_COMPROMISED_DATA, Image, 1, 0),
+        PATH_CASE(PATH_FV_NO_HANDLE, EFI_COMPROMISED_DATA, Image, 1, 0),
+        PATH_CASE(PATH_FV_IMAGE_HANDLE, EFI_COMPROMISED_DATA, Image, 1, 0),
+        PATH_CASE(PATH_FV_MISSING, EFI_UNSUPPORTED, Image, 1, 1),
+        PATH_CASE(PATH_FV_NULL, EFI_COMPROMISED_DATA, Image, 1, 1),
+        PATH_CASE(PATH_FV_WARNING, EFI_PROTOCOL_ERROR, Image, 1, 1),
+        PATH_CASE(PATH_FV_LATE_GUID, EFI_COMPROMISED_DATA, Recheck, 2, 2),
+        PATH_CASE(PATH_FV_LATE_PATH, EFI_COMPROMISED_DATA, Recheck, 2, 2),
+        PATH_CASE(PATH_FV_LATE_VOLUME, EFI_COMPROMISED_DATA, Recheck, 2, 2),
+        PATH_CASE(PATH_FV_LATE_INTERFACE, EFI_COMPROMISED_DATA, Recheck, 2, 2),
+        PATH_CASE(PATH_FV_LATE_NON_FV, EFI_COMPROMISED_DATA, Recheck, 2, 1),
+        PATH_CASE(PATH_FV_CHANGED_DURING_LOOKUP, EFI_COMPROMISED_DATA, Recheck, 2, 2),
+        PATH_CASE(PATH_FV_CHANGED_GUID_DURING_LOOKUP, EFI_COMPROMISED_DATA, Recheck, 2, 2),
+        PATH_CASE(PATH_FV_CHANGED_END_DURING_LOOKUP, EFI_COMPROMISED_DATA, Recheck, 2, 2),
     };
+#undef PATH_CASE
     for (UINTN index = 0; index < sizeof(paths) / sizeof(*paths); ++index)
-        exercise_path(paths[index].scenario, paths[index].expected, paths[index].snapshots, paths[index].volume_reads);
+        exercise_path(paths[index].scenario, paths[index].expected, paths[index].stage,
+                      paths[index].snapshots, paths[index].volume_reads);
     printf("PASS %zu preboot path-only observation scenarios (CPU fixture only)\n", sizeof(paths) / sizeof(*paths));
     return EXIT_SUCCESS;
 }

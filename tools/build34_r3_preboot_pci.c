@@ -236,8 +236,11 @@ same_image(CONST IMAGE_SAMPLE *first, CONST IMAGE_SAMPLE *last)
 
 static EFI_STATUS
 attribute_pci_manager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *target,
-                      PHX34_PREBOOT_PCI_ATTRIBUTION *attribution, PHX34_PREBOOT_FIRMWARE_FILE *origin)
+                      PHX34_PREBOOT_PCI_ATTRIBUTION *attribution, PHX34_PREBOOT_FIRMWARE_FILE *origin,
+                      PHX34_PREBOOT_FAILURE_STAGE *stage)
 {
+    if (stage != NULL)
+        *stage = Phx34PrebootStageInput;
     if (attribution == NULL)
         return EFI_INVALID_PARAMETER;
     *attribution = (PHX34_PREBOOT_PCI_ATTRIBUTION){0};
@@ -252,13 +255,20 @@ attribute_pci_manager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *t
     OPEN_SAMPLE first = {0}, second = {0};
     IMAGE_SAMPLE image = {0}, confirmation = {0};
 
+    PHX34_PREBOOT_FAILURE_STAGE current = Phx34PrebootStageEndpoint;
     EFI_STATUS status = check_target(boot, &identity);
-    if (status == EFI_SUCCESS)
+    if (status == EFI_SUCCESS) {
+        current = Phx34PrebootStageOpenRecords;
         status = read_sample(boot, identity.Controller, NULL, &first);
-    if (status == EFI_SUCCESS)
+    }
+    if (status == EFI_SUCCESS) {
+        current = Phx34PrebootStageImage;
         status = resolve_image(boot, identity.Controller, first.Manager, origin != NULL, &image);
-    if (status == EFI_SUCCESS)
+    }
+    if (status == EFI_SUCCESS) {
+        current = Phx34PrebootStageRecheck;
         status = read_sample(boot, identity.Controller, first.Entries, &second);
+    }
     if (status == EFI_SUCCESS && !same_sample(&first, &second))
         status = EFI_COMPROMISED_DATA;
     if (status == EFI_SUCCESS)
@@ -268,10 +278,14 @@ attribute_pci_manager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *t
     if (status == EFI_SUCCESS)
         status = check_target(boot, &identity);
 
-    if (second.Entries != NULL && second.Entries != first.Entries && boot->FreePool(second.Entries) != EFI_SUCCESS)
+    if (second.Entries != NULL && second.Entries != first.Entries && boot->FreePool(second.Entries) != EFI_SUCCESS) {
+        current = Phx34PrebootStageCleanup;
         status = EFI_DEVICE_ERROR;
-    if (first.Entries != NULL && boot->FreePool(first.Entries) != EFI_SUCCESS)
+    }
+    if (first.Entries != NULL && boot->FreePool(first.Entries) != EFI_SUCCESS) {
+        current = Phx34PrebootStageCleanup;
         status = EFI_DEVICE_ERROR;
+    }
     if (status == EFI_SUCCESS) {
         attribution->BindingHandle = first.Manager;
         attribution->ImageHandle = image.Handle;
@@ -279,6 +293,8 @@ attribute_pci_manager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *t
         if (origin != NULL)
             *origin = image.FirmwareFile;
     }
+    if (stage != NULL)
+        *stage = status == EFI_SUCCESS ? Phx34PrebootStageNone : current;
     return strict_status(status);
 }
 
@@ -286,7 +302,7 @@ EFI_STATUS EFIAPI
 Phx34AttributePciManager(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_TARGET *target,
                          PHX34_PREBOOT_PCI_ATTRIBUTION *attribution)
 {
-    return attribute_pci_manager(boot, target, attribution, NULL);
+    return attribute_pci_manager(boot, target, attribution, NULL, NULL);
 }
 
 static BOOLEAN
@@ -521,7 +537,7 @@ Phx34ObservePciManagerAtPath(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_PA
 {
     if (observation == NULL)
         return EFI_INVALID_PARAMETER;
-    *observation = (PHX34_PREBOOT_PCI_PATH_OBSERVATION){0};
+    *observation = (PHX34_PREBOOT_PCI_PATH_OBSERVATION){.FailureStage = Phx34PrebootStageInput};
     if (boot == NULL || boot->LocateHandle == NULL || boot->HandleProtocol == NULL ||
         boot->OpenProtocolInformation == NULL || boot->FreePool == NULL || identity == NULL)
         return EFI_INVALID_PARAMETER;
@@ -539,13 +555,18 @@ Phx34ObservePciManagerAtPath(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_PA
     PHX34_PREBOOT_PCI_TARGET first = {0}, last = {0};
     ROOT_SAMPLE first_root = {0}, last_root = {0};
     PHX34_PREBOOT_PCI_PATH_OBSERVATION result = {0};
+    PHX34_PREBOOT_FAILURE_STAGE stage = Phx34PrebootStageRoot;
     EFI_STATUS status = resolve_root(boot, &sealed, TRUE, &first_root);
-    if (status == EFI_SUCCESS)
+    if (status == EFI_SUCCESS) {
+        stage = Phx34PrebootStageEndpoint;
         status = resolve_by_path(boot, &sealed, TRUE, &first);
+    }
     if (status == EFI_SUCCESS)
-        status = attribute_pci_manager(boot, &first, &result.Candidate, &result.FirmwareFile);
-    if (status == EFI_SUCCESS)
+        status = attribute_pci_manager(boot, &first, &result.Candidate, &result.FirmwareFile, &stage);
+    if (status == EFI_SUCCESS) {
+        stage = Phx34PrebootStageRecheck;
         status = resolve_by_path(boot, &sealed, TRUE, &last);
+    }
     if (status == EFI_SUCCESS && !same_target(&first, &last))
         status = EFI_NO_MAPPING;
     if (status == EFI_SUCCESS)
@@ -554,5 +575,7 @@ Phx34ObservePciManagerAtPath(EFI_BOOT_SERVICES *boot, CONST PHX34_PREBOOT_PCI_PA
         status = EFI_NO_MAPPING;
     if (status == EFI_SUCCESS)
         *observation = result;
+    else
+        observation->FailureStage = stage;
     return strict_status(status);
 }
