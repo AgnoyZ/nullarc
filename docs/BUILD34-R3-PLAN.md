@@ -137,10 +137,13 @@ preboot identity, IH ownership or old-writer drain.
    enable it in production, or retry arbitrary `EAGAIN`. The
    [full Vulkan pressure fixture](BUILD34-SUBMIT-RECEIPT.md#full-vulkan-submit-backpressure-on-cpu)
    reproduces device loss from a single known prepublication Busy, with no
-   replay of either sustained refusal or an uncertain reply. Separate proven
-   retryable admission from terminal and postpublication failures, and verify
-   bounded progress through the real caller. Independent snapshot/visibility
-   and native/SDK integration still have to exist.
+   replay of either sustained refusal or an uncertain reply. The follow-on
+   [typed capacity stage](BUILD34-SUBMIT-RECEIPT.md#typed-receipt-capacity-backpressure)
+   distinguishes a full native receipt table from raw errors, permanent
+   serial exhaustion and malformed replies, with matched capability and
+   checked completion/ACK recovery in the paired CPU test. It adds no retry.
+   Verify bounded progress and single dispatch in the real Vulkan caller.
+   Independent snapshot/visibility and native integration still have to exist.
    Staged receipt wait/ACK now validate complete owner/slot/serial/sequence/
    queue/generation requests at the actual pre-lock dispatch entry; see
    [the experimental wire contract](BUILD34-RECEIPT-WIRE.md). This is only

@@ -8,7 +8,11 @@ import re
 import shlex
 import subprocess
 import sys
+from unittest.mock import patch
 
+import build34_exact_submit_pressure as pressure
+import build34_native_object_check as native_objects
+from build34_exact_ih_workloop import stage_quiescent_provider, stage_header as ih_header
 from build34_exact_overlap_snapshot import DECLARATIONS, GLOBAL
 from build34_exact_progress_wire import (
     DISPATCH, PREFIX as NATIVE_PREFIX, PREFIX_DECL, PROGRESS, PROGRESS_DECL,
@@ -21,6 +25,7 @@ from build34_r3_mesa_open import stage_drm as open_drm_stage, stage_iokit as ope
 from build34_r3_radv_entry import ENTRY_SHA256, PHYSICAL, WRAPPER, WINSYS
 from build34_r3_radv_entry import stage_drm as entry_drm_stage, stage_physical, stage_wrapper
 from test_build34_exact_ownership import DRIVER, ROOT, method, sha
+from test_build34_exact_open import EXTRA, FACTORY_RECORD, KDK_RECORD
 from test_build34_exact_transport import DRM, KEXT, PATCH, PREFIX, SHAPE_PATCHES
 from test_build34_exact_multitarget import apply, stage
 from upstream34_layout import radv_ib_tail
@@ -28,9 +33,36 @@ from upstream34_layout import radv_ib_tail
 
 EXACT_OPEN_WIRE = 'tools/build34_exact_open_wire.h'
 EXACT_OPEN_WIRE_SHA256 = '3871eccc5e3aca90936d1fc76ea01a7824c5fe534712a225a8c1ab6d4099a5e8'
+IH_REFERENCE = 'docs/validation/build34-r3-ih-provider-quiescence-offline-20261123.json'
+PRESSURE_HEADERS = native_objects.HEADERS + EXTRA
 
 
-def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=False):
+def compile_pressure_native(out, driver, inputs, sdk, kdk):
+    reference = json.loads(inputs[IH_REFERENCE])
+    baseline = stage_quiescent_provider(driver)
+    if sha(baseline.encode()) != reference['staged_source_sha256']:
+        raise ValueError('Reviewed IH predecessor changed')
+    compiler = Path(subprocess.check_output(['/usr/bin/xcrun', '--find', 'clang++'], text=True,
+                                            timeout=15).strip()).resolve()
+    ownership = pressure.stage_ownership(ih_header(inputs['tools/build34_exact_ownership.h'].decode()))
+    compile_inputs = dict(inputs)
+    for name, transform in (('build34_exact_submit_wire.h', pressure.stage_submit_wire),
+                            ('build34_exact_progress_wire.h', pressure.stage_progress_wire)):
+        path = 'tools/' + name
+        compile_inputs[path] = transform(inputs[path].decode()).encode()
+    after = pressure.stage(baseline)
+    with patch.object(native_objects, 'HEADERS', PRESSURE_HEADERS):
+        result = native_objects.check(out, compile_inputs, baseline, after, ownership, sdk, kdk,
+                                      reference['native_import_count'],
+                                      json.loads(inputs[FACTORY_RECORD])['compiler_warnings']['proposed'],
+                                      json.loads(inputs[KDK_RECORD]), compiler)
+    return dict(**result, composed_driver_sha256=sha(after.encode()))
+
+
+def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=False, submit_pressure=False,
+         sdk=None, kdk=None):
+    if bool(sdk) != bool(kdk) or (sdk and not submit_pressure):
+        raise ValueError('Supply both SDK and KDK only with --submit-pressure')
     exact_open = exact_open or radv_entry
     drm = drm or exact_open
     iokit = iokit or drm
@@ -85,6 +117,12 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
         entry_source = {name: (mesa / name).read_bytes() for name in ENTRY_SHA256}
         if {name: sha(data) for name, data in entry_source.items()} != ENTRY_SHA256:
             raise ValueError('Previously reviewed RADV entry input changed')
+    if submit_pressure:
+        paths.append('tools/build34_exact_submit_pressure.py')
+    if sdk:
+        paths.extend([IH_REFERENCE, FACTORY_RECORD, KDK_RECORD, 'src/phxbringup/Info.plist',
+                      'tools/build34_native_object_check.py', 'tools/build34_exact_ih_workloop.py',
+                      *('tools/' + name for name in PRESSURE_HEADERS)])
     inputs = {name: (ROOT / name).read_bytes() for name in paths}
     pinned = {**native_evidence['input_sha256'], **{name: mesa_evidence['input_sha256'][name] for name in patches}}
     if exact_open:
@@ -99,6 +137,7 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
         restored = once(restored, addition, '')
     if sha(before.encode()) != json.loads(inputs[dispatch_record])['staged_dispatch_source_sha256'] or restored != before:
         raise ValueError('Unexpected progress wire predecessor or out-of-scope delta')
+    proposed_native = pressure.stage(after) if submit_pressure else after
     out.mkdir(parents=True, mode=0o700)
     frozen, closure, native = out / 'frozen', out / 'mesa', out / 'native-private'
     stage(inputs, frozen)
@@ -206,20 +245,35 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
                    '    exactQueueSubmitted[actualQueue] = seq;')
     binding = once(binding, 'CHECK(ms==1 && !gpuHeld); testTicks+=1000000;',
                    'CHECK(ms==1 && !gpuHeld); event("poll-sleep"); testTicks+=1000000;')
+    adapter_source = frozen / adapter
+    if submit_pressure:
+        binding = once(binding, '    IOReturn submitExactReceipt(const void *,uint32_t,Ticket &,Receipt &);',
+                       '    IOReturn submitExactReceipt(const void *,uint32_t,Ticket &,Receipt &,bool &);')
+        generated_native = pressure.stage_native(generated_native)
+        owner_header = pressure.stage_ownership(ownership.read_text())
+        reserve = '    Status reserve(Ticket &ticket) {\n'
+        ownership.write_text(once(owner_header, reserve,
+                             '    void fixtureLastSerial(uint64_t last) { serial_ = Counter(last); }\n' + reserve))
+        submit_path = native_headers / 'build34_exact_submit_wire.h'
+        progress_path = native_headers / 'build34_exact_progress_wire.h'
+        submit_path.write_text(pressure.stage_submit_wire(submit_path.read_text()))
+        progress_path.write_text(pressure.stage_progress_wire(inputs['tools/build34_exact_progress_wire.h'].decode()))
+        adapter_source = out / Path(adapter).name
+        adapter_source.write_text(pressure.stage_mesa(inputs[adapter].decode()))
     paired_binding.write_text(binding)
     generated_native = once(generated_native, '#include "submit-binding-CPU-only.h"',
                             '#include "paired-native-binding.h"\n#include "build34_exact_progress_wire.h"\n'
                             'static constexpr unsigned PHX_KEXT_BUILD = 34;')
     generated_native = once(generated_native, method(generated_native, DISPATCH), method(after, DISPATCH))
     signatures = [NATIVE_PREFIX, PROGRESS, GLOBAL, 'bool PhxBringup::readExactFence32(', 'bool PhxBringup::vmWorkCurrent(']
-    paired_native.write_text(generated_native + '\n'.join(method(after, sig) for sig in signatures))
+    paired_native.write_text(generated_native + '\n'.join(method(proposed_native, sig) for sig in signatures))
     includes = ['-I' + str(path) for path in [native, native_headers, frozen / 'tools',
                 native / 'frozen/src/phxbringup', *(closure / name for name in ('include', 'include/darwin', 'src', 'src/amd', PREFIX))]]
     allowed = {str(path.resolve()) for root in (frozen, closure, native_headers, native / 'frozen')
                for path in root.rglob('*') if path.is_file() and '.git' not in path.relative_to(root).parts}
-    allowed |= {str(paired_native), str(paired_binding)}
+    allowed |= {str(paired_native), str(paired_binding), str(adapter_source)}
     checks = {}
-    sources = [closure / KEXT, frozen / adapter, frozen / fixture,
+    sources = [closure / KEXT, adapter_source, frozen / fixture,
                native / 'frozen/tests/test_build34_exact_submit_peer.c',
                native / 'frozen/tests/test_build34_exact_receipt_peer.c']
     if iokit:
@@ -245,6 +299,8 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
                 extra.append('-Dcalloc=phx34_fixture_calloc')
             if drm and source == frozen / fixture:
                 extra.append('-DPHX34_TEST_DRM=1')
+            if submit_pressure and source == frozen / fixture:
+                extra.append('-DPHX34_TEST_SUBMIT_PRESSURE=1')
             if exact_open and source in (frozen / fixture, frozen / iokit_fixture):
                 extra.append('-DPHX34_TEST_EXACT_OPEN=1')
             if radv_entry and source == frozen / fixture:
@@ -280,6 +336,7 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
             raise ValueError('Paired receipt suite did not pass')
         checks[label] = int(result[1])
 
+    native_compile = compile_pressure_native(out / 'native-objects', driver, inputs, sdk, kdk) if sdk else None
     if checks['memory'] != checks['thread'] or radv_ib_tail.verified_source(mesa) != mesa_source:
         raise ValueError('Unequal coverage or Mesa source drift')
     if any((ROOT / name).read_bytes() != data or (frozen / name).read_bytes() != data for name, data in inputs.items()):
@@ -331,6 +388,12 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
                       profile_read_uses_owned_core_without_new_sync_clone=True, live_vulkan_runtime_built=False,
                       entry_base_source_sha256=ENTRY_SHA256,
                       entry_staged_source_sha256={name: sha(data) for name, data in entry_staged.items()})
+    if submit_pressure:
+        report.update(status='passed-CPU-only-staged-R3-submit-receipt-capacity',
+                      typed_pressure_driver_sha256=sha(proposed_native.encode()),
+                      typed_pressure_adapter_sha256=sha(adapter_source.read_bytes()),
+                      typed_pressure_capability_required=True, raw_submit_errors_never_retryable=True,
+                      automatic_submit_retry=False, composed_native_compile=native_compile)
     (out / 'result-private.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report))
 
@@ -343,5 +406,9 @@ if __name__ == '__main__':
     parser.add_argument('--drm', action='store_true')
     parser.add_argument('--exact-open', action='store_true')
     parser.add_argument('--radv-entry', action='store_true')
+    parser.add_argument('--submit-pressure', action='store_true')
+    parser.add_argument('--sdk', type=Path)
+    parser.add_argument('--kdk', type=Path)
     args = parser.parse_args()
-    test(args.mesa_source, args.out, iokit=args.iokit, drm=args.drm, exact_open=args.exact_open, radv_entry=args.radv_entry)
+    test(args.mesa_source, args.out, iokit=args.iokit, drm=args.drm, exact_open=args.exact_open,
+         radv_entry=args.radv_entry, submit_pressure=args.submit_pressure, sdk=args.sdk, kdk=args.kdk)

@@ -568,3 +568,51 @@ exhaustion and ambiguous/possibly published results must not be retried. Prove
 lock ordering, teardown, single dispatch, and unchanged sync/fence behavior
 on retry before allowing native admission. No retry policy or production
 source was changed by this experiment.
+
+### Typed receipt-capacity backpressure
+
+The separate `--submit-pressure` stage gives the exact submit pair a
+`SUBMIT_RECEIPT_FULL` capability and a `RECEIPT_FULL` reply, without changing
+the request, reply size or selector. The client emits it only when its own
+64-slot registry returns `Full` under the client lock, before `gpuSubmit` and
+before any submission packet publication. Known receipt serial exhaustion
+takes precedence even with all slots occupied. The handler still rechecks
+client and service admission before writing the reply. This is a no-dispatch
+result, not a promise that all preflight work was side-effect-free or that the
+next attempt will succeed.
+
+The Mesa pair requires the new flag set at session discovery and on prefix
+snapshots. It sets `no_dispatch` and returns `-EAGAIN` only for a full-size,
+valid `RECEIPT_FULL` reply with the negotiated owner and no receipt identity.
+A raw submit call error stays uncertain and maps to `-EIO`. In particular,
+generic `Busy`, `NoResources` and `NoMemory` cannot become a retry signal,
+including under the old winsys `-ENOMEM` retry rule. A malformed reply
+remains `-EPROTO`; neither result frees the reservation or permits replay.
+Wait and ACK do not accept the pressure reply. Earlier exact experiments and
+the untyped adapter remain unchanged when the option is omitted.
+
+With the actual staged native handler and Mesa transport in one CPU process,
+the 65th request leaves the sequence and modeled packet writes unchanged.
+An independent checked completion and ACK opens slots; the next explicit
+submit publishes once. Serial exhaustion (with and without free slots), old
+flags, truncation and polluted pressure fields fail closed. Substituting raw
+`Busy`, `NoResources` or `NoMemory` after modeled publication leaves the
+receipt retained and prevents another wire submit. ASan/UBSan and TSan each
+passed 35,301 checks with the exact-open/DRM regressions included. The complete
+IH-quiescence source with this stage also compiled to nonloadable objects
+with the same 406 imports as the comparison source.
+See the [offline record](validation/build34-r3-typed-submit-pressure-offline-20261123.json).
+
+```sh
+python3 -B tools/test_build34_r3_mesa_wire.py --mesa-source "$MESA_SOURCE" \
+  --out build/build34-r3-typed-pressure-new-private --exact-open --submit-pressure \
+  --sdk "$KERNEL_SDK" --kdk "$KDK"
+```
+
+No retry is implemented, no full RADV runtime is relinked for this pair, and
+native admission stays off. The next software step is to service older
+receipts under one bounded budget and reattempt only after verified capacity
+progress, keeping the original batch order and attaching its outputs once.
+Then rerun the full Vulkan caller with transient, permanent and uncertain
+cases. Native lifecycle, hardware visibility and old-writer drain are still
+independent requirements.

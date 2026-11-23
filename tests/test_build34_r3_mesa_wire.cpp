@@ -81,6 +81,9 @@ struct Bridge {
                 case 7: reply.owner = selector == PHX34_R3_SEL_PREFIX ? reply.owner + 1 : 0; break;
                 case 8: reply.retired = UINT64_MAX; break;
                 case 9: ++reply.reserved; break;
+#ifdef PHX34_TEST_SUBMIT_PRESSURE
+                case 10: reply.flags &= ~PHX34_R3_CAP_SUBMIT_RECEIPT_FULL; break;
+#endif
                 default: CHECK(false);
                 }
                 return 0;
@@ -101,6 +104,11 @@ struct Bridge {
             case 11: reply.slot ^= 1; break;
             case 12: reply.queue ^= 1; break;
             case 13: return static_cast<int>(ACD_KR_EXCLUSIVE_ACCESS);
+#ifdef PHX34_TEST_SUBMIT_PRESSURE
+            case 14: return static_cast<int>(ACD_KR_BUSY);
+            case 15: return static_cast<int>(ACD_KR_NO_RESOURCES);
+            case 16: return static_cast<int>(ACD_KR_NO_MEMORY);
+#endif
             default: CHECK(false);
             }
         }
@@ -155,23 +163,73 @@ static void paired_round_trip() {
     CHECK(snapshot.retired == gfx && bridge.acks == 2 && !bridge.client.exactRegistry.occupied());
 }
 
-static void full_receipts() {
-    reset();
-    Bridge bridge;
+static uint64_t fill_receipts(Bridge &bridge) {
     uint64_t sequence = 0;
     for (unsigned index = 0; index < 64; ++index) {
         CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == 0);
         bridge.device.setFence(1, sequence);
     }
     CHECK(bridge.client.exactRegistry.occupied() == 64);
+    return sequence;
+}
+
+static void full_receipts() {
+    reset();
+    Bridge bridge;
+    uint64_t sequence = fill_receipts(bridge);
     unsigned writes = packetWrites;
     CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == -EAGAIN && packetWrites == writes);
     CHECK(bridge.client.exactRegistry.occupied() == 64 && sequence == 163);
+#ifdef PHX34_TEST_SUBMIT_PRESSURE
+    CHECK(bridge.submits == 65 && !bridge.waits && !bridge.acks && bridge.device.gSeq == 163);
+#endif
     bool busy = true;
     CHECK(acd_kext_wait_seq(bridge.transport, 100, 0, &busy, nullptr) == 0 && !busy);
     CHECK(!bridge.client.exactRegistry.occupied() && bridge.acks == 64);
     CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == 0 && sequence == 164);
 }
+
+#ifdef PHX34_TEST_SUBMIT_PRESSURE
+static void classify_submit_pressure() {
+    for (bool full : {false, true}) {
+        reset();
+        Bridge bridge;
+        uint64_t sequence = full ? fill_receipts(bridge) : 0;
+        const unsigned writes = packetWrites;
+        bridge.client.exactRegistry.fixtureLastSerial(UINT64_MAX - 1);
+        CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == -EIO && packetWrites == writes);
+        CHECK(bridge.client.exactRegistry.occupied() == (full ? 64u : 0u));
+        CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == -ECANCELED && bridge.submits == (full ? 65u : 1u));
+    }
+    for (unsigned fault : {0u, 1u, 2u, 3u, 4u, 5u, 7u, 8u, 9u, 10u, 11u, 12u}) {
+        reset();
+        Bridge bridge;
+        uint64_t sequence = fill_receipts(bridge);
+        const unsigned writes = packetWrites;
+        bridge.corruptSelector = PHX34_R3_SEL_SUBMIT_RECEIPT;
+        bridge.corruption = fault;
+        CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == (fault ? -EPROTO : -EIO));
+        CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == -ECANCELED && bridge.submits == 65);
+        CHECK(sequence == 163 && bridge.client.exactRegistry.occupied() == 64 && packetWrites == writes);
+    }
+    for (unsigned fault : {14u, 15u, 16u}) {
+        reset();
+        Bridge bridge;
+        uint64_t sequence = 0;
+        bridge.corruptSelector = PHX34_R3_SEL_SUBMIT_RECEIPT;
+        bridge.corruption = fault;
+        CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == -EIO && !sequence);
+        CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == -ECANCELED && bridge.submits == 1);
+        CHECK(bridge.client.exactRegistry.occupied() == 1 && packetWrites);
+    }
+    reset();
+    Bridge older(false);
+    older.corruptSelector = PHX34_R3_SEL_SESSION;
+    older.corruption = 10;
+    CHECK(phx34_mesa_wire_backend(&older.wire, &older.backend) == -EPROTO);
+    CHECK(!older.wire.owner && !older.submits && !packetWrites);
+}
+#endif
 
 static void uncertain_replies() {
     for (uint32_t selector : {64u, 65u, 66u}) {
@@ -792,6 +850,9 @@ static void radv_entry_lifetime() {
 int main() {
     paired_round_trip();
     full_receipts();
+#ifdef PHX34_TEST_SUBMIT_PRESSURE
+    classify_submit_pressure();
+#endif
     uncertain_replies();
     sequence_modes();
     checked_progress();
