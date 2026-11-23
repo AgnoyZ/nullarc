@@ -16,6 +16,7 @@ from build34_r3_radv_runtime import DARWIN, ROOT, TARGET, digest, inventory, inv
 
 LINK_RECORD = ROOT / 'docs/validation/build34-r3-radv-full-link-offline-20261123.json'
 EXACT_CS_LINK_RECORD = ROOT / 'docs/validation/build34-r3-radv-exact-cs-link-offline-20261123.json'
+RETRY_LINK_RECORD = ROOT / 'docs/validation/build34-r3-radv-submit-retry-link-offline-20261123.json'
 FIXTURE_LIBRARY = ROOT / 'tests/build34_radv_runtime_iokit.c'
 FIXTURE_MAIN = ROOT / 'tests/test_build34_radv_runtime_enumeration.c'
 FIXTURE_HEADER = ROOT / 'tests/build34_radv_runtime_cpu.h'
@@ -45,13 +46,15 @@ def text_section(path):
     return result.partition(marker)[2]
 
 
-def test(runtime, output, exact_cs=False):
+def test(runtime, output, exact_cs=False, submit_retry=False):
+    if submit_retry and not exact_cs:
+        raise ValueError('The staged submit retry requires --exact-cs')
     runtime, output = Path(runtime).resolve(), Path(output).resolve()
     if (ROOT / 'build' not in output.parents or output.exists() or not output.name.endswith('-private') or
             output == runtime or runtime in output.parents or output in runtime.parents):
         raise ValueError('Use a fresh separate ignored worktree output ending -private')
     subprocess.run(['/usr/bin/git', 'check-ignore', '-q', str(output)], cwd=ROOT, check=True, timeout=15)
-    link_record = EXACT_CS_LINK_RECORD if exact_cs else LINK_RECORD
+    link_record = RETRY_LINK_RECORD if submit_retry else EXACT_CS_LINK_RECORD if exact_cs else LINK_RECORD
     recorded = json.loads(link_record.read_text())
     library = runtime / 'native' / TARGET
     if (json.loads((runtime / 'result-private.json').read_text()) != recorded or
@@ -84,6 +87,8 @@ def test(runtime, output, exact_cs=False):
            'LANG': 'C', 'LC_ALL': 'C', 'MESA_SHADER_CACHE_DISABLE': 'true'}
     cc = ['/usr/bin/xcrun', 'clang', '-arch', 'x86_64', '-std=c11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
           '-DPHX34_CPU_R3=1', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']
+    if submit_retry:
+        cc.append('-DPHX34_CPU_RETRY=1')
     cc.extend('-I' + str(mesa / name) for name in ('include', 'include/darwin', DARWIN, DARWIN + 'r3/phxbringup'))
     stub = output / 'libcpu_iokit.dylib'
     executable = output / 'cpu-radv-r3-lifecycle'
@@ -119,28 +124,40 @@ def test(runtime, output, exact_cs=False):
                       (8, 'exact_no_resources'), (9, 'exact_short_submit')]
     else:
         scenarios.append((4, 'submit_refused'))
+    if submit_retry:
+        scenarios += [(10, 'receipt_capacity_recovers'), (11, 'receipt_capacity_no_progress'),
+                      (12, 'receipt_capacity_full_again'), (13, 'receipt_capacity_retry_short_reply'),
+                      (14, 'receipt_capacity_late_progress'), (15, 'exact_raw_oom'), (16, 'old_pressure_flags')]
     for index, name in scenarios:
         result = results[name] = json.loads(run([executable, copy, str(index)], name))
-        expected_acks = {5: 1, 6: 2}.get(index, 0)
-        expected_short = int(index == 9)
-        expected_refusals = int(index in (7, 8))
-        expected_lost = index in (4, 7, 8, 9)
+        expected_acks = {5: 1, 6: 2, 10: 2, 12: 1, 13: 1, 14: 1}.get(index, 0)
+        expected_short = int(index in (9, 13))
+        expected_refusals = int(index in (7, 8, 15))
+        expected_capacity = {10: 1, 11: 1, 12: 2, 13: 1, 14: 1}.get(index, 0)
+        expected_publications = expected_acks + expected_short + int(index == 11)
+        capacity_case = 10 <= index <= 14
+        expected_lost = index in (4, 7, 8, 9, 11, 12, 13, 14, 15)
+        expected_api = [0, -4] if capacity_case and expected_lost else [-4] if expected_lost else [0] * expected_acks
+        has_fence_queries = index in (5, 6, 10)
         if (result['scenario'] != index or result['GPU_executed'] or result['native_submits'] or
-                result['physical_devices'] != (index not in (1, 2, 3)) or result['open_attempts'] != 1 or
-                result['vkQueueSubmit'] != ([-4] if expected_lost else [0] * expected_acks) or
+                result['physical_devices'] != (index not in (1, 2, 3, 16)) or result['open_attempts'] != 1 or
+                result['vkQueueSubmit'] != expected_api or
                 result['post_failure_device_lost'] != expected_lost or result['exact_acks'] != expected_acks or
-                result['submit_attempts'] != expected_acks + expected_short + expected_refusals or
+                result['submit_attempts'] != expected_publications + expected_refusals + expected_capacity or
                 result['submit_refusals'] != expected_refusals or result['short_submit_replies'] != expected_short or
-                result['modeled_exact_submits'] != expected_acks + expected_short or
-                result['positive_waits'] != result['positive_pending'] + bool(expected_acks) or
-                bool(result['positive_pending']) != (index == 6) or
+                result['capacity_replies'] != expected_capacity or result['recovery_waits'] != int(capacity_case) or
+                result['capacity_replays'] != int(index in (10, 12, 13)) or
+                result['modeled_exact_submits'] != expected_publications or
+                result['positive_waits'] != (1 if capacity_case else result['positive_pending'] + bool(expected_acks)) or
+                bool(result['positive_pending']) != (index in (6, 11)) or
                 result['prefix_snapshots'] != result['zero_polls'] + result['positive_waits'] or
-                (expected_acks and result['zero_polls'] < 2) or
-                (not expected_acks and (result['zero_polls'] or result['prefix_snapshots'])) or
+                (has_fence_queries and result['zero_polls'] < 2) or
+                (not has_fence_queries and result['zero_polls']) or
                 bool(result['gap_prefixes']) != (index == 6) or result['closed_prefixes'] != (index == 6)):
             raise ValueError('Incomplete or unexpected Vulkan lifecycle evidence')
-        if index in (7, 8, 9):
-            expected_error = -(errno.EPROTO if expected_short else errno.EAGAIN)
+        if index in (7, 8, 9, 11, 12, 13, 14, 15):
+            expected_error = -(errno.EPROTO if expected_short else errno.ETIMEDOUT if index == 14 else
+                               errno.EIO if submit_retry and index in (7, 8, 15) else errno.EAGAIN)
             diagnostic = f'see dmesg for more information ({expected_error}).'
             if (output / (name + '.stderr')).read_text().count(diagnostic) != 1:
                 raise ValueError('Unexpected RADV winsys submit error')
@@ -149,6 +166,8 @@ def test(runtime, output, exact_cs=False):
             production_snapshot() != protected or any(digest(path) != sha for path, sha in inputs.items())):
         raise ValueError('Source, library or fixture changed during verification')
     status = 'passed-full-RADV-R3-CPU-exact-submit' if exact_cs else 'passed-full-RADV-R3-CPU-submit-refusal'
+    if submit_retry:
+        status = 'passed-full-RADV-R3-CPU-bounded-submit-retry'
     report = dict(status=status, kernel_build=34,
                   linked_library_sha256=recorded['library_sha256'], staged_inventory_sha256=inventory_digest(manifest),
                   retargeted_test_copy_only=True, executable_text_identical=True, system_IOKit_linked=False,
@@ -165,5 +184,6 @@ if __name__ == '__main__':
     parser.add_argument('--runtime', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--exact-cs', action='store_true', help='Verify the separately pinned staged exact-CS variant')
+    parser.add_argument('--submit-retry', action='store_true', help='Verify the separately pinned typed-pressure retry')
     args = parser.parse_args()
-    test(args.runtime, args.out, args.exact_cs)
+    test(args.runtime, args.out, args.exact_cs, args.submit_retry)

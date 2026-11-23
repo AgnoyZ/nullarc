@@ -609,10 +609,64 @@ python3 -B tools/test_build34_r3_mesa_wire.py --mesa-source "$MESA_SOURCE" \
   --sdk "$KERNEL_SDK" --kdk "$KDK"
 ```
 
-No retry is implemented, no full RADV runtime is relinked for this pair, and
-native admission stays off. The next software step is to service older
-receipts under one bounded budget and reattempt only after verified capacity
-progress, keeping the original batch order and attaching its outputs once.
-Then rerun the full Vulkan caller with transient, permanent and uncertain
-cases. Native lifecycle, hardware visibility and old-writer drain are still
-independent requirements.
+This typed stage by itself never retries. Native lifecycle, hardware
+visibility and old-writer drain are still independent requirements.
+
+### One retry after an acknowledged receipt
+
+The isolated `--exact-cs --submit-retry` runtime pairs the strict typed
+adapter with a Mesa transport change. After authenticating `RECEIPT_FULL`,
+it takes an ACK count watermark and tries the oldest eligible receipt on
+each queue, oldest first. It uses the existing exact wait, independent
+prefix snapshot and checked ACK. A prefix observation, an exact completion
+without ACK, or a concurrent ACK already counted at refusal is not enough.
+An ACK observed after the watermark means the native side released a receipt
+slot. Only then can the transport resend the same batch once.
+
+The submit-order mutex stays held across the transaction, but the cache
+mutex is not held across the wire calls. Existing wait/ACK callers do not
+take the submit-order mutex. Recovery uses one 20 ms monotonic admission
+budget with at most two requested exact waits, each clipped to at most
+5 ms. It rechecks the deadline before another submit. These limits do not
+bound a blocked IPC call, OS scheduling or overall `vkQueueSubmit` time.
+If neither eligible receipt releases capacity, the second attempt is
+refused again, or the reply may have been lost after publication, the
+caller still fails without another dispatch or legacy fallback.
+
+The replay is below dependency preparation and output sync attachment in
+the DRM wrapper. An output timeline allocation failure after exact
+publication becomes `-EIO`, so the existing winsys `-ENOMEM` retry cannot
+replay that published batch. The legacy stack and untyped exact-CS link
+are unchanged. This experiment neither certifies native wait/ACK lifetimes
+nor changes installed behavior.
+
+The staged native handler plus Mesa CPU pairing filled all 64 slots. The
+65th request was refused, a checked wait/prefix and ACK released capacity,
+and one retry published sequence 164. Exact status for an old ACKed receipt
+stayed local, and the retried receipt stayed pending until its own fence.
+ASan/UBSan and TSan each passed 35,383 checks in the paired suite.
+
+The [pinned full runtime](validation/build34-r3-radv-submit-retry-link-offline-20261123.json)
+passed 16 Vulkan scenarios with substituted IOKit, including an existing
+Compute receipt followed by injected pressure on a GFX submit. `vkQueueSubmit`
+succeeded only after the older receipt's ACK and one byte-identical resend;
+the GFX `VkFence` still needed its own completion. No progress or an ACK
+after the deadline led to no resend. A second full reply or a truncated
+postpublication reply stopped the attempted submission after one resend.
+The prior exact-CS and original runtime controls and default tests passed.
+See the [CPU validation record](validation/build34-r3-radv-submit-retry-cpu-20261123.json).
+
+Append `--exact-cs --submit-retry` to the full link recipe with a fresh
+private output. Exercise the pinned link separately:
+
+```sh
+python3 -B tools/test_build34_r3_mesa_wire.py --mesa-source "$MESA_SOURCE" \
+  --out build/build34-r3-submit-retry-pair-new-private --exact-open --submit-pressure --submit-retry
+python3 -B tools/test_build34_r3_radv_runtime.py --runtime "$R3_RADV_RETRY_LINK_OUT" \
+  --exact-cs --submit-retry --out build/build34-r3-submit-retry-vulkan-new-private
+```
+
+Still needed: pressure recovery with competing native waiters and teardown,
+postpublication allocation-failure injection, actual exact loaded images,
+and the hardware gates in the R3 ledger. The CPU suite exercises modeled
+pressure and protocol ordering, not device timing or performance.

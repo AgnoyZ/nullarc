@@ -178,6 +178,17 @@ static void full_receipts() {
     Bridge bridge;
     uint64_t sequence = fill_receipts(bridge);
     unsigned writes = packetWrites;
+#ifdef PHX34_TEST_SUBMIT_RETRY
+    CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == 0 && sequence == 164 && packetWrites > writes);
+    CHECK(bridge.submits == 66 && bridge.waits == 1 && bridge.prefixes == 1 && bridge.acks == 64);
+    CHECK(bridge.client.exactRegistry.occupied() == 1 && bridge.device.gSeq == 164);
+    bool busy = true;
+    CHECK(acd_kext_wait_seq(bridge.transport, 100, 0, &busy, nullptr) == 0 && !busy && bridge.waits == 1);
+    CHECK(acd_kext_wait_seq(bridge.transport, 164, 0, &busy, nullptr) == 0 && busy && bridge.acks == 64);
+    bridge.device.setFence(1, sequence);
+    CHECK(acd_kext_wait_seq(bridge.transport, 164, 0, &busy, nullptr) == 0 && !busy && bridge.acks == 65);
+    CHECK(!bridge.client.exactRegistry.occupied());
+#else
     CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == -EAGAIN && packetWrites == writes);
     CHECK(bridge.client.exactRegistry.occupied() == 64 && sequence == 163);
 #ifdef PHX34_TEST_SUBMIT_PRESSURE
@@ -187,6 +198,7 @@ static void full_receipts() {
     CHECK(acd_kext_wait_seq(bridge.transport, 100, 0, &busy, nullptr) == 0 && !busy);
     CHECK(!bridge.client.exactRegistry.occupied() && bridge.acks == 64);
     CHECK(bridge.submit(AMDGPU_HW_IP_GFX, &sequence) == 0 && sequence == 164);
+#endif
 }
 
 #ifdef PHX34_TEST_SUBMIT_PRESSURE

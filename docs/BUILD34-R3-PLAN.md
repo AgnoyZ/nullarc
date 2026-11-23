@@ -141,9 +141,12 @@ preboot identity, IH ownership or old-writer drain.
    [typed capacity stage](BUILD34-SUBMIT-RECEIPT.md#typed-receipt-capacity-backpressure)
    distinguishes a full native receipt table from raw errors, permanent
    serial exhaustion and malformed replies, with matched capability and
-   checked completion/ACK recovery in the paired CPU test. It adds no retry.
-   Verify bounded progress and single dispatch in the real Vulkan caller.
-   Independent snapshot/visibility and native integration still have to exist.
+   checked completion/ACK recovery in the paired CPU test. The separate
+   [bounded retry](BUILD34-SUBMIT-RECEIPT.md#one-retry-after-an-acknowledged-receipt)
+   requires a new ACK before resending the same batch once. An actual
+   full-library Vulkan caller with substituted IOKit verifies recovery and
+   the no-progress, late-ACK and uncertain-reply controls. Native integration
+   still needs real snapshot/visibility and lifecycle evidence.
    Staged receipt wait/ACK now validate complete owner/slot/serial/sequence/
    queue/generation requests at the actual pre-lock dispatch entry; see
    [the experimental wire contract](BUILD34-RECEIPT-WIRE.md). This is only

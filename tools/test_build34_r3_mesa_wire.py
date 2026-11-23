@@ -11,6 +11,7 @@ import sys
 from unittest.mock import patch
 
 import build34_exact_submit_pressure as pressure
+import build34_r3_submit_retry as retry
 import build34_native_object_check as native_objects
 from build34_exact_ih_workloop import stage_quiescent_provider, stage_header as ih_header
 from build34_exact_overlap_snapshot import DECLARATIONS, GLOBAL
@@ -60,7 +61,9 @@ def compile_pressure_native(out, driver, inputs, sdk, kdk):
 
 
 def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=False, submit_pressure=False,
-         sdk=None, kdk=None):
+         submit_retry=False, sdk=None, kdk=None):
+    if submit_retry and not (submit_pressure and (exact_open or radv_entry)):
+        raise ValueError('Submit retry requires the matched typed-pressure and exact-open path')
     if bool(sdk) != bool(kdk) or (sdk and not submit_pressure):
         raise ValueError('Supply both SDK and KDK only with --submit-pressure')
     exact_open = exact_open or radv_entry
@@ -119,6 +122,8 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
             raise ValueError('Previously reviewed RADV entry input changed')
     if submit_pressure:
         paths.append('tools/build34_exact_submit_pressure.py')
+    if submit_retry:
+        paths.append('tools/build34_r3_submit_retry.py')
     if sdk:
         paths.extend([IH_REFERENCE, FACTORY_RECORD, KDK_RECORD, 'src/phxbringup/Info.plist',
                       'tools/build34_native_object_check.py', 'tools/build34_exact_ih_workloop.py',
@@ -212,6 +217,10 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
             if block.count('r = ac_drm_device_initialize(fd, is_virtio, &drm_major, &drm_minor, &dev);') != 1:
                 raise ValueError('RADV winsys no longer uses the shared Darwin initializer: ' + name)
         stage({name: block.encode() for name, block in entry_blocks.items()}, frozen / 'tools')
+    if submit_retry:
+        for name, transform in ((KEXT, retry.stage_transport), (DRM, retry.stage_drm)):
+            mesa_staged[name] = transform(mesa_staged[name].decode()).encode()
+            (closure / name).write_bytes(mesa_staged[name])
 
     native_result = json.loads(run([sys.executable, '-B', ROOT / native_case, '--out', native],
                                    'native-regressions', cwd=ROOT, timeout=360))
@@ -301,6 +310,8 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
                 extra.append('-DPHX34_TEST_DRM=1')
             if submit_pressure and source == frozen / fixture:
                 extra.append('-DPHX34_TEST_SUBMIT_PRESSURE=1')
+            if submit_retry and source == frozen / fixture:
+                extra.append('-DPHX34_TEST_SUBMIT_RETRY=1')
             if exact_open and source in (frozen / fixture, frozen / iokit_fixture):
                 extra.append('-DPHX34_TEST_EXACT_OPEN=1')
             if radv_entry and source == frozen / fixture:
@@ -393,7 +404,7 @@ def test(mesa, out, *, iokit=False, drm=False, exact_open=False, radv_entry=Fals
                       typed_pressure_driver_sha256=sha(proposed_native.encode()),
                       typed_pressure_adapter_sha256=sha(adapter_source.read_bytes()),
                       typed_pressure_capability_required=True, raw_submit_errors_never_retryable=True,
-                      automatic_submit_retry=False, composed_native_compile=native_compile)
+                      automatic_submit_retry=submit_retry, composed_native_compile=native_compile)
     (out / 'result-private.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report))
 
@@ -407,8 +418,10 @@ if __name__ == '__main__':
     parser.add_argument('--exact-open', action='store_true')
     parser.add_argument('--radv-entry', action='store_true')
     parser.add_argument('--submit-pressure', action='store_true')
+    parser.add_argument('--submit-retry', action='store_true')
     parser.add_argument('--sdk', type=Path)
     parser.add_argument('--kdk', type=Path)
     args = parser.parse_args()
     test(args.mesa_source, args.out, iokit=args.iokit, drm=args.drm, exact_open=args.exact_open,
-         radv_entry=args.radv_entry, submit_pressure=args.submit_pressure, sdk=args.sdk, kdk=args.kdk)
+         radv_entry=args.radv_entry, submit_pressure=args.submit_pressure, submit_retry=args.submit_retry,
+         sdk=args.sdk, kdk=args.kdk)

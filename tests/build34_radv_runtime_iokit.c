@@ -14,10 +14,18 @@
 #include "build34_exact_open_wire.h"
 #include "build34_exact_progress_wire.h"
 #include "build34_exact_submit_wire.h"
+#ifdef PHX34_CPU_RETRY
+static const uint32_t exact_flags = PHX34_R3_PRESSURE_FLAGS;
+#else
+static const uint32_t exact_flags = PHX34_R3_PROGRESS_FLAGS;
+#endif
 static unsigned scenario, attempts, sessions, hellos, releases, matches;
 static unsigned match_token;
 static struct cpu_exact_trace trace;
 static struct phx34_r3_reply receipts[CPU_QUEUE_COUNT];
+#ifdef PHX34_CPU_RETRY
+static struct phx34_r3_submit_request refused_request;
+#endif
 static unsigned scheduled_mask, acked_mask;
 static int need_prefix;
 static const uint64_t owner = 0x10000000bull, first_sequence = 0x200000005ull;
@@ -69,6 +77,11 @@ const struct cpu_exact_trace *phx34_cpu_exact_trace(void) { return &trace; }
 
 void phx34_cpu_schedule_completion(unsigned queue)
 {
+   if (scenario == CPU_RETRY_RECOVERS) {
+      require(queue == CPU_GFX && trace.submits == 2 && trace.acks == 1 && !need_prefix);
+      scheduled_mask |= 1u << queue;
+      return;
+   }
    require(scenario == CPU_EXACT_DUAL && trace.submits == 2 && !need_prefix);
    if (queue == CPU_GFX)
       require(!scheduled_mask && !trace.completed_mask && !trace.acks);
@@ -145,7 +158,8 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_close, IOServiceClose)(io_connect_t co
 {
    require(armed && connection == 0x789a && opens == closes + 1 && !contexts);
 #ifdef PHX34_CPU_R3
-   require(!need_prefix && trace.submits == trace.acks + trace.short_submit_replies);
+   require(!need_prefix && trace.submits == trace.acks + trace.short_submit_replies +
+           (scenario == CPU_RETRY_NO_PROGRESS));
 #endif
    for (unsigned h = 1; h < next_handle; ++h) {
       require(!bos[h].maps); free(bos[h].data); allocated -= bos[h].size; bos[h] = (struct cpu_bo){0};
@@ -183,7 +197,8 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
               !request->owner && !request->target && !request->timeout_ns);
       const struct phx34_r3_progress_reply reply = {
          .version = PHX34_R3_WIRE_VERSION, .size = sizeof(reply), .build = PHX34_R3_PROGRESS_BUILD,
-         .flags = scenario == CPU_SESSION_CAPS ? PHX34_R3_CAP_EXACT_RECEIPTS : PHX34_R3_PROGRESS_FLAGS,
+         .flags = scenario == CPU_SESSION_CAPS ? PHX34_R3_CAP_EXACT_RECEIPTS :
+                  scenario == CPU_RETRY_OLD_FLAGS ? PHX34_R3_PROGRESS_FLAGS : exact_flags,
          .owner = owner,
       };
       if (scenario == CPU_SESSION_SHORT)
@@ -192,8 +207,9 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
       return KERN_SUCCESS;
    }
    case PHX34_R3_SEL_SUBMIT_RECEIPT: {
+      const bool capacity_case = cpu_is_capacity_case(scenario);
       require(scenario >= CPU_EXACT_SUBMIT && sessions == 1 && hellos == 2 &&
-              contexts == 1 && !need_prefix && trace.submits < (scenario == CPU_EXACT_DUAL ? 2u : 1u));
+              contexts == 1 && !need_prefix && trace.submits < (scenario == CPU_EXACT_DUAL || capacity_case ? 2u : 1u));
       const unsigned queue = trace.submits ? CPU_GFX : CPU_COMPUTE;
       struct phx34_r3_reply *receipt = &receipts[queue];
       require(!input && !input_count && !output && !output_count && structure &&
@@ -220,6 +236,28 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
                  !(ib->va_start & 3) && mapped_ib(ib));
       }
       ++trace.submit_attempts;
+#ifdef PHX34_CPU_RETRY
+      if (scenario == CPU_RETRY_RAW_OOM) {
+         ++trace.submit_refusals;
+         return kIOReturnNoMemory;
+      }
+      if (capacity_case && queue == CPU_GFX) {
+         if (trace.capacity_replies) {
+            require(trace.acks == 1 && trace.ack_order[0] == CPU_COMPUTE && !trace.capacity_replays &&
+                    scenario != CPU_RETRY_NO_PROGRESS && scenario != CPU_RETRY_LATE_PROGRESS &&
+                    !memcmp(request, &refused_request, sizeof(*request)));
+            ++trace.capacity_replays;
+         }
+         if (!trace.capacity_replies || scenario == CPU_RETRY_FULL_AGAIN) {
+            refused_request = *request;
+            const struct phx34_r3_reply pressure = {.version = PHX34_R3_WIRE_VERSION, .size = sizeof(pressure),
+               .status = PHX34_R3_REPLY_RECEIPT_FULL, .owner = owner};
+            ++trace.capacity_replies;
+            memcpy(result, &pressure, sizeof(pressure));
+            return KERN_SUCCESS;
+         }
+      }
+#endif
       if (scenario == CPU_EXACT_BUSY_ONCE && trace.submit_attempts == 1) {
          ++trace.submit_refusals;
          return kIOReturnBusy;
@@ -233,7 +271,7 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
          .sequence = first_sequence + trace.submits, .generation = 0x400000023ull + queue,
          .slot = 63 - trace.submits, .queue = queue};
       ++trace.submits;
-      if (scenario == CPU_EXACT_SHORT_SUBMIT) {
+      if (scenario == CPU_EXACT_SHORT_SUBMIT || (scenario == CPU_RETRY_SHORT_REPLY && queue == CPU_GFX)) {
          --*result_size;
          ++trace.short_submit_replies;
       }
@@ -242,7 +280,9 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
    }
    case PHX34_R3_SEL_WAIT_RECEIPT:
    case PHX34_R3_SEL_ACK_RECEIPT: {
-      require((scenario == CPU_EXACT_SUBMIT || scenario == CPU_EXACT_DUAL) && trace.submits && !need_prefix);
+      const bool capacity_case = cpu_is_capacity_case(scenario);
+      require((scenario == CPU_EXACT_SUBMIT || scenario == CPU_EXACT_DUAL || capacity_case) &&
+              trace.submits && !need_prefix);
       require(!input && !input_count && !output && !output_count && structure &&
               structure_size == sizeof(struct phx34_r3_request) && result && result_size &&
               *result_size == sizeof(receipts[0]));
@@ -258,7 +298,7 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
               request->timeout_ns <= 20000000ull);
       struct phx34_r3_reply reply = receipt;
       if (sel == PHX34_R3_SEL_ACK_RECEIPT) {
-         require(trace.zero_polls && trace.acks < trace.submits && !request->timeout_ns &&
+         require((trace.zero_polls || trace.recovery_waits) && trace.acks < trace.submits && !request->timeout_ns &&
                  (trace.completed_mask & queue_mask));
          if (scenario == CPU_EXACT_DUAL) {
             require(request->queue == (trace.acks ? CPU_COMPUTE : CPU_GFX));
@@ -270,12 +310,23 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
       } else {
          require(!(trace.completed_mask & queue_mask) && trace.zero_polls < 24 && trace.positive_waits < 8);
          if (request->timeout_ns) {
-            require(trace.zero_polls && request->queue == CPU_COMPUTE);
             ++trace.positive_waits;
-            if (scenario == CPU_EXACT_SUBMIT || (scheduled_mask & queue_mask)) {
+            if (capacity_case) {
+               require(request->queue == CPU_COMPUTE && trace.capacity_replies == 1 && !trace.capacity_replays &&
+                       ++trace.recovery_waits == 1 && request->timeout_ns <= 5000000ull);
+               if (scenario == CPU_RETRY_LATE_PROGRESS) {
+                  struct timespec remaining = {.tv_nsec = 25000000};
+                  while (nanosleep(&remaining, &remaining) != 0)
+                     require(errno == EINTR);
+               }
+            } else {
+               require(trace.zero_polls && request->queue == CPU_COMPUTE);
+            }
+            if (scenario == CPU_EXACT_SUBMIT || (capacity_case && scenario != CPU_RETRY_NO_PROGRESS) ||
+                (scheduled_mask & queue_mask)) {
                trace.completed_mask |= queue_mask;
             } else {
-               require(trace.acks == 1 && acked_mask == (1u << CPU_GFX));
+               require(capacity_case || (trace.acks == 1 && acked_mask == (1u << CPU_GFX)));
                struct timespec remaining = {.tv_nsec = (long)request->timeout_ns};
                while (nanosleep(&remaining, &remaining) != 0)
                   require(errno == EINTR);
@@ -283,7 +334,8 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
             }
          } else {
             ++trace.zero_polls;
-            if (scenario == CPU_EXACT_DUAL && request->queue == CPU_GFX && (scheduled_mask & queue_mask))
+            if ((scenario == CPU_EXACT_DUAL || capacity_case) && request->queue == CPU_GFX &&
+                (scheduled_mask & queue_mask))
                trace.completed_mask |= queue_mask;
          }
          reply.status = (trace.completed_mask & queue_mask) ? PHX34_R3_REPLY_COMPLETE : PHX34_R3_REPLY_PENDING;
@@ -293,7 +345,8 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
       return KERN_SUCCESS;
    }
    case PHX34_R3_SEL_PREFIX: {
-      require((scenario == CPU_EXACT_SUBMIT || scenario == CPU_EXACT_DUAL) && need_prefix);
+      const bool capacity_case = cpu_is_capacity_case(scenario);
+      require((scenario == CPU_EXACT_SUBMIT || scenario == CPU_EXACT_DUAL || capacity_case) && need_prefix);
       require(!input && !input_count && !output && !output_count && structure &&
               structure_size == sizeof(struct phx34_r3_progress_request) && result && result_size &&
               *result_size == sizeof(struct phx34_r3_progress_reply));
@@ -310,10 +363,14 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
             retired = first_sequence + 1;
             ++trace.closed_prefixes;
          }
+      } else if (capacity_case) {
+         retired = first_sequence - 1;
+         if (trace.completed_mask & (1u << CPU_COMPUTE))
+            retired = first_sequence + !!(trace.completed_mask & (1u << CPU_GFX));
       }
       const struct phx34_r3_progress_reply reply = {
          .version = PHX34_R3_WIRE_VERSION, .size = sizeof(reply), .build = PHX34_R3_PROGRESS_BUILD,
-         .flags = PHX34_R3_PROGRESS_FLAGS, .owner = owner, .retired = retired,
+         .flags = exact_flags, .owner = owner, .retired = retired,
       };
       need_prefix = 0;
       ++trace.prefixes;

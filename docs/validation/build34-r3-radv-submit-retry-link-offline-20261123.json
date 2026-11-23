@@ -1,0 +1,70 @@
+{
+  "status": "passed-private-R3-RADV-full-link-only",
+  "kernel_build": 34,
+  "full_runtime_linked": true,
+  "baseline_files_and_links": 12969,
+  "staged_files_and_links": 12980,
+  "baseline_inventory_sha256": "802ba367ff234b3117f6c384384778f3ea85f74f64d77fb484a7037461a55398",
+  "staged_inventory_sha256": "de7830727dc4559aefb54ae4efaf93d36470785213b1185ce9c9c532bce9c352",
+  "changed_source_paths": [
+    "src/amd/common/ac_linux_drm.c",
+    "src/amd/common/darwin/ac_darwin_drm.c",
+    "src/amd/common/darwin/ac_darwin_drm.h",
+    "src/amd/common/darwin/ac_darwin_iokit.c",
+    "src/amd/common/darwin/ac_darwin_kext.c",
+    "src/amd/common/darwin/ac_darwin_kext.h",
+    "src/amd/common/darwin/ac_darwin_sync.c",
+    "src/amd/common/darwin/build34_exact_open_wire.h",
+    "src/amd/common/darwin/build34_exact_progress_wire.h",
+    "src/amd/common/darwin/build34_exact_receipt_wire.h",
+    "src/amd/common/darwin/build34_exact_submit_wire.h",
+    "src/amd/common/darwin/build34_r3_mesa_drm.h",
+    "src/amd/common/darwin/build34_r3_mesa_iokit.h",
+    "src/amd/common/darwin/build34_r3_mesa_wire.c",
+    "src/amd/common/darwin/build34_r3_mesa_wire.h",
+    "src/amd/common/darwin/build34_r3_radv_entry.h",
+    "src/amd/common/darwin/r3/amd/phx_topology.h",
+    "src/amd/common/darwin/r3/phxbringup/PhxNativeABI.h",
+    "src/amd/common/meson.build",
+    "src/amd/vulkan/meson.build",
+    "src/amd/vulkan/radv_physical_device.c",
+    "src/amd/vulkan/winsys/amdgpu/radv_amdgpu_cs.c"
+  ],
+  "checked_translation_units": {
+    "src/amd/common/ac_linux_drm.c": "19874a4f9c25385099f42762b5f7f8990ce4b1e19f78185c176de0e323c19c2a",
+    "src/amd/vulkan/radv_physical_device.c": "b82b0393cfb3e4a2478ff89c45fc0d25e49ab3b7de9ccdd55e5b2b54d138229a",
+    "src/amd/vulkan/winsys/amdgpu/radv_amdgpu_winsys.c": "e1a16e10f6df4058ab8efaba700a47f8242ba9fa2d54b49833f54a05168dd722",
+    "src/amd/common/darwin/ac_darwin_kext.c": "c29bb8eb58435cfd4fc7c84bd45cd7cfca3a0f437395a584f4c68b69d082b7f5",
+    "src/amd/common/darwin/ac_darwin_iokit.c": "86174076e0373524d29c06da91026d9861ca6f4d0ff174eedfa4ea19bd276bcc",
+    "src/amd/common/darwin/ac_darwin_drm.c": "4201d719ba5730a3755679c57fccc6b1b866c34371f28a066d0cd1337397f15a",
+    "src/amd/common/darwin/ac_darwin_sync.c": "241c94a14bb21ee1f4df934069c83fadf004a72a3ceb971f892a9152700ea2f8",
+    "src/amd/common/darwin/build34_r3_mesa_wire.c": "1938a2ec3c4a16574a68b82201fb8b0e40ff81892d899acfe350c23986915836",
+    "src/amd/vulkan/winsys/amdgpu/radv_amdgpu_cs.c": "5976a05ea932469a992b32ede5e0efa5f8c43d8371c41d7245cb2a67e6a12b31"
+  },
+  "IOKit_imports": [
+    "_IOConnectCallMethod", "_IOConnectMapMemory64", "_IOConnectUnmapMemory64", "_IOObjectRelease",
+    "_IOServiceClose", "_IOServiceGetMatchingService", "_IOServiceMatching", "_IOServiceOpen"
+  ],
+  "system_dylib_dependencies": [
+    "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit", "/usr/lib/libSystem.B.dylib",
+    "/usr/lib/libz.1.dylib", "/usr/lib/libc++.1.dylib"
+  ],
+  "library_sha256": "4392e16486c41dc8bf3db7770748725cd10141ab73a4d190adacee762de5c66c",
+  "library_bytes": 20703064,
+  "protected_production_inputs": 172,
+  "tool_versions": {
+    "meson": "1.9.1",
+    "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+    "glslangValidator": "Glslang Version: 11:16.5.0\nESSL Version: OpenGL ES GLSL 3.20 glslang Khronos. 16.5.0\nGLSL Version: 4.60 glslang Khronos. 16.5.0\nSPIR-V Version 0x00010600, Revision 1\nGLSL.std.450 Version 100, Revision 1\nKhronos Tool ID 8\nSPIR-V Generator Version 11\nGL_KHR_vulkan_glsl version 100\nARB_GL_gl_spirv version 100"
+  },
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "native_mode_admitted": false,
+  "installed": false,
+  "loaded": false,
+  "binary_uploaded": false,
+  "real_IOKit_called": false,
+  "GPU_executed": false,
+  "R3_complete": false,
+  "exact_cs_omits_legacy_fence_chunk": true,
+  "staged_typed_receipt_submit_retry": true
+}

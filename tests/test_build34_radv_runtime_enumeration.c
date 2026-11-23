@@ -28,13 +28,16 @@ static void report_r3(unsigned scenario, unsigned devices, const struct cpu_vulk
           "\"service_releases\":%u,\"session_calls\":%u,\"hello_calls\":%u,\"BO_creates\":%u,"
           "\"fake_IOKit_calls\":%u,\"modeled_exact_submits\":%u,\"submit_attempts\":%u,\"submit_refusals\":%u,"
           "\"short_submit_replies\":%u,\"zero_polls\":%u,\"positive_waits\":%u,\"positive_pending\":%u,"
+          "\"capacity_replies\":%u,\"recovery_waits\":%u,\"capacity_replays\":%u,"
           "\"prefix_snapshots\":%u,\"exact_acks\":%u,\"gap_prefixes\":%u,\"closed_prefixes\":%u,"
           "\"native_submits\":0,\"GPU_executed\":false,\"post_failure_device_lost\":%s,\"vkQueueSubmit\":[",
           scenario, devices, phx34_cpu_opens(), phx34_cpu_closes(), phx34_cpu_attempts(),
           phx34_cpu_releases(), phx34_cpu_sessions(), phx34_cpu_hellos(), phx34_cpu_creates(), phx34_cpu_calls(),
           trace->submits, trace->submit_attempts, trace->submit_refusals, trace->short_submit_replies,
-          trace->zero_polls, trace->positive_waits, trace->positive_pending, trace->prefixes, trace->acks,
-          trace->gap_prefixes, trace->closed_prefixes, submit->post_failure_device_lost ? "true" : "false");
+          trace->zero_polls, trace->positive_waits, trace->positive_pending,
+          trace->capacity_replies, trace->recovery_waits, trace->capacity_replays, trace->prefixes, trace->acks,
+          trace->gap_prefixes,
+          trace->closed_prefixes, submit->post_failure_device_lost ? "true" : "false");
    for (unsigned index = 0; index < submit->count; ++index)
       printf("%s%d", index ? "," : "", (int)submit->results[index]);
    puts("]}");
@@ -56,8 +59,10 @@ static void test_submit(VkDevice device, const VkDeviceQueueCreateInfo *families
    DFN(vkBeginCommandBuffer); DFN(vkEndCommandBuffer);
    DFN(vkCreateFence); DFN(vkDestroyFence); DFN(vkGetFenceStatus); DFN(vkQueueSubmit); DFN(vkWaitForFences);
 #undef DFN
-   const uint32_t count = scenario == CPU_EXACT_DUAL ? 2 : 1;
-   const bool expect_failure = scenario == CPU_SUBMIT_REFUSED || scenario >= CPU_EXACT_BUSY_ONCE;
+   const bool capacity_case = cpu_is_capacity_case(scenario);
+   const uint32_t count = scenario == CPU_EXACT_DUAL || capacity_case ? 2 : 1;
+   const bool expect_failure = scenario == CPU_SUBMIT_REFUSED ||
+      (scenario >= CPU_EXACT_BUSY_ONCE && scenario != CPU_RETRY_RECOVERS);
    VkCommandPool pools[CPU_QUEUE_COUNT] = {0};
    VkFence fences[CPU_QUEUE_COUNT] = {0};
    for (uint32_t index = 0; index < count; ++index) {
@@ -81,15 +86,25 @@ static void test_submit(VkDevice device, const VkDeviceQueueCreateInfo *families
       const VkSubmitInfo submit = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                                    .commandBufferCount = 1, .pCommandBuffers = &command};
       observed->results[observed->count++] = vkQueueSubmit(queue, 1, &submit, fences[index]);
-      require(observed->results[index] == (expect_failure ? VK_ERROR_DEVICE_LOST : VK_SUCCESS));
+      require(observed->results[index] == (expect_failure && index == count - 1 ? VK_ERROR_DEVICE_LOST : VK_SUCCESS));
    }
    const struct cpu_exact_trace *trace = phx34_cpu_exact_trace();
    if (expect_failure) {
       const unsigned calls = phx34_cpu_calls();
-      require(!trace->zero_polls && !trace->positive_waits && !trace->prefixes && !trace->acks);
+      if (!capacity_case)
+         require(!trace->zero_polls && !trace->positive_waits && !trace->prefixes && !trace->acks);
       observed->post_failure_device_lost = vkGetFenceStatus(device, fences[0]) == VK_ERROR_DEVICE_LOST &&
          vkWaitForFences(device, 1, fences, VK_TRUE, 0) == VK_ERROR_DEVICE_LOST;
       require(observed->post_failure_device_lost && phx34_cpu_calls() == calls);
+   } else if (scenario == CPU_RETRY_RECOVERS) {
+      require(trace->submits == 2 && trace->acks == 1 && trace->ack_order[0] == CPU_COMPUTE &&
+              trace->recovery_waits == 1 && trace->capacity_replays == 1);
+      const unsigned calls = phx34_cpu_calls();
+      require(vkGetFenceStatus(device, fences[0]) == VK_SUCCESS && phx34_cpu_calls() == calls);
+      require(vkGetFenceStatus(device, fences[1]) == VK_NOT_READY);
+      phx34_cpu_schedule_completion(CPU_GFX);
+      require(vkWaitForFences(device, count, fences, VK_TRUE, 0) == VK_SUCCESS && trace->acks == 2 &&
+              trace->ack_order[1] == CPU_GFX);
    } else if (scenario == CPU_EXACT_SUBMIT) {
       require(trace->submits == 1 && !trace->positive_waits && !trace->acks);
       require(vkGetFenceStatus(device, fences[0]) == VK_NOT_READY);
@@ -129,8 +144,9 @@ static void test_submit(VkDevice device, const VkDeviceQueueCreateInfo *families
 int main(int argc, char **argv)
 {
 #ifdef PHX34_CPU_R3
-   require(argc == 3 && strlen(argv[2]) == 1 && argv[2][0] >= '0' && argv[2][0] < '0' + CPU_SCENARIO_COUNT);
-   const unsigned scenario = argv[2][0] - '0';
+   require(argc == 3 && strlen(argv[2]) && strlen(argv[2]) <= 2 && strspn(argv[2], "0123456789") == strlen(argv[2]));
+   const unsigned scenario = (unsigned)strtoul(argv[2], NULL, 10);
+   require(scenario < CPU_SCENARIO_COUNT);
    struct cpu_vulkan_submit_trace submit = {0};
    phx34_cpu_select(scenario);
 #else
@@ -159,7 +175,7 @@ int main(int argc, char **argv)
    require(vkEnumeratePhysicalDevices(instance, &count, &physical) == VK_SUCCESS);
 #ifdef PHX34_CPU_R3
    require(phx34_cpu_attempts() == 1 && phx34_cpu_releases() == 1);
-   if (scenario >= CPU_OPEN_REFUSED && scenario <= CPU_SESSION_SHORT) {
+   if ((scenario >= CPU_OPEN_REFUSED && scenario <= CPU_SESSION_SHORT) || scenario == CPU_RETRY_OLD_FLAGS) {
       const unsigned opened = scenario != CPU_OPEN_REFUSED;
       require(!count && !physical && phx34_cpu_opens() == opened && phx34_cpu_closes() == opened);
       require(phx34_cpu_hellos() == opened && phx34_cpu_sessions() == opened && !phx34_cpu_creates());
@@ -196,7 +212,7 @@ int main(int argc, char **argv)
    VkDeviceCreateInfo di = {.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, .queueCreateInfoCount=1, .pQueueCreateInfos=&qi};
 #ifdef PHX34_CPU_R3
    VkDeviceQueueCreateInfo tested_families[CPU_QUEUE_COUNT] = {qi, qi};
-   if (scenario == CPU_EXACT_DUAL) {
+   if (scenario == CPU_EXACT_DUAL || cpu_is_capacity_case(scenario)) {
       uint32_t graphics = 0;
       while (graphics < family_count && (!families[graphics].queueCount ||
                                          !(families[graphics].queueFlags & VK_QUEUE_GRAPHICS_BIT)))
