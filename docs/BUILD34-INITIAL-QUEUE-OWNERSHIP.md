@@ -765,6 +765,32 @@ firmware writers or rule out a later rebind. Do not publish the input,
 binary, private digests, or physical locator. See the
 [sanitized preparation record](validation/build34-r3-preboot-host-capture-preparation-20261123.json).
 
+### Separate the capture outcome from EFI application exit
+
+The first USB attempt was reported as an EFI boot failure; no capture
+classification or exact firmware error was confirmed. A private post-boot
+readback matched the external partition and the exact prepared image. In
+isolated OVMF, those same image bytes started from an emulated USB fallback
+path, printed `NOT_FOUND` for the absent target, then triggered the firmware's
+failed-to-start message by returning `EFI_NOT_FOUND`. This reproduces one
+possible explanation, not the physical firmware's actual failure.
+
+The capture entry now returns the console write status after printing any
+classification, including `NOT_FOUND`, `NO_MAPPING` and `REFUSED`. A successful
+exit means a line was emitted, not that attribution succeeded. Invalid entry
+arguments, a missing console, and console errors still propagate. The CPU
+suite checks exact output and exit status separately, including rejection of
+the application itself as the manager. No observation logic, target admission
+or underlying production component changes. The 10 ASan/UBSan entry checks,
+108 adapter cases, the existing isolated OVMF capture and attribution suites,
+and `make test` passed (missing firmware fixtures skipped). Two fixed links
+with the unchanged private target input matched byte-for-byte. In OVMF both
+the prior and fixed private images reported `NOT_FOUND`; only the prior image
+triggered the firmware's failed-to-start message. The fixed image was not
+retained or written to the USB disk. Rollback is to revert this reporting-only
+change. Do not overwrite or retry the existing physical USB scope; a further
+one-shot observation requires fresh admission.
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes

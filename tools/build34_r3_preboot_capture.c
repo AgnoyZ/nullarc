@@ -51,6 +51,5 @@ EfiMain(EFI_HANDLE image, EFI_SYSTEM_TABLE *system)
     else if (status == EFI_NOT_FOUND)
         line = L"PHX34_PREBOOT_CAPTURE_V1 NOT_FOUND\r\n";
 
-    EFI_STATUS reported = console->OutputString(console, line);
-    return reported == EFI_SUCCESS ? status : reported;
+    return console->OutputString(console, line);
 }

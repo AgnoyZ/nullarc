@@ -82,6 +82,11 @@ test-build34-r3-preboot-pci:
 		-isystem "$(R3_PREBOOT_EDK2_INCLUDE)/X64" -Itools tools/build34_r3_preboot_pci.c \
 		tests/test_build34_r3_preboot_pci.c -o "$(R3_PREBOOT_PCI_OUT)/test_preboot_pci"
 	"$(R3_PREBOOT_PCI_OUT)/test_preboot_pci"
+	clang -std=c11 -O1 -g -Wall -Wextra -Werror -fshort-wchar '-DEFIAPI=__attribute__((ms_abi))' \
+		-fsanitize=address,undefined -fno-sanitize-recover=all -isystem "$(R3_PREBOOT_EDK2_INCLUDE)" \
+		-isystem "$(R3_PREBOOT_EDK2_INCLUDE)/X64" -Itools tools/build34_r3_preboot_capture.c \
+		tests/test_build34_r3_preboot_capture.c -o "$(R3_PREBOOT_PCI_OUT)/test_preboot_capture"
+	"$(R3_PREBOOT_PCI_OUT)/test_preboot_capture"
 	clang -target x86_64-pc-windows-msvc -std=c11 -O2 -Wall -Wextra -Werror -fshort-wchar \
 		-ffreestanding -fno-builtin -fno-stack-protector -isystem "$(R3_PREBOOT_EDK2_INCLUDE)" \
 		-isystem "$(R3_PREBOOT_EDK2_INCLUDE)/X64" -c tools/build34_r3_preboot_pci.c \
