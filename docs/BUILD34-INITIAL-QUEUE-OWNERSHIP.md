@@ -834,6 +834,28 @@ change to recover the V1 diagnostic contract. Neither version supplies IH
 ownership, old-writer drain or R3 hardware acceptance. See the
 [sanitized record](validation/build34-r3-preboot-capture-stages-20261123.json).
 
+### Prepare the inactive V2 physical-target image
+
+From the exact build34 V2 source `48aa885`, two fresh host preparations on
+macOS 26.7.2 (`25G332`) agreed with each other and the V1 private target
+inputs byte-for-byte. Two independent links produced the same unsigned
+x86-64 EFI application. Independent PE readback verified the entry point,
+embedded path, path length and segment, target-pointer relocation, V2
+marker and absence of DLL imports. The image and SHA-256 manifest remain
+local, read-only and inactive; the manifest is not a signature or permission
+to launch.
+
+The exact image bytes, copied to the simulated USB fallback path, printed
+`NOT_FOUND ROOT` in two fresh OVMF runs using isolated variable stores.
+This confirms that the private image starts and reports a stage when the
+emulated root does not match. It does not identify the physical V1 failure
+stage or establish that any firmware writer was absent. No physical EFI,
+NVRAM or startup setting changed. Physical admission still requires fresh
+authorization for the exact external image write and one manual observation.
+Until then, leave the V1 USB image untouched; the private V2 packet can be
+discarded without rolling back any installed state. See the
+[sanitized preparation record](validation/build34-r3-preboot-v2-image-20261123.json).
+
 ### PCI quiescence is not an IH handoff
 
 Keep device producer stop, posted writes toward host memory, host writes
