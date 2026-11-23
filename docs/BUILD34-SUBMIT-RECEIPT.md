@@ -522,3 +522,49 @@ kernel timing. The prefix and queue completion come from the CPU substitute,
 not from device writeback. This does not prove hardware overlap, independent
 BAR0 visibility, sleep or stop lifecycle, or stability. The next hardware
 gate remains exclusive IH ownership and independent old-writer drain.
+
+### Full Vulkan submit backpressure on CPU
+
+The same pinned exact-CS image exercised three separate selector-66 outcomes.
+The fixture checked the entire submit envelope before choosing the outcome.
+
+| CPU substitute outcome | Winsys error | `vkQueueSubmit` | Submit calls | Modeled publications |
+| --- | --- | --- | ---: | ---: |
+| First call `Busy` before publication; the substitute would accept a retry | `-EAGAIN` | `VK_ERROR_DEVICE_LOST` | 1 | 0 |
+| Persistent `NoResources` before publication | `-EAGAIN` | `VK_ERROR_DEVICE_LOST` | 1 | 0 |
+| One modeled publication followed by a truncated success reply | `-EPROTO` | `VK_ERROR_DEVICE_LOST` | 1 | 1 |
+
+No case retried, issued a legacy submit/wait, queried the prefix or sent an
+ACK. Subsequent Vulkan fence status and zero-budget wait both reported device
+loss without entering the transport. The pinned winsys retry loop only handles
+`-ENOMEM`; `radv_queue_submit` marks the device lost for the other errors. This
+reproduces loss on even transient, known prepublication pressure. In contrast,
+refusing a replay of the truncated reply is required. The modeled teardown
+only frees host test memory; it says nothing about draining that publication
+or reclaiming native resources. The normal single/dual-queue cases and
+the original link's fence-chunk refusal still pass. See the
+[offline record](validation/build34-r3-radv-submit-pressure-cpu-20261123.json).
+
+Do not add `-EAGAIN` to the winsys retry loop as-is. In the staged native
+path, sequence/receipt serial exhaustion is terminal; `NoResources` can also
+mean a full receipt table. A published native slot becomes reusable after a
+validated completion and ACK, not merely on another submit. The Mesa cache
+needs both ACK and a valid retired prefix before reusing a record.
+Window/ring/VM pressure needs independent queue or retirement progress;
+a later submit does not prove it.
+The raw DRM wrapper also prepares dependency waits and can encounter errors
+attaching sync outputs **after** publication. Its final errno is not a
+dispatch verdict. The winsys holds the global BO-list read lock across raw
+submit (and may hold the device's fault-tracing mutex); exact transport holds
+its submit-order mutex during admission but releases the cache mutex around
+the backend call. Existing exact wait/ACK can progress without that submit
+mutex, but simple sleep and replay neither services pending receipts nor
+proves progress when capacity is full.
+
+A follow-up needs a distinct, typed prepublication pressure result for the
+composed native path, an absolute retry budget and a progress step that can
+observe and ACK older receipts without blocking their owners. Permanent
+exhaustion and ambiguous/possibly published results must not be retried. Prove
+lock ordering, teardown, single dispatch, and unchanged sync/fence behavior
+on retry before allowing native admission. No retry policy or production
+source was changed by this experiment.

@@ -2,6 +2,7 @@
 """Exercise pinned full R3 Vulkan entrypoints with no system IOKit dependency."""
 
 import argparse
+import errno
 import json
 import os
 from pathlib import Path
@@ -113,20 +114,37 @@ def test(runtime, output, exact_cs=False):
 
     results = {}
     scenarios = [(0, 'success'), (1, 'open_refused'), (2, 'missing_capability'), (3, 'short_session_reply')]
-    scenarios += [(5, 'exact_submit'), (6, 'exact_dual_queue')] if exact_cs else [(4, 'submit_refused')]
+    if exact_cs:
+        scenarios += [(5, 'exact_submit'), (6, 'exact_dual_queue'), (7, 'exact_busy_once'),
+                      (8, 'exact_no_resources'), (9, 'exact_short_submit')]
+    else:
+        scenarios.append((4, 'submit_refused'))
     for index, name in scenarios:
         result = results[name] = json.loads(run([executable, copy, str(index)], name))
-        expected_submits = {5: 1, 6: 2}.get(index, 0)
+        expected_acks = {5: 1, 6: 2}.get(index, 0)
+        expected_short = int(index == 9)
+        expected_refusals = int(index in (7, 8))
+        expected_lost = index in (4, 7, 8, 9)
         if (result['scenario'] != index or result['GPU_executed'] or result['native_submits'] or
-                result['physical_devices'] != (index in (0, 4, 5, 6)) or result['open_attempts'] != 1 or
-                any(result[key] != expected_submits for key in ('modeled_exact_submits', 'exact_acks')) or
-                result['positive_waits'] != result['positive_pending'] + bool(expected_submits) or
+                result['physical_devices'] != (index not in (1, 2, 3)) or result['open_attempts'] != 1 or
+                result['vkQueueSubmit'] != ([-4] if expected_lost else [0] * expected_acks) or
+                result['post_failure_device_lost'] != expected_lost or result['exact_acks'] != expected_acks or
+                result['submit_attempts'] != expected_acks + expected_short + expected_refusals or
+                result['submit_refusals'] != expected_refusals or result['short_submit_replies'] != expected_short or
+                result['modeled_exact_submits'] != expected_acks + expected_short or
+                result['positive_waits'] != result['positive_pending'] + bool(expected_acks) or
                 bool(result['positive_pending']) != (index == 6) or
                 result['prefix_snapshots'] != result['zero_polls'] + result['positive_waits'] or
-                (expected_submits and result['zero_polls'] < 2) or
-                (not expected_submits and (result['zero_polls'] or result['prefix_snapshots'])) or
+                (expected_acks and result['zero_polls'] < 2) or
+                (not expected_acks and (result['zero_polls'] or result['prefix_snapshots'])) or
                 bool(result['gap_prefixes']) != (index == 6) or result['closed_prefixes'] != (index == 6)):
             raise ValueError('Incomplete or unexpected Vulkan lifecycle evidence')
+        if index in (7, 8, 9):
+            expected_error = -(errno.EPROTO if expected_short else errno.EAGAIN)
+            diagnostic = f'see dmesg for more information ({expected_error}).'
+            if (output / (name + '.stderr')).read_text().count(diagnostic) != 1:
+                raise ValueError('Unexpected RADV winsys submit error')
+            result['observed_winsys_errno'] = expected_error
     if (digest(library) != recorded['library_sha256'] or inventory(mesa) != manifest or
             production_snapshot() != protected or any(digest(path) != sha for path, sha in inputs.items())):
         raise ValueError('Source, library or fixture changed during verification')

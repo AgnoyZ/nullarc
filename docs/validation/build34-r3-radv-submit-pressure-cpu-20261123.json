@@ -1,0 +1,56 @@
+{
+  "status": "passed-full-RADV-R3-CPU-submit-pressure-reproduction",
+  "kernel_build": 34,
+  "linked_library_sha256": "9a0b829f2758701c7ac4739fcca3119505661d5d57ef391a0e761d865cd13eb8",
+  "scenarios": {
+    "exact_busy_once": {
+      "modeled_return": "kIOReturnBusy",
+      "observed_winsys_ret": "-EAGAIN",
+      "submit_attempts": 1,
+      "submit_refusals": 1,
+      "modeled_publications": 0,
+      "short_submit_replies": 0
+    },
+    "exact_no_resources": {
+      "modeled_return": "kIOReturnNoResources",
+      "observed_winsys_ret": "-EAGAIN",
+      "submit_attempts": 1,
+      "submit_refusals": 1,
+      "modeled_publications": 0,
+      "short_submit_replies": 0
+    },
+    "exact_short_submit": {
+      "modeled_return": "KERN_SUCCESS with truncated reply",
+      "observed_winsys_ret": "-EPROTO",
+      "submit_attempts": 1,
+      "submit_refusals": 0,
+      "modeled_publications": 1,
+      "short_submit_replies": 1
+    }
+  },
+  "all_pressure_cases": {
+    "vkQueueSubmit": "VK_ERROR_DEVICE_LOST",
+    "vkGetFenceStatus_after_failure": "VK_ERROR_DEVICE_LOST",
+    "zero_budget_vkWaitForFences_after_failure": "VK_ERROR_DEVICE_LOST",
+    "fence_queries_entered_transport_after_failure": false,
+    "exact_wait_calls": 0,
+    "prefix_snapshots": 0,
+    "exact_acks": 0,
+    "legacy_submit_or_wait_calls": 0
+  },
+  "full_runtime_scenarios_passed": 14,
+  "default_test_target_passed": true,
+  "firmware_fixture_tests_skipped": true,
+  "retargeted_test_copies_only": true,
+  "executable_text_identical_to_original_per_image": true,
+  "fixture_ASan_UBSan": true,
+  "runtime_sanitized": false,
+  "protected_production_inputs": 172,
+  "native_mode_admitted": false,
+  "real_IOKit_called": false,
+  "installed": false,
+  "binary_uploaded": false,
+  "native_submits": 0,
+  "GPU_executed": false,
+  "R3_complete": false
+}

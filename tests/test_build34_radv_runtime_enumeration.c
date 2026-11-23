@@ -15,19 +15,29 @@ extern void phx34_cpu_arm(void);
 extern void phx34_cpu_select(unsigned scenario);
 extern unsigned phx34_cpu_attempts(void), phx34_cpu_sessions(void), phx34_cpu_hellos(void), phx34_cpu_releases(void);
 
-static void report_r3(unsigned scenario, unsigned devices)
+struct cpu_vulkan_submit_trace {
+   VkResult results[CPU_QUEUE_COUNT];
+   unsigned count;
+   bool post_failure_device_lost;
+};
+
+static void report_r3(unsigned scenario, unsigned devices, const struct cpu_vulkan_submit_trace *submit)
 {
    const struct cpu_exact_trace *trace = phx34_cpu_exact_trace();
    printf("{\"scenario\":%u,\"physical_devices\":%u,\"opens\":%u,\"closes\":%u,\"open_attempts\":%u,"
           "\"service_releases\":%u,\"session_calls\":%u,\"hello_calls\":%u,\"BO_creates\":%u,"
-          "\"fake_IOKit_calls\":%u,\"modeled_exact_submits\":%u,\"zero_polls\":%u,\"positive_waits\":%u,"
-          "\"positive_pending\":%u,"
+          "\"fake_IOKit_calls\":%u,\"modeled_exact_submits\":%u,\"submit_attempts\":%u,\"submit_refusals\":%u,"
+          "\"short_submit_replies\":%u,\"zero_polls\":%u,\"positive_waits\":%u,\"positive_pending\":%u,"
           "\"prefix_snapshots\":%u,\"exact_acks\":%u,\"gap_prefixes\":%u,\"closed_prefixes\":%u,"
-          "\"native_submits\":0,\"GPU_executed\":false}\n",
+          "\"native_submits\":0,\"GPU_executed\":false,\"post_failure_device_lost\":%s,\"vkQueueSubmit\":[",
           scenario, devices, phx34_cpu_opens(), phx34_cpu_closes(), phx34_cpu_attempts(),
           phx34_cpu_releases(), phx34_cpu_sessions(), phx34_cpu_hellos(), phx34_cpu_creates(), phx34_cpu_calls(),
-          trace->submits, trace->zero_polls, trace->positive_waits, trace->positive_pending, trace->prefixes, trace->acks,
-          trace->gap_prefixes, trace->closed_prefixes);
+          trace->submits, trace->submit_attempts, trace->submit_refusals, trace->short_submit_replies,
+          trace->zero_polls, trace->positive_waits, trace->positive_pending, trace->prefixes, trace->acks,
+          trace->gap_prefixes, trace->closed_prefixes, submit->post_failure_device_lost ? "true" : "false");
+   for (unsigned index = 0; index < submit->count; ++index)
+      printf("%s%d", index ? "," : "", (int)submit->results[index]);
+   puts("]}");
 }
 #endif
 static void fixture_require(int okay, unsigned line)
@@ -38,7 +48,7 @@ static void fixture_require(int okay, unsigned line)
 
 #ifdef PHX34_CPU_R3
 static void test_submit(VkDevice device, const VkDeviceQueueCreateInfo *families, PFN_vkGetDeviceProcAddr get_proc,
-                        unsigned scenario)
+                        unsigned scenario, struct cpu_vulkan_submit_trace *observed)
 {
 #define DFN(name) PFN_##name name = (PFN_##name)get_proc(device, #name); require(name != NULL)
    DFN(vkGetDeviceQueue);
@@ -47,6 +57,7 @@ static void test_submit(VkDevice device, const VkDeviceQueueCreateInfo *families
    DFN(vkCreateFence); DFN(vkDestroyFence); DFN(vkGetFenceStatus); DFN(vkQueueSubmit); DFN(vkWaitForFences);
 #undef DFN
    const uint32_t count = scenario == CPU_EXACT_DUAL ? 2 : 1;
+   const bool expect_failure = scenario == CPU_SUBMIT_REFUSED || scenario >= CPU_EXACT_BUSY_ONCE;
    VkCommandPool pools[CPU_QUEUE_COUNT] = {0};
    VkFence fences[CPU_QUEUE_COUNT] = {0};
    for (uint32_t index = 0; index < count; ++index) {
@@ -69,12 +80,16 @@ static void test_submit(VkDevice device, const VkDeviceQueueCreateInfo *families
       require(vkGetFenceStatus(device, fences[index]) == VK_NOT_READY);
       const VkSubmitInfo submit = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                                    .commandBufferCount = 1, .pCommandBuffers = &command};
-      const VkResult expected = scenario == CPU_SUBMIT_REFUSED ? VK_ERROR_DEVICE_LOST : VK_SUCCESS;
-      require(vkQueueSubmit(queue, 1, &submit, fences[index]) == expected);
+      observed->results[observed->count++] = vkQueueSubmit(queue, 1, &submit, fences[index]);
+      require(observed->results[index] == (expect_failure ? VK_ERROR_DEVICE_LOST : VK_SUCCESS));
    }
    const struct cpu_exact_trace *trace = phx34_cpu_exact_trace();
-   if (scenario == CPU_SUBMIT_REFUSED) {
-      require(!trace->submits);
+   if (expect_failure) {
+      const unsigned calls = phx34_cpu_calls();
+      require(!trace->zero_polls && !trace->positive_waits && !trace->prefixes && !trace->acks);
+      observed->post_failure_device_lost = vkGetFenceStatus(device, fences[0]) == VK_ERROR_DEVICE_LOST &&
+         vkWaitForFences(device, 1, fences, VK_TRUE, 0) == VK_ERROR_DEVICE_LOST;
+      require(observed->post_failure_device_lost && phx34_cpu_calls() == calls);
    } else if (scenario == CPU_EXACT_SUBMIT) {
       require(trace->submits == 1 && !trace->positive_waits && !trace->acks);
       require(vkGetFenceStatus(device, fences[0]) == VK_NOT_READY);
@@ -114,8 +129,9 @@ static void test_submit(VkDevice device, const VkDeviceQueueCreateInfo *families
 int main(int argc, char **argv)
 {
 #ifdef PHX34_CPU_R3
-   require(argc == 3 && strlen(argv[2]) == 1 && argv[2][0] >= '0' && argv[2][0] <= '6');
+   require(argc == 3 && strlen(argv[2]) == 1 && argv[2][0] >= '0' && argv[2][0] < '0' + CPU_SCENARIO_COUNT);
    const unsigned scenario = argv[2][0] - '0';
+   struct cpu_vulkan_submit_trace submit = {0};
    phx34_cpu_select(scenario);
 #else
    require(argc == 3 && (!strcmp(argv[2], "1") || !strcmp(argv[2], "0")));
@@ -150,7 +166,7 @@ int main(int argc, char **argv)
       require(phx34_cpu_calls() == 2 * opened);
       vkDestroyInstance(instance, NULL);
       require(!dlclose(library) && phx34_cpu_attempts() == 1 && phx34_cpu_closes() == opened && !phx34_cpu_blocked());
-      report_r3(scenario, 0);
+      report_r3(scenario, 0, &submit);
       return 0;
    }
 #endif
@@ -195,7 +211,7 @@ int main(int argc, char **argv)
    require(phx34_cpu_opens() == (enabled ? 1u : 3u) && phx34_cpu_closes() == (enabled ? 0u : 2u));
 #ifdef PHX34_CPU_R3
    if (scenario >= CPU_SUBMIT_REFUSED)
-      test_submit(device, tested_families, vkGetDeviceProcAddr, scenario);
+      test_submit(device, tested_families, vkGetDeviceProcAddr, scenario, &submit);
 #endif
    PFN_vkDestroyDevice destroy = (PFN_vkDestroyDevice)vkGetDeviceProcAddr(device, "vkDestroyDevice"); require(destroy != NULL);
    destroy(device, NULL);
@@ -205,7 +221,7 @@ int main(int argc, char **argv)
    require(!dlclose(library));
 #ifdef PHX34_CPU_R3
    require(phx34_cpu_attempts() == 1 && phx34_cpu_sessions() == 1);
-   report_r3(scenario, 1);
+   report_r3(scenario, 1, &submit);
 #else
    printf("{\"CPU_only\":true,\"real_full_Vulkan_enumeration_and_device_lifecycle\":true,\"tail_enabled\":%s,"
           "\"opens\":%u,\"closes\":%u,\"BO_creates\":%u,\"fake_IOKit_calls\":%u,\"native_submits\":0,\"GPU_executed\":false}\n",

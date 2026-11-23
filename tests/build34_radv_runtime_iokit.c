@@ -60,7 +60,7 @@ unsigned phx34_cpu_blocked(void) { return blocked; }
 void phx34_cpu_arm(void) { require(!armed && blocked == 1 && !opens && !calls); armed = 1; blocked = 0; }
 
 #ifdef PHX34_CPU_R3
-void phx34_cpu_select(unsigned value) { require(!armed && value <= CPU_EXACT_DUAL); scenario = value; }
+void phx34_cpu_select(unsigned value) { require(!armed && value < CPU_SCENARIO_COUNT); scenario = value; }
 unsigned phx34_cpu_attempts(void) { return attempts; }
 unsigned phx34_cpu_sessions(void) { return sessions; }
 unsigned phx34_cpu_hellos(void) { return hellos; }
@@ -145,7 +145,7 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_close, IOServiceClose)(io_connect_t co
 {
    require(armed && connection == 0x789a && opens == closes + 1 && !contexts);
 #ifdef PHX34_CPU_R3
-   require(!need_prefix && trace.submits == trace.acks);
+   require(!need_prefix && trace.submits == trace.acks + trace.short_submit_replies);
 #endif
    for (unsigned h = 1; h < next_handle; ++h) {
       require(!bos[h].maps); free(bos[h].data); allocated -= bos[h].size; bos[h] = (struct cpu_bo){0};
@@ -192,7 +192,7 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
       return KERN_SUCCESS;
    }
    case PHX34_R3_SEL_SUBMIT_RECEIPT: {
-      require((scenario == CPU_EXACT_SUBMIT || scenario == CPU_EXACT_DUAL) && sessions == 1 && hellos == 2 &&
+      require(scenario >= CPU_EXACT_SUBMIT && sessions == 1 && hellos == 2 &&
               contexts == 1 && !need_prefix && trace.submits < (scenario == CPU_EXACT_DUAL ? 2u : 1u));
       const unsigned queue = trace.submits ? CPU_GFX : CPU_COMPUTE;
       struct phx34_r3_reply *receipt = &receipts[queue];
@@ -219,12 +219,25 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
                  ib->ib_bytes && !(ib->ib_bytes & 3) && ib->ib_bytes <= 0xfffffu * 4 &&
                  !(ib->va_start & 3) && mapped_ib(ib));
       }
+      ++trace.submit_attempts;
+      if (scenario == CPU_EXACT_BUSY_ONCE && trace.submit_attempts == 1) {
+         ++trace.submit_refusals;
+         return kIOReturnBusy;
+      }
+      if (scenario == CPU_EXACT_NO_RESOURCES) {
+         ++trace.submit_refusals;
+         return kIOReturnNoResources;
+      }
       *receipt = (struct phx34_r3_reply){.version = PHX34_R3_WIRE_VERSION, .size = sizeof(*receipt),
          .status = PHX34_R3_REPLY_SUBMITTED, .owner = owner, .serial = 0x300000019ull + trace.submits,
          .sequence = first_sequence + trace.submits, .generation = 0x400000023ull + queue,
          .slot = 63 - trace.submits, .queue = queue};
       ++trace.submits;
-      memcpy(result, receipt, sizeof(*receipt));
+      if (scenario == CPU_EXACT_SHORT_SUBMIT) {
+         --*result_size;
+         ++trace.short_submit_replies;
+      }
+      memcpy(result, receipt, *result_size);
       return KERN_SUCCESS;
    }
    case PHX34_R3_SEL_WAIT_RECEIPT:
@@ -350,7 +363,7 @@ IOKIT_LINKAGE kern_return_t IOKIT_API(cpu_call, IOConnectCallMethod)(mach_port_t
    case N48N_SEL_GEMVA:
       require(structure && structure_size == sizeof(struct n48n_gem_va));
 #ifdef PHX34_CPU_R3
-      if (scenario == CPU_EXACT_SUBMIT || scenario == CPU_EXACT_DUAL) {
+      if (scenario >= CPU_EXACT_SUBMIT) {
          const struct n48n_gem_va *request = structure;
          require(request->handle && request->handle < next_handle && !request->_pad &&
                  !request->vm_timeline_point && !request->vm_timeline_syncobj_out &&

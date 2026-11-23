@@ -134,9 +134,13 @@ preboot identity, IH ownership or old-writer drain.
    The 0007 transport cache now tests that late-query prerequisite with CPU
    callbacks, preserving raw sequence numbers and the genuine global prefix.
    Its callback table is not native negotiation: do not bind it to old WAITSEQ,
-   enable it in production, or assume RADV safely retries its EAGAIN admission
-   refusal without testing the real caller. The independent snapshot/visibility,
-   strict native error classification and SDK integration still have to exist.
+   enable it in production, or retry arbitrary `EAGAIN`. The
+   [full Vulkan pressure fixture](BUILD34-SUBMIT-RECEIPT.md#full-vulkan-submit-backpressure-on-cpu)
+   reproduces device loss from a single known prepublication Busy, with no
+   replay of either sustained refusal or an uncertain reply. Separate proven
+   retryable admission from terminal and postpublication failures, and verify
+   bounded progress through the real caller. Independent snapshot/visibility
+   and native/SDK integration still have to exist.
    Staged receipt wait/ACK now validate complete owner/slot/serial/sequence/
    queue/generation requests at the actual pre-lock dispatch entry; see
    [the experimental wire contract](BUILD34-RECEIPT-WIRE.md). This is only
