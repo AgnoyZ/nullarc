@@ -536,11 +536,43 @@ drift, a successful submit without nomination, an in-flight ACK, checked
 completion after a prefix, capacity retry, and malformed replies. Rollback
 is to discard the paired overlays; there is no installed wire change.
 
-No consumer is registered with `performTransaction`. Before any copy
-bypass, a retained present handoff must establish earlier-writer drain,
-later writer exclusion, actual native translation and HUBP visibility, and
-keep the backing alive through flip latch and old-page retirement. The
-exact-open gate, the R2a copy, and the `l10r` fallback remain unchanged.
+The paired [present handoff](../tools/build34_dcn_present_handoff_stage.py)
+connects that receipt to the observation hook in `performTransaction`.
+The [plugin stage](../tools/build34_dcn_plugin_present_stage.py) offers one
+revalidated, successfully published WindowServer attachment before the
+completed part is cleared. It accepts either a single matching drawable
+action or a single landed part with no drawable action. The latter covers
+the source path where the compositor drives the display transaction
+separately. It does not delay readiness or alter present actions, so a
+display transaction can race ahead of the offer under kernel-wait policy.
+Neither route has been shown to reach this hook on the running compositor.
+
+A [separately negotiated 88-byte request](../tools/build34_dcn_present_wire.h)
+carries an IOSurface ID, the checked native receipt and its exact BO range
+on the same RADV connection. It carries no user pointer and does not add a
+legacy selector. The kernel resolves the ID with the owning task, outside
+the client and GPUVM locks, then rechecks the writer and queue generation.
+One provider slot owns the retained IOSurface. Match and consume use kernel
+object identity, never the numerical ID alone. One receipt cannot offer
+twice. Replacement, matching consumption, close and stop release the slot's
+surface reference. A mismatched transaction leaves at most one observation
+pending; a later submit invalidates the proof even if the slot still holds
+the surface.
+
+The hook borrows the prepared R2a copy descriptor for the synchronous page
+comparison and only increments `debug.nvaccel_iop_dcn_backing_matches` on
+success. Wrong object, stale writer, lock contention, and unsupported layouts
+never alter copy or flip decisions; `l10r` still converts through R2a. CPU
+checks exercise replay, replacement, stop, submission during lookup, and
+close during lookup or comparison. No native open, kext, plugin or Mesa
+runtime is enabled by these stages, and no installed state changes.
+Rollback is to discard the three paired source overlays.
+
+Before any copy bypass, qualify the render-only alias on the actual
+compositor path. Establish earlier-writer drain and later GPU, CPU and
+external writer exclusion, actual device translation and HUBP visibility,
+then retain the backing through flip latch and old-page retirement. The
+page-match counter is not proof of any of those properties.
 
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and

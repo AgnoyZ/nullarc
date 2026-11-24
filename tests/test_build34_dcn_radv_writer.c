@@ -6,6 +6,9 @@
 #include "build34_r3_mesa_wire.h"
 #include "build34_exact_progress_wire.h"
 #include "build34_dcn_writer_wire.h"
+#ifdef TEST_PRESENT_OFFER
+#include "build34_dcn_present_wire.h"
+#endif
 
 uint64_t acd_kext_now_ns(struct acd_kext *transport)
 {
@@ -28,6 +31,9 @@ struct peer {
    uint64_t sequence, retired;
    unsigned short_submits, extended_submits, dispatches, waits, acks;
    bool accept, busy, ack_busy, full_once, raw_failure, bad_queue, bad_full;
+#ifdef TEST_PRESENT_OFFER
+   unsigned offers;
+#endif
 };
 
 static int peer_call(void *context, uint32_t selector, const void *input, size_t input_size,
@@ -49,6 +55,16 @@ static int peer_call(void *context, uint32_t selector, const void *input, size_t
       return 0;
    }
 
+#ifdef TEST_PRESENT_OFFER
+   if (selector == BUILD34_DCN_SEL_OFFER) {
+      const struct build34_dcn_present_offer *offer = input;
+      assert(peer->flags == PHX34_R3_DCN_PRESENT_FLAGS && !output && !output_size && input_size == sizeof(*offer));
+      assert(offer->surface == 17 && offer->native.owner == owner && offer->native.sequence == peer->sequence);
+      assert(!memcmp(&offer->range, &candidate.range, sizeof(offer->range)));
+      ++peer->offers;
+      return 0;
+   }
+#endif
    assert(*output_size == sizeof(struct phx34_r3_reply));
    struct phx34_r3_reply *reply = output;
    *reply = (struct phx34_r3_reply){.version = PHX34_R3_WIRE_VERSION, .size = sizeof(*reply), .owner = owner};
@@ -59,7 +75,7 @@ static int peer_call(void *context, uint32_t selector, const void *input, size_t
       const bool extended = input_size == sizeof(struct build34_dcn_writer_request);
       if (extended) {
          const struct build34_dcn_writer_request *envelope = input;
-         assert(peer->flags == PHX34_R3_DCN_FLAGS && build34_dcn_matches_writer_ib(request, &envelope->writer));
+         assert((peer->flags & PHX34_R3_CAP_DCN_WRITER) && build34_dcn_matches_writer_ib(request, &envelope->writer));
          assert(!memcmp(&envelope->writer, &candidate, sizeof(candidate)));
          ++peer->extended_submits;
       } else {
@@ -113,7 +129,7 @@ static void attach(struct acd_kext *transport, struct phx34_mesa_wire *wire)
 {
    struct acd_exact_backend backend = {0};
    assert(!phx34_mesa_wire_backend(wire, &backend));
-   assert((backend.submit_writer != NULL) == (wire->flags == PHX34_R3_DCN_FLAGS));
+   assert((backend.submit_writer != NULL) == !!(wire->flags & PHX34_R3_CAP_DCN_WRITER));
    assert(!acd_kext_set_exact_backend(transport, &backend));
 }
 
@@ -223,13 +239,42 @@ static void refusal_cases(void)
    }
 }
 
+#ifdef TEST_PRESENT_OFFER
+static void present_offer(void)
+{
+   struct peer peer = {.flags = PHX34_R3_DCN_PRESENT_FLAGS, .prefix_flags = PHX34_R3_DCN_PRESENT_FLAGS, .accept = true};
+   struct acd_kext transport = {.mtx = PTHREAD_MUTEX_INITIALIZER};
+   struct phx34_mesa_wire wire = wire_for(&peer);
+   attach(&transport, &wire);
+   struct build34_dcn_present_offer offer = {.version = BUILD34_DCN_PRESENT_VERSION, .size = sizeof(offer),
+      .surface = 17, .range = candidate.range};
+   assert(!nominate(&transport, &candidate, &offer.native));
+   assert(acd_kext_dcn_offer(&transport, &offer) == -ENOENT && !peer.offers);
+   expect_poll(&transport, &offer.native, 0, false);
+   assert(!pthread_mutex_lock(&transport.exact->submit_mtx));
+   assert(acd_kext_dcn_offer(&transport, &offer) == -EAGAIN && !peer.offers);
+   assert(!pthread_mutex_unlock(&transport.exact->submit_mtx));
+   assert(!acd_kext_dcn_offer(&transport, &offer) && peer.offers == 1);
+   --offer.range.bytes;
+   assert(acd_kext_dcn_offer(&transport, &offer) == -EINVAL && peer.offers == 1);
+   ++offer.range.bytes;
+   struct build34_dcn_native_submit replaced;
+   assert(!nominate(&transport, &candidate, &replaced));
+   assert(acd_kext_dcn_offer(&transport, &offer) == -ENOENT && peer.offers == 1);
+   finish(&transport);
+}
+#endif
+
 int main(void)
 {
-   struct peer unknown = {.flags = PHX34_R3_DCN_FLAGS | (1u << 4)};
+   struct peer unknown = {.flags = PHX34_R3_DCN_FLAGS | (1u << 5)};
    struct phx34_mesa_wire wire = wire_for(&unknown);
    struct acd_exact_backend backend = {0};
    assert(phx34_mesa_wire_backend(&wire, &backend) == -EPROTO && !wire.owner && !backend.submit_writer);
    negotiated_writer();
    refusal_cases();
+#ifdef TEST_PRESENT_OFFER
+   present_offer();
+#endif
    return 0;
 }

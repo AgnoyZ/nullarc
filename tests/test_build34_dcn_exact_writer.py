@@ -13,6 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 
 import build34_dcn_exact_writer_stage as writer
+import build34_dcn_present_handoff_stage as handoff
+from build34_dcn_present_backing_stage import ACCEL, stage as present_backing
 import build34_exact_submit_pressure as pressure
 from build34_exact_open import stage as exact_open, stage_header
 from test_build34_exact_ownership import method
@@ -63,13 +65,34 @@ class ExactWriterTests(unittest.TestCase):
                 writer.stage(driver, abi)
 
     def test_extracted_native_exact_methods(self):
+        self.check_native_methods()
+
+    def test_extracted_present_handoff(self):
+        self.check_native_methods(paired=True)
+
+    def test_present_handoff_preserves_collecting_only_boundaries(self):
+        source = handoff.stage_native(DRIVER, ABI)
+        for signature in ('bool PhxBringup::exactNativeOpenAdmitted(', 'bool PhxBringup::captureExactOpenLocked(',
+                          'IOReturn PhxBringup::gpuSubmit(', writer.PROBE):
+            self.assertEqual(method(source, signature), method(self.source, signature))
+        accelerator = (ROOT / ACCEL).read_bytes()
+        signature = 'IOReturn NVDisplayPipe::performTransaction('
+        self.assertEqual(method(handoff.stage_accelerator(accelerator), signature),
+                         method(present_backing(accelerator), signature))
+
+    def check_native_methods(self, paired=False):
         fixture = Path(__file__).with_suffix('.cpp').read_text()
-        client = self.source[self.source.index('class IOAccelPhxNativeClient :'):]
+        source = handoff.stage_native(DRIVER, ABI) if paired else self.source
+        client = source[source.index('class IOAccelPhxNativeClient :'):]
         types = client[client.index('    struct Bo {'):client.index('    IOReturn doHello(')]
+        signatures = SIGNATURES
+        if paired:
+            signatures += (handoff.ATTACH, handoff.CONSUME, handoff.DISPATCH, handoff.CLIENT_MATCH, handoff.OFFER,
+                           handoff.CLOSE, handoff.SEAL)
         for marker, replacement in {
-            '// WRITER_METHODS': '\n'.join(method(self.source, signature) for signature in SIGNATURES),
-            '// WRITER_SERVICE': writer.SERVICE_DECL,
-            '// WRITER_CLIENT': writer.CLIENT_STATE + writer.PROBE_DECL,
+            '// WRITER_METHODS': '\n'.join(method(source, signature) for signature in signatures),
+            '// WRITER_SERVICE': writer.SERVICE_DECL + (handoff.PROVIDER_PUBLIC + handoff.PROVIDER_FIELDS if paired else ''),
+            '// WRITER_CLIENT': writer.CLIENT_STATE + writer.PROBE_DECL + (handoff.CLIENT_FIELDS if paired else ''),
             '// WRITER_TYPES': types,
         }.items():
             self.assertEqual(fixture.count(marker), 1)
@@ -78,7 +101,8 @@ class ExactWriterTests(unittest.TestCase):
         binary = self.directory / 'writer-CPU-only'
         source.write_text(fixture)
         compiler = shlex.split(os.environ.get('CXX', 'clang++'))
-        self.run_checked([*compiler, '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable', '-O1', '-g',
+        self.run_checked([*compiler, *(['-DTEST_PRESENT_HANDOFF'] if paired else []),
+                          '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable', '-O1', '-g',
                           '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I' + str(self.headers),
                           '-I' + str(ROOT / 'tests/build34_dcn'), '-I' + str(ROOT / 'tools'),
                           '-I' + str(ROOT / 'src/phxbringup'), str(source), '-o', str(binary)])
@@ -90,17 +114,24 @@ class ExactWriterTests(unittest.TestCase):
     def test_kernel_sdk_syntax(self):
         src = self.directory / writer.DRIVER
         src.parent.mkdir(parents=True)
-        src.write_text(self.source)
         (self.directory / writer.ABI).write_bytes(ABI)
         topology = self.directory / 'src/amd/phx_topology.h'
         topology.parent.mkdir()
         topology.write_bytes((ROOT / 'src/amd/phx_topology.h').read_bytes())
         compiler = shlex.split(os.environ.get('CXX', 'clang++'))
-        self.run_checked([*compiler, '-arch', 'x86_64', '-mmacosx-version-min=11.0', '-mkernel', '-fno-builtin',
-                          '-fno-common', '-nostdinc', '-DKERNEL', '-DKERNEL_PRIVATE', '-DDRIVER_PRIVATE', '-DAPPLE', '-DNeXT',
-                          '-std=c++17', '-fapple-kext', '-fno-rtti', '-fno-exceptions', '-fsyntax-only',
-                          '-I' + os.environ['BUILD34_KERNEL_HEADERS'], '-I' + str(self.headers),
-                          '-I' + str(ROOT / 'tools'), '-I' + str(src.parent), str(src)])
+        flags = [*compiler, '-arch', 'x86_64', '-mmacosx-version-min=11.0', '-mkernel', '-fno-builtin',
+                 '-fno-common', '-nostdinc', '-DKERNEL', '-DKERNEL_PRIVATE', '-DDRIVER_PRIVATE', '-DAPPLE', '-DNeXT',
+                 '-std=c++17', '-fapple-kext', '-fno-rtti', '-fno-exceptions', '-fsyntax-only',
+                 '-I' + os.environ['BUILD34_KERNEL_HEADERS'], '-I' + str(self.headers),
+                 '-I' + str(ROOT / 'tools'), '-I' + str(src.parent)]
+        for source in (self.source, handoff.stage_native(DRIVER, ABI)):
+            src.write_text(source)
+            self.run_checked([*flags, str(src)])
+        accel = ROOT / ACCEL
+        staged = self.directory / 'nvrm-accel.cpp'
+        staged.write_text(handoff.stage_accelerator(accel.read_bytes()))
+        self.run_checked([*flags, '-DNMX_ACCEL', '-DNM_TAHOE', '-DPHX_FB', '-I' + str(accel.parent.parent), '-I' + str(accel.parent),
+                          '-I' + str(accel.parent / 'iofam'), '-I' + str(accel.parent / 're'), str(staged)])
 
 
 if __name__ == '__main__':

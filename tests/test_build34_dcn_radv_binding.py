@@ -17,6 +17,7 @@ import build34_dcn_radv_clear_stage as clear
 import build34_dcn_radv_part_stage as part
 import build34_dcn_radv_submit_stage as submit
 import build34_dcn_radv_writer_stage as writer
+import build34_dcn_radv_present_stage as present
 
 
 class RenderBinding(unittest.TestCase):
@@ -49,6 +50,9 @@ class RenderBinding(unittest.TestCase):
     def test_paired_mesa_writer_and_wire_syntax(self):
         self.check_mesa_overlay(writer)
 
+    def test_paired_mesa_present_handoff(self):
+        self.check_mesa_overlay(present)
+
     def check_mesa_overlay(self, stage):
         recipe = os.environ.get("BUILD34_RADV_COMPILE_COMMANDS")
         if not recipe:
@@ -56,7 +60,8 @@ class RenderBinding(unittest.TestCase):
         rows = json.loads(Path(recipe).read_text())
         commands = {}
         names = [name for name in stage.INPUTS if name.endswith(".c")]
-        paired = stage is writer
+        paired = stage is not part
+        present_handoff = stage is present
         if paired:
             names.append("src/amd/common/darwin/ac_darwin_iokit.c")
         for name in names:
@@ -87,7 +92,8 @@ class RenderBinding(unittest.TestCase):
             out = Path(tmp)
             queue = sources[submit.QUEUE]
             (out / "staged_radv_part.inc").write_text(
-                queue[queue.index("struct radv_dcn_part_scope {"):queue.index("#endif\n\nstatic VkResult\nradv_queue_submit_normal(")]
+                queue[queue.index("struct radv_dcn_part_scope {"):queue.index(
+                    "int radv_dcn_offer_native(" if present_handoff else "#endif\n\nstatic VkResult\nradv_queue_submit_normal(")]
             )
             self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_part.c", ("-I" + tmp, "-I" + str(mesa / "include")))
             transport = sources[submit.DRM]
@@ -105,6 +111,8 @@ class RenderBinding(unittest.TestCase):
             headers = (binding.HEADER, clear.HEADER, submit.HEADER, submit.NATIVE_HEADER, part.HEADER)
             if paired:
                 headers += (writer.WIRE_HEADER,)
+            if present_handoff:
+                headers += (present.PRESENT_HEADER,)
             for name in headers:
                 sources[name] = (ROOT / "tools" / Path(name).name).read_text()
             overlay = []
@@ -128,6 +136,7 @@ class RenderBinding(unittest.TestCase):
             wire = [str(mesa / writer.WIRE)] if paired else []
             self.run_checked([
                 *args, "-UNDEBUG", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
+                *(["-DTEST_PRESENT_OFFER"] if present_handoff else []),
                 "-ivfsoverlay", str(manifest), "-I" + tmp, "-I" + str(mesa / Path(submit.KEXT).parent),
                 str(ROOT / "tests" / harness), *wire, "-o", binary,
             ], cwd)

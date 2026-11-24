@@ -139,12 +139,30 @@ class RenderWrite(unittest.TestCase):
             result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_present_offer_precedes_part_retirement_and_original_present(self):
+        from build34_dcn_plugin_present_stage import stage as present_stage
+
+        staged = present_stage(self.inputs)
+        events = staged["NVMTLEventSync.m"]
+        advance = function(events, "- (BOOL)nvmtlAdvancePart {")
+        offer = advance.index("nvmtl_vk_dcn_offer_present(")
+        self.assertLess(advance.index("nvmtl_dcn_part_landed(part, published)"), advance.index("if (!published)"))
+        self.assertLess(advance.index("if (!published)"), offer)
+        self.assertLess(offer, advance.index("_parts[_nextPart++] = [NSNull null]"))
+        self.assertIn("_parts.count == 1 && part->landedWriter.recording", advance)
+        self.assertIn("_presentations.count == 0 && !drawable", advance)
+        self.assertIn("_presentations.count == 1 && attachment == drawable", advance)
+        finish = "- (void)nvmtlFinishExecution:(NSError *)error {"
+        self.assertEqual(function(events, finish), function(part.stage(self.inputs)["NVMTLEventSync.m"], finish))
+
     @unittest.skipUnless(sys.platform == "darwin" and os.environ.get("VULKAN_HEADERS"), "requires macOS SDK and Vulkan headers")
     def test_exact_part_plugin_syntax(self):
+        from build34_dcn_plugin_present_stage import stage as present_stage
+
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
             overlay = []
-            for name, text in part.stage(self.inputs).items():
+            for name, text in present_stage(self.inputs).items():
                 destination = out / name
                 destination.write_text(text)
                 overlay.append({"type": "file", "name": str(PLUGIN / name), "external-contents": str(destination)})

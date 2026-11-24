@@ -1,6 +1,9 @@
 #include "build34_dcn_writer_receipt.h"
 #include "build34_exact_callbacks.h"
 #include "build34_exact_ownership.h"
+#ifdef TEST_PRESENT_HANDOFF
+#include "build34_dcn_present_route.h"
+#endif
 
 #include <cassert>
 #include <cstdio>
@@ -62,7 +65,51 @@ struct Descriptor final : IOMemoryDescriptor {
 
 struct IOAccelPhxNativeClient;
 
-struct PhxBringup {
+#ifdef TEST_PRESENT_HANDOFF
+using task_t = void *;
+static task_t taskNow;
+static task_t current_task() { return taskNow; }
+constexpr IOReturn kIOReturnNotPermitted = -8, kIOReturnNotAttached = -9;
+struct OSObject {
+    unsigned references = 1;
+    void retain() { assert(references); ++references; }
+    void release() { assert(references > 1); --references; }
+};
+struct OSSymbol {
+    const char *str;
+    bool isEqualTo(const char *name) const { return !strcmp(str, name); }
+};
+struct IOService : OSObject {
+    std::function<IOReturn(task_t, uint32_t, OSObject **)> lookup;
+    static IOService *accelerator;
+    static const char *serviceMatching(const char *service) { return service; }
+    static IOService *copyMatchingService(const char *service) {
+        assert(!strcmp(service, "NMXAccel"));
+        if (accelerator) accelerator->retain();
+        return accelerator;
+    }
+    IOReturn callPlatformFunction(const char *name, bool wait, void *first, void *second, void *third, void *fourth) {
+        OSSymbol symbol{name};
+        return callPlatformFunction(&symbol, wait, first, second, third, fourth);
+    }
+    virtual IOReturn callPlatformFunction(const OSSymbol *name, bool wait, void *first, void *second, void *third, void *fourth) {
+        assert(!wait && first && second && third && !fourth && name->isEqualTo(BUILD34_DCN_PRESENT_LOOKUP));
+        return lookup(second, *static_cast<uint32_t *>(first), static_cast<OSObject **>(third));
+    }
+};
+IOService *IOService::accelerator = nullptr;
+struct Phx34ScopedReference {
+    OSObject *object;
+    Phx34ScopedReference(OSObject *value, bool take) : object(value) { assert(!take); }
+    ~Phx34ScopedReference() { if (object) object->release(); }
+};
+#endif
+
+struct PhxBringup
+#ifdef TEST_PRESENT_HANDOFF
+    : IOService
+#endif
+{
     struct VmCtx {
         uint64_t generation = 5, newest = 0, queueSequence[2]{}, queueGeneration[2]{};
         const void *client = nullptr;
@@ -75,6 +122,15 @@ struct PhxBringup {
     IOLock *gpuLock = &guard;
     uint64_t gSeq = 0, exactQueueSubmitted[2]{}, exactQueueGeneration[2]{3, 4}, done[2]{};
     bool exactQueueLive[2]{true, true}, exactStopped = false, isSleeping = false, exactVMFault = false;
+#ifdef TEST_PRESENT_HANDOFF
+    static constexpr uint32_t kMaxCtx = 2;
+    struct LegacyClientSlot { IOAccelPhxNativeClient *client; bool pending; } legacyClients[kMaxCtx]{};
+    IOReturn callPlatformFunction(const OSSymbol *, bool, void *, void *, void *, void *) override;
+    bool exactClaimCurrentLocked(void *) { assert(false); return false; }
+    bool requestLegacyClose(IOAccelPhxNativeClient *);
+    void invalidateExactQueues() { exactQueueLive[0] = exactQueueLive[1] = false; }
+    void sealStoppedQueues();
+#endif
     IOReturn dispatchResult = kIOReturnSuccess, mapResult = kIOReturnSuccess;
     unsigned dispatches = 0;
     std::function<void()> beforeDispatch;
@@ -116,7 +172,11 @@ struct PhxBringup {
     bool parkExactEvent(const Receipt &, uint64_t, const CallbackGate<> &, uint64_t, uint64_t) { assert(false); return false; }
 };
 
-struct IOAccelPhxNativeClient {
+struct IOAccelPhxNativeClient
+#ifdef TEST_PRESENT_HANDOFF
+    : OSObject
+#endif
+{
     // WRITER_TYPES
     // WRITER_CLIENT
     PhxBringup device;
@@ -132,11 +192,17 @@ struct IOAccelPhxNativeClient {
     bool boCleanupFault = false, mayHaveLogicalMappings = false, exactResourcesExposed = false;
     uint32_t vmid = 1, legacyState = 2, pendFenceHandle = 0, pendFenceOffset = 0;
     uint64_t vmGeneration = 5, lastSeq = 0, emitted = 0, pendFenceSeq = 0;
+#ifdef TEST_PRESENT_HANDOFF
+    task_t task = this;
+#endif
 
     IOAccelPhxNativeClient() {
         assert(exactRegistry.bind(owner, this, owners) == Status::Ok);
         device.vm.client = this;
         ctx[1] = true;
+#ifdef TEST_PRESENT_HANDOFF
+        device.legacyClients[0] = {this, false};
+#endif
     }
 
     Bo *findBo(uint32_t);
@@ -370,10 +436,133 @@ static void remapCloseAndPressure() {
     assert(!closing.probe(newest));
 }
 
+#ifdef TEST_PRESENT_HANDOFF
+static void exercisePresentHandoff() {
+    Frame frame;
+    auto &client = frame.client;
+    taskNow = client.task;
+    IOService accelerator;
+    IOService::accelerator = &accelerator;
+    OSObject surface, otherSurface;
+    OSObject *resolved = &surface;
+    unsigned lookups = 0;
+    std::function<void()> duringLookup;
+    accelerator.lookup = [&](task_t task, uint32_t id, OSObject **out) {
+        assert(!client.guard.held && !client.device.guard.held && task == client.task && id == 17);
+        ++lookups;
+        if (duringLookup) duringLookup();
+        resolved->retain();
+        *out = resolved;
+        return kIOReturnSuccess;
+    };
+    auto writer = frame.nominate();
+    build34_dcn_present_offer offer{BUILD34_DCN_PRESENT_VERSION, sizeof(offer), writer, frame.request.writer.range, 17, 0};
+    IOExternalMethodArguments args;
+    args.selector = BUILD34_DCN_SEL_OFFER;
+    args.structureInput = &offer;
+    args.structureInputSize = sizeof(offer);
+    assert(client.doDcnPresentOffer(&args) == kIOReturnNotReady && !lookups);
+    client.device.done[1] = writer.sequence;
+    assert(frame.ack(writer) == Status::Ok);
+    taskNow = &otherSurface;
+    assert(client.doDcnPresentOffer(&args) == kIOReturnNotPermitted && !lookups);
+    taskNow = client.task;
+    --args.structureInputSize;
+    assert(client.doDcnPresentOffer(&args) == kIOReturnBadArgument && !lookups);
+    ++args.structureInputSize;
+    offer.reserved = 1;
+    assert(client.doDcnPresentOffer(&args) == kIOReturnBadArgument && !lookups);
+    offer.reserved = 0;
+    ++offer.native.serial;
+    assert(client.doDcnPresentOffer(&args) == kIOReturnNotReady && !lookups);
+    offer.native = writer;
+    assert(client.doDcnPresentOffer(&args) == kIOReturnSuccess && lookups == 1 && surface.references == 2);
+    frame.copy.surface = &otherSurface;
+    const OSSymbol probe{BUILD34_DCN_PRESENT_PROBE};
+    assert(client.device.callPlatformFunction(&probe, false, &frame.copy, nullptr, nullptr, nullptr) == kIOReturnNotReady);
+    assert(surface.references == 2 && !frame.host.reads);
+    frame.copy.surface = &surface;
+    IOLockLock(client.device.gpuLock);
+    assert(!client.device.checkDcnPresent(frame.copy) && surface.references == 2 && !frame.host.reads);
+    IOLockUnlock(client.device.gpuLock);
+    assert(client.device.callPlatformFunction(&probe, false, &frame.copy, nullptr, nullptr, nullptr) == kIOReturnSuccess);
+    assert(!client.device.checkDcnPresent(frame.copy) && surface.references == 1 && frame.host.reads == 2);
+    assert(client.doDcnPresentOffer(&args) == kIOReturnNotReady && lookups == 1);
+
+    offer.native = frame.nominate();
+    client.device.done[1] = offer.native.sequence;
+    assert(frame.wait(offer.native) == Status::Complete);
+    duringLookup = [&] { frame.nominate(); };
+    assert(client.doDcnPresentOffer(&args) == kIOReturnNotReady && lookups == 2 && surface.references == 1);
+    duringLookup = nullptr;
+    offer.native = frame.nominate();
+    client.device.done[1] = offer.native.sequence;
+    assert(frame.wait(offer.native) == Status::Complete);
+    assert(client.doDcnPresentOffer(&args) == kIOReturnSuccess && surface.references == 2);
+    frame.nominate();
+    assert(!client.device.checkDcnPresent(frame.copy) && surface.references == 1 && frame.host.reads == 2);
+
+    offer.native = frame.nominate();
+    client.device.done[1] = offer.native.sequence;
+    assert(frame.ack(offer.native) == Status::Ok);
+    assert(client.doDcnPresentOffer(&args) == kIOReturnSuccess && surface.references == 2);
+    offer.native = frame.nominate();
+    client.device.done[1] = offer.native.sequence;
+    assert(frame.ack(offer.native) == Status::Ok);
+    resolved = &otherSurface;
+    assert(client.doDcnPresentOffer(&args) == kIOReturnSuccess && surface.references == 1 && otherSurface.references == 2);
+    client.device.sealStoppedQueues();
+    assert(otherSurface.references == 1 && client.references == 1 && accelerator.references == 1);
+    IOService::accelerator = nullptr;
+}
+
+static void closeDuringPresent(bool inLookup) {
+    Frame frame;
+    auto &client = frame.client;
+    taskNow = client.task;
+    IOService accelerator;
+    IOService::accelerator = &accelerator;
+    OSObject surface;
+    auto close = [&] {
+        if (client.exactClientCallbacks.close()) assert(client.device.requestLegacyClose(&client));
+    };
+    accelerator.lookup = [&](task_t, uint32_t, OSObject **out) {
+        if (inLookup) close();
+        surface.retain();
+        *out = &surface;
+        return kIOReturnSuccess;
+    };
+    auto writer = frame.nominate();
+    client.device.done[1] = writer.sequence;
+    assert(frame.ack(writer) == Status::Ok);
+    build34_dcn_present_offer offer{BUILD34_DCN_PRESENT_VERSION, sizeof(offer), writer, frame.request.writer.range, 17, 0};
+    IOExternalMethodArguments args;
+    args.selector = BUILD34_DCN_SEL_OFFER;
+    args.structureInput = &offer;
+    args.structureInputSize = sizeof(offer);
+    frame.copy.surface = &surface;
+    if (inLookup) {
+        assert(client.doDcnPresentOffer(&args) == kIOReturnNotReady);
+    } else {
+        assert(client.doDcnPresentOffer(&args) == kIOReturnSuccess && surface.references == 2);
+        frame.host.afterRead = close;
+        assert(!client.device.checkDcnPresent(frame.copy));
+    }
+    assert(client.exactClientCallbacks.closed() && !client.device.checkDcnPresent(frame.copy));
+    assert(surface.references == 1 && client.references == 1 && accelerator.references == 1);
+    IOService::accelerator = nullptr;
+}
+#endif
+
 int main() {
     completionAndPages();
     newerAndRacingCompletions();
     refusalAndInvalidation();
     remapCloseAndPressure();
+#ifdef TEST_PRESENT_HANDOFF
+    exercisePresentHandoff();
+    closeDuringPresent(true);
+    closeDuringPresent(false);
+#endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }
