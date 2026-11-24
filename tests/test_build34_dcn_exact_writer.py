@@ -151,6 +151,8 @@ class ExactWriterTests(unittest.TestCase):
         self.assertNotIn('dcnQualifiedFlipRoute =', bound)
         self.assertIn('dcnProveGpuVmOwnership)(const PhxBringup &, build34::dcn::PhysicalPageSet){nullptr}', bound)
         self.assertNotIn('dcnProveGpuVmOwnership =', bound)
+        self.assertIn('DcnGpuPermissionPhase){nullptr}', bound)
+        self.assertNotIn('dcnGpuPermissionEvidence =', bound)
         bind = method(bound, flip_commit.VM_BIND)
         self.assertIn(flip_commit.BOUND_SLOT_GATE, bind)
         self.assertIn(flip_commit.FREE_SLOT_GATE, bind)
@@ -189,7 +191,8 @@ class ExactWriterTests(unittest.TestCase):
             probe = scanout_dma.DMA_PROBE_DECL
         if flip:
             signatures += (flip_commit.WRITER_CURRENT, flip_commit.LOOKUP, flip_commit.BIND, flip_commit.BEGIN,
-                           flip_commit.POLL)
+                           flip_commit.POLL, flip_commit.PERMISSION_CURRENT, flip_commit.PERMISSION_TABLE,
+                           flip_commit.PERMISSION_CHANGE, flip_commit.PERMISSION_RESTORE, flip_commit.VM_FREE)
             fields = fields.replace(scanout_dma.DMA_FIELDS, scanout_dma.DMA_FIELDS + flip_commit.SLOT)
             fields = fields.replace(scanout_dma.MAPPER_GATE, scanout_dma.MAPPER_GATE + flip_commit.FIELDS)
             probe += flip_commit.CLIENT

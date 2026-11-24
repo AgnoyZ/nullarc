@@ -1146,6 +1146,38 @@ failure, history exhaustion and retirement. Revert this isolated overlay
 change to roll back. Production source, exact-open admission and the R2a
 copy remain unchanged.
 
+An optional staged permission path now lets the original writer submit
+against a different buffer in the same GPUVM. With the global writer
+prefix drained, it validates that writer's four-level owned tables before
+changing a word, then clears only the write bit of every matching leaf.
+The bit matches [upstream AMDGPU's PTE definition at Linux v6.12](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.h);
+this is an encoding reference, not Tahoe cache-visibility evidence. The
+writer's allocation, page-table root and hardware slot stay pinned through
+the two-pin transition. Only that context/slot pair is removed from each
+pin's exclusion masks. New writable mappings, other contexts and other
+historical slots stay blocked. A service epoch change refuses further
+submissions while any permission pin remains.
+
+Permission evidence is a separate null hook, `dcnGpuPermissionEvidence`.
+It must preflight without mutation, then attest fresh permission visibility
+for the exact operation serial, allocation, root, slot, epoch and direction
+under `gpuLock`. Revocation must cover writable cached translations for the
+protected physical pages in the admitted slot, including entries from old
+virtual aliases or previously bound roots. The inherited TLB ACK alone
+cannot grant that exception. The two bounded table walks reject malformed,
+shared or out-of-pool page-table links. An uncertain post-write result
+faults the staged VM gate.
+
+On retirement, the branch waits for both DCN fetch/translation retirement
+and the protected GPU context's genuine drained prefix. It restores the
+write bit only on surviving old-buffer leaves and requires separate fresh
+publication evidence. The old masks are not released until DMA and
+descriptor cleanup succeed. Uncertain retirement keeps both protections.
+CPU fixtures exercise a same-context two-buffer flip, faults and expired
+proof, pending submissions, historical aliases, and attempts to free or
+evict the pinned writer. No native evidence callback, production source or
+fallback copy behavior changes. Revert this overlay commit to roll back.
+
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and
 out-of-order completion. Set `BUILD34_RADV_COMPILE_COMMANDS` to the

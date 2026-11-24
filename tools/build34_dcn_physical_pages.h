@@ -64,6 +64,16 @@ struct DcnManagedWriteExclusion {
     }
 };
 
+struct DcnGpuWriteOwner {
+    uint64_t allocation, root, epoch;
+    uint32_t context, slot;
+
+    bool operator==(const DcnGpuWriteOwner &other) const {
+        return allocation == other.allocation && root == other.root && epoch == other.epoch &&
+            context == other.context && slot == other.slot;
+    }
+};
+
 class DcnManagedWriteHolds {
 public:
     bool active() const { return holds_[0].pages.count || holds_[1].pages.count; }
@@ -80,11 +90,61 @@ public:
         return holds_[0].blocked.blocksSlot(slot) || holds_[1].blocked.blocksSlot(slot);
     }
 
+    DcnGpuWriteOwner readOnly(PhysicalPageSet pages) const {
+        for (const auto &hold : holds_)
+            if (samePages(hold.pages, pages)) return hold.readOnly;
+        return {};
+    }
+
+    bool pinReadOnly(PhysicalPageSet pages, DcnGpuWriteOwner owner) {
+        for (auto &hold : holds_) {
+            if (!samePages(hold.pages, pages) || hold.readOnly.context || !owner.allocation || !owner.root ||
+                !hold.blocked.blocksContext(owner.context) || !hold.blocked.blocksSlot(owner.slot)) continue;
+            hold.readOnly = owner;
+            return true;
+        }
+        return false;
+    }
+
+    bool setReadOnlyAccess(PhysicalPageSet pages, bool allow) {
+        for (auto &hold : holds_) {
+            const auto owner = hold.readOnly;
+            if (!samePages(hold.pages, pages) || !owner.context) continue;
+            const uint64_t bit = 1ull << ((owner.context - 1) % 64);
+            auto &mask = hold.blocked.contexts[(owner.context - 1) / 64];
+            if (allow) {
+                mask &= ~bit;
+                hold.blocked.slots &= ~(1u << owner.slot);
+            } else {
+                mask |= bit;
+                hold.blocked.slots |= 1u << owner.slot;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    bool pinsContext(uint32_t context) const {
+        return context && (holds_[0].readOnly.context == context || holds_[1].readOnly.context == context);
+    }
+
+    bool pinsSlot(uint32_t slot) const {
+        for (const auto &hold : holds_)
+            if (hold.readOnly.context && hold.readOnly.slot == slot) return true;
+        return false;
+    }
+
+    bool permissionsCurrent(uint64_t epoch) const {
+        for (const auto &hold : holds_)
+            if (hold.readOnly.context && hold.readOnly.epoch != epoch) return false;
+        return true;
+    }
+
     bool acquire(PhysicalPageSet next, DcnManagedWriteExclusion blocked) {
         if (!next.pages || !next.count || holds_[0].pages.overlaps(next) || holds_[1].pages.overlaps(next)) return false;
         for (auto &held : holds_) {
             if (held.pages.count) continue;
-            held = {next, blocked};
+            held = {next, blocked, {}};
             return true;
         }
         return false;
@@ -92,13 +152,18 @@ public:
 
     void release(PhysicalPageSet retired) {
         for (auto &held : holds_)
-            if (held.pages.pages == retired.pages && held.pages.count == retired.count) held = {};
+            if (samePages(held.pages, retired)) held = {};
     }
 
 private:
+    static bool samePages(PhysicalPageSet first, PhysicalPageSet second) {
+        return first.count && first.count == second.count && first.pages == second.pages;
+    }
+
     struct Hold {
         PhysicalPageSet pages;
         DcnManagedWriteExclusion blocked;
+        DcnGpuWriteOwner readOnly;
     } holds_[2]{};
 };
 

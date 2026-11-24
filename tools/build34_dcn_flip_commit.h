@@ -175,9 +175,9 @@ public:
         return ScanoutFlipResult::Issued;
     }
 
-    template<typename IsLive, typename RetireWrites>
+    template<typename IsLive, typename RestoreWrites, typename RetireWrites>
     ScanoutFlipResult poll(ScanoutPinToken operation, IsLive live, OSObject *&releaseRoute, IOService *&releaseFramebuffer,
-                           RetireWrites retireWrites) {
+                           RestoreWrites restoreWrites, RetireWrites retireWrites) {
         if (!matches(operation)) return ScanoutFlipResult::Refused;
         if (uncertain_) return ScanoutFlipResult::Uncertain;
         auto withinBudget = [&] { return live() && readback_.stillInBudget(); };
@@ -220,7 +220,11 @@ public:
             const auto translations = route_.translationsRetired(route_.reader.context, request_, frontVm_);
             if (!displayCurrent() || !oldCurrent()) return fail();
             if (translations == DcnRetirement::Pending) return ScanoutFlipResult::Waiting;
-            if (translations != DcnRetirement::Complete || !old_.dma->table_.withdraw(old_.dma->qualified_) ||
+            if (translations != DcnRetirement::Complete) return fail();
+            const auto writes = restoreWrites(old_.dma->physicalPages());
+            if (writes == DcnRetirement::Pending) return ScanoutFlipResult::Waiting;
+            if (writes != DcnRetirement::Complete || !displayCurrent() || !oldCurrent() ||
+                !old_.dma->table_.withdraw(old_.dma->qualified_) ||
                 !displayCurrent() || !detached() || !old_.dma->releaseUnmapped(true) || !old_.pin->retireDisplayUse()) return fail();
             retireWrites(old_.dma->physicalPages());
             old_.dma->releasePlan();

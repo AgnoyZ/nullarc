@@ -148,6 +148,7 @@ struct Phx34ScopedReference {
 #ifdef TEST_SCANOUT_FLIP
 #include "build34_dcn_flip_commit.h"
 #include "build34_dcn_gpu_write_history.h"
+#include "build34_dcn_gpu_permissions.h"
 using addr64_t = uint64_t;
 constexpr uint64_t kPtAddrMask = 0x0000FFFFFFFFF000ull, kPteSysFlags = 0x0004000000000077ull;
 constexpr IOReturn kIOReturnVMError = -10;
@@ -223,7 +224,10 @@ struct PhxBringup
         bool closing = false, busy = false;
 #ifdef TEST_SCANOUT_FLIP
         uint64_t phys = 0x1e0000;
-        uint32_t hw = 0;
+        uint32_t hw = 0, pages = 0, used = 0;
+        static constexpr uint32_t kPtChunks = 4;
+        IOBufferMemoryDescriptor *chunk[kPtChunks]{};
+        uint64_t chunkPhys[kPtChunks]{};
 #endif
     } vm[kMaxCtx];
     struct GpuQueue {
@@ -274,8 +278,11 @@ struct PhxBringup
     // WRITER_SERVICE
 
 #ifdef TEST_SCANOUT_FLIP
+    static constexpr uint32_t kPtChunks = VmCtx::kPtChunks, kPtChunkPages = 2, kPtChunkBytes = kPtChunkPages * kPage;
     unsigned pteLookups = 0, gpuVmWrites = 0;
     uint64_t lastPte = 0;
+    uint64_t *testGpuLeaf = nullptr;
+    std::function<DcnGpuPermissionAck(const DcnGpuPermissionUse &, DcnGpuPermissionPhase)> permission;
     struct HwVmid { uint32_t ctx; uint64_t generation, lastSeq, lastUse; } hwv[kNumUserVmids]{};
     uint64_t hwTick = 0;
     bool isolationEvidence = true;
@@ -283,14 +290,15 @@ struct PhxBringup
         assert(device.guard.held && pages.count == 2);
         return device.isolationEvidence;
     }
-    uint64_t *vmPte(VmCtx &, uint64_t, bool allocate) {
+    uint64_t *vmPte(VmCtx &, uint64_t va, bool allocate) {
         assert(guard.held && allocate);
         ++pteLookups;
-        return &lastPte;
+        return testGpuLeaf ? testGpuLeaf + ((va / kPage) % 512) : &lastPte;
     }
     bool vmFlushTlbChecked(uint32_t slot) { assert(guard.held && slot >= kFirstUserVmid); return true; }
     void wreg(uint32_t, uint32_t) { assert(guard.held); ++gpuVmWrites; }
     uint32_t vmBind(uint32_t, uint64_t, const void *, uint64_t);
+    bool vmidFree(uint32_t, uint64_t, const void *, uint64_t);
     IOReturn guardedVmMap(uint32_t, uint64_t, const void *, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t);
 #endif
     IOReturn vmMap(uint32_t, uint64_t, const void *, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t) {
@@ -1966,6 +1974,144 @@ static void scanoutHistoricalAliases(bool direct) {
     submit(1, false, kIOReturnSuccess);
 }
 
+struct ScanoutPermissionFixture : CommitFixture {
+    IOBufferMemoryDescriptor directories, leaves;
+
+    explicit ScanoutPermissionFixture(bool direct = false) : CommitFixture(direct) {
+        auto &device = scanout.device;
+        auto &context = device.vm[0];
+        context.used = 4;
+        context.pages = device.kPtChunks * device.kPtChunkPages;
+        context.chunk[0] = &directories;
+        context.chunk[1] = &leaves;
+        context.chunkPhys[0] = context.phys;
+        context.chunkPhys[1] = context.phys + 16 * kPage;
+        directories.words[0] = (context.phys + kPage) | 7;
+        directories.words[512] = context.chunkPhys[1] | 7;
+        leaves.words[0] = (context.chunkPhys[1] + kPage) | 7;
+        device.testGpuLeaf = leaves.words + 512;
+        auto &frame = scanout.frame;
+        map(frame.host, kVa);
+        map(frame.host, 3 * kVa);
+        IOLockLock(device.gpuLock);
+        assert(device.vmBind(1, context.generation, &scanout.client, device.gSeq) == kFirstUserVmid);
+        IOLockUnlock(device.gpuLock);
+        device.dcnQualifiedFlipRoute = [](IOPCIDevice *pci) -> const HubpFlipRoute * { return pci->route; };
+        device.dcnGpuPermissionEvidence = [](PhxBringup &provider, const DcnGpuPermissionUse &use,
+                                               DcnGpuPermissionPhase phase) {
+            assert(provider.guard.held && provider.permission && use.serial && use.owner.context == 1 && !use.owner.slot);
+            return provider.permission(use, phase);
+        };
+        device.permission = [](const DcnGpuPermissionUse &use, DcnGpuPermissionPhase phase) {
+            return DcnGpuPermissionAck{use.serial, use.owner, phase};
+        };
+    }
+
+    void map(Descriptor &descriptor, uint64_t va) {
+        assert(scanout.device.guardedVmMap(1, scanout.client.vmGeneration, &scanout.client, va, &descriptor,
+                                          kPage, 2 * kPage) == kIOReturnSuccess);
+    }
+
+    uint64_t &leaf(uint64_t va) { return scanout.device.testGpuLeaf[va / kPage]; }
+
+    bool writable(uint64_t va) { return leaf(va) & kGpuPteWrite; }
+
+    void submit(bool gfx, IOReturn expected) {
+        uint64_t sequence = UINT64_MAX;
+        auto &device = scanout.device;
+        assert(device.gpuSubmit(1, scanout.client.vmGeneration, &scanout.client, gfx, nullptr, nullptr, 1,
+                                &sequence, nullptr, {}, nullptr) == expected);
+        assert((sequence != UINT64_MAX) == (expected == kIOReturnSuccess));
+    }
+};
+
+static void scanoutReadOnlyRejection(bool stale, bool brokenTable, bool afterWrite) {
+    ScanoutPermissionFixture fixture;
+    auto &device = fixture.scanout.device;
+    if (brokenTable) fixture.directories.words[1] = fixture.directories.words[0];
+    unsigned permissions = 0;
+    device.permission = [&](const DcnGpuPermissionUse &use, DcnGpuPermissionPhase phase) {
+        ++permissions;
+        auto serial = use.serial;
+        if (stale && (phase == DcnGpuPermissionPhase::Restricted) == afterWrite) --serial;
+        return DcnGpuPermissionAck{serial, use.owner, phase};
+    };
+    ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(intent) == kIOReturnNotReady && !fixture.vmWrites && !fixture.writes && !intent.operation.serial);
+    assert(permissions == (brokenTable ? 0u : afterWrite ? 2u : 1u));
+    assert(fixture.writable(kVa) == !afterWrite && fixture.writable(3 * kVa) == !afterWrite && device.exactVMFault == afterWrite);
+    assert(!device.dcnManagedWrites.active() && fixture.scanout.cancelPin(fixture.pin) == kIOReturnSuccess);
+}
+
+static void scanoutReadOnlyDoubleBuffer(bool loseRestore) {
+    ScanoutPermissionFixture fixture;
+    auto &scanout = fixture.scanout;
+    auto &device = scanout.device;
+    auto &frame = scanout.frame;
+    ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    assert(!fixture.writable(kVa) && !fixture.writable(kVa + kPage) && !fixture.writable(3 * kVa));
+    assert(device.dcnManagedWrites.pinsContext(1) && device.dcnManagedWrites.pinsSlot(0));
+    assert(!device.vmidFree(1, scanout.client.vmGeneration, &scanout.client, device.gSeq));
+    assert(!device.vm[0].closing && device.vm[0].hw == kFirstUserVmid);
+    IOLockLock(device.gpuLock);
+    for (uint32_t handle = 2; handle <= device.kMaxCtx; ++handle) {
+        auto &context = device.vm[handle - 1];
+        context.busy = true;
+        context.client = &context;
+        const auto expected = kFirstUserVmid + (handle == 3 ? 2 : 1);
+        assert(device.vmBind(handle, context.generation, context.client, device.gSeq) == expected);
+    }
+    IOLockUnlock(device.gpuLock);
+    assert(device.hwv[0].ctx == 1 && device.vm[0].hw == kFirstUserVmid);
+
+    ScanoutFlipPoll poll{intent.operation, ScanoutFlipResult::Refused};
+    fixture.pending = false;
+    fixture.retire = true;
+    fixture.active = fixture.earliest = fixture.mapped;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Presented);
+
+    fixture.selectAlternate();
+    frame.client.boTable[1].md = &frame.host;
+    frame.client.boTable[2].md = &fixture.nextHost;
+    assert(frame.client.changeMap(PHX_AMDGPU_VA_OP_MAP, 2 * kVa, 2, kPage, 2 * kPage) == kIOReturnSuccess);
+    frame.request.writer.range = {2 * kVa, 2 * kPage, 2, 0};
+    frame.copy.scanout = {64, 17, fixture.pitch, 8, 2 * kPage};
+    fixture.map(fixture.nextHost, 2 * kVa);
+    assert(fixture.writable(2 * kVa) && !fixture.writable(kVa));
+    scanout.offer();
+    DmaRun scratch[2]{};
+    uint64_t pages[2]{};
+    ScanoutDmaRequest mapped{&frame.copy, fixture.alternate.address, scratch, 2, pages, 2, {}, {}};
+    const OSSymbol map{BUILD34_DCN_PIN_MAP};
+    assert(fixture.dispatch(map, &mapped) == kIOReturnSuccess && mapped.token.serial);
+    fixture.alternatePin = mapped.token;
+    intent = {fixture.mapped, fixture.alternate, fixture.alternatePin, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    assert(!fixture.writable(kVa) && !fixture.writable(2 * kVa));
+    fixture.submit(false, kIOReturnSuccess);
+    const auto compute = device.gSeq;
+    poll.operation = intent.operation;
+    fixture.pending = false;
+    fixture.active = fixture.earliest = fixture.alternate;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    assert(!fixture.writable(kVa) && !fixture.command.completes);
+    fixture.submit(true, kIOReturnBusy);
+    device.done[0] = compute;
+    device.permission = [&](const DcnGpuPermissionUse &use, DcnGpuPermissionPhase phase) {
+        return DcnGpuPermissionAck{use.serial - (loseRestore && phase == DcnGpuPermissionPhase::Restored), use.owner, phase};
+    };
+    fixture.step(poll, loseRestore ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
+    assert(fixture.writable(kVa) && fixture.writable(3 * kVa) && !fixture.writable(2 * kVa));
+    assert(device.dcnManagedWrites.excludes(frame.host.base + 2 * kPage) == loseRestore);
+    assert(device.dcnManagedWrites.excludes(fixture.nextHost.base + 2 * kPage) && device.exactVMFault == loseRestore);
+    fixture.submit(true, loseRestore ? kIOReturnBusy : kIOReturnSuccess);
+    ++device.exactInvalidationEpoch;
+    fixture.submit(true, kIOReturnNotReady);
+}
+
 enum class PixelFault { MapperRemap, MapperUnavailable, RenderPage, PresentPage, RenderGeneration, PresentGeneration,
                         LateGeneration, WrongCommandSlice, SubstitutedDescriptor, LateEvidence, FrontRemap, None };
 
@@ -2627,6 +2773,11 @@ int main() {
     managedWriteHistoryLimits();
     scanoutHistoricalAliases(false);
     scanoutHistoricalAliases(true);
+    scanoutReadOnlyRejection(true, false, false);
+    scanoutReadOnlyRejection(true, false, true);
+    scanoutReadOnlyRejection(false, true, false);
+    scanoutReadOnlyDoubleBuffer(false);
+    scanoutReadOnlyDoubleBuffer(true);
     for (const bool direct : {false, true})
         for (const auto fault : {WriterFault::NewerCompletedWork, WriterFault::ChangedEpoch, WriterFault::ChangedQueueGeneration,
              WriterFault::ReplacedWriterMap, WriterFault::ClientBusy, WriterFault::GpuBusy, WriterFault::DuringPageWalk,
