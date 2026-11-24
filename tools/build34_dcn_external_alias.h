@@ -110,6 +110,7 @@ static int nvmtl_dcn_create_render_alias_body(uint32_t width, uint32_t height, s
     if (!out->dcn_attachment.image)
         return -1;
     out->dcn_attachment.external_host = 1;
+    out->dcn_attachment.host = host->map;
     out->w = width;
     out->h = height;
     out->fmt = query.format;

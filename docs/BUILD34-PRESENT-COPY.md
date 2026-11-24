@@ -428,13 +428,43 @@ does it grant ownership to scanout. A caller still needs live object
 lifetimes, exclusion of other writers and a retained display lease, along
 with visibility in the HUBP fetch domain.
 
+The paired [plugin part](../tools/build34_dcn_plugin_part_stage.py) and
+[RADV part](../tools/build34_dcn_radv_part_stage.py) overlays carry the exact
+writer through one retained plugin submission part. The plugin prepares
+both normal and ahead submissions only for a unique retained IOSurface
+texture with an external host render alias. It uses the paired private
+entrypoints only from a directly loaded AMD ICD, under the existing plugin
+submit lock. A counter reset or upload prologue that adds a command buffer
+leaves observation off; the original Vulkan submit is still made once.
+
+RADV associates the writer inside the same synchronous submit call. It
+requires one actual driver submit on the same queue and command buffer,
+then checks the recorded view, image, imported memory, BO and live map
+generation, address and extent. Deferred or threaded submissions do not
+get an association. The paired stage removes the shared RADV queue
+snapshot and copies only the matched receipt and numeric map identity to
+that part's in-flight object. After successful Vulkan fence and existing
+witness checks, it revalidates the live binding and polls the exact native
+receipt before retiring the command. The part retains the result only
+after successful legacy publication and a second retained-texture match.
+Busy, stale or unobserved submits do not produce a completed writer record.
+
+This stage does not activate the render-only alias constructor, export the
+part record to PhxAccel, or treat a userspace address as page identity. It
+does not change ready marks, fence behavior, or the R2a copy. Next bind the
+observed writer to the retained IOSurface descriptor in `performTransaction`
+using the live kernel mapping and the exact page-rounded render range, then
+establish writer exclusion and display retirement before bypassing any copy.
+
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
-submission record lifecycles. Set `BUILD34_RADV_COMPILE_COMMANDS` to the
+submission record lifecycles, plus the exact part's refusal paths and
+out-of-order completion. Set `BUILD34_RADV_COMPILE_COMMANDS` to the
 reviewed Darwin Meson recipe to check all 17 input digests, syntax-check
 nine Mesa translation units, and run extracted Darwin submission and
-exact completion logic against CPU doubles. Discarding the overlay rolls
-back these stages. The installed R2a path, including `l10r` conversion,
-remains unchanged.
+exact completion logic against CPU doubles. Set `VULKAN_HEADERS` to also
+syntax-check the paired plugin translation unit. Discarding the overlay
+rolls back these stages. The installed R2a path, including `l10r`
+conversion, remains unchanged.
 
 Hardware acceptance requires proof of the actual device mapper,
 lease/reverse-lookup semantics and HUBP fetch domain. It also requires

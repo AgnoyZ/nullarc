@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define RADV_DCN_PAGE_BYTES 4096ull
@@ -18,6 +19,7 @@ struct radv_dcn_render_binding {
    struct radv_dcn_host_map map;
    uint64_t phx_va, bind_bytes, pitch, scanout_bytes;
    uint32_t width, height;
+   const void *memory;
 };
 
 static inline uint64_t
@@ -55,5 +57,5 @@ radv_dcn_check_binding(struct radv_dcn_host_map map, const void *host, uint64_t 
    const uint64_t texel_end = footprint - pitch + (uint64_t)width * 4;
    if (rounded > bind_bytes || layout_bytes < texel_end || layout_bytes > bind_bytes)
       return (struct radv_dcn_render_binding){0};
-   return (struct radv_dcn_render_binding){map, radv_dcn_phx_va(map.va), bind_bytes, pitch, rounded, width, height};
+   return (struct radv_dcn_render_binding){map, radv_dcn_phx_va(map.va), bind_bytes, pitch, rounded, width, height, NULL};
 }

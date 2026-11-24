@@ -190,16 +190,15 @@ int
 ac_drm_dcn_cs_submit(""")
     replace(submit.CS, "static void\nradv_amdgpu_winsys_get_cpu_addr(", """#ifdef HAVE_AMDGPU_DARWIN
 int
-radv_dcn_poll_submission(const struct radeon_winsys *ws, const struct radv_dcn_submitted_clear *writer, bool *busy)
+radv_dcn_poll_native(const struct radeon_winsys *ws, const struct build34_dcn_native_submit *writer, bool *busy)
 {
    if (!busy)
       return -EINVAL;
    *busy = true;
-   if (!ws || ws->cs_submit != radv_amdgpu_winsys_cs_submit || !writer || !writer->clear.serial ||
-       writer->clear.phase != RADV_DCN_CLEAR_CLOSED || writer->clear.binding.map.winsys != ws)
+   if (!ws || ws->cs_submit != radv_amdgpu_winsys_cs_submit || !writer)
       return -EINVAL;
    const struct radv_amdgpu_winsys *amdgpu = (const struct radv_amdgpu_winsys *)ws;
-   return ac_drm_dcn_poll(amdgpu->dev, &writer->native, busy);
+   return ac_drm_dcn_poll(amdgpu->dev, writer, busy);
 }
 #endif
 

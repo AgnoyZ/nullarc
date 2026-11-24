@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import build34_dcn_radv_binding_stage as binding
 import build34_dcn_radv_clear_stage as clear
-import build34_dcn_radv_complete_stage as complete
+import build34_dcn_radv_part_stage as part
 import build34_dcn_radv_submit_stage as submit
 
 
@@ -48,7 +48,7 @@ class RenderBinding(unittest.TestCase):
             self.skipTest("set BUILD34_RADV_COMPILE_COMMANDS to the reviewed Darwin Meson recipe")
         rows = json.loads(Path(recipe).read_text())
         commands = {}
-        for name in (name for name in complete.INPUTS if name.endswith(".c")):
+        for name in (name for name in part.INPUTS if name.endswith(".c")):
             matches = [row for row in rows if row["file"].endswith("/" + name)]
             self.assertEqual(len(matches), 1, name)
             row = matches[0]
@@ -59,11 +59,11 @@ class RenderBinding(unittest.TestCase):
         for name, (_, source, _) in commands.items():
             self.assertEqual(mesa / name, source)
 
-        inputs = {name: (mesa / name).read_bytes() for name in complete.INPUTS}
+        inputs = {name: (mesa / name).read_bytes() for name in part.INPUTS}
         for name in inputs:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, name):
-                complete.stage({**inputs, name: inputs[name] + b"\n"})
-        sources = complete.stage(inputs)
+                part.stage({**inputs, name: inputs[name] + b"\n"})
+        sources = part.stage(inputs)
         BO, IMAGE = binding.BO, binding.IMAGE
         self.assertLess(sources[BO].index("goto error_va_map;", sources[BO].index("radv_amdgpu_winsys_bo_from_ptr(")),
                         sources[BO].index("bo->dcn_host_map = host_map;"))
@@ -74,6 +74,11 @@ class RenderBinding(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
+            queue = sources[submit.QUEUE]
+            (out / "staged_radv_part.inc").write_text(
+                queue[queue.index("struct radv_dcn_part_scope {"):queue.index("#endif\n\nstatic VkResult\nradv_queue_submit_normal(")]
+            )
+            self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_part.c", ("-I" + tmp, "-I" + str(mesa / "include")))
             transport = sources[submit.DRM]
             (out / "staged_darwin_submit.inc").write_text(
                 transport[transport.index("static bool\nacd_dcn_matches_plan("):transport.index("static int\nacd_cmd_ctx(")]
@@ -84,7 +89,7 @@ class RenderBinding(unittest.TestCase):
                 kext[kext.index("enum acd_exact_phase"):kext.index("/* G6:")] +
                 kext[kext.index("static inline void\nacd_sfence("):kext.index("static bool\ntrace_enabled(")]
             )
-            for name in (binding.HEADER, clear.HEADER, submit.HEADER, submit.NATIVE_HEADER):
+            for name in (binding.HEADER, clear.HEADER, submit.HEADER, submit.NATIVE_HEADER, part.HEADER):
                 sources[name] = (ROOT / "tools" / Path(name).name).read_text()
             overlay = []
             for name, source in sources.items():

@@ -1,5 +1,6 @@
 """Test the staged plugin attachment observation without a Vulkan device."""
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "src/nmplugin"
 sys.path.insert(0, str(ROOT / "tools"))
 from build34_dcn_render_write_stage import INPUTS, stage
+import build34_dcn_plugin_part_stage as part
 from test_nmplugin_render_pass_integrity import function
 
 
@@ -106,6 +108,54 @@ class RenderWrite(unittest.TestCase):
                 with self.subTest(group=group):
                     result = subprocess.run([str(binary), group], capture_output=True, text=True, timeout=10)
                     self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_exact_part_callsite_lifetime(self):
+        sources = part.stage(self.inputs)
+        vk, events = sources["nvmtl_vk.c"], sources["NVMTLEventSync.m"]
+        begin = function(vk, "int nvmtl_vk_submit_begin_at(nvk_cmdbuf *c, nvmtl_inflight *f, const char *who)\n{")
+        finish = function(vk, "int nvmtl_vk_submit_finish(nvmtl_inflight *f)\n{")
+        start = "    const nvmtl_dcn_attachment *attachment = &c->dcn_recording.recorded;"
+        self.assertLess(begin.index("pthread_mutex_lock(&nvmtl_submit_mutex)"), begin.index(start))
+        self.assertLess(finish.index("nvmtl_keep_verdict(c->wseq)"), finish.index("    struct build34_dcn_part_writer completed_writer"))
+        self.assertLess(finish.index("nvmtl_dcn_complete_part(g_queue"), finish.index("nvmtl_cmd_retire(c)"))
+        self.assertEqual(events.count("nvmtl_dcn_part_prepare(part);"), 2)
+        landed = function(events, "static void nvmtl_dcn_part_landed(")
+        self.assertLess(landed.index("part->commands.dcn_writer ="), landed.index("if (!published"))
+        self.assertLess(landed.index("nvmtl_dcn_part_texture(part"), landed.index("part->landedWriter = writer"))
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "nvmtl_vk.h").write_text(sources["nvmtl_vk.h"])
+            (out / "inflight.inc").write_text(extract(vk, "struct nvmtl_inflight {", "nvmtl_inflight *nvmtl_vk_inflight_new"))
+            (out / "part_submit.inc").write_text(extract(begin, start, "    pthread_mutex_unlock(&nvmtl_submit_mutex);"))
+            (out / "part_finish.inc").write_text(extract(finish, "    struct build34_dcn_part_writer completed_writer", "    pt[7]"))
+            binary = out / "plugin-part"
+            built = subprocess.run([
+                os.environ.get("CC", "clang"), "-std=c11", "-Wall", "-Wextra", "-Werror", "-g",
+                "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
+                "-I" + tmp, "-I" + str(PLUGIN), "-I" + str(ROOT / "tools"),
+                str(Path(__file__).with_name("test_build34_dcn_plugin_part.c")), "-o", str(binary),
+            ], capture_output=True, text=True, timeout=60)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipUnless(sys.platform == "darwin" and os.environ.get("VULKAN_HEADERS"), "requires macOS SDK and Vulkan headers")
+    def test_exact_part_plugin_syntax(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            overlay = []
+            for name, text in part.stage(self.inputs).items():
+                destination = out / name
+                destination.write_text(text)
+                overlay.append({"type": "file", "name": str(PLUGIN / name), "external-contents": str(destination)})
+            manifest = out / "overlay.json"
+            manifest.write_text(json.dumps({"version": 0, "use-external-names": False, "roots": overlay}))
+            result = subprocess.run([
+                "xcrun", "clang", "-arch", "x86_64", "-fobjc-arc", "-fsyntax-only", "-ivfsoverlay", str(manifest),
+                "-Wno-protocol", "-Wno-incomplete-implementation", "-I" + str(PLUGIN),
+                "-I" + str(ROOT / "tools"), "-I" + os.environ["VULKAN_HEADERS"], str(PLUGIN / "NVMTLDevice.m"),
+            ], capture_output=True, text=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":

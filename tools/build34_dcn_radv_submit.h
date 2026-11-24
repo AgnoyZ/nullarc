@@ -11,7 +11,7 @@ struct radv_dcn_submitted_clear {
 
 #ifdef HAVE_AMDGPU_DARWIN
 struct radeon_winsys;
-int radv_dcn_poll_submission(const struct radeon_winsys *ws, const struct radv_dcn_submitted_clear *writer, bool *busy);
+int radv_dcn_poll_native(const struct radeon_winsys *ws, const struct build34_dcn_native_submit *writer, bool *busy);
 #endif
 
 static inline void
