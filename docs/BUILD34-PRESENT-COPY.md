@@ -870,20 +870,35 @@ Power/connection off or stop prevents future samples before releasing any
 mapping; a later power-on does not rearm a revoked sample path. It does not
 claim to serialize other PCI, firmware, or platform power transitions.
 
-The [sample](../tools/build34_dcn_firmware_home.h) validates the console's
-CPU-visible BAR0 range and checks the live HUBP0 geometry twice around
-matching programmed, in-use and earliest VMID 0 addresses. All reads must
-fall within a single observed physical frame counter value, with no pending
-flip, update lock or unsupported layout. It returns the observed HUBP
-address, geometry, frame and console BAR0 offset separately. No register is
-written and no address or sample is logged or published to userspace. A
-readback is not proof the two address domains refer to the same backing.
-The next route must bind that relationship, provide actual display-writer
-exclusion, and address power, translation visibility and uncertain-flip
-recovery. No route provider or production caller is enabled. Tests cover
-the bounded register sample and its rejection cases, source preservation,
-and full PhxFB syntax against the pinned kernel SDK. Roll back by omitting
-the overlay; copy, VBL and accepted runtime inputs stay unchanged.
+The [V2 sample](../tools/build34_dcn_firmware_home.h) validates the console's
+CPU-visible BAR0 range and brackets matching programmed, in-use and earliest
+VMID 0 addresses with two reads of the live HUBP0 geometry and memory windows.
+There are at most 80 BAR5 register reads, all within one observed physical
+frame, with no pending flip, update lock or unsupported layout. The query
+checks the BAR0 resource again before returning. No register is written and
+no address or sample is logged or published to userspace.
+
+The [aperture check](../tools/build34_dcn_firmware_aperture.h) requires stable,
+identical DCN and MMHUB local framebuffer base, inclusive top and UMA offset.
+The full rounded range must fit that local window, with the HUBP address's
+offset matching the console's BAR0 offset and no overlap with the AGP aperture
+or a VMID 0 page-table range. A nonempty but malformed VMID 0 context refuses
+even when its nominal window would not overlap. The resulting backing address
+is the checked UMA start plus that common byte offset, not a PCI bus address.
+The decode was checked against AMD's [DCN register definitions](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/include/asic_reg/dcn/dcn_3_1_4_offset.h),
+[HUBBUB context setup](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubbub/dcn20/dcn20_hubbub.c#L394-L425),
+and [MC-to-physical conversion](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c#L1051-L1054);
+no implementation was copied.
+
+This is register evidence for a local firmware backing, not a read of DCN
+fetches or a proof of the live BAR decoder, cache visibility or absence of
+stale translations. A future route must retain and revalidate the backing,
+exclude other display writers, and handle power and uncertain-flip recovery.
+No route provider or production caller is enabled. CPU fixtures cover the
+matching offset, disjoint GART, conflicting or changing windows, a wrong BAR
+offset, final-page overlap, overflow and torn reads. PhxFB is syntax-checked
+against the pinned kernel SDK. Roll back by omitting the overlay; copy, VBL
+and accepted runtime inputs stay unchanged.
 
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of

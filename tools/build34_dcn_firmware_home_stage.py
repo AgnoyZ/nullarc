@@ -41,9 +41,13 @@ FIELDS = '''    IOLock *fDcnFirmwareLock = nullptr;
             auto *bar = fPCI->getDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
             const auto *mmio = reinterpret_cast<const volatile uint32_t *>(fMmio->getVirtualAddress());
             if (!bar || !mmio) return false;
-            return build34::dcn::sampleFirmwareScanout(fBase, bar->getPhysicalAddress(), bar->getLength(),
+            const auto barBase = bar->getPhysicalAddress();
+            const auto barBytes = bar->getLength();
+            if (!build34::dcn::sampleFirmwareScanout(fBase, barBase, barBytes,
                 fSurfMap->getLength(), fWidth, fHeight, fRowBytes, fMmio->getLength(),
-                [&](uint32_t reg, uint32_t &value) { value = mmio[reg]; return true; }, out) && accessible();
+                [&](uint32_t reg, uint32_t &value) { value = mmio[reg]; return true; }, out) || !accessible()) return false;
+            auto *currentBar = fPCI->getDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
+            return currentBar == bar && currentBar->getPhysicalAddress() == barBase && currentBar->getLength() == barBytes;
         }();
         IOLockUnlock(fDcnFirmwareLock);
         if (!sample) out = {};

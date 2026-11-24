@@ -1,8 +1,9 @@
 #pragma once
 
 #include "build34_dcn_flip_program.h"
+#include "build34_dcn_firmware_aperture.h"
 
-#define BUILD34_DCN_SAMPLE_FIRMWARE "phx34DcnSampleFirmwareV1"
+#define BUILD34_DCN_SAMPLE_FIRMWARE "phx34DcnSampleFirmwareV2"
 
 namespace build34::dcn {
 
@@ -10,6 +11,7 @@ struct FirmwareScanoutSample {
     HubpAddress scanout;
     ScanoutSurface surface;
     uint64_t barOffset;
+    uint64_t backing;
     uint32_t frame;
 };
 
@@ -21,7 +23,7 @@ bool sampleFirmwareScanout(uint64_t consoleBase, uint64_t barBase, uint64_t barB
     out = {};
     if (!barBase || barBase % kPageBytes || barBytes > UINT64_MAX - barBase || consoleBase < barBase ||
         consoleBase % kPageBytes || rowBytes < 4 || rowBytes % 4 ||
-        mmioBytes < (uint64_t{kOtgLockSelect} + 1) * sizeof(uint32_t)) return false;
+        mmioBytes < firmwareAperture::kMmioBytes) return false;
     const uint64_t offset = consoleBase - barBase, visible = uint64_t{rowBytes} * height;
     if (offset >= barBytes || visible > mappedBytes || visible > kMaxBackingBytes) return false;
     const auto bytes = (visible + kPageBytes - 1) & ~(kPageBytes - 1);
@@ -37,14 +39,16 @@ bool sampleFirmwareScanout(uint64_t consoleBase, uint64_t barBase, uint64_t barB
             read(kFlip, flip) && !(flip & (kStereoFlip | kPending | kUpdateLocked | kImmediate));
     };
     uint32_t firstFrame = 0, lastFrame = 0, sampledFrame = 0;
+    uint64_t backing = 0;
     HubpAddress address{};
-    if (!read(kFrame, firstFrame) || !unlocked() || !matchHubpFlipGeometry(surface, read) ||
-        !HubpFlipReadback::observeQuiescent(read, address, sampledFrame) || address.vmid ||
-        bytes > kAddressLimit - address.address || !matchHubpFlipGeometry(surface, read) || !unlocked() ||
+    FirmwareLocalAperture before, after;
+    if (!read(kFrame, firstFrame) || !unlocked() || !before.sample(read) || !matchHubpFlipGeometry(surface, read) ||
+        !HubpFlipReadback::observeQuiescent(read, address, sampledFrame) || !matchHubpFlipGeometry(surface, read) ||
+        !after.sample(read) || !before.same(after) || !before.bind(address, offset, bytes, backing) || !unlocked() ||
         !read(kFrame, lastFrame) || (firstFrame & kFrameMask) != sampledFrame ||
         (lastFrame & kFrameMask) != sampledFrame) return false;
 
-    out = {address, surface, offset, sampledFrame};
+    out = {address, surface, offset, backing, sampledFrame};
     return true;
 }
 

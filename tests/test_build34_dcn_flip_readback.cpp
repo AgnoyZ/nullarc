@@ -199,18 +199,41 @@ static void testPollBoundAndTornRead() {
     assert(fixture.registersRead == 22 * 65);
 }
 
-enum class FirmwareFault { None, WrongVmid, BadLength, BarOffset, ConsoleMap, Geometry, ChangedGeometry, Lock,
-                           LockSelect, Stereo, Pending, TornAddress, CrossedFrame, ReadFailed, AllOnes };
+enum class FirmwareFault { None, DisjointGart, WrongVmid, BadLength, BarOffset, ConsoleMap, Geometry, ChangedGeometry, Lock,
+                           LockSelect, Stereo, Pending, TornAddress, CrossedFrame, ReadFailed, AllOnes,
+                           MisboundBar, DifferentBase, DifferentTop, DifferentOffset, ChangedAperture, CrossingAperture,
+                           AgpOverlap, GartOverlap, GartInvalid, PhysicalOverflow };
 
 static void testFirmwareSample(FirmwareFault fault) {
     Fixture fixture;
-    fixture.programmed = fixture.inUse = fixture.earliest = {fixture.oldAddress.address, fault == FirmwareFault::WrongVmid ? 3u : 0u};
+    constexpr uint32_t fbBase = 0x9000, fbTop = fbBase + 1;
+    const uint32_t physicalBase = fault == FirmwareFault::PhysicalOverflow ? 0xffffff : 0x18;
+    const auto offset = fault == FirmwareFault::CrossingAperture ? (2ull << 24) - kPageBytes :
+        fault == FirmwareFault::PhysicalOverflow ? 1ull << 24 : 0x4000;
+    const auto scanout = (uint64_t{fbBase} << 24) + offset;
+    fixture.programmed = fixture.inUse = fixture.earliest = {scanout, fault == FirmwareFault::WrongVmid ? 3u : 0u};
     if (fault == FirmwareFault::Pending) fixture.flip = hubp0::kPending;
     if (fault == FirmwareFault::Stereo) fixture.flip = hubp0::kStereoFlip;
-    unsigned reads = 0, pitchReads = 0, frameReads = 0;
+    const bool gart = fault == FirmwareFault::DisjointGart || fault == FirmwareFault::GartOverlap || fault == FirmwareFault::GartInvalid;
+    const auto gartStart = !gart ? 0u : static_cast<uint32_t>(scanout / kPageBytes + (fault == FirmwareFault::GartOverlap ? 1 : 0x1000));
+    unsigned reads = 0, pitchReads = 0, frameReads = 0, offsetReads = 0;
     const auto read = [&](uint32_t reg, uint32_t &value) {
         ++reads;
         switch (reg) {
+        case 0x03935: value = fbBase; return true;
+        case 0x03936: value = fbTop; return true;
+        case 0x03937:
+            value = physicalBase + (++offsetReads == 2 && fault == FirmwareFault::ChangedAperture);
+            return true;
+        case 0x03938: value = fault == FirmwareFault::AgpOverlap ? fbBase : 0xffffff; return true;
+        case 0x03939: value = fault == FirmwareFault::AgpOverlap ? fbBase : 0; return true;
+        case 0x1a8ec: value = fbBase + (fault == FirmwareFault::DifferentBase); return true;
+        case 0x1a8ed: value = fbTop + (fault == FirmwareFault::DifferentTop); return true;
+        case 0x1a8d7: value = physicalBase + (fault == FirmwareFault::DifferentOffset); return true;
+        case 0x03a19: case 0x03a1a: case 0x03a1c: case 0x03a1e: value = 0; return true;
+        case 0x03a1b: value = !gart ? 0 : fault == FirmwareFault::GartInvalid ? 0x1000 : 0x1001; return true;
+        case 0x03a1d: value = gartStart; return true;
+        case 0x03a1f: value = gartStart + (gart ? 8 : 0); return true;
         case 0x03aa5: value = 8; return true;
         case 0x03aa7: case 0x03aa9: case 0x03ada: value = 0; return true;
         case 0x03aaa: value = (17u << 16) | 64; return true;
@@ -232,17 +255,20 @@ static void testFirmwareSample(FirmwareFault fault) {
         }
     };
     constexpr uint64_t bar = 0x800000000, barBytes = 0x10000000, visible = 17 * 256, mmio = 0x80000;
-    FirmwareScanoutSample sample{fixture.oldAddress, {}, UINT64_MAX, UINT32_MAX};
-    assert(sampleFirmwareScanout(bar + (fault == FirmwareFault::BarOffset ? barBytes - kPageBytes : 0x4000), bar,
+    const bool accepted = fault == FirmwareFault::None || fault == FirmwareFault::DisjointGart;
+    FirmwareScanoutSample sample{fixture.oldAddress, {}, UINT64_MAX, UINT64_MAX, UINT32_MAX};
+    const auto consoleOffset = fault == FirmwareFault::BarOffset ? barBytes - kPageBytes :
+        offset + (fault == FirmwareFault::MisboundBar ? kPageBytes : 0);
+    assert(sampleFirmwareScanout(bar + consoleOffset, bar,
         barBytes, fault == FirmwareFault::ConsoleMap ? visible - 1 : visible, 64, 17, 256,
-        fault == FirmwareFault::BadLength ? 0x05051 * 4 : mmio, read, sample) == (fault == FirmwareFault::None));
-    if (fault == FirmwareFault::None) {
+        fault == FirmwareFault::BadLength ? 0x1a8ed * 4 : mmio, read, sample) == accepted);
+    if (accepted) {
         assert(sample.scanout == fixture.programmed && sample.surface.width == 64 && sample.surface.height == 17 &&
                sample.surface.pitchPixelsMinusOne == 63 && sample.surface.mappedBytes == 2 * kPageBytes);
         assert(sample.barOffset == 0x4000 && sample.scanout.address != bar + sample.barOffset && sample.frame == 8);
-        assert(reads == 50);
+        assert(sample.backing == (uint64_t{physicalBase} << 24) + offset && reads == 80);
     } else {
-        assert(!sample.scanout.address && !sample.barOffset && !sample.surface.mappedBytes && !sample.frame);
+        assert(!sample.scanout.address && !sample.barOffset && !sample.backing && !sample.surface.mappedBytes && !sample.frame);
         if (fault == FirmwareFault::BarOffset || fault == FirmwareFault::ConsoleMap || fault == FirmwareFault::BadLength)
             assert(!reads);
     }
@@ -257,10 +283,13 @@ int main() {
                              Fault::SerialChanged, Fault::ClockFailed, Fault::BackwardsClock, Fault::Late})
         testFault(fault);
     testPollBoundAndTornRead();
-    for (const auto fault : {FirmwareFault::None, FirmwareFault::WrongVmid, FirmwareFault::BadLength, FirmwareFault::BarOffset,
+    for (const auto fault : {FirmwareFault::None, FirmwareFault::DisjointGart, FirmwareFault::WrongVmid, FirmwareFault::BadLength, FirmwareFault::BarOffset,
             FirmwareFault::ConsoleMap, FirmwareFault::Geometry, FirmwareFault::ChangedGeometry, FirmwareFault::Lock,
             FirmwareFault::LockSelect, FirmwareFault::Stereo, FirmwareFault::Pending, FirmwareFault::TornAddress,
-            FirmwareFault::CrossedFrame, FirmwareFault::ReadFailed, FirmwareFault::AllOnes})
+            FirmwareFault::CrossedFrame, FirmwareFault::ReadFailed, FirmwareFault::AllOnes, FirmwareFault::MisboundBar,
+            FirmwareFault::DifferentBase, FirmwareFault::DifferentTop, FirmwareFault::DifferentOffset, FirmwareFault::ChangedAperture,
+            FirmwareFault::CrossingAperture, FirmwareFault::AgpOverlap, FirmwareFault::GartOverlap, FirmwareFault::GartInvalid,
+            FirmwareFault::PhysicalOverflow})
         testFirmwareSample(fault);
     std::puts("[PASS] build34 HUBP flip readback (CPU only)");
 }
