@@ -1,4 +1,4 @@
-#include "../tools/build34_dcn_page_layout.h"
+#include "../tools/build34_dcn_descriptor_backing.h"
 
 #include <array>
 #include <cassert>
@@ -100,6 +100,24 @@ struct PhysicalPages {
     const uint64_t *addresses;
     size_t count;
     size_t calls = 0;
+};
+
+struct DescriptorFixture final : IOMemoryDescriptor {
+    const uint64_t *pages;
+    uint64_t bytes;
+    uint64_t contiguous = kPageBytes;
+    unsigned reads = 0;
+
+    DescriptorFixture(const uint64_t *addresses, uint64_t length) : pages(addresses), bytes(length) {}
+
+    IOByteCount getLength() const override { return bytes; }
+
+    uint64_t getPhysicalSegment(IOByteCount offset, IOByteCount *length, unsigned options) override {
+        assert(options == kIOMemoryMapperNone && offset < bytes && offset % kPageBytes == 0);
+        ++reads;
+        *length = contiguous;
+        return pages[offset / kPageBytes];
+    }
 };
 
 static bool lookupPage(PhysicalPages &pages, uint64_t offset, uint64_t *physical) {
@@ -230,23 +248,25 @@ static void testPageIdentity() {
     auto rendered = expected;
     auto presented = expected;
     auto targets = expected;
-    PhysicalPages renderPages{rendered.data(), rendered.size()};
-    PhysicalPages presentPages{presented.data(), presented.size()};
+    DescriptorFixture renderPages{rendered.data(), surface.mappedBytes};
+    DescriptorFixture presentPages{presented.data(), surface.mappedBytes};
+    PinnedDescriptorSlice renderSlice{&renderPages, 0, surface.mappedBytes};
+    PinnedDescriptorSlice presentSlice{&presentPages, 0, surface.mappedBytes};
     BatchSource source{surface.mappedBytes, BatchResult::Normal, {targets.data(), targets.size()}, 0, true};
-    OriginalBacking renderBacking{&renderPages, readOriginalPage};
-    OriginalBacking presentBacking{&presentPages, readOriginalPage};
+    OriginalBacking renderBacking{&renderSlice, readPinnedDescriptorPage};
+    OriginalBacking presentBacking{&presentSlice, readPinnedDescriptorPage};
     PreparedDmaMapping mapping{surface.mappedBytes, &kFixtureMapper, &source, readBatch, resolvePage};
     DmaRun scratch{};
     std::array<uint64_t, 4> pages;
 
     const auto check = [&](const void *deviceMapper, size_t batches, size_t renderReads, size_t presentReads,
                            size_t resolutions, bool accept = false) {
-        renderPages.calls = presentPages.calls = source.calls = source.targets.calls = 0;
+        renderPages.reads = presentPages.reads = source.calls = source.targets.calls = 0;
         pages.fill(kUnwritten);
         const auto layout = collectScanoutPages(0, surface, mapping, deviceMapper, renderBacking, presentBacking,
                                                 &scratch, 1, pages.data(), pages.size());
         assert(source.calls == batches && source.targets.calls == resolutions);
-        assert(renderPages.calls == renderReads && presentPages.calls == presentReads);
+        assert(renderPages.reads == renderReads && presentPages.reads == presentReads);
         if (accept) {
             assert(layout.entryCount == 3 && layout.tableBytes == 24);
             assert(pages[0] == kDmaBase && pages[1] == kDmaBase + kPageBytes);
@@ -283,6 +303,12 @@ static void testPageIdentity() {
     targets = presented;
     check(&kFixtureMapper, 1, 3, 3, 2);
     presented = targets = expected;
+    --presentPages.bytes;
+    check(&kFixtureMapper, 1, 1, 0, 0);
+    ++presentPages.bytes;
+    --presentPages.contiguous;
+    check(&kFixtureMapper, 1, 1, 1, 0);
+    ++presentPages.contiguous;
 
     const unsigned otherMapper = 2;
     check(nullptr, 0, 0, 0, 0);
@@ -295,9 +321,41 @@ static void testPageIdentity() {
     mapping.resolvePage = resolvePage;
     renderBacking.readPage = nullptr;
     check(&kFixtureMapper, 0, 0, 0, 0);
-    renderBacking.readPage = readOriginalPage;
+    renderBacking.readPage = readPinnedDescriptorPage;
     presentBacking.readPage = nullptr;
     check(&kFixtureMapper, 0, 0, 0, 0);
+}
+
+static void testDescriptorSlice() {
+    const uint64_t addresses[] = {0xa0000, 0x70000, 0x210000, 0x4000};
+    DescriptorFixture descriptor{addresses, 4 * kPageBytes};
+    PinnedDescriptorSlice slice{&descriptor, kPageBytes, 3 * kPageBytes};
+    uint64_t physical = kUnwritten;
+    assert(readPinnedDescriptorPage(&slice, 0, &physical) && physical == addresses[1]);
+    assert(readPinnedDescriptorPage(&slice, 2 * kPageBytes, &physical) && physical == addresses[3]);
+    assert(descriptor.reads == 2);
+
+    const auto refuse = [&](PinnedDescriptorSlice candidate, uint64_t offset = 0) {
+        physical = kUnwritten;
+        assert(!readPinnedDescriptorPage(&candidate, offset, &physical) && physical == kUnwritten);
+    };
+    assert(!readPinnedDescriptorPage(nullptr, 0, &physical));
+    assert(!readPinnedDescriptorPage(&slice, 0, nullptr));
+    refuse({nullptr, 0, kPageBytes});
+    refuse({&descriptor, 0, 0});
+    refuse({&descriptor, 0, kPageBytes - 1});
+    refuse({&descriptor, 0, 2 * kPageBytes - 1});
+    refuse({&descriptor, 0, kMaxBackingBytes + kPageBytes});
+    refuse({&descriptor, 1, kPageBytes});
+    refuse({&descriptor, 2 * kPageBytes, 3 * kPageBytes});
+    refuse({&descriptor, UINT64_MAX & ~(kPageBytes - 1), 2 * kPageBytes});
+    refuse(slice, 1);
+    refuse(slice, slice.bytes);
+    refuse(slice, UINT64_MAX & ~(kPageBytes - 1));
+    assert(descriptor.reads == 2);
+    descriptor.contiguous = 0;
+    refuse(slice);
+    assert(descriptor.reads == 3);
 }
 
 static void expectRefusal(uint64_t start, uint64_t bytes, const DmaRun *runs, size_t count,
@@ -405,6 +463,7 @@ int main() {
     testSurfaceQualifications();
     testSegmentBatches();
     testPageIdentity();
+    testDescriptorSlice();
     testFragmentedBacking();
     testAddressAndCapacityEdges();
     testRefusesMalformedRunsBeforeWriting();

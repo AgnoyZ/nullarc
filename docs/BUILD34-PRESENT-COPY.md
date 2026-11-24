@@ -76,6 +76,26 @@ physical pages. A last-page render mismatch also refuses publication when
 the present descriptor and DMA mapping agree with each other. The 4,000-page
 test checks all three lookups and every emitted address.
 
+The [descriptor adapter](../tools/build34_dcn_descriptor_backing.h) supplies
+either original-backing callback for an already pinned descriptor slice.
+It checks that the whole page-rounded slice fits the descriptor's length
+and reads each requested page with `getPhysicalSegment` and
+`kIOMemoryMapperNone`, following the pinned XNU
+[descriptor implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L3187-L3284).
+A nonzero, page-aligned address is accepted only when
+the returned contiguous length covers a full 4 KiB. The adapter neither
+prepares the descriptor nor takes ownership of its wire or reference;
+those must survive the lookup and any later use by the scanout transaction.
+The option is not proof of a descriptor's provenance or address domain:
+the cited XNU implementation may reverse-map physical descriptors through
+the system mapper. Admit only concrete descriptors known to return the
+original pages in the comparison's physical address domain. The adapter
+does not derive DMA addresses. The page cap limits callback count, not the
+runtime cost of a descriptor walk; a per-frame call needs a separate latency
+and reuse bound. Fixtures cover nonzero slice offsets, a descriptor shorter
+than the rounded extent, and a short physical segment despite sufficient
+descriptor length.
+
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or
 matching descriptor cannot rule out per-page bounce buffering. A null mapper
 does not establish identity, and the presence of `mapToPhysicalAddress()`
