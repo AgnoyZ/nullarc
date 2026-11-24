@@ -160,6 +160,22 @@ The software map generation identifies a completed software page-table
 update. The legacy `vmMap` can return before the context has a hardware
 VMID, and its TLB invalidation helper does not propagate timeout.
 
+The isolated source stage also assigns GPUVM context, binding and table
+generations at the original driver call sites under `gpuLock`. A snapshot
+requires a live host-map slice under the client lock, the owning client
+and reciprocal context-to-VMID ownership under `gpuLock`. Freeing the
+context, evicting its VMID or changing its tables invalidates old identities.
+A partial map failure disables snapshots for that allocation. Stop and the
+first sleep close identity admission for the provider instance. The
+generator's counter can saturate without changing the legacy return values.
+The snapshot carries an invalidation generation of zero, so the legacy
+flush cannot satisfy the lease gate. Tests extract the build34 allocation,
+bind, free, map, unmap, flush and power callback for CPU-only execution.
+They cover reused context slots and VMIDs, partial page-table writes and
+counter saturation. A future caller must hold the provider lifetime through
+the lock acquisition and snapshot use. The admission bit alone cannot
+serialize teardown with a live consumer.
+
 The offline render lease gate now requires a
 [TLB observation](../tools/build34_dcn_render_tlb.h) for the exact client map,
 provider, context allocation, VMID binding, page-table generation and

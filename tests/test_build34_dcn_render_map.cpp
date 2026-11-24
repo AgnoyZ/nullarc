@@ -1,4 +1,5 @@
 #include "PhxNativeABI.h"
+#include "build34_dcn_render_tlb.h"
 #include <cassert>
 #include <cstdio>
 #include <functional>
@@ -39,7 +40,13 @@ struct PhxBringup {
     bool sessionReleased = false;
     std::function<void()> onMap, onUnmap;
     bool gpuReady() const { return ready; }
-    uint32_t vmidAlloc() { ++allocs; return context; }
+    const void *renderClient = nullptr;
+    uint32_t vmidAlloc(const void *client) { ++allocs; renderClient = client; return context; }
+    build34::dcn::RenderVmTranslation renderVmIdentityLocked(uint32_t handle,
+                                                            build34::dcn::RenderMapIdentity mapping) {
+        assert(handle == context && mapping.client == renderClient);
+        return {mapping, this, 1, 2, 3, 0, handle, 8};
+    }
     IOReturn vmMap(uint32_t vmid, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t) {
         assert(vmid == context);
         ++mapCalls;
@@ -102,6 +109,12 @@ struct IOAccelPhxNativeClient {
         IOLockUnlock(lock);
         return result;
     }
+    build34::dcn::RenderVmTranslation translation(uint64_t va, uint64_t bytes) {
+        IOLockLock(lock);
+        const auto result = renderTranslationLocked(va, bytes);
+        IOLockUnlock(lock);
+        return result;
+    }
 };
 
 // PHX34_RENDER_MAP_METHODS
@@ -124,6 +137,10 @@ static void testPublicationAndReuse() {
     assert(client.changeMap(mapOp, start + 2 * page, 2, page, 2 * page) == kIOReturnSuccess);
     assert(client.vmid && client.generation(start, page) == 0);
     assert(client.generation(start + 2 * page, 2 * page) == 1);
+    const auto translation = client.translation(start + 2 * page, 2 * page);
+    assert(translation.mapping.client == &client && translation.mapping.generation == 1);
+    assert(translation.provider == &client.device && !client.translation(start, page).provider);
+    assert(!client.translation(start + 2 * page, 3 * page).provider);
 
     assert(client.changeMap(unmapOp, start, 1, page, 2 * page) == kIOReturnSuccess);
     client.device.onMap = [&] {

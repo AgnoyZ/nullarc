@@ -1,0 +1,174 @@
+#include "build34_dcn_render_tlb.h"
+#include <cassert>
+#include <cstdio>
+#include <cstring>
+
+using IOReturn = int;
+using IOByteCount = uint64_t;
+using addr64_t = uint64_t;
+constexpr IOReturn kIOReturnSuccess = 0, kIOReturnNotReady = -1, kIOReturnVMError = -2, kIOReturnNoMemory = -3;
+constexpr IOReturn IOPMAckImplied = 0;
+constexpr unsigned kIOMemoryMapperNone = 0;
+
+static constexpr uint64_t page = 4096;
+struct IOService {};
+struct IOMemoryDescriptor {
+    uint64_t validBytes = 2 * page;
+    uint64_t getPhysicalSegment(uint64_t offset, IOByteCount *bytes, unsigned options) const {
+        assert(options == kIOMemoryMapperNone);
+        *bytes = offset < validBytes ? page : 0;
+        return *bytes ? 0x80000 + offset : 0;
+    }
+};
+struct IOBufferMemoryDescriptor {
+    uint8_t storage[64 * 1024]{};
+    void *getBytesNoCopy() { return storage; }
+};
+struct IOLock { bool held = false; };
+static void IOLockLock(IOLock *lock) { assert(!lock->held); lock->held = true; }
+static void IOLockUnlock(IOLock *lock) { assert(lock->held); lock->held = false; }
+static void IODelay(unsigned) { assert(false); }
+static void IOSleep(unsigned) { assert(false); }
+static void IOLog(const char *) {}
+static void flushLine(const volatile void *) {}
+
+// PHX34_VM_REGISTERS
+
+struct PhxBringup {
+    // PHX34_VM_FIELDS
+    IOLock lock;
+    IOLock *gpuLock = &lock;
+    bool isSleeping = false;
+    IOBufferMemoryDescriptor root;
+    mutable unsigned invalidations = 0;
+    mutable uint32_t request = 0;
+    uint64_t ptes[2]{};
+
+    bool gpuReady() const { return true; }
+    uint64_t gpuRetired() const { return 100; }
+    VmCtx *vmCtx(uint32_t handle) { return handle && handle <= kMaxCtx && vm[handle - 1].busy ? &vm[handle - 1] : nullptr; }
+    uint64_t ptTablePhys(VmCtx &context, uint32_t index) {
+        assert(lock.held && index == 0);
+        context.chunk[0] = &root;
+        return 0x10000;
+    }
+    uint64_t *vmPte(VmCtx &, uint64_t va, bool) {
+        assert(lock.held && !(va & (page - 1)));
+        return &ptes[(va / page) % 2];
+    }
+    void wreg(uint32_t reg, uint32_t value) const {
+        assert(lock.held);
+        if (reg == kRegInvEng17Req) {
+            request = value;
+            ++invalidations;
+        }
+    }
+    uint32_t rreg(uint32_t reg) const {
+        assert(lock.held && reg == kRegInvEng17Ack && request);
+        return request & 0xff00;
+    }
+
+    void vmFlushTlb(uint32_t vmid) const;
+    uint32_t vmidAlloc(const void *client);
+    uint32_t vmBind(uint32_t handle);
+    void vmidFree(uint32_t handle, uint64_t lastSeq);
+    IOReturn vmMap(uint32_t handle, uint64_t va, IOMemoryDescriptor *descriptor, uint64_t offset, uint64_t bytes);
+    IOReturn vmUnmap(uint32_t handle, uint64_t va, uint64_t bytes);
+    IOReturn setPowerState(unsigned long ordinal, IOService *whichDevice);
+
+    uint32_t bind(uint32_t handle) {
+        IOLockLock(gpuLock);
+        const auto vmid = vmBind(handle);
+        IOLockUnlock(gpuLock);
+        return vmid;
+    }
+
+    build34::dcn::RenderVmTranslation identity(uint32_t handle, build34::dcn::RenderMapIdentity mapping) {
+        IOLockLock(gpuLock);
+        const auto snapshot = renderVmIdentityLocked(handle, mapping);
+        IOLockUnlock(gpuLock);
+        return snapshot;
+    }
+};
+
+// PHX34_VM_METHODS
+
+static void testIdentityLifetime() {
+    PhxBringup service;
+    const unsigned client = 1, otherClient = 2;
+    const build34::dcn::RenderMapIdentity mapping{&client, 1};
+    const uint32_t handle = service.vmidAlloc(&client);
+    assert(handle == 1 && !service.identity(handle, mapping).provider);
+
+    IOMemoryDescriptor descriptor;
+    assert(service.vmMap(handle, 0x10000, &descriptor, 0, 2 * page) == kIOReturnSuccess);
+    assert(!service.invalidations && !service.identity(handle, mapping).provider);
+    const auto vmid = service.bind(handle);
+    const auto original = service.identity(handle, mapping);
+    assert(vmid == kFirstUserVmid && original.vmid == vmid && original.context == handle);
+    assert(original.provider == &service && original.contextGeneration && original.bindingGeneration && original.tableGeneration);
+    assert(!original.invalidateGeneration && service.invalidations == 1);
+    assert(!service.identity(handle, {&otherClient, 1}).provider);
+    assert(!service.identity(handle, {&client, 0}).provider);
+    assert(!service.identity(handle, {&client, UINT64_MAX}).provider);
+    service.hwv[0].ctx = 0;
+    assert(!service.identity(handle, mapping).provider);
+    service.hwv[0].ctx = handle;
+
+    assert(service.bind(handle) == vmid && service.invalidations == 1);
+    assert(build34::dcn::sameRenderTranslation(original, service.identity(handle, mapping)));
+    assert(service.vmUnmap(handle, 0x10000, page) == kIOReturnSuccess);
+    assert(!service.ptes[0] && service.ptes[1] && service.invalidations == 2);
+    const auto edited = service.identity(handle, mapping);
+    assert(edited.contextGeneration == original.contextGeneration && edited.bindingGeneration == original.bindingGeneration);
+    assert(edited.tableGeneration > original.tableGeneration);
+
+    for (uint32_t index = 0; index < kNumUserVmids; ++index)
+        assert(service.bind(service.vmidAlloc(&otherClient)) == kFirstUserVmid + (index + 1) % kNumUserVmids);
+    assert(!service.identity(handle, mapping).provider);
+    assert(service.bind(handle) == kFirstUserVmid + 1);
+    const auto rebound = service.identity(handle, mapping);
+    assert(rebound.contextGeneration == edited.contextGeneration && rebound.tableGeneration == edited.tableGeneration);
+    assert(rebound.bindingGeneration > edited.bindingGeneration);
+
+    service.vmidFree(handle, 0);
+    assert(!service.identity(handle, mapping).provider);
+    assert(service.vmidAlloc(&client) == handle);
+    assert(service.bind(handle) == rebound.vmid);
+    const auto reused = service.identity(handle, mapping);
+    assert(reused.contextGeneration > rebound.contextGeneration && reused.bindingGeneration > rebound.bindingGeneration);
+    assert(reused.tableGeneration > rebound.tableGeneration && !reused.invalidateGeneration);
+
+    descriptor.validBytes = page;
+    assert(service.vmMap(handle, 0x10000, &descriptor, 0, 2 * page) == kIOReturnVMError);
+    assert(service.ptes[0] && !service.identity(handle, mapping).provider);
+    assert(service.vmMap(handle, 0x10000, &descriptor, 0, page) == kIOReturnSuccess);
+    assert(!service.identity(handle, mapping).provider);
+}
+
+static void testPowerAndExhaustion() {
+    PhxBringup service;
+    const unsigned client = 1;
+    const build34::dcn::RenderMapIdentity mapping{&client, 1};
+    const auto handle = service.vmidAlloc(&client);
+    assert(service.bind(handle) == kFirstUserVmid && service.identity(handle, mapping).provider);
+    assert(service.setPowerState(0, nullptr) == IOPMAckImplied && !service.identity(handle, mapping).provider);
+    assert(service.setPowerState(1, nullptr) == IOPMAckImplied && !service.identity(handle, mapping).provider);
+
+    PhxBringup exhausted;
+    exhausted.renderVmSerial = UINT64_MAX - 4;
+    const auto last = exhausted.vmidAlloc(&client);
+    assert(exhausted.bind(last) == kFirstUserVmid);
+    assert(exhausted.identity(last, mapping).bindingGeneration == UINT64_MAX - 1);
+    assert(exhausted.vmUnmap(last, 0x10000, page) == kIOReturnSuccess);
+    assert(!exhausted.identity(last, mapping).provider);
+    exhausted.vmidFree(last, 0);
+    assert(exhausted.vmidAlloc(&client) == last && exhausted.bind(last) == kFirstUserVmid);
+    assert(!exhausted.identity(last, mapping).provider && exhausted.renderVmSerial == UINT64_MAX - 1);
+}
+
+int main() {
+    testIdentityLifetime();
+    testPowerAndExhaustion();
+    std::puts("[PASS] staged build34 GPUVM identities (CPU only)");
+}
