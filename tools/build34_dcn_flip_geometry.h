@@ -21,7 +21,7 @@ namespace dcnPeers {
 inline constexpr uint32_t kPower1 = 0x03543, kPowerStride = 2;
 inline constexpr uint32_t kHubpStride = 0xdc, kOtgStride = 0x80;
 inline constexpr uint32_t kPowerMask = 0xc0000000, kGated = 0x80000000;
-inline constexpr uint32_t kHubpIdle = 0x1003;
+inline constexpr uint32_t kHubpIdle = hubp0::kControlBlank | hubp0::kControlNoOutstanding | hubp0::kControlTtuDisable;
 inline constexpr uint32_t kCount = 3;
 inline constexpr uint64_t kMmioBytes = (hubp0::kOtgControl + kCount * kOtgStride + 1ull) * sizeof(uint32_t);
 }

@@ -39,9 +39,10 @@ inline constexpr uint32_t kFlip = 0x03adb, kFlip2 = 0x03adc;
 inline constexpr uint32_t kInUseLow = 0x03ae1, kInUseHigh = 0x03ae2;
 inline constexpr uint32_t kEarliestLow = 0x03ae5, kEarliestHigh = 0x03ae6;
 inline constexpr uint32_t kFrame = 0x0500c, kFrameMask = 0x00ffffff;
-inline constexpr uint32_t kControlBlank = 1u << 0, kControlReset = 1u << 2, kControlNoRequests = 1u << 12;
+inline constexpr uint32_t kControlBlank = 1u << 0, kControlNoOutstanding = 1u << 1, kControlReset = 1u << 2;
+inline constexpr uint32_t kControlTtuDisable = 1u << 12;
 inline constexpr uint32_t kControlVtg = 0x000000f0, kControlUnderflow = 0x70000000;
-inline constexpr uint32_t kUnsupportedControl = kControlBlank | kControlReset | kControlNoRequests |
+inline constexpr uint32_t kUnsupportedControl = kControlBlank | kControlReset | kControlTtuDisable |
     kControlVtg | kControlUnderflow;
 inline constexpr uint32_t kImmediate = 1u << 1, kPending = 1u << 8, kUpdateLocked = 1u << 9;
 inline constexpr uint32_t kUnsupportedFlip2 = (1u << 8) | (1u << 10);
@@ -86,7 +87,8 @@ public:
         return true;
     }
 
-    HubpFlipProgress poll() {
+    HubpFlipProgress poll(bool *noOutstanding = nullptr) {
+        if (noOutstanding) *noOutstanding = false;
         if (progress_ == HubpFlipProgress::Idle || progress_ == HubpFlipProgress::Uncertain)
             return progress_;
         if (progress_ == HubpFlipProgress::OldAddressAbsent)
@@ -129,6 +131,7 @@ public:
             drainSeen_ = true;
         } else if (earliestNew && frame_ != drainFrame_) {
             progress_ = HubpFlipProgress::OldAddressAbsent;
+            if (noOutstanding) *noOutstanding = sample.noOutstanding;
         }
         return progress_;
     }
@@ -162,7 +165,8 @@ private:
         uint32_t inUseLow, inUseHigh, earliestLow, earliestHigh;
 
         bool operator==(const Registers &other) const {
-            return control == other.control && vmid == other.vmid && programmedLow == other.programmedLow &&
+            return !((control ^ other.control) & ~hubp0::kControlNoOutstanding) &&
+                vmid == other.vmid && programmedLow == other.programmedLow &&
                 programmedHigh == other.programmedHigh && flip == other.flip && flip2 == other.flip2 &&
                 inUseLow == other.inUseLow && inUseHigh == other.inUseHigh && earliestLow == other.earliestLow &&
                 earliestHigh == other.earliestHigh;
@@ -172,7 +176,7 @@ private:
     struct Sample {
         HubpAddress programmed, inUse, earliest;
         uint32_t frame;
-        bool pending;
+        bool pending, noOutstanding;
     };
 
     static bool validRequest(const HubpFlipRequest &request) {
@@ -223,7 +227,8 @@ private:
         sample = {{address(last.programmedLow, last.programmedHigh), last.vmid & 0xf},
                   {address(last.inUseLow, last.inUseHigh), last.inUseHigh >> 28},
                   {address(last.earliestLow, last.earliestHigh), last.earliestHigh >> 28},
-                  lastFrame & kFrameMask, (last.flip & kPending) != 0};
+                  lastFrame & kFrameMask, (last.flip & kPending) != 0,
+                  (first.control & last.control & kControlNoOutstanding) != 0};
         return Read::Stable;
     }
 

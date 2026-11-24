@@ -925,8 +925,20 @@ low write or unlock after a partial or revoked issue. Register acceptance
 does not establish hardware latch, which still requires separate readback.
 
 Old DMA teardown now has separate fetch drain, context clear and translation
-retirement steps. After fresh old-address absence, the route must confirm
-fetch drain without mutating the context. The old root remains bound to its
+retirement steps. For a pinned old front, the provider requires both HUBP0
+control reads in the fresh, same-frame old-address-absence sample to report
+`HUBP_NO_OUTSTANDING_REQ` (bit 1). A changing request status does not invalidate
+the address sample, but cannot satisfy this gate. Bit 12 is `HUBP_TTU_DISABLE`
+and remains an unsupported active-pipe state. AMD's
+[blanking sequence](https://codebrowser.dev/linux/linux/drivers/gpu/drm/amd/display/dc/hubp/dcn10/dcn10_hubp.c.html#41)
+uses the status bit with requests stopped; the live sample here neither stops
+fetches nor proves that all old VMID work has retired. The route still must
+confirm exact fetch drain without mutating the context. When the readback gate
+stays busy, polling times out without clearing or unwiring the old mapping.
+CPU tests cover torn and stale idle samples, wait/resume and timeout with the
+old mapping and write hold retained. Revert this overlay change to roll it back.
+
+The old root remains bound to its
 pin and a replacement root refuses. For an old pinned surface only, the
 provider clears its nonzero VMID through the normal checked MMIO writer. It
 compares all seven words before each write, checks the exact new front and

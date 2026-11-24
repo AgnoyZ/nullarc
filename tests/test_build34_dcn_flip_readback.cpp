@@ -10,6 +10,8 @@ using namespace build34::dcn;
 static_assert(hubp0::kFrame == phxdcn314::kOtgFrameCount.addr);
 static_assert(hubp0::kFrameMask == phxdcn314::kOtgFrameCount.mask);
 static_assert(hubp0::kControl == phxdcn314::kHubpVtgSel.addr);
+static_assert(hubp0::kControlNoOutstanding == 0x00000002);
+static_assert(hubp0::kControlTtuDisable == 0x00001000);
 static_assert(hubp0::kControlVtg == phxdcn314::kHubpVtgSel.mask);
 static_assert(hubp0::kControlUnderflow == phxdcn314::kHubpUnderflow.mask);
 
@@ -21,6 +23,7 @@ struct Fixture {
     uint32_t frame = 8, control = 0, flip = 0, flip2 = 0;
     uint32_t registersRead = 0, clocksRead = 0, readsInSnapshot = 0;
     uint32_t unstableReadAt = 0, failReadAt = 0, allOnesAt = 0;
+    uint32_t controlXorAt = 0;
     uint64_t now = 1000, endDelay = 0;
     bool clockFails = false, losesRouteDuringRead = false, routeLive = true;
     HubpFlipReader reader{this, (uint64_t{0x0500c} + 1) * 4, current, read, clock, this};
@@ -58,6 +61,7 @@ struct Fixture {
         default: assert(false); return false;
         }
         if (self.losesRouteDuringRead) self.routeLive = false;
+        if (address == hubp0::kControl && self.readsInSnapshot == self.controlXorAt) value ^= 0x2;
         if (self.readsInSnapshot == self.unstableReadAt) value ^= 1;
         if (self.readsInSnapshot == self.allOnesAt) value = UINT32_MAX;
         return self.readsInSnapshot != self.failReadAt;
@@ -70,9 +74,9 @@ struct Fixture {
         return !self.clockFails;
     }
 
-    HubpFlipProgress poll(HubpFlipReadback &observation) {
+    HubpFlipProgress poll(HubpFlipReadback &observation, bool *noOutstanding = nullptr) {
         readsInSnapshot = 0;
-        return observation.poll();
+        return observation.poll(noOutstanding);
     }
 
     void setNew() { programmed = inUse = earliest = newAddress; }
@@ -123,6 +127,30 @@ static void testNoSyntheticVblOrStalePending() {
     assert(fixture.poll(observation) == HubpFlipProgress::Uncertain);
 }
 
+static void testOutstandingRequests() {
+    Fixture fixture;
+    HubpFlipReadback observation;
+    fixture.control = 0x2;
+    assert(observation.begin(fixture.request, fixture.reader));
+    fixture.setNew();
+    ++fixture.frame;
+    bool noOutstanding = true;
+    assert(fixture.poll(observation, &noOutstanding) == HubpFlipProgress::Latched && !noOutstanding);
+    ++fixture.frame;
+    for (const auto read : {2u, 12u}) {
+        fixture.controlXorAt = read;
+        assert(fixture.poll(observation, &noOutstanding) == HubpFlipProgress::OldAddressAbsent && !noOutstanding);
+    }
+    fixture.controlXorAt = 0;
+    assert(fixture.poll(observation, &noOutstanding) == HubpFlipProgress::OldAddressAbsent && noOutstanding);
+    fixture.unstableReadAt = 22;
+    assert(fixture.poll(observation, &noOutstanding) == HubpFlipProgress::Latched && !noOutstanding);
+    fixture.unstableReadAt = 0;
+    assert(fixture.poll(observation, &noOutstanding) == HubpFlipProgress::OldAddressAbsent && noOutstanding);
+    fixture.control = 0;
+    assert(fixture.poll(observation, &noOutstanding) == HubpFlipProgress::OldAddressAbsent && !noOutstanding);
+}
+
 static void testBaselineRefusals() {
     Fixture fixture;
     HubpFlipReadback observation;
@@ -136,7 +164,7 @@ static void testBaselineRefusals() {
     fixture.request.next = fixture.request.previous;
     assert(!observation.begin(fixture.request, fixture.reader) && !fixture.registersRead);
     fixture.request.next = next;
-    for (const auto control : {hubp0::kControlBlank, hubp0::kControlReset, hubp0::kControlNoRequests,
+    for (const auto control : {hubp0::kControlBlank, hubp0::kControlReset, hubp0::kControlTtuDisable,
                               hubp0::kControlVtg, hubp0::kControlUnderflow}) {
         fixture.control = control;
         assert(!observation.begin(fixture.request, fixture.reader));
@@ -426,6 +454,7 @@ static void testIdleDcnPeers() {
 int main() {
     testFlipAndOldBacking();
     testNoSyntheticVblOrStalePending();
+    testOutstandingRequests();
     testBaselineRefusals();
     for (const auto fault : {Fault::WrongVmid, Fault::WrongAddress, Fault::EarliestAhead, Fault::Reverted,
                              Fault::BackwardsFrame, Fault::ReadFailed, Fault::AllOnes, Fault::RouteLost,

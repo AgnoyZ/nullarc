@@ -1201,7 +1201,8 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        WrongHomeBacking, HomeLostAfterInstall, HomeLostAtRetire, WrongReturnAddress, ReplacedFramebuffer,
                        PeerActive, PeerShortWindow, PeerDuringInstall, PeerAfterHigh, PeerDuringRetire, PeerAfterWithdraw,
                        NoRetirementProof, ClearDenied, ClearWriteUncertain, ReplacedDuringFetchDrain,
-                       TranslationPending, TranslationLost, FrontRevertedDuringTranslations, PhysicalAlias };
+                       TranslationPending, TranslationLost, FrontRevertedDuringTranslations, PhysicalAlias,
+                       FetchBusy, FetchNeverDrained };
 
 struct CommitFixture {
     struct Table : IOBufferMemoryDescriptor {
@@ -1281,6 +1282,7 @@ struct CommitFixture {
     bool qualify = true, live = true, pending = false, failHigh = false, failIssue = false, retire = false, failUnmap = false;
     bool loseRouteAfterHigh = false, rewindAfterHigh = false;
     bool closeDuringQualify = false, closeDuringRetire = false, lateRetire = false;
+    bool noOutstanding = true;
     bool changeGeometryAtLock = false, changeGeometryAtRetire = false;
     bool publicationCurrent = true;
     bool directMode = false;
@@ -1678,7 +1680,8 @@ struct CommitFixture {
         const auto high = [](HubpAddress surface) { return static_cast<uint32_t>(surface.address >> 32); };
         ++self.reads;
         switch (address) {
-        case hubp0::kControl: case hubp0::kFlip2: value = 0; break;
+        case hubp0::kControl: value = self.noOutstanding ? 0x2 : 0; break;
+        case hubp0::kFlip2: value = 0; break;
         case hubp0::kFlip:
             value = (self.pending ? hubp0::kPending : 0) | (self.lockHeld ? hubp0::kUpdateLocked : 0);
             break;
@@ -2653,6 +2656,23 @@ static void scanoutFlip(FlipFault fault) {
     IOLockUnlock(scanout.client.lock);
     fixture.retire = true;
     fixture.failUnmap = fault == FlipFault::Unmap;
+    if (fault == FlipFault::FetchBusy || fault == FlipFault::FetchNeverDrained) {
+        fixture.noOutstanding = false;
+        fixture.step(poll, ScanoutFlipResult::Waiting);
+        assert(fixture.retireChecks == 2 && !fixture.clearChecks && !fixture.clearWrites && !fixture.translationChecks &&
+               fixture.contextRoot == fixture.ownedRoot && !fixture.homeTable.withdrawals && fixture.command.prepared &&
+               scanout.device.dcnManagedWrites.excludes(scanout.frame.host.base + 2 * kPage));
+        if (fault == FlipFault::FetchNeverDrained) {
+            fixture.now += 100000000;
+            fixture.step(poll, ScanoutFlipResult::Uncertain);
+            fixture.noOutstanding = true;
+            fixture.step(poll, ScanoutFlipResult::Uncertain);
+            assert(!fixture.clearWrites && !fixture.homeTable.withdrawals && fixture.command.prepared &&
+                   scanout.device.dcnManagedWrites.excludes(scanout.frame.host.base + 2 * kPage));
+            return;
+        }
+        fixture.noOutstanding = true;
+    }
     if (fault == FlipFault::HomeLostAtRetire || fault == FlipFault::PeerDuringRetire || fault == FlipFault::PeerAfterWithdraw) {
         const bool withdrew = fault == FlipFault::PeerAfterWithdraw;
         fixture.step(poll, ScanoutFlipResult::Uncertain);
@@ -3286,6 +3306,8 @@ int main() {
     scanoutFlip(FlipFault::ClearWriteUncertain);
     scanoutFlip(FlipFault::ReplacedDuringFetchDrain);
     scanoutFlip(FlipFault::TranslationPending);
+    scanoutFlip(FlipFault::FetchBusy);
+    scanoutFlip(FlipFault::FetchNeverDrained);
     scanoutFlip(FlipFault::TranslationLost);
     scanoutFlip(FlipFault::FrontRevertedDuringTranslations);
 #endif

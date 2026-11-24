@@ -214,7 +214,8 @@ public:
         };
         const auto peersIdle = [&] { return HubpFlipProgram::peersIdle(request_, route_.reader, withinBudget); };
         if (!peersIdle() || !nextCurrent() || !oldCurrent()) return fail();
-        const auto progress = readback_.poll();
+        bool noOutstanding = false;
+        const auto progress = readback_.poll(&noOutstanding);
         if (progress == HubpFlipProgress::Uncertain || !live()) return fail();
         if (progress != HubpFlipProgress::OldAddressAbsent) return ScanoutFlipResult::Waiting;
         const auto displayCurrent = [&] {
@@ -223,6 +224,7 @@ public:
         };
         if (!displayCurrent() || !oldCurrent()) return fail();
         if (!contextCleared_) {
+            if (old_.pin && !noOutstanding) return ScanoutFlipResult::Waiting;
             const bool retired = route_.fetchesRetired(route_.reader.context, request_);
             if (!displayCurrent() || !oldCurrent()) return fail();
             if (!retired) return ScanoutFlipResult::Waiting;
