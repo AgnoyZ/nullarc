@@ -5,10 +5,16 @@
 
 namespace build34::dcn {
 
+struct DcnPixelMapping {
+    const IODMACommand *command;
+    const DcnDirectDomain *direct;
+};
+
 struct DcnFlatMapping {
-    const IODMACommand &pixels;
-    const IODMACommand &table;
-    const IOMapper &mapper;
+    DcnPixelMapping pixels;
+    const IODMACommand *table;
+    const IOMapper *mapper;
+    const IOMemoryDescriptor *directTable;
     uint64_t address;
     size_t bytes;
 };
@@ -36,14 +42,14 @@ class DcnFlatTable {
     template<typename Current>
     bool prepare(DcnFlatFormat format, void *ownerContext, OSObject &ownerLifetime, const HubpFlipRequest &request,
                  const ScanoutDmaMapper &mapper,
-                 const IODMACommand &command, const FlatPageLayout &layout, const uint64_t *pages,
+                 DcnPixelMapping pixels, const FlatPageLayout &layout, const uint64_t *pages,
                  const DcnFlatTable *front, const Current &live) {
         const size_t bytes = (layout.tableBytes + kPageBytes - 1) & ~(kPageBytes - 1);
         if (!live() || !bytes) return false;
         if (dma_.buffer_) {
             collided_ = collided_ || overlaps(front, vm_.rootEntry);
             return !collided_ && matches(request, ownerLifetime, request.nextPin, request.next.vmid) &&
-                current(mapper, command) && live();
+                current(mapper, pixels) && live();
         }
         if (!format.complete()) return false;
         ownerLifetime.retain();
@@ -55,7 +61,7 @@ class DcnFlatTable {
         }
         collided_ = overlaps(front, 0);
         if (!ready || collided_ || !live()) return false;
-        const auto mapping = view(mapper, command);
+        const auto mapping = view(mapper, pixels);
         uint64_t root = 0;
         const bool encoded = format.encodeRoot(ownerContext, mapping, root);
         collided_ = overlaps(front, root);
@@ -74,7 +80,7 @@ class DcnFlatTable {
         token_ = request.nextPin;
         format_ = format;
         context_ = ownerContext;
-        return current(mapper, command) && live();
+        return current(mapper, pixels) && live();
     }
 
     bool matches(const HubpFlipRequest &request, const OSObject &ownerLifetime, ScanoutPinToken token, uint32_t vmid) const {
@@ -82,19 +88,20 @@ class DcnFlatTable {
             ownerLifetime_ == &ownerLifetime && token_ == token;
     }
 
-    DcnFlatMapping view(const ScanoutDmaMapper &mapper, const IODMACommand &command) const {
-        return {command, *dma_.command_, *mapper.mapper, dma_.dmaAddress_, dma_.bytes_};
+    DcnFlatMapping view(const ScanoutDmaMapper &mapper, DcnPixelMapping pixels) const {
+        return {pixels, dma_.command_, mapper.mapper, pixels.direct ? dma_.buffer_ : nullptr, dma_.dmaAddress_, dma_.bytes_};
     }
 
-    bool current(const ScanoutDmaMapper &mapper, const IODMACommand &command) const {
-        return dma_.mapped() && vm_.valid() && token_.serial && format_.visible(context_, view(mapper, command), vm_);
+    bool current(const ScanoutDmaMapper &mapper, DcnPixelMapping pixels) const {
+        return dma_.mapped() && vm_.valid() && token_.serial && mapper.current() &&
+            format_.visible(context_, view(mapper, pixels), vm_) && mapper.current();
     }
 
     template<typename Current>
-    bool matchesPages(const ScanoutDmaMapper &mapper, const IODMACommand &command, const FlatPageLayout &layout,
+    bool matchesPages(const ScanoutDmaMapper &mapper, DcnPixelMapping pixels, const FlatPageLayout &layout,
                       const uint64_t *pages, const Current &live) const {
-        if (!live() || !current(mapper, command) || !dma_.pagesCurrent(mapper, live)) return false;
-        const auto mapping = view(mapper, command);
+        if (!live() || !current(mapper, pixels) || !dma_.pagesCurrent(mapper, live)) return false;
+        const auto mapping = view(mapper, pixels);
         for (size_t index = 0; index < mapping.bytes / sizeof(uint64_t); ++index) {
             if (!live()) return false;
             const auto word = dma_.words_[index];
@@ -105,7 +112,7 @@ class DcnFlatTable {
             uint64_t observed = 0;
             if (!word || !format_.decodeLeaf(context_, mapping, word, observed) || observed != pages[index]) return false;
         }
-        return live() && current(mapper, command) && live();
+        return live() && current(mapper, pixels) && live();
     }
 
     bool withdraw(const ScanoutDmaMapper &mapper) {

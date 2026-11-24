@@ -124,8 +124,11 @@ class ExactWriterTests(unittest.TestCase):
         for stage in (mapped, flipped, bound):
             self.assertEqual(stage.count('dcnQualifyMapper)(IOPCIDevice &, IOMapper &){nullptr}'), 1)
             self.assertNotIn('dcnQualifyMapper =', stage)
+            self.assertEqual(stage.count('dcnQualifyDirect)(IOPCIDevice &){nullptr}'), 1)
+            self.assertNotIn('dcnQualifyDirect =', stage)
         mapping = method(mapped, scanout_dma.MAP)
         self.assertEqual(mapping.count('IOMapper::copyMapperForDevice(device)'), 1)
+        self.assertLess(mapping.index('return prepareDcnPin'), mapping.index('IOMapper::copyMapperForDevice(device)'))
         self.assertNotIn('gSystem', mapping)
         self.assertNotIn('mapToPhysicalAddress', mapping)
         self.assertEqual(flipped.count('dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr}'), 1)

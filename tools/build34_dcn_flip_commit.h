@@ -37,7 +37,7 @@ struct HubpFlipRoute {
     OSObject *lifetime;
     HubpFlipReader reader;
     HubpFlipWriter writer;
-    bool (*qualify)(void *, const HubpFlipRequest &, const IODMACommand *, const IODMACommand *);
+    bool (*qualify)(void *, const HubpFlipRequest &, DcnPixelMapping, DcnPixelMapping);
     DcnFlatFormat flatFormat;
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
     bool (*canInstallFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
@@ -60,8 +60,9 @@ public:
             !route.flatFormat.complete() || !route.canInstallFlatVm || !route.fetchesRetired ||
             !route.canClearFlatVm || !route.translationsRetired || !route.framebuffer || !pci ||
             !(old.token == front_) || !(next.token == intent.nextPin) ||
-            !validBinding(old, intent.previous, operation.provider, true) ||
-            !validBinding(next, intent.next, operation.provider, false) ||
+            !validBinding(old, intent.previous, operation.provider, pci, true) ||
+            !validBinding(next, intent.next, operation.provider, pci, false) ||
+            (old.dma && next.dma && !(old.dma->qualified_.direct == next.dma->qualified_.direct)) ||
             ((old.pin || next.pin) && intent.previous.vmid == intent.next.vmid) ||
             (old.pin && next.pin && (!sameFlipGeometry(old.surface, next.surface) ||
                 (old.window <= next.window ? next.window - old.window < old.surface.mappedBytes :
@@ -106,13 +107,12 @@ public:
         const auto homeCurrent = [&] { return checkFirmware(*route.framebuffer, pci, home, translationCurrent); };
         const auto peersIdle = [&] { return HubpFlipProgram::peersIdle(request, route.reader, withinBudget); };
         const auto nextEmpty = [&] { return !nextTable || DcnFlatProgram::empty(intent.next.vmid, route.reader, inactive); };
-        if (!route.qualify(route.reader.context, request, old.dma ? old.dma->command_ : nullptr,
-                           next.dma ? next.dma->command_ : nullptr) ||
+        if (!route.qualify(route.reader.context, request, mapping(old), mapping(next)) ||
             !live() || !readback_.begin(request, route.reader) || !captureHome() || !homeCurrent() ||
             (oldTable && !oldTable->matches(request, *route.lifetime, old.token, intent.previous.vmid)) || !oldInstalled() ||
             !HubpFlipProgram::preflight(request, route.reader, route.writer, surface, withinBudget) ||
             (nextTable && !nextTable->prepare(route.flatFormat, route.reader.context, *route.lifetime, request,
-                next.dma->qualified_, *next.dma->command_, next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
+                next.dma->qualified_, mapping(next), next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
             !nextEmpty() || !matchesTranslation(old, translationCurrent) || !matchesTranslation(next, translationCurrent) ||
             !homeCurrent() || !oldInstalled() || !nextEmpty() || !peersIdle() ||
             (next.pin && !next.pin->beginDisplayUse())) {
@@ -225,23 +225,29 @@ private:
             nullptr, nullptr) == kIOReturnSuccess && current();
     }
 
-    static bool validBinding(ScanoutFlipBinding binding, HubpAddress address, const void *provider, bool displayed) {
+    static bool validBinding(ScanoutFlipBinding binding, HubpAddress address, const void *provider,
+                             const void *pci, bool displayed) {
         if (!binding.token.serial)
             return !binding.token.provider && !binding.pin && !binding.dma && !binding.surface.mappedBytes;
         return address.vmid && binding.token.provider == provider && binding.pin && binding.dma &&
             binding.window == address.address &&
             validFlipGeometry(binding.surface) && binding.surface.mappedBytes == binding.pin->lease_.bytes() &&
             binding.surface.mappedBytes <= kAddressLimit - binding.window &&
-            binding.dma->command_ && binding.dma->pages_ && !binding.dma->uncertain() &&
+            binding.dma->hasBacking() && binding.dma->pages_ && !binding.dma->uncertain() &&
+            (!binding.dma->qualified_.direct.device || binding.dma->qualified_.direct.device == pci) &&
             binding.dma->layout_.firstLogicalPage == binding.window / kPageBytes &&
             binding.dma->layout_.entryCount == binding.surface.mappedBytes / kPageBytes && binding.pin->held() &&
             binding.pin->displayUse_ == displayed;
     }
 
+    static DcnPixelMapping mapping(ScanoutFlipBinding binding) {
+        return binding.dma ? binding.dma->mapping() : DcnPixelMapping{};
+    }
+
     template<typename Current>
     static bool tableCurrent(const ScanoutDmaLease *dma, const DcnFlatContext &context, const Current &current) {
         return !dma ? !context.vmid : current() && dma->table_.vm_ == context &&
-            dma->table_.current(dma->qualified_, *dma->command_) && current();
+            dma->table_.current(dma->qualified_, dma->mapping()) && current();
     }
 
     template<typename Current>
@@ -252,7 +258,7 @@ private:
     template<typename Current>
     static bool matchesTranslation(ScanoutFlipBinding binding, const Current &current) {
         const auto *dma = binding.dma;
-        return !dma || (dma->table_.matchesPages(dma->qualified_, *dma->command_, dma->layout_, dma->pages_, current) &&
+        return !dma || (dma->table_.matchesPages(dma->qualified_, mapping(binding), dma->layout_, dma->pages_, current) &&
                         dma->matchesPixels(*binding.pin, current));
     }
 

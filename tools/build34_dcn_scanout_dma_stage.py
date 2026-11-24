@@ -9,7 +9,8 @@ MAP = 'IOReturn PhxBringup::mapDcnPin('
 DMA_FIELDS = '''        build34::dcn::ScanoutDmaLease dma;
 '''
 MAPPER_GATE = '''    build34::dcn::ScanoutDmaMapper (*dcnQualifyMapper)(IOPCIDevice &, IOMapper &){nullptr};
-    IOReturn mapDcnPin(build34::dcn::ScanoutDmaRequest &);
+    build34::dcn::DcnDirectDomain (*dcnQualifyDirect)(IOPCIDevice &){nullptr};
+    IOReturn mapDcnPin(build34::dcn::ScanoutDmaRequest &, bool direct = false);
 '''
 CONSUME_DECL = '    bool checkDcnPresent(const build34::dcn::PresentCopyBacking &, DcnPinSlot * = nullptr);\n'
 DMA_CONSUME = '''    bool checkDcnPresent(const build34::dcn::PresentCopyBacking &, DcnPinSlot * = nullptr,
@@ -19,12 +20,21 @@ DMA_PROBE_DECL = pin.PROBE_DECL.replace(' * = nullptr);', ' * = nullptr, build34
 DMA_OPERATIONS_DECL = pin.OPERATIONS_DECL.replace(' &);\n',
     ' &, build34::dcn::ScanoutDmaRequest * = nullptr, const build34::dcn::ScanoutDmaMapper * = nullptr);\n', 1)
 
-MAP_METHOD = '''IOReturn PhxBringup::mapDcnPin(build34::dcn::ScanoutDmaRequest &request) {
+MAP_METHOD = '''IOReturn PhxBringup::mapDcnPin(build34::dcn::ScanoutDmaRequest &request, bool direct) {
+    using namespace build34::dcn;
     phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
     auto *device = pci;
-    if (!callback || !device || device->isInactive() || !dcnQualifyMapper) return kIOReturnNotReady;
-    if (!request.present || !build34::dcn::validScanoutDmaStorage(request, request.present->slice.bytes))
+    if (!callback || !device || device->isInactive() || (direct ? !dcnQualifyDirect : !dcnQualifyMapper))
+        return kIOReturnNotReady;
+    if (!request.present || !validScanoutDmaStorage(request, request.present->slice.bytes))
         return kIOReturnBadArgument;
+    if (direct) {
+        Phx34ScopedReference deviceLifetime(device);
+        const ScanoutDmaMapper qualified{nullptr, nullptr, nullptr, dcnQualifyDirect(*device)};
+        if (qualified.direct.device != device || !qualified.current() || exactCallbacks.closed() || pci != device)
+            return kIOReturnNotReady;
+        return prepareDcnPin(*request.present, request.token, &request, &qualified);
+    }
     auto *mapper = IOMapper::copyMapperForDevice(device);
     if (!mapper) return kIOReturnNotReady;
     Phx34ScopedReference mapperLifetime(mapper, false);
@@ -99,6 +109,10 @@ def stage_native(driver, abi):
     replace(pin.handoff.DISPATCH, anchor, '''    if (name && name->isEqualTo(BUILD34_DCN_PIN_MAP)) {
         if (wait || !device || p2 || p3 || p4) return kIOReturnBadArgument;
         return mapDcnPin(*static_cast<build34::dcn::ScanoutDmaRequest *>(device));
+    }
+    if (name && name->isEqualTo(BUILD34_DCN_PIN_MAP_DIRECT)) {
+        if (wait || !device || p2 || p3 || p4) return kIOReturnBadArgument;
+        return mapDcnPin(*static_cast<build34::dcn::ScanoutDmaRequest *>(device), true);
     }
 ''' + anchor)
     return source

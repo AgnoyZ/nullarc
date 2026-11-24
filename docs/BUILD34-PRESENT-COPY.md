@@ -632,6 +632,30 @@ remains null, so no lookup or DMA command runs by default. There is no
 system mapper lookup, identity fallback, framebuffer call or MMIO change.
 This uses XNU interfaces without importing implementation code.
 
+The separate `BUILD34_DCN_PIN_MAP_DIRECT` selector stages a direct physical
+path for a platform on which the target DCN requester is independently proven
+to read host physical addresses unchanged. It is never a fallback for a failed
+mapper lookup. The [target mapper observation](BUILD34-SYSTEM-WRITEBACK.md#host-iommu-and-the-release-boundary)
+does not establish that guarantee. Admission requires a current domain
+generation from the exact PCI provider and positive DCN fetch evidence for
+each page's descriptor, offset and physical address. The hook remains null;
+there is no implementation that attests this domain on the target.
+
+Direct pins retain the same render and present preparations and build the
+same private ordered page list, but do not create a pixel `IODMACommand`.
+For a direct pin the driver requests a physically contiguous wired table
+buffer, checks its full extent and each page in that same domain, and does
+not create a table `IODMACommand` either. The route receives an explicit
+direct-domain identity in place of the pixel command; it still has to encode
+the root and leaves, verify visibility, and hold the route and domain current.
+Mapped and direct pins, or direct pins of different domain generations,
+cannot form the same flip. A direct pin has no host DMA allocation to unmap,
+but stays wired until the same old-fetch drain, context detach and translation
+retirement checks pass. Loss of the domain after issue quarantines the pin
+and table. CPU fixtures exercise a firmware round trip without mapper lookup
+or DMA commands, as well as denied pixel or table evidence, a short physical
+span and domain revocation. Omit the overlay to roll it back.
+
 The framebuffer must independently establish that DCN consumes the returned
 address domain. Call on a sleepable thread outside a workloop gate. DMA
 preparation, the page walk and cleanup hold the client lock, not `gpuLock`.

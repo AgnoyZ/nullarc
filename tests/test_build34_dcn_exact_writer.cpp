@@ -106,12 +106,13 @@ struct OSSymbol {
 };
 struct IOService : OSObject {
     std::function<IOReturn(task_t, uint32_t, OSObject **)> lookup;
+    bool inactive = false;
+    bool isInactive() const { return inactive; }
 #ifdef TEST_SCANOUT_FLIP
     const void *provider = nullptr;
-    bool inactive = false, isPhxFramebuffer = false;
+    bool isPhxFramebuffer = false;
     std::function<void()> onRelease;
     const void *getProvider() const { return provider; }
-    bool isInactive() const { return inactive; }
     IOService *metaCast(const char *name) { return isPhxFramebuffer && !strcmp(name, "PhxAMDFB") ? this : nullptr; }
     void release() {
         if (onRelease) onRelease();
@@ -137,7 +138,7 @@ struct IOService : OSObject {
 IOService *IOService::accelerator = nullptr;
 struct Phx34ScopedReference {
     OSObject *object;
-    Phx34ScopedReference(OSObject *value, bool take) : object(value) { assert(!take); }
+    explicit Phx34ScopedReference(OSObject *value, bool take = true) : object(value) { if (object && take) object->retain(); }
     ~Phx34ScopedReference() { if (object) object->release(); }
 };
 #endif
@@ -168,11 +169,11 @@ struct IOMemoryMap {
 static unsigned bar5Delays = 0;
 static void IODelay(unsigned us) { assert(us == 1); ++bar5Delays; }
 #endif
-struct IOPCIDevice {
+struct IOPCIDevice : IOService {
     IOMapper *mapper = nullptr;
     unsigned mapperLookups = 0;
-    bool inactive = false;
-    bool isInactive() const { return inactive; }
+    uint64_t directGeneration = 0;
+    std::function<bool(const IOMemoryDescriptor &, uint64_t, uint64_t, DcnDirectUse)> directEvidence;
 #ifdef TEST_SCANOUT_FLIP
     HubpFlipRoute *route = nullptr;
 #endif
@@ -844,6 +845,19 @@ static ScanoutDmaMapper mapperContract(IOPCIDevice &device, IOMapper &mapper) {
         [](IOMapper &selected, const IODMACommand &command) { return selected.confirmUnmap(command); }};
 }
 
+static DcnDirectDomain directContract(IOPCIDevice &device) {
+    return {&device, device.directGeneration,
+        [](IOService &selected, uint64_t generation) {
+            return static_cast<IOPCIDevice &>(selected).directGeneration == generation;
+        },
+        [](IOService &selected, uint64_t, const IOMemoryDescriptor &descriptor, uint64_t offset, uint64_t address,
+           DcnDirectUse use) {
+            auto &pci = static_cast<IOPCIDevice &>(selected);
+            assert(pci.references >= 2 && pci.directEvidence);
+            return pci.directEvidence(descriptor, offset, address, use);
+        }};
+}
+
 static void scanoutDmaQualification() {
     ScanoutFixture fixture;
     auto &device = fixture.device;
@@ -938,6 +952,41 @@ static void scanoutDmaPresentPreparation(bool uncertain) {
     assert(present.references == (uncertain ? 2u : 1u) && present.wires == present.references);
     assert(host.references == (uncertain ? 2u : 1u) && host.wires == host.references);
     assert(fixture.surface.references == (uncertain ? 2u : 1u) && fixture.client.references == fixture.surface.references);
+    IODMACommand::next = nullptr;
+}
+
+static void scanoutDirectQualification() {
+    ScanoutFixture fixture;
+    auto &device = fixture.device;
+    auto &pci = *device.pci;
+    auto &host = fixture.frame.host;
+    const auto &present = fixture.frame.present;
+    IODMACommand command;
+    IODMACommand::next = &command;
+    DmaRun scratch[2]{};
+    uint64_t pages[2]{UINT64_MAX, UINT64_MAX};
+    ScanoutDmaRequest request{&fixture.frame.copy, 0x100000, scratch, 2, pages, 2, {}, {}};
+    const OSSymbol mapped{BUILD34_DCN_PIN_MAP}, direct{BUILD34_DCN_PIN_MAP_DIRECT};
+    auto dispatch = [&](const OSSymbol &selector) {
+        return device.callPlatformFunction(&selector, false, &request, nullptr, nullptr, nullptr);
+    };
+    fixture.offer();
+    assert(dispatch(direct) == kIOReturnNotReady && !pci.mapperLookups);
+    device.dcnQualifyDirect = directContract;
+    assert(dispatch(direct) == kIOReturnNotReady && !pci.mapperLookups && !host.prepares);
+    pci.directGeneration = 17;
+    device.dcnQualifyMapper = mapperContract;
+    assert(dispatch(mapped) == kIOReturnNotReady && pci.mapperLookups == 1 && !host.prepares);
+    unsigned pagesChecked = 0;
+    pci.directEvidence = [&](const IOMemoryDescriptor &descriptor, uint64_t offset, uint64_t physical, DcnDirectUse use) {
+        assert(use == DcnDirectUse::Pixel && &descriptor == &host && host.wires == 2 && present.wires == 2);
+        assert(fixture.client.guard.held && !fixture.device.guard.held && offset == (++pagesChecked) * kPage);
+        assert(physical == host.base + 2 * offset);
+        return pagesChecked == 1;
+    };
+    assert(dispatch(direct) == kIOReturnNotReady && pagesChecked == 2 && !command.created && pci.mapperLookups == 1);
+    assert(!request.layout.entryCount && !request.token.serial && pages[0] == UINT64_MAX && pages[1] == UINT64_MAX);
+    assert(pci.references == 1 && host.wires == 1 && present.wires == 1 && !DcnAllocationStub::live());
     IODMACommand::next = nullptr;
 }
 
@@ -1112,6 +1161,7 @@ struct CommitFixture {
     bool closeDuringQualify = false, closeDuringRetire = false, lateRetire = false;
     bool changeGeometryAtLock = false, changeGeometryAtRetire = false;
     bool publicationCurrent = true;
+    bool directMode = false;
     FlipFault translationFault = FlipFault::None;
     uint64_t outputPages[2]{};
     HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock, this}, {write, delay},
@@ -1119,7 +1169,7 @@ struct CommitFixture {
                        canClearFlatVm, translationsRetired, &framebuffer};
     ScanoutPinToken pin{}, alternatePin{};
 
-    CommitFixture() {
+    explicit CommitFixture(bool direct = false) : directMode(direct) {
         framebuffer.fixture = this;
         framebuffer.provider = scanout.device.pci;
         framebuffer.isPhxFramebuffer = true;
@@ -1128,7 +1178,23 @@ struct CommitFixture {
             ++framebuffer.releases;
         };
         alternateTable.physical += 2 * kPage;
-        configureTable(homeTable, ownedRoot, 0x500091, 0x601091);
+        if (directMode) {
+            auto &pci = *scanout.device.pci;
+            auto &host = scanout.frame.host;
+            pci.directGeneration = 7;
+            homeTable.physical = ownedRoot & ~(kPage - 1);
+            pci.directEvidence = [&](const IOMemoryDescriptor &descriptor, uint64_t offset, uint64_t address, DcnDirectUse use) {
+                if (use == DcnDirectUse::Table)
+                    return &descriptor == &homeTable && offset == 0 && address == homeTable.physical;
+                assert(&descriptor == &host && (offset == kPage || offset == 2 * kPage));
+                ++pixelReads;
+                return address == host.base + 2 * offset;
+            };
+            scanout.device.dcnQualifyDirect = directContract;
+            configureTable(homeTable, ownedRoot, (host.base + 2 * kPage) | 0x91, (host.base + 4 * kPage) | 0x91);
+        } else {
+            configureTable(homeTable, ownedRoot, 0x500091, 0x601091);
+        }
         configureTable(alternateTable, alternateRoot, 0x800091, 0x901091);
         IODMACommand::next = &command;
         scanout.device.pci->mapper = &mapper;
@@ -1188,7 +1254,7 @@ struct CommitFixture {
         scanout.offer();
         DmaRun scratch[2]{};
         ScanoutDmaRequest request{&scanout.frame.copy, mapped.address, scratch, 2, outputPages, 2, {}, {}};
-        const OSSymbol symbol{BUILD34_DCN_PIN_MAP};
+        const OSSymbol symbol{directMode ? BUILD34_DCN_PIN_MAP_DIRECT : BUILD34_DCN_PIN_MAP};
         const auto surface = scanout.frame.copy.scanout;
         scanout.frame.copy.scanout.pitchPixelsMinusOne = 1;
         assert(dispatch(symbol, &request) == kIOReturnBadArgument && !command.created);
@@ -1196,7 +1262,9 @@ struct CommitFixture {
         assert(dispatch(symbol, &request) == kIOReturnBadArgument && !command.created);
         scanout.frame.copy.scanout = surface;
         assert(dispatch(symbol, &request) == kIOReturnSuccess && request.token.serial);
-        assert(outputPages[0] == 0x500000 && outputPages[1] == 0x601000 && DcnAllocationStub::live() == 1);
+        const auto base = scanout.frame.host.base;
+        assert(outputPages[0] == (directMode ? base + 2 * kPage : 0x500000) &&
+               outputPages[1] == (directMode ? base + 4 * kPage : 0x601000) && DcnAllocationStub::live() == 1);
         outputPages[0] = outputPages[1] = 0x700000;
         pin = request.token;
         scanout.frame.copy.scanout = {};
@@ -1228,18 +1296,25 @@ struct CommitFixture {
         return self.live && request.routeOwner == &self && request.routeGeneration == self.route.generation;
     }
 
-    static bool qualified(void *context, const HubpFlipRequest &request, const IODMACommand *old,
-                          const IODMACommand *next) {
+    static bool qualified(void *context, const HubpFlipRequest &request, DcnPixelMapping old, DcnPixelMapping next) {
         auto &self = *static_cast<CommitFixture *>(context);
         assert(self.lifetime.references >= 2 && !self.scanout.device.guard.held);
-        const auto commandFor = [&](ScanoutPinToken token) -> const IODMACommand * {
-            if (!token.serial) return nullptr;
+        const auto check = [&](ScanoutPinToken token, DcnPixelMapping mapping) {
+            if (!token.serial) {
+                assert(!mapping.command && !mapping.direct);
+                return;
+            }
             assert(token == self.pin || token == self.alternatePin);
-            return token == self.pin ? &self.command : &self.nextCommand;
+            if (self.directMode) {
+                assert(!mapping.command && mapping.direct && mapping.direct->device == self.scanout.device.pci);
+            } else {
+                assert(!mapping.direct && mapping.command == (token == self.pin ? &self.command : &self.nextCommand));
+            }
         };
-        assert(old == commandFor(request.previousPin) && next == commandFor(request.nextPin));
-        if (next) {
-            auto &table = next == &self.command ? self.homeTable : self.alternateTable;
+        check(request.previousPin, old);
+        check(request.nextPin, next);
+        if (request.nextPin.serial) {
+            auto &table = request.nextPin == self.pin ? self.homeTable : self.alternateTable;
             table.failStore = self.translationFault == FlipFault::PublishError;
             table.shortBuffer = self.translationFault == FlipFault::ShortTable;
             table.dma.failPrepare = self.translationFault == FlipFault::TablePrepareUncertain;
@@ -1253,10 +1328,17 @@ struct CommitFixture {
     }
 
     const Table &tableFor(const DcnFlatMapping &mapping) const {
-        const auto &table = &mapping.pixels == &command ? homeTable : alternateTable;
-        assert((&mapping.pixels == &command || &mapping.pixels == &nextCommand) && mapping.pixels.prepared);
-        assert(&mapping.table == &table.dma && table.dma.prepared && table.references == 2);
-        assert(&mapping.mapper == &mapper && mapping.bytes == kPage && mapping.address == (table.root & ~(kPage - 1)));
+        const auto &table = directMode || mapping.pixels.command == &command ? homeTable : alternateTable;
+        if (directMode) {
+            assert(!mapping.pixels.command && mapping.pixels.direct && mapping.pixels.direct->device == scanout.device.pci);
+            assert(mapping.directTable == &table && !mapping.table && !mapping.mapper && !table.dma.created && table.references == 1);
+        } else {
+            assert(!mapping.pixels.direct && (mapping.pixels.command == &command || mapping.pixels.command == &nextCommand) &&
+                   mapping.pixels.command->prepared);
+            assert(!mapping.directTable && mapping.table == &table.dma && table.dma.prepared && table.references == 2 &&
+                   mapping.mapper == &mapper);
+        }
+        assert(mapping.bytes == kPage && mapping.address == (table.root & ~(kPage - 1)));
         return table;
     }
 
@@ -1315,7 +1397,8 @@ struct CommitFixture {
             const uint32_t sequence[]{3, 4, 5, 6, 0, 1, 2};
             assert(self.retire && !self.lockRequested && !self.translationChecks && self.clearWrites < 7 &&
                    self.clearChecks == self.clearWrites + 1 && address == 0x03a4a + sequence[self.clearWrites++] && !value);
-            assert(self.homeTable.dma.prepared && !self.homeTable.withdrawals && self.command.prepared);
+            assert(self.homeTable.dma.prepared == !self.directMode && !self.homeTable.withdrawals &&
+                   self.command.prepared == !self.directMode);
             switch (address - 0x03a4a) {
             case 0: self.contextControl = 0; break;
             case 1: self.contextRoot &= UINT32_MAX; break;
@@ -1439,7 +1522,8 @@ struct CommitFixture {
         assert(self.scanout.client.guard.held && !self.scanout.device.guard.held && self.retire &&
                request.previousPin == self.pin && request.next == self.active && old.vmid == self.mapped.vmid &&
                old.rootEntry == self.ownedRoot && self.clearWrites == 7 && !self.contextRoot && !self.firstPage &&
-               !self.lastPage && !self.contextControl && self.homeTable.dma.prepared && self.command.prepared);
+               !self.lastPage && !self.contextControl && self.homeTable.dma.prepared == !self.directMode &&
+               self.command.prepared == !self.directMode);
         ++self.translationChecks;
         if (self.translationFault == FlipFault::TranslationLost) return DcnRetirement::Lost;
         if (self.translationFault == FlipFault::TranslationPending && self.translationChecks == 1) return DcnRetirement::Pending;
@@ -1605,6 +1689,67 @@ static void revalidateScanoutPixels(PixelFault fault) {
     fixture.retire = true;
     fixture.step(poll, ScanoutFlipResult::Presented);
     assert(fixture.command.completes == 1 && present.wires == 0 && present.references == 1 && host.wires == 1);
+}
+
+enum class DirectFlipFault { None, DeniedTable, ShortTable, DomainLost, ReplacedPci, DomainLostAfterIssue };
+
+static void scanoutDirectFlip(DirectFlipFault fault) {
+    CommitFixture fixture(true);
+    auto &scanout = fixture.scanout;
+    auto &pci = *scanout.device.pci;
+    assert(pci.mapperLookups == 0 && pci.references == 2 && fixture.pixelReads == 2);
+    scanout.device.dcnQualifiedFlipRoute = [](IOPCIDevice *device) -> const HubpFlipRoute * { return device->route; };
+    if (fault == DirectFlipFault::DeniedTable) {
+        const auto original = pci.directEvidence;
+        pci.directEvidence = [original](const IOMemoryDescriptor &descriptor, uint64_t offset, uint64_t physical, DcnDirectUse use) {
+            return use != DcnDirectUse::Table && original(descriptor, offset, physical, use);
+        };
+    }
+    if (fault == DirectFlipFault::ShortTable) fixture.homeTable.shortPhysical = true;
+    if (fault == DirectFlipFault::DomainLost) ++pci.directGeneration;
+    IOPCIDevice replacement;
+    if (fault == DirectFlipFault::ReplacedPci) {
+        replacement.route = &fixture.route;
+        fixture.framebuffer.provider = &replacement;
+        scanout.device.pci = &replacement;
+    }
+    ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    if (fault != DirectFlipFault::None && fault != DirectFlipFault::DomainLostAfterIssue) {
+        assert(fixture.begin(intent) == kIOReturnNotReady && !intent.operation.serial && !fixture.writes && !fixture.vmWrites);
+        assert(!fixture.command.created && !fixture.homeTable.dma.created && !fixture.homeTable.stores && !pci.mapperLookups);
+        assert(scanout.cancelPin(fixture.pin) == kIOReturnSuccess && pci.references == 1 && !fixture.homeTable.references);
+        return;
+    }
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    assert(fixture.homeTable.direct && fixture.homeTable.references == 1 && fixture.pixelReads == 4);
+    assert(fixture.writes == 5 && fixture.vmWrites == 7 && fixture.homeTable.stores == 1 && !fixture.command.created);
+    assert(!fixture.homeTable.dma.created && scanout.frame.host.wires == 2 && scanout.frame.present.wires == 2);
+    ScanoutFlipPoll poll{intent.operation, ScanoutFlipResult::Refused};
+    fixture.pending = false;
+    fixture.active = fixture.earliest = fixture.mapped;
+    if (fault == DirectFlipFault::DomainLostAfterIssue) {
+        ++pci.directGeneration;
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(pci.references == 2 && fixture.homeTable.references == 1 && scanout.frame.present.wires == 2);
+        assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && !pci.mapperLookups);
+        return;
+    }
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    intent = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    poll.operation = intent.operation;
+    fixture.pending = fixture.retire = false;
+    fixture.active = fixture.earliest = fixture.home;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    assert(fixture.homeTable.references == 1 && pci.references == 2 && !fixture.clearWrites);
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    assert(fixture.clearWrites == 7 && fixture.translationChecks && fixture.pixelReads == 6 && !fixture.homeTable.references);
+    assert(!fixture.command.created && !fixture.homeTable.dma.created && !pci.mapperLookups && pci.references == 1);
+    assert(scanout.frame.host.wires == 1 && scanout.frame.present.wires == 1 && !DcnAllocationStub::live());
 }
 
 static void scanoutFlip(FlipFault fault) {
@@ -2082,6 +2227,7 @@ int main() {
 #endif
 #ifdef TEST_SCANOUT_DMA
     scanoutDmaQualification();
+    scanoutDirectQualification();
     scanoutDmaPresentPreparation(false);
     scanoutDmaPresentPreparation(true);
     scanoutDma(DmaFault::None);
@@ -2099,6 +2245,8 @@ int main() {
     scanoutDma(DmaFault::WrongPage, DmaCleanupFault::ConfirmUnmap);
 #endif
 #ifdef TEST_SCANOUT_FLIP
+    for (const auto fault : {DirectFlipFault::None, DirectFlipFault::DeniedTable, DirectFlipFault::ShortTable,
+         DirectFlipFault::DomainLost, DirectFlipFault::ReplacedPci, DirectFlipFault::DomainLostAfterIssue}) scanoutDirectFlip(fault);
     for (const auto fault : {PixelFault::MapperRemap, PixelFault::MapperUnavailable, PixelFault::RenderPage,
          PixelFault::PresentPage, PixelFault::RenderGeneration, PixelFault::PresentGeneration, PixelFault::LateGeneration,
          PixelFault::WrongCommandSlice, PixelFault::SubstitutedDescriptor, PixelFault::LateEvidence, PixelFault::FrontRemap,
