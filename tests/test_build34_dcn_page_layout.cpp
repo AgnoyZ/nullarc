@@ -9,6 +9,82 @@ using namespace build34::dcn;
 
 static constexpr uint64_t kUnwritten = UINT64_MAX;
 
+static SurfaceDescription bgraSurface() {
+    return {kSurfaceBgra, 2560, 1600, 10240, 0, 1, 40ull << 20, true, true, true};
+}
+
+static void testSurfaceQualifications() {
+    const SurfaceDescription surface = bgraSurface();
+    ScanoutSurface scanout{};
+    assert(validateScanoutSurface(surface, 2560, 1600, &scanout));
+    assert(scanout.width == 2560 && scanout.height == 1600);
+    assert(scanout.pitchPixelsMinusOne == 2559 && scanout.dcnPixelFormat == kDcnArgb8888);
+    assert(scanout.mappedBytes == 40ull << 20);
+
+    auto reject = [&](SurfaceDescription candidate, uint32_t width = 2560, uint32_t height = 1600) {
+        ScanoutSurface unchanged{7, 11, 13, 17, 19};
+        assert(!validateScanoutSurface(candidate, width, height, &unchanged));
+        assert(unchanged.width == 7 && unchanged.height == 11 && unchanged.pitchPixelsMinusOne == 13);
+        assert(unchanged.dcnPixelFormat == 17 && unchanged.mappedBytes == 19);
+    };
+
+    auto candidate = surface;
+    candidate.pixelFormat = 0x6c313072;
+    reject(candidate);
+    candidate = surface;
+    candidate.directlyImportedForRendering = false;
+    reject(candidate);
+    candidate = surface;
+    candidate.backingRetained = false;
+    reject(candidate);
+    candidate = surface;
+    candidate.linearLayout = false;
+    reject(candidate);
+    candidate = surface;
+    candidate.planeIndex = 1;
+    reject(candidate);
+    candidate = surface;
+    candidate.planeCount = 2;
+    reject(candidate);
+    reject(surface, 1920, 1080);
+    candidate = surface;
+    candidate.width = 0;
+    reject(candidate);
+    candidate = surface;
+    candidate.height = 0;
+    reject(candidate);
+    candidate = surface;
+    candidate.bytesPerRow = 0;
+    reject(candidate);
+    candidate = surface;
+    candidate.bytesPerRow = 10241;
+    reject(candidate);
+    candidate = surface;
+    candidate.bytesPerRow = 10236;
+    reject(candidate);
+    candidate = surface;
+    candidate.bytesPerRow = 65540;
+    reject(candidate);
+    candidate = surface;
+    candidate.allocationBytes = 0;
+    reject(candidate);
+    candidate = surface;
+    candidate.allocationBytes = (uint64_t)candidate.bytesPerRow * candidate.height - 1;
+    reject(candidate);
+    candidate = surface;
+    candidate.allocationBytes = kMaxBackingBytes + 1;
+    reject(candidate);
+    assert(!validateScanoutSurface(surface, 2560, 1600, nullptr));
+
+    candidate = surface;
+    candidate.bytesPerRow = 2560 * 4 + 64;
+    candidate.allocationBytes = (uint64_t)candidate.bytesPerRow * candidate.height;
+    ScanoutSurface padded{};
+    assert(validateScanoutSurface(candidate, 2560, 1600, &padded));
+    assert(padded.pitchPixelsMinusOne == 2575);
+    assert(padded.mappedBytes == ((candidate.allocationBytes + kPageBytes - 1) & ~(kPageBytes - 1)));
+}
+
 static void expectRefusal(uint64_t start, uint64_t bytes, const DmaRun *runs, size_t count,
                            size_t capacity = 4) {
     std::array<uint64_t, 4> pages;
@@ -111,6 +187,7 @@ static void testPanelAndBoundedWork() {
 }
 
 int main() {
+    testSurfaceQualifications();
     testFragmentedBacking();
     testAddressAndCapacityEdges();
     testRefusesMalformedRunsBeforeWriting();

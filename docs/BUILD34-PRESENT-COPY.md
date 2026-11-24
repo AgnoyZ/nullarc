@@ -30,11 +30,24 @@ segments of the exact rendered IOSurface. The tests include a synthetic
 2560x1600 frame with all 4,000 pages fragmented, the 48-bit boundary and
 malformed inputs that must leave output untouched.
 
+The same helper now has a separate surface-qualification gate. It accepts
+only one retained, linear, directly host-imported `BGRA` IOSurface plane
+whose dimensions exactly match the panel and whose byte pitch fits the full
+image in its allocation. It emits the inclusive DCN pitch in pixels minus
+one and the native `ARGB8888` surface-format value. This matches the current
+framebuffer's 8-bit channel layout and the pinned DCN field reference;
+10-bit `l10r`, private Vulkan images, family VRAM backing, multi-plane images,
+unretained surfaces and unknown layouts are rejected for copy fallback.
+Padded byte rows are allowed only when word-aligned and within the DCN
+14-bit pitch field. The test also checks output is unchanged on refusal.
+
 There is no native call site, MMIO or active page-table change. Keep the
 AMD flip guard and the accepted R2a copy fallback unchanged. Next prove
 that the retained IOSurface descriptor yields DCN-usable DMA segments and
-that the image layout matches the scanout format. Still required: native
-mapping and invalidation, render completion and visibility, hardware latch
+that the exact retained IOSurface descriptor yields DCN-usable DMA segments.
+The actual plugin does not yet publish this qualification metadata to
+PhxAccel; the gate is CPU-only and not wired to live surfaces. Still required:
+native mapping and invalidation, render completion and visibility, hardware latch
 confirmation before retiring old pages, and bounded fallback/recovery. Do
 not treat a successful plan as a valid hardware mapping, R3 acceptance or
 permission to run any hardware trial. Source-only rollback is a revert of
