@@ -123,7 +123,8 @@ class ExactWriterTests(unittest.TestCase):
             if signature == flip_commit.MAP:
                 previous = previous.replace('    for (uint64_t p = 0; p < size; p += 4096) {\n',
                     flip_commit.MAP_PREFLIGHT + '    for (uint64_t p = 0; p < size; p += 4096) {\n').replace(
-                    '        uint64_t *pte = validPage ?', flip_commit.MAP_PAGE_GATE + '        uint64_t *pte = validPage ?')
+                    '        uint64_t *pte = validPage ?', flip_commit.MAP_PAGE_GATE + '        uint64_t *pte = validPage ?').replace(
+                    '        *pte =', flip_commit.MAP_RECORD + '        *pte =')
             self.assertEqual(method(flipped, signature), previous)
             self.assertEqual(method(bound, signature), method(flipped, signature))
         mapped_submit = method(mapped, flip_commit.SUBMIT)
@@ -148,8 +149,12 @@ class ExactWriterTests(unittest.TestCase):
         self.assertEqual(flipped.count('dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr}'), 1)
         self.assertNotIn('dcnQualifiedFlipRoute =', flipped)
         self.assertNotIn('dcnQualifiedFlipRoute =', bound)
-        self.assertIn('dcnProveManagedWriteIsolation)(PhxBringup &, build34::dcn::PhysicalPageSet){nullptr}', bound)
-        self.assertNotIn('dcnProveManagedWriteIsolation =', bound)
+        self.assertIn('dcnProveGpuVmOwnership)(const PhxBringup &, build34::dcn::PhysicalPageSet){nullptr}', bound)
+        self.assertNotIn('dcnProveGpuVmOwnership =', bound)
+        bind = method(bound, flip_commit.VM_BIND)
+        self.assertIn(flip_commit.BOUND_SLOT_GATE, bind)
+        self.assertIn(flip_commit.FREE_SLOT_GATE, bind)
+        self.assertLess(bind.index('dcnGpuWrites.bound('), bind.index('wreg('))
         begin = method(bound, flip_commit.BEGIN)
         self.assertLess(begin.index('bindDcnBar5(intent, boundRoute)'), begin.index('dcnFlip.begin('))
         self.assertIn('return barLive && dcnBar5Live();', method(bound, flip_commit.POLL))
@@ -196,6 +201,7 @@ class ExactWriterTests(unittest.TestCase):
         extracted = '\n'.join(method(source, signature) for signature in signatures)
         if flip:
             extracted += '\n' + method(source, flip_commit.MAP).replace('PhxBringup::vmMap(', 'PhxBringup::guardedVmMap(', 1)
+            extracted += '\n' + method(source, flip_commit.VM_BIND)
         if bar5_adapter:
             bound = bar5.stage_native(DRIVER, ABI)
             fields += bar5.FIELDS

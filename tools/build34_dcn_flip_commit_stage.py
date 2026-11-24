@@ -13,6 +13,7 @@ BIND = 'build34::dcn::ScanoutFlipBinding PhxBringup::dcnFlipBinding('
 WRITER_CURRENT = 'bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent('
 SUBMIT = 'IOReturn PhxBringup::gpuSubmit('
 MAP = 'IOReturn PhxBringup::vmMap('
+VM_BIND = 'uint32_t PhxBringup::vmBind('
 SUBMIT_EPOCH = '        if (exact && !retried) admissionEpoch = exactInvalidationEpoch;\n'
 SUBMIT_GATE = '''        if (dcnSubmitGate.held()) {
             IOLockUnlock(gpuLock);
@@ -21,6 +22,10 @@ SUBMIT_GATE = '''        if (dcnSubmitGate.held()) {
             if (elapsed >= 2000000000ull) return kIOReturnBusy;
             IOSleep(1);
             continue;
+        }
+        if (dcnManagedWrites.blocksContext(handle)) {
+            IOLockUnlock(gpuLock);
+            return kIOReturnBusy;
         }
 '''
 DRAIN_DECL = once(dma.pin.handoff.DRAIN_DECL, 'DcnDrainStamp * = nullptr);', '''DcnDrainStamp * = nullptr,
@@ -31,7 +36,8 @@ CLIENT = '''    bool dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescript
 '''
 FIELDS = '''    build34::dcn::DcnSubmitGate dcnSubmitGate;
     build34::dcn::DcnManagedWriteHolds dcnManagedWrites;
-    bool (*dcnProveManagedWriteIsolation)(PhxBringup &, build34::dcn::PhysicalPageSet){nullptr};
+    build34::dcn::DcnGpuWriteHistory<> dcnGpuWrites;
+    bool (*dcnProveGpuVmOwnership)(const PhxBringup &, build34::dcn::PhysicalPageSet){nullptr};
     build34::dcn::ScanoutFlipCommit dcnFlip;
     const build34::dcn::HubpFlipRoute *(*dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr};
     DcnPinSlot *findDcnFlipPin(build34::dcn::ScanoutPinToken);
@@ -58,6 +64,9 @@ MAP_PAGE_GATE = '''        if (validPage && dcnManagedWrites.excludes(pa)) {
             break;
         }
 '''
+MAP_RECORD = '        dcnGpuWrites.mapped(handle, pa);\n'
+BOUND_SLOT_GATE = '        if (dcnManagedWrites.blocksSlot(c.hw - kFirstUserVmid)) return 0;\n'
+FREE_SLOT_GATE = '        if (dcnManagedWrites.blocksSlot(i)) continue;\n'
 
 METHODS = '''bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescriptorPin &pin,
     const build34::dcn::ScanoutDmaLease &dma, build34::dcn::DcnSubmitGate::Lease *reserve) {
@@ -186,7 +195,8 @@ def stage_native(driver, abi):
         source = once(source, before, once(before, old, new))
 
     include = '#include "build34_dcn_scanout_dma.h"\n'
-    source = once(source, include, include + '#include "build34_dcn_flip_commit.h"\n')
+    source = once(source, include, include + '#include "build34_dcn_flip_commit.h"\n'
+                  '#include "build34_dcn_gpu_write_history.h"\n')
     source = once(source, dma.DMA_FIELDS, dma.DMA_FIELDS + SLOT)
     source = once(source, dma.MAPPER_GATE, dma.MAPPER_GATE + FIELDS)
     source = once(source, dma.DMA_PROBE_DECL, dma.DMA_PROBE_DECL + CLIENT)
@@ -197,9 +207,10 @@ def stage_native(driver, abi):
     replace(writer, '    IOLockUnlock(gpuLock);\n', '''    if (current && expected) current = drain && drain->matches(*expected);
     if (current && reserve) {
         const auto pages = dma ? dma->physicalPages() : build34::dcn::PhysicalPageSet{};
-        current = expected && pages.count && dcnProveManagedWriteIsolation &&
-            dcnProveManagedWriteIsolation(*this, pages) && !exactCallbacks.closed() &&
-            reserve->reserve(dcnSubmitGate) && dcnManagedWrites.acquire(pages);
+        build34::dcn::DcnManagedWriteExclusion blocked{};
+        current = expected && dcnProveGpuVmOwnership && dcnGpuWrites.exclusion(pages, blocked) &&
+            dcnProveGpuVmOwnership(*this, pages) && !exactCallbacks.closed() &&
+            reserve->reserve(dcnSubmitGate) && dcnManagedWrites.acquire(pages, blocked);
     }
     IOLockUnlock(gpuLock);
 ''')
@@ -207,6 +218,18 @@ def stage_native(driver, abi):
             MAP_PREFLIGHT + '    for (uint64_t p = 0; p < size; p += 4096) {\n')
     replace(MAP, '        uint64_t *pte = validPage ? vmPte(c, va + p, true) : nullptr;\n',
             MAP_PAGE_GATE + '        uint64_t *pte = validPage ? vmPte(c, va + p, true) : nullptr;\n')
+    replace(MAP, '        *pte = (pa & kPtAddrMask) | kPteSysFlags;\n',
+            MAP_RECORD + '        *pte = (pa & kPtAddrMask) | kPteSysFlags;\n')
+    replace(VM_BIND, '    VmCtx &c = *context;\n', '''    static_assert(kMaxCtx <= build34::dcn::DcnManagedWriteExclusion::kContexts);
+    static_assert(kNumUserVmids <= build34::dcn::DcnManagedWriteExclusion::kVmidSlots);
+    if (dcnManagedWrites.blocksContext(handle)) return 0;
+    VmCtx &c = *context;
+''')
+    replace(VM_BIND, '        hwv[c.hw - kFirstUserVmid].lastUse = now;\n',
+            BOUND_SLOT_GATE + '        hwv[c.hw - kFirstUserVmid].lastUse = now;\n')
+    replace(VM_BIND, '        if (!hwv[i].ctx)', FREE_SLOT_GATE + '        if (!hwv[i].ctx)')
+    replace(VM_BIND, '    wreg(kRegCtx0BaseLo + 2 * vmid,',
+            '    dcnGpuWrites.bound(handle, static_cast<uint32_t>(pick));\n    wreg(kRegCtx0BaseLo + 2 * vmid,')
     submit_anchor = '        // Re-select and validate under the lock after every sleep: adoption,\n'
     replace(SUBMIT, SUBMIT_EPOCH, '')
     replace(SUBMIT, submit_anchor, SUBMIT_EPOCH + SUBMIT_GATE + submit_anchor)

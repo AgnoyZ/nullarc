@@ -50,19 +50,41 @@ inline void sortPhysicalPages(uint64_t *pages, size_t count) {
     }
 }
 
-class DcnManagedWriteHolds {
-public:
-    bool active() const { return holds_[0].count || holds_[1].count; }
+struct DcnManagedWriteExclusion {
+    static constexpr uint32_t kContexts = 128, kVmidSlots = 32;
+    uint64_t contexts[2]{};
+    uint32_t slots{0};
 
-    bool excludes(uint64_t physicalPage) const {
-        return holds_[0].contains(physicalPage) || holds_[1].contains(physicalPage);
+    bool blocksContext(uint32_t handle) const {
+        return handle && handle <= kContexts && (contexts[(handle - 1) / 64] & (1ull << ((handle - 1) % 64)));
     }
 
-    bool acquire(PhysicalPageSet next) {
-        if (!next.pages || !next.count || holds_[0].overlaps(next) || holds_[1].overlaps(next)) return false;
+    bool blocksSlot(uint32_t slot) const {
+        return slot < kVmidSlots && (slots & (1u << slot));
+    }
+};
+
+class DcnManagedWriteHolds {
+public:
+    bool active() const { return holds_[0].pages.count || holds_[1].pages.count; }
+
+    bool excludes(uint64_t physicalPage) const {
+        return holds_[0].pages.contains(physicalPage) || holds_[1].pages.contains(physicalPage);
+    }
+
+    bool blocksContext(uint32_t handle) const {
+        return holds_[0].blocked.blocksContext(handle) || holds_[1].blocked.blocksContext(handle);
+    }
+
+    bool blocksSlot(uint32_t slot) const {
+        return holds_[0].blocked.blocksSlot(slot) || holds_[1].blocked.blocksSlot(slot);
+    }
+
+    bool acquire(PhysicalPageSet next, DcnManagedWriteExclusion blocked) {
+        if (!next.pages || !next.count || holds_[0].pages.overlaps(next) || holds_[1].pages.overlaps(next)) return false;
         for (auto &held : holds_) {
-            if (held.count) continue;
-            held = next;
+            if (held.pages.count) continue;
+            held = {next, blocked};
             return true;
         }
         return false;
@@ -70,11 +92,14 @@ public:
 
     void release(PhysicalPageSet retired) {
         for (auto &held : holds_)
-            if (held.pages == retired.pages && held.count == retired.count) held = {};
+            if (held.pages.pages == retired.pages && held.pages.count == retired.count) held = {};
     }
 
 private:
-    PhysicalPageSet holds_[2]{};
+    struct Hold {
+        PhysicalPageSet pages;
+        DcnManagedWriteExclusion blocked;
+    } holds_[2]{};
 };
 
 }

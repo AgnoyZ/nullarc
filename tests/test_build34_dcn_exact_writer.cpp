@@ -147,9 +147,13 @@ struct Phx34ScopedReference {
 #include "build34_dcn_scanout_dma.h"
 #ifdef TEST_SCANOUT_FLIP
 #include "build34_dcn_flip_commit.h"
+#include "build34_dcn_gpu_write_history.h"
 using addr64_t = uint64_t;
 constexpr uint64_t kPtAddrMask = 0x0000FFFFFFFFF000ull, kPteSysFlags = 0x0004000000000077ull;
 constexpr IOReturn kIOReturnVMError = -10;
+constexpr uint32_t kFirstUserVmid = 8, kNumUserVmids = 3;
+constexpr uint32_t kRegCtx0BaseLo = 0x2953, kRegCtx0Cntl = 0x28e8;
+constexpr uint32_t kRegCtx0StartLo = 0x2973, kRegCtx0EndLo = 0x2993;
 static void flushLine(const volatile void *) {}
 #endif
 #ifdef TEST_SCANOUT_BAR5
@@ -212,12 +216,13 @@ struct PhxBringup
     IOMemoryMap *mmio = nullptr;
     CallbackGate<1> exactRawWriters;
 #endif
-    static constexpr uint32_t kMaxCtx = 2;
+    static constexpr uint32_t kMaxCtx = 4;
     struct VmCtx {
         uint64_t generation = 5, newest = 0, queueSequence[2]{}, queueGeneration[2]{};
         const void *client = nullptr;
         bool closing = false, busy = false;
 #ifdef TEST_SCANOUT_FLIP
+        uint64_t phys = 0x1e0000;
         uint32_t hw = 0;
 #endif
     } vm[kMaxCtx];
@@ -269,20 +274,23 @@ struct PhxBringup
     // WRITER_SERVICE
 
 #ifdef TEST_SCANOUT_FLIP
-    unsigned pteLookups = 0;
+    unsigned pteLookups = 0, gpuVmWrites = 0;
     uint64_t lastPte = 0;
+    struct HwVmid { uint32_t ctx; uint64_t generation, lastSeq, lastUse; } hwv[kNumUserVmids]{};
+    uint64_t hwTick = 0;
     bool isolationEvidence = true;
-    uint64_t existingWriteAlias = 0;
-    static bool proveIsolation(PhxBringup &device, PhysicalPageSet pages) {
+    static bool proveIsolation(const PhxBringup &device, PhysicalPageSet pages) {
         assert(device.guard.held && pages.count == 2);
-        return device.isolationEvidence && !pages.contains(device.existingWriteAlias);
+        return device.isolationEvidence;
     }
     uint64_t *vmPte(VmCtx &, uint64_t, bool allocate) {
         assert(guard.held && allocate);
         ++pteLookups;
         return &lastPte;
     }
-    bool vmFlushTlbChecked(uint32_t) { assert(false); return false; }
+    bool vmFlushTlbChecked(uint32_t slot) { assert(guard.held && slot >= kFirstUserVmid); return true; }
+    void wreg(uint32_t, uint32_t) { assert(guard.held); ++gpuVmWrites; }
+    uint32_t vmBind(uint32_t, uint64_t, const void *, uint64_t);
     IOReturn guardedVmMap(uint32_t, uint64_t, const void *, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t);
 #endif
     IOReturn vmMap(uint32_t, uint64_t, const void *, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t) {
@@ -319,8 +327,9 @@ struct PhxBringup
 #endif
         assert(vmOwned(handle, generation, client));
         const uint32_t queue = gfx ? 1 : 0;
-        vm[0].newest = vm[0].queueSequence[queue] = *seq = recordQueued(queue);
-        vm[0].queueGeneration[queue] = exactQueueGeneration[queue];
+        auto &ctx = vm[handle - 1];
+        ctx.newest = ctx.queueSequence[queue] = *seq = recordQueued(queue);
+        ctx.queueGeneration[queue] = exactQueueGeneration[queue];
         assert(!registry || registry->publish(ticket, {*seq, exactQueueGeneration[queue], queue}) == Status::Ok);
         IOLockUnlock(gpuLock);
         ++dispatches;
@@ -1256,7 +1265,7 @@ struct CommitFixture {
 
     explicit CommitFixture(bool direct = false)
         : ownedRoot(direct ? 0xe3400005007 : 0x123400005001), directMode(direct) {
-        scanout.device.dcnProveManagedWriteIsolation = PhxBringup::proveIsolation;
+        scanout.device.dcnProveGpuVmOwnership = PhxBringup::proveIsolation;
         framebuffer.fixture = this;
         framebuffer.provider = scanout.device.pci;
         framebuffer.isPhxFramebuffer = true;
@@ -1810,12 +1819,12 @@ static void scanoutWriteIsolation(bool direct, bool physicalDrift) {
     const auto second = first + 2 * kPage;
     device.dcnQualifiedFlipRoute = [](IOPCIDevice *pci) -> const HubpFlipRoute * { return pci->route; };
     ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
-    device.dcnProveManagedWriteIsolation = nullptr;
+    device.dcnProveGpuVmOwnership = nullptr;
     assert(fixture.begin(intent) == kIOReturnNotReady && !device.dcnManagedWrites.active() && !fixture.vmWrites);
-    device.dcnProveManagedWriteIsolation = PhxBringup::proveIsolation;
-    device.existingWriteAlias = second;
+    device.dcnProveGpuVmOwnership = PhxBringup::proveIsolation;
+    device.isolationEvidence = false;
     assert(fixture.begin(intent) == kIOReturnNotReady && !device.dcnManagedWrites.active() && !fixture.vmWrites);
-    device.existingWriteAlias = 0;
+    device.isolationEvidence = true;
     fixture.pageReads = 0;
     assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
     assert(!device.dcnSubmitGate.held() && device.dcnManagedWrites.excludes(first) && device.dcnManagedWrites.excludes(second));
@@ -1855,6 +1864,106 @@ static void scanoutWriteIsolation(bool direct, bool physicalDrift) {
     fixture.retire = true;
     fixture.step(poll, ScanoutFlipResult::Presented);
     assert(!device.dcnManagedWrites.active() && map() == kIOReturnSuccess && device.pteLookups == 4);
+}
+
+static void managedWriteHistoryLimits() {
+    DcnGpuWriteHistory<1> history;
+    const uint64_t page = 29 * kPage, next = page + kPage;
+    DcnManagedWriteExclusion blocked{};
+    history.mapped(128, page);
+    history.bound(128, 31);
+    assert(history.exclusion({&page, 1}, blocked));
+    assert(blocked.blocksContext(128) && !blocked.blocksContext(127) && blocked.blocksSlot(31));
+    history.mapped(1, page);
+    assert(history.exclusion({&page, 1}, blocked) && blocked.blocksContext(1));
+    DcnManagedWriteHolds holds;
+    assert(holds.acquire({&page, 1}, blocked));
+    DcnManagedWriteExclusion alternate{};
+    alternate.contexts[0] = 1ull << 1;
+    alternate.slots = 1u << 5;
+    assert(holds.acquire({&next, 1}, alternate));
+    history.mapped(1, next);
+    assert(!history.exclusion({&page, 1}, blocked) && blocked.blocksContext(128) && blocked.blocksSlot(31));
+    assert(holds.blocksContext(1) && holds.blocksContext(2) && holds.blocksSlot(31) && holds.blocksSlot(5));
+    holds.release({&page, 1});
+    assert(!holds.blocksContext(1) && holds.blocksContext(2) && !holds.blocksSlot(31) && holds.blocksSlot(5));
+    holds.release({&next, 1});
+    assert(!holds.active());
+
+    DcnGpuWriteHistory<1> noMemory;
+    DcnAllocationStub::fail = true;
+    noMemory.mapped(1, page);
+    DcnAllocationStub::fail = false;
+    noMemory.mapped(1, page);
+    assert(!noMemory.exclusion({&page, 1}, blocked));
+}
+
+static void scanoutHistoricalAliases(bool direct) {
+    CommitFixture fixture(direct);
+    auto &scanout = fixture.scanout;
+    auto &device = scanout.device;
+    auto &client = scanout.client;
+    Descriptor alias, reused, unrelated;
+    alias.base = scanout.frame.host.base + 2 * kPage;
+    for (uint32_t handle = 2; handle <= device.kMaxCtx; ++handle) device.vm[handle - 1].busy = true;
+    device.vm[1].client = &alias;
+    device.vm[2].client = &reused;
+    device.vm[3].client = &unrelated;
+    const auto bind = [&](uint32_t handle) {
+        auto &ctx = device.vm[handle - 1];
+        IOLockLock(device.gpuLock);
+        const auto assigned = device.vmBind(handle, ctx.generation, ctx.client, device.gSeq);
+        IOLockUnlock(device.gpuLock);
+        return assigned;
+    };
+    assert(device.guardedVmMap(1, client.vmGeneration, &client, kVa, &alias, 0, 2 * kPage) == kIOReturnSuccess);
+    assert(bind(1) == kFirstUserVmid && bind(2) == kFirstUserVmid + 1);
+    assert(device.guardedVmMap(2, device.vm[1].generation, &alias, 2 * kVa, &alias, 0, kPage) == kIOReturnSuccess);
+    ++device.vm[1].generation;
+    device.vm[1].hw = 0;
+    device.hwv[1] = {};
+    assert(bind(3) == kFirstUserVmid + 1);
+    device.dcnQualifiedFlipRoute = [](IOPCIDevice *pci) -> const HubpFlipRoute * { return pci->route; };
+    ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    const auto &holds = device.dcnManagedWrites;
+    assert(!device.dcnSubmitGate.held() && holds.blocksContext(1) && holds.blocksContext(2) && !holds.blocksContext(3));
+    assert(holds.blocksSlot(0) && holds.blocksSlot(1) && !holds.blocksSlot(2));
+    const auto writes = device.gpuVmWrites;
+    assert(!bind(1) && !bind(2) && !bind(3) && device.gpuVmWrites == writes);
+    device.vm[2].hw = 0;
+    device.hwv[1] = {};
+    assert(bind(4) == kFirstUserVmid + 2 && device.gpuVmWrites == writes + 7);
+    const auto submit = [&](uint32_t handle, bool graphics, IOReturn expected) {
+        auto &ctx = device.vm[handle - 1];
+        uint64_t sequence = UINT64_MAX;
+        const auto prior = device.gSeq;
+        assert(device.gpuSubmit(handle, ctx.generation, ctx.client, graphics, nullptr, nullptr, 1, &sequence,
+                                nullptr, {}, nullptr) == expected);
+        assert(expected == kIOReturnSuccess ? sequence == prior + 1 : sequence == UINT64_MAX && device.gSeq == prior);
+    };
+    submit(1, true, kIOReturnBusy);
+    submit(2, false, kIOReturnBusy);
+    submit(4, true, kIOReturnSuccess);
+
+    ScanoutFlipPoll poll{intent.operation, ScanoutFlipResult::Refused};
+    fixture.pending = false;
+    fixture.retire = true;
+    fixture.active = fixture.earliest = fixture.mapped;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    submit(1, false, kIOReturnBusy);
+    intent = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    poll.operation = intent.operation;
+    fixture.pending = fixture.retire = false;
+    fixture.active = fixture.earliest = fixture.home;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    assert(!holds.active() && bind(1) == kFirstUserVmid && bind(2) == kFirstUserVmid + 1);
+    submit(1, false, kIOReturnSuccess);
 }
 
 enum class PixelFault { MapperRemap, MapperUnavailable, RenderPage, PresentPage, RenderGeneration, PresentGeneration,
@@ -2515,6 +2624,9 @@ int main() {
     scanoutWriteIsolation(false, false);
     scanoutWriteIsolation(true, false);
     scanoutWriteIsolation(false, true);
+    managedWriteHistoryLimits();
+    scanoutHistoricalAliases(false);
+    scanoutHistoricalAliases(true);
     for (const bool direct : {false, true})
         for (const auto fault : {WriterFault::NewerCompletedWork, WriterFault::ChangedEpoch, WriterFault::ChangedQueueGeneration,
              WriterFault::ReplacedWriterMap, WriterFault::ClientBusy, WriterFault::GpuBusy, WriterFault::DuringPageWalk,

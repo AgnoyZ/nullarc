@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 
 struct DcnAllocationStub {
@@ -18,8 +19,9 @@ struct DcnAllocationStub {
 };
 
 inline void *IOMallocZero(size_t bytes) {
-    assert(bytes && bytes <= sizeof(DcnAllocationStub::Slot::pages));
+    assert(bytes);
     if (DcnAllocationStub::fail) return nullptr;
+    if (bytes > sizeof(DcnAllocationStub::Slot::pages)) return std::calloc(1, bytes);
     for (auto &slot : DcnAllocationStub::slots) {
         if (slot.bytes) continue;
         slot.bytes = bytes;
@@ -37,5 +39,6 @@ inline void IOFree(void *pages, size_t bytes) {
         slot.bytes = 0;
         return;
     }
-    assert(false);
+    assert(bytes > sizeof(DcnAllocationStub::Slot::pages));
+    std::free(pages);
 }

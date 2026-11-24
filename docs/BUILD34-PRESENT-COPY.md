@@ -1112,18 +1112,39 @@ The hold remains during latch polling and front residence. It is released
 only after old fetch/translation retirement and successful DMA and
 descriptor cleanup. A refused begin drops only its own temporary hold;
 uncertain issue or retirement keeps every potentially reachable hold.
-`dcnProveManagedWriteIsolation` remains null. Before taking a hold, that
-bounded, non-reentrant evidence callback must prove no existing runnable
-managed client or cached translation can write any protected page, even
-after VMID rebinding. It must not edit page tables under the check or accept
-the inherited TLB ACK as revocation. Blocking new PTEs alone cannot exclude
-the writer's retained mapping, aliases in another client or stale cached
-translations. Until a real proof exists, even an exact writer and a
-qualified flip route refuse. CPU and external writers still need separate
-exclusion. CPU fixtures cover proof refusal, aliasing through distinct
-mappings, mapping drift and release after successful retirement. Revert
-this overlay change to roll back; production source, exact-open admission
-and the R2a copy remain unchanged.
+
+The managed path now builds its own exclusion masks. Before publishing a
+writable PTE, `vmMap` records its original physical page and software
+context handle. Before writing the GPUVM registers, `vmBind` records the
+hardware slot used for that handle. Both records are monotonic for the
+provider lifetime. Unmap, rebinding and software handle reuse do not remove
+entries; ordinary TLB ACKs are not retirement evidence. The final drained
+flip admission blocks every handle that ever mapped a protected page and
+every hardware slot ever used by those handles. Both Compute and GFX refuse
+blocked handles before binding, receipt publication or ring work. Existing
+bindings and free/LRU slot selection also refuse blocked slots, including
+slots now owned by disjoint clients. The two pins have independent masks;
+retirement removes only the mask belonging to the retired pin.
+
+This is conservative: the same context cannot render a disjoint next frame
+while its protected page is reachable, and a reassigned slot can remain
+blocked even if its old entries were actually purged. Disjoint contexts
+using unblocked slots can continue. The history allocates at most 6 MiB,
+with 32 probes per page; allocation or insertion failure refuses new holds
+without altering existing ones or fabricating retirement. This is not a
+long-running reclamation design. Same-context overlap requires qualified
+permission revocation, or the renderer must use separate write contexts.
+
+`dcnProveGpuVmOwnership` remains null. Its bounded, non-reentrant native
+evidence must establish exclusive tracked GPUVM use, no untracked old
+translations or writes, and that cached translations cannot escape their
+recorded hardware slot. It may not edit PTEs or infer those conditions from
+a TLB ACK. CPU and external writers still need separate exclusion. CPU
+fixtures cover missing ownership evidence, aliases through different
+descriptors and clients, handle and VMID reuse, mapping drift, allocation
+failure, history exhaustion and retirement. Revert this isolated overlay
+change to roll back. Production source, exact-open admission and the R2a
+copy remain unchanged.
 
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and
