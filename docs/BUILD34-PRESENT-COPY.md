@@ -384,20 +384,36 @@ render passes, resolves, gang streams, and conflicting eligible clears.
 The observation closes only at the corresponding rendering end with the
 same stream, view, BO and map generation. Only successful command-stream
 finalization and command-buffer end stamp a process-local recording serial;
-reset or re-recording erases the observation. The serial identifies a
-recording, not a submission, and the record does not retain any object or
-establish that a clear has reached the GPU. The next step is to carry this
-identity only into the actual native request containing its IB, rejecting
-unsupported chaining, splitting and partial submission before using any
-completion evidence. Later or overlapping writes still need separate
-exclusion before the display can take a lease.
+reset or re-recording erases the observation. The serial identifies one
+recording. The observation holds borrowed identities under normal Vulkan
+object lifetimes.
 
-Tests exercise binding bounds, generation reuse and clear record lifecycle
-with ASan/UBSan. Set `BUILD34_RADV_COMPILE_COMMANDS` to the reviewed Darwin
-Meson recipe to check all seven input digests and syntax-check the four
-edited Mesa translation units with a temporary overlay. No Mesa source copy
-or binary is published; rollback is to discard the overlay. No runtime hook
-consumes this record, and R2a, including `l10r` conversion, is unchanged.
+The exact submission stage adds ten pinned MIT Mesa inputs. It observes a
+single unprotected graphics command buffer and checks the actual winsys
+request for its direct IB. The request may contain graphics preambles and
+postambles. The record preserves the writer IB's ordinal, address and byte
+length. The Darwin transport checks those fields again in the marshalled
+native plan and requires a unique matching IB on GFX instance 0, ring 0.
+Split requests, chained command streams, mixed engines and legacy
+submission leave the observation empty.
+[Exact submission stage](../tools/build34_dcn_radv_submit_stage.py)
+
+The exact marshaller copies the complete native receipt at acceptance
+while it holds the transport lock. The Darwin transport returns the
+receipt only after all output syncobj attachments succeed. Its existing
+handling of an allocation failure after dispatch prevents the RADV retry
+from repeating that exact submit. The queue clears its previous
+observation on entry and installs the new one only if the submission
+succeeds. A missing observation can accompany a native dispatch after an
+attachment failure. The queue snapshot holds historical write identity.
+It needs checked native completion and exclusion of later and overlapping
+writers before the display can take a lease.
+
+ASan/UBSan tests cover binding bounds, generation reuse and the clear and
+submission record lifecycles. Set `BUILD34_RADV_COMPILE_COMMANDS` to the
+reviewed Darwin Meson recipe to check all 17 input digests, syntax-check
+nine Mesa translation units, and run extracted Darwin submission logic
+against CPU doubles. Discarding the overlay rolls back both stages.
 
 Hardware acceptance requires proof of the actual device mapper,
 lease/reverse-lookup semantics and HUBP fetch domain. It also requires

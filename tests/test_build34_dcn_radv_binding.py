@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import build34_dcn_radv_binding_stage as binding
 import build34_dcn_radv_clear_stage as clear
+import build34_dcn_radv_submit_stage as submit
 
 
 class RenderBinding(unittest.TestCase):
@@ -21,13 +22,13 @@ class RenderBinding(unittest.TestCase):
         result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def run_sanitized(self, source):
+    def run_sanitized(self, source, flags=()):
         with tempfile.TemporaryDirectory() as tmp:
             binary = str(Path(tmp) / source.stem)
             self.run_checked([
                 os.environ.get("CC", "clang"), "-std=c11", "-Wall", "-Wextra", "-Werror",
                 "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
-                "-I" + str(ROOT / "tools"), str(source), "-o", binary,
+                "-I" + str(ROOT / "tools"), *flags, str(source), "-o", binary,
             ])
             self.run_checked([binary])
 
@@ -37,13 +38,16 @@ class RenderBinding(unittest.TestCase):
     def test_clear_recording_lifetime(self):
         self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_clear.c")
 
+    def test_clear_submission_lifetime(self):
+        self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_submit.c")
+
     def test_pinned_mesa_native_syntax(self):
         recipe = os.environ.get("BUILD34_RADV_COMPILE_COMMANDS")
         if not recipe:
             self.skipTest("set BUILD34_RADV_COMPILE_COMMANDS to the reviewed Darwin Meson recipe")
         rows = json.loads(Path(recipe).read_text())
         commands = {}
-        for name in (binding.BO, binding.IMAGE, clear.CMD, clear.META):
+        for name in (name for name in submit.INPUTS if name.endswith(".c")):
             matches = [row for row in rows if row["file"].endswith("/" + name)]
             self.assertEqual(len(matches), 1, name)
             row = matches[0]
@@ -54,11 +58,11 @@ class RenderBinding(unittest.TestCase):
         for name, (_, source, _) in commands.items():
             self.assertEqual(mesa / name, source)
 
-        inputs = {name: (mesa / name).read_bytes() for name in clear.INPUTS}
+        inputs = {name: (mesa / name).read_bytes() for name in submit.INPUTS}
         for name in inputs:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, name):
-                clear.stage({**inputs, name: inputs[name] + b"\n"})
-        sources = clear.stage(inputs)
+                submit.stage({**inputs, name: inputs[name] + b"\n"})
+        sources = submit.stage(inputs)
         BO, IMAGE = binding.BO, binding.IMAGE
         self.assertLess(sources[BO].index("goto error_va_map;", sources[BO].index("radv_amdgpu_winsys_bo_from_ptr(")),
                         sources[BO].index("bo->dcn_host_map = host_map;"))
@@ -69,7 +73,12 @@ class RenderBinding(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            for name in (binding.HEADER, clear.HEADER):
+            transport = sources[submit.DRM]
+            (out / "staged_darwin_submit.inc").write_text(
+                transport[transport.index("static bool\nacd_dcn_matches_plan("):transport.index("static int\nacd_cmd_ctx(")]
+            )
+            self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_submit.c", ("-DTEST_DARWIN_SUBMIT", "-I" + tmp))
+            for name in (binding.HEADER, clear.HEADER, submit.HEADER, submit.NATIVE_HEADER):
                 sources[name] = (ROOT / "tools" / Path(name).name).read_text()
             overlay = []
             for name, source in sources.items():
