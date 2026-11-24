@@ -684,12 +684,15 @@ change the framebuffer or copy path. Rollback is to omit the observer.
 
 The [flip-commit overlay](../tools/build34_dcn_flip_commit_stage.py) connects
 the mapper-backed provider slots to that observer. The provider snapshots
-the DMA plan's logical window and extent on successful preparation; an
-unmapped pin, stale token, substituted address or overlapping pinned window
-cannot be submitted. The initial previous address and any requested return
-to the firmware surface must be qualified by the route owner, not inferred
-from the framebuffer's CPU mapping. Only one commit can be outstanding.
-A provider operation serial is distinct from the two DMA pin serials.
+the DMA plan's logical window and the pinned surface's width, height, pixel
+format, pitch and page-rounded extent on successful preparation. It rejects
+invalid footprints before taking the writer offer. An unmapped pin, stale
+token, substituted address or overlapping pinned window cannot be submitted;
+a pinned-to-pinned flip also requires identical geometry. The route owner
+must qualify the initial previous address and any requested return to the
+firmware surface, not infer either from the framebuffer's CPU mapping.
+Only one commit can be outstanding, with an operation serial distinct from
+the two DMA pin serials.
 
 The route qualification hook is null. A future route must keep its context,
 power, exclusive display-writer lease, exact HUBP translation and render
@@ -704,17 +707,25 @@ still updating the active framebuffer after that point.
 The [address programmer](../tools/build34_dcn_flip_program.h) now owns the
 write order inside that transaction. The route supplies scoped, ordered
 register access and a bounded microsecond delay, not an arbitrary issue
-callback. The existing live geometry, stride, linear BGRA mode and route
-must remain qualified; this is an address-only flip, not a modeset. It
-refuses an already-held update lock or a lock selected for another OTG,
-pending/immediate/stereo flips, triple-buffer/GSL modes, and compressed or
-protected primary surfaces. It requests OTG0's update lock without changing
-the lock selector, requires matching OTG and HUBP lock state, and rechecks
-the old programmed address under the lock. It updates the VMID field,
+callback. Before locking and again under the lock, it matches the pinned
+geometry against HUBP0's single-plane, linear BGRA format and red/blue
+crossbar, unrotated and unmirrored zero-origin viewport, and exact pitch.
+It checks that OTG0 is enabled and ODM has one input from OPP0 and one
+output. This is an address-only flip, not a modeset. It refuses an already-held
+update lock or a lock selected for another OTG, pending/immediate/stereo flips,
+triple-buffer/GSL modes, and compressed or protected surface state. It
+requests OTG0's update lock without changing the lock selector, requires
+matching OTG and HUBP lock state, and rechecks the old programmed address
+under the lock. It updates the VMID field,
 writes primary address high then low, and releases only the lock it acquired.
 The register order follows the AMD [HUBP graphics flip](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubp/dcn20/dcn20_hubp.c#L712-L765)
 and [OTG update lock](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/optc/dcn30/dcn30_optc.c#L119-L131)
 references; no implementation was copied.
+The read-only layout checks use AMD's [HUBP size and format programming](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubp/dcn20/dcn20_hubp.c#L346-L460),
+[viewport fields](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubp/dcn10/dcn10_hubp.c#L833-L839)
+and [ODM bypass](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/optc/dcn314/dcn314_optc.c#L163-L183)
+as references. Matching those registers does not identify the full display
+topology, fetch envelope or address translation.
 
 Both lock transitions have a ten-sample bound. Loss of route, write
 uncertainty or a missing lock acknowledgement stops all further writes.
@@ -725,17 +736,28 @@ low write or unlock after a partial or revoked issue. Register acceptance
 does not establish hardware latch, which still requires separate readback.
 
 Only fresh old-address absence plus the same route's independent fetch and
-old-translation retirement confirmation permits old DMA teardown. The client
-lock is try-only and no GPU lock is held across callbacks. The old command
-must complete, independently confirm unmap, and clear before the descriptor
+old-translation retirement confirmation permits old DMA teardown. The live
+geometry and route must still match before and after that callback, within
+the same deadline. The client lock is try-only and no GPU lock is held
+across callbacks. The old command must complete, independently confirm
+unmap, and clear before the descriptor
 hold is released. The new front stays pinned. On timeout, observed close,
 an ambiguous write, or cleanup failure, the provider retains the reachable
 backing and route and admits no replacement commit. On success, a return to
 the verified firmware surface retires the last DMA pin and releases the route
-reference outside the client lock. The CPU tests cover both directions and
-teardown faults. There is no hardware implementation of the route callback,
-no active framebuffer caller, and no change to the R2a or `l10r` path. Omit
-the overlay to roll back this source-only step.
+reference outside the client lock. The CPU tests use independent register
+offsets and cover both directions, different pinned pitches with the same
+page count, wrong geometry before issue, geometry changes at lock acquisition
+or retirement, and teardown faults. There is no hardware implementation of
+the route callback, no active framebuffer caller, and no change to the R2a
+or `l10r` path. Omit the overlay to roll back this source-only step.
+
+PhxFB owns a BAR5 mapping for backlight PWM and releases it during `stop`.
+Retaining that mapping would keep a CPU view, not a live display power or
+route lease. PhxFB's backlight power handler does not supply such a lease.
+Before binding the callback to PhxFB, the owner must account for stop and
+power transitions, prove the firmware surface's actual HUBP address and
+fetch domain, and provide a recovery path for an uncertain flip.
 
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of

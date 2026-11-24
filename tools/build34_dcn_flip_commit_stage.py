@@ -16,20 +16,21 @@ FIELDS = '''    build34::dcn::ScanoutFlipCommit dcnFlip;
     IOReturn beginDcnFlip(build34::dcn::ScanoutFlipIntent &);
     IOReturn pollDcnFlip(build34::dcn::ScanoutFlipPoll &);
 '''
-SLOT = '''        uint64_t dmaWindow{0}, dmaBytes{0};
+SLOT = '''        uint64_t dmaWindow{0};
+        build34::dcn::ScanoutSurface dmaSurface{};
 '''
 
 METHODS = '''PhxBringup::DcnPinSlot *PhxBringup::findDcnFlipPin(build34::dcn::ScanoutPinToken token) {
     if (token.provider == this && token.serial) {
         for (auto &slot : dcnPins)
-            if (slot.serial == token.serial && slot.client && slot.dmaBytes) return &slot;
+            if (slot.serial == token.serial && slot.client && slot.dmaSurface.mappedBytes) return &slot;
     }
     return nullptr;
 }
 
 build34::dcn::ScanoutFlipBinding PhxBringup::dcnFlipBinding(DcnPinSlot *slot) {
     if (!slot) return {};
-    return {{this, slot->serial}, &slot->descriptor, &slot->dma, slot->dmaWindow, slot->dmaBytes};
+    return {{this, slot->serial}, &slot->descriptor, &slot->dma, slot->dmaWindow, slot->dmaSurface};
 }
 
 IOReturn PhxBringup::beginDcnFlip(build34::dcn::ScanoutFlipIntent &intent) {
@@ -72,7 +73,8 @@ IOReturn PhxBringup::pollDcnFlip(build34::dcn::ScanoutFlipPoll &poll) {
     if (old && result == ScanoutFlipResult::Presented) {
         auto *surface = old->surface;
         auto *client = old->client;
-        old->serial = old->dmaWindow = old->dmaBytes = 0;
+        old->serial = old->dmaWindow = 0;
+        old->dmaSurface = {};
         old->surface = nullptr;
         old->client = nullptr;
         surface->release();
@@ -99,11 +101,18 @@ def stage_native(driver, abi):
     source = once(source, dma.DMA_FIELDS, dma.DMA_FIELDS + SLOT)
     source = once(source, dma.MAPPER_GATE, dma.MAPPER_GATE + FIELDS)
     source = once(source, dma.MAP_METHOD, METHODS + dma.MAP_METHOD)
+    replace(dma.pin.PREPARE, '    for (auto &slot : dcnPins) {\n', '''    const auto surface = request ? present.scanout : build34::dcn::ScanoutSurface{};
+    if (request && (!build34::dcn::validFlipGeometry(surface) || surface.mappedBytes != present.slice.bytes))
+        return kIOReturnBadArgument;
+    for (auto &slot : dcnPins) {
+''')
     replace(dma.pin.PREPARE, '        slot.serial = serial;\n', '''        slot.serial = serial;
         slot.dmaWindow = request ? request->windowStart : 0;
-        slot.dmaBytes = request ? present.slice.bytes : 0;
+        slot.dmaSurface = surface;
 ''')
-    replace(dma.pin.CANCEL, '        slot.serial = 0;\n', '        slot.serial = slot.dmaWindow = slot.dmaBytes = 0;\n')
+    replace(dma.pin.CANCEL, '        slot.serial = 0;\n', '''        slot.serial = slot.dmaWindow = 0;
+        slot.dmaSurface = {};
+''')
     anchor = '    if (name && name->isEqualTo(BUILD34_DCN_PIN_MAP)) {\n'
     replace(dma.pin.handoff.DISPATCH, anchor, '''    if (name && name->isEqualTo(BUILD34_DCN_FLIP_BEGIN)) {
         if (wait || !device || p2 || p3 || p4) return kIOReturnBadArgument;

@@ -1,12 +1,10 @@
 #pragma once
 
-#include "build34_dcn_flip_readback.h"
+#include "build34_dcn_flip_geometry.h"
 
 namespace build34::dcn {
 
 namespace hubp0 {
-inline constexpr uint32_t kSurfaceControl = 0x03ada;
-inline constexpr uint32_t kUnsafeSurface = 0x00010003;
 inline constexpr uint32_t kStereoFlip = 0x00013000;
 inline constexpr uint32_t kOtgUpdateLock = 0x0504a, kOtgLockSelect = 0x05051;
 inline constexpr uint32_t kOtgLockRequest = 1u << 0, kOtgLockStatus = 1u << 8;
@@ -23,22 +21,24 @@ class HubpFlipProgram {
 
     template<typename IsLive>
     static bool preflight(const HubpFlipRequest &request, const HubpFlipReader &reader, HubpFlipWriter writer,
-                          IsLive live) {
+                          const ScanoutSurface &surface, IsLive live) {
         if (!request.previous.valid() || !request.next.valid() || !reader.current || !reader.readDword ||
             !writer.writeDword || !writer.delayUs || reader.apertureBytes < (uint64_t{hubp0::kOtgLockSelect} + 1) * 4)
             return false;
         Access<IsLive> access{request, reader, writer, live};
         uint32_t vmid = 0;
-        return access.baseline(false, vmid);
+        return access.baseline(surface, false, vmid);
     }
 
     template<typename IsLive>
-    static bool issue(const HubpFlipRequest &request, const HubpFlipReader &reader, HubpFlipWriter writer, IsLive live) {
-        if (!preflight(request, reader, writer, live)) return false;
+    static bool issue(const HubpFlipRequest &request, const HubpFlipReader &reader, HubpFlipWriter writer,
+                      const ScanoutSurface &surface, IsLive live) {
+        if (!preflight(request, reader, writer, surface, live)) return false;
         using namespace hubp0;
         Access<IsLive> access{request, reader, writer, live};
         uint32_t vmid = 0;
-        if (!access.write(kOtgUpdateLock, kOtgLockRequest) || !access.waitLock(true) || !access.baseline(true, vmid))
+        if (!access.write(kOtgUpdateLock, kOtgLockRequest) || !access.waitLock(true) ||
+            !access.baseline(surface, true, vmid))
             return false;
         if (!access.write(kVmid, (vmid & ~0xfu) | request.next.vmid) ||
             !access.locked() || !access.write(kProgrammedHigh, static_cast<uint32_t>(request.next.address >> 32)) ||
@@ -46,6 +46,14 @@ class HubpFlipProgram {
             !access.locked())
             return false;
         return access.write(kOtgUpdateLock, 0) && access.waitLock(false);
+    }
+
+    template<typename IsLive>
+    static bool geometryCurrent(const HubpFlipRequest &request, const HubpFlipReader &reader,
+                                const ScanoutSurface &surface, IsLive live) {
+        if (reader.apertureBytes < (uint64_t{hubp0::kOtgControl} + 1) * 4) return false;
+        Access<IsLive> access{request, reader, {}, live};
+        return access.geometry(surface) && access.current();
     }
 
     template<typename IsLive>
@@ -65,12 +73,15 @@ class HubpFlipProgram {
             return current() && writer.writeDword(reader.context, reg, value);
         }
 
-        bool baseline(bool held, uint32_t &vmid) const {
+        bool geometry(const ScanoutSurface &surface) const {
+            return matchHubpFlipGeometry(surface, [&](uint32_t reg, uint32_t &value) { return read(reg, value); });
+        }
+
+        bool baseline(const ScanoutSurface &surface, bool held, uint32_t &vmid) const {
             using namespace hubp0;
-            uint32_t select = 0, control = 0, surface = 0, flip = 0, flip2 = 0, lock = 0, high = 0, low = 0;
+            uint32_t select = 0, flip = 0, flip2 = 0, lock = 0, high = 0, low = 0;
             if (!read(kOtgLockSelect, select) || (select & kOtgLockSelectMask) ||
-                !read(kControl, control) || (control & kUnsupportedControl) ||
-                !read(kSurfaceControl, surface) || (surface & kUnsafeSurface) ||
+                !geometry(surface) ||
                 !read(kFlip2, flip2) || (flip2 & kUnsupportedFlip2) ||
                 !read(kOtgUpdateLock, lock) || !read(kFlip, flip) || (flip & (kImmediate | kPending | kStereoFlip)) ||
                 !lockMatches(lock, flip, held) || !read(kVmid, vmid) || !read(kProgrammedHigh, high) ||

@@ -862,12 +862,15 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
 
 #ifdef TEST_SCANOUT_FLIP
 enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, HighWrite, RouteLost, ClockRewind,
-                       Issue, UnlockTimeout, Close, CloseDuringQualify, CloseDuringRetire, LateRetire, Unmap };
+                       Issue, UnlockTimeout, Close, CloseDuringQualify, CloseDuringRetire, LateRetire, Unmap,
+                       WrongFormat, SwappedChannels, AlphaPlane, Protected, Tiled, WrongPitch, Cropped, WrongViewport,
+                       SplitInput, SplitOutput, WrongOdmSource, DisabledOtg,
+                       DifferentPinnedPitch, GeometryAtLock, GeometryAtRetire, GeometryBeforeRetire };
 
 struct CommitFixture {
     ScanoutFixture scanout;
     IOMapper mapper;
-    IODMACommand command;
+    IODMACommand command, nextCommand;
     OSObject lifetime;
     const HubpAddress home{0x800000000, 0}, mapped{0x100000, 7};
     HubpAddress programmed = home, active = home, earliest = home;
@@ -875,10 +878,13 @@ struct CommitFixture {
     uint64_t now = 800;
     unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0;
     uint32_t lockSelect = 0, surfaceControl = 0;
+    uint32_t surfaceFormat = 8, returnControl = 0x00e00000, swizzle = 0, start = 0;
+    uint32_t dimensions = (17u << 16) | 64u, pitch = 63, odm = 0xfff00000, otg = 0x00010001;
     bool lockRequested = false, lockHeld = false, lockTimeout = false, unlockTimeout = false;
     bool qualify = true, live = true, pending = false, failHigh = false, failIssue = false, retire = false, failUnmap = false;
     bool loseRouteAfterHigh = false, rewindAfterHigh = false;
     bool closeDuringQualify = false, closeDuringRetire = false, lateRetire = false;
+    bool changeGeometryAtLock = false, changeGeometryAtRetire = false;
     HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay}, qualified, retired};
     ScanoutPinToken pin{};
 
@@ -901,8 +907,9 @@ struct CommitFixture {
             *cursor = 2 * kPage;
             return kIOReturnSuccess;
         };
+        nextCommand.segments = command.segments;
         mapper.resolve = [&](const IODMACommand &mapped, uint64_t address, uint64_t &physical) {
-            assert(&mapped == &command && (address == 0x500000 || address == 0x501000));
+            assert(&mapped == IODMACommand::next && (address == 0x500000 || address == 0x501000));
             physical = scanout.frame.host.base + (address == 0x500000 ? 2 : 4) * kPage;
             return true;
         };
@@ -916,9 +923,16 @@ struct CommitFixture {
         uint64_t addresses[2]{};
         ScanoutDmaRequest request{&scanout.frame.copy, mapped.address, scratch, 2, addresses, 2, {}, {}};
         const OSSymbol symbol{BUILD34_DCN_PIN_MAP};
+        const auto surface = scanout.frame.copy.scanout;
+        scanout.frame.copy.scanout.pitchPixelsMinusOne = 1;
+        assert(dispatch(symbol, &request) == kIOReturnBadArgument && !command.created);
+        scanout.frame.copy.scanout.pitchPixelsMinusOne = 127;
+        assert(dispatch(symbol, &request) == kIOReturnBadArgument && !command.created);
+        scanout.frame.copy.scanout = surface;
         assert(dispatch(symbol, &request) == kIOReturnSuccess && request.token.serial);
         assert(addresses[0] == 0x500000 && addresses[1] == 0x501000);
         pin = request.token;
+        scanout.frame.copy.scanout = {};
     }
 
     ~CommitFixture() { IODMACommand::next = nullptr; }
@@ -950,6 +964,7 @@ struct CommitFixture {
                 assert(step == 0 && !self.lockRequested && !self.lockHeld && value == hubp0::kOtgLockRequest);
                 self.lockRequested = true;
                 self.lockHeld = !self.lockTimeout;
+                if (self.changeGeometryAtLock) ++self.pitch;
             } else {
                 assert(step == 4 && self.lockRequested && self.lockHeld && self.pending &&
                        self.programmed == (self.issues == 1 ? self.mapped : self.home));
@@ -991,6 +1006,7 @@ struct CommitFixture {
         ++self.retireChecks;
         if (self.closeDuringRetire && request.previousPin.serial) self.scanout.device.exactCallbacks.close();
         if (self.lateRetire && request.previousPin.serial) self.now += 100000000;
+        if (self.changeGeometryAtRetire && request.previousPin.serial) ++self.pitch;
         return self.retire;
     }
 
@@ -1005,7 +1021,15 @@ struct CommitFixture {
             value = (self.pending ? hubp0::kPending : 0) | (self.lockHeld ? hubp0::kUpdateLocked : 0);
             break;
         case hubp0::kVmid: value = 0x10 | self.programmed.vmid; break;
-        case hubp0::kSurfaceControl: value = self.surfaceControl; break;
+        case 0x03ada: value = self.surfaceControl; break;
+        case 0x03aa5: value = self.surfaceFormat; break;
+        case 0x03b2c: value = self.returnControl; break;
+        case 0x03aa7: value = self.swizzle; break;
+        case 0x03aa9: value = self.start; break;
+        case 0x03aaa: value = self.dimensions; break;
+        case 0x03ac7: value = self.pitch; break;
+        case 0x04f8b: value = self.odm; break;
+        case 0x05001: value = self.otg; break;
         case hubp0::kOtgLockSelect: value = self.lockSelect; break;
         case hubp0::kOtgUpdateLock:
             value = (self.lockRequested ? hubp0::kOtgLockRequest : 0) | (self.lockHeld ? hubp0::kOtgLockStatus : 0);
@@ -1062,6 +1086,19 @@ static void scanoutFlip(FlipFault fault) {
     fixture.lockSelect = fault == FlipFault::ForeignLock ? 1u << 25 : 0;
     fixture.lockRequested = fixture.lockHeld = fault == FlipFault::HeldLock;
     fixture.surfaceControl = fault == FlipFault::Dcc ? 1u << 1 : 0;
+    if (fault == FlipFault::Protected) fixture.surfaceControl |= 1u << 17;
+    fixture.surfaceFormat += fault == FlipFault::WrongFormat;
+    if (fault == FlipFault::AlphaPlane) fixture.surfaceFormat |= 1u << 11;
+    if (fault == FlipFault::SwappedChannels) fixture.returnControl = 0x00b00000;
+    fixture.swizzle = fault == FlipFault::Tiled;
+    fixture.start = fault == FlipFault::Cropped ? 1u << 16 : 0;
+    fixture.dimensions -= fault == FlipFault::WrongViewport;
+    fixture.pitch += fault == FlipFault::WrongPitch;
+    if (fault == FlipFault::SplitInput) fixture.odm |= 1u;
+    if (fault == FlipFault::SplitOutput) fixture.odm |= 1u << 8;
+    if (fault == FlipFault::WrongOdmSource) fixture.odm |= 1u << 16;
+    if (fault == FlipFault::DisabledOtg) fixture.otg &= ~0x00010000u;
+    fixture.changeGeometryAtLock = fault == FlipFault::GeometryAtLock;
     fixture.lockTimeout = fault == FlipFault::LockTimeout;
     fixture.unlockTimeout = fault == FlipFault::UnlockTimeout;
     fixture.failHigh = fault == FlipFault::HighWrite;
@@ -1073,7 +1110,8 @@ static void scanoutFlip(FlipFault fault) {
         assert(!request.operation.serial && fixture.lifetime.references == 1);
         return;
     }
-    if (fixture.lockSelect || fixture.lockHeld || fixture.surfaceControl) {
+    const bool badGeometry = fault >= FlipFault::WrongFormat && fault <= FlipFault::DisabledOtg;
+    if (fixture.lockSelect || fixture.lockHeld || fault == FlipFault::Dcc || badGeometry) {
         assert(fixture.begin(request) == kIOReturnNotReady && fixture.reads && !fixture.writes);
         assert(!request.operation.serial && fixture.lifetime.references == 1);
         return;
@@ -1083,8 +1121,9 @@ static void scanoutFlip(FlipFault fault) {
     assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
     ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
     const bool afterHigh = fixture.failHigh || fixture.loseRouteAfterHigh || fixture.rewindAfterHigh;
-    if (fixture.lockTimeout || afterHigh || fixture.failIssue || fixture.unlockTimeout) {
-        const unsigned expectedWrites = fixture.lockTimeout ? 1 : afterHigh ? 3 : fixture.failIssue ? 4 : 5;
+    if (fixture.lockTimeout || fixture.changeGeometryAtLock || afterHigh || fixture.failIssue || fixture.unlockTimeout) {
+        const unsigned expectedWrites = (fixture.lockTimeout || fixture.changeGeometryAtLock) ? 1 :
+            afterHigh ? 3 : fixture.failIssue ? 4 : 5;
         assert(fixture.writes == expectedWrites && fixture.issues == (expectedWrites >= 4));
         assert(fixture.delays == (fixture.lockTimeout || fixture.unlockTimeout ? 9u : 0u));
         assert(request.result == ScanoutFlipResult::Uncertain);
@@ -1108,6 +1147,23 @@ static void scanoutFlip(FlipFault fault) {
     assert(!fixture.command.completes && fixture.retireChecks == 1);
     assert(fixture.poll(poll) == kIOReturnNotFound && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
 
+    if (fault == FlipFault::DifferentPinnedPitch) {
+        IODMACommand::next = &fixture.nextCommand;
+        scanout.frame.copy.scanout = {64, 17, ++fixture.pitch, 8, 2 * kPage};
+        scanout.offer();
+        DmaRun scratch[2]{};
+        uint64_t pages[2]{};
+        const HubpAddress next{fixture.mapped.address + 2 * kPage, fixture.mapped.vmid};
+        ScanoutDmaRequest mapped{&scanout.frame.copy, next.address, scratch, 2, pages, 2, {}, {}};
+        const OSSymbol map{BUILD34_DCN_PIN_MAP};
+        assert(fixture.dispatch(map, &mapped) == kIOReturnSuccess && mapped.token.serial);
+        const auto reads = fixture.reads;
+        ScanoutFlipIntent different{fixture.mapped, next, mapped.token, {}, ScanoutFlipResult::Refused};
+        assert(fixture.begin(different) == kIOReturnNotReady && !different.operation.serial);
+        assert(fixture.reads == reads && fixture.writes == 5 && !fixture.command.completes);
+        return;
+    }
+
     request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
     assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Issued);
     assert(fixture.writes == 10 && fixture.issues == 2);
@@ -1115,12 +1171,16 @@ static void scanoutFlip(FlipFault fault) {
     fixture.pending = fixture.retire = false;
     fixture.active = fixture.earliest = fixture.home;
     fixture.step(poll, ScanoutFlipResult::Waiting);
-    if (fault == FlipFault::CloseDuringRetire || fault == FlipFault::LateRetire) {
+    if (fault == FlipFault::CloseDuringRetire || fault == FlipFault::LateRetire ||
+        fault == FlipFault::GeometryAtRetire || fault == FlipFault::GeometryBeforeRetire) {
         fixture.retire = true;
         fixture.closeDuringRetire = fault == FlipFault::CloseDuringRetire;
         fixture.lateRetire = fault == FlipFault::LateRetire;
+        fixture.changeGeometryAtRetire = fault == FlipFault::GeometryAtRetire;
+        if (fault == FlipFault::GeometryBeforeRetire) ++fixture.pitch;
         fixture.step(poll, ScanoutFlipResult::Uncertain);
         assert(fixture.command.prepared && !fixture.command.completes && fixture.lifetime.references == 2);
+        assert(fixture.retireChecks == (fault == FlipFault::GeometryBeforeRetire ? 1u : 2u));
         return;
     }
     fixture.step(poll, ScanoutFlipResult::Waiting);
@@ -1189,6 +1249,22 @@ int main() {
     scanoutFlip(FlipFault::CloseDuringRetire);
     scanoutFlip(FlipFault::LateRetire);
     scanoutFlip(FlipFault::Unmap);
+    scanoutFlip(FlipFault::WrongFormat);
+    scanoutFlip(FlipFault::SwappedChannels);
+    scanoutFlip(FlipFault::AlphaPlane);
+    scanoutFlip(FlipFault::Protected);
+    scanoutFlip(FlipFault::Tiled);
+    scanoutFlip(FlipFault::WrongPitch);
+    scanoutFlip(FlipFault::Cropped);
+    scanoutFlip(FlipFault::WrongViewport);
+    scanoutFlip(FlipFault::SplitInput);
+    scanoutFlip(FlipFault::SplitOutput);
+    scanoutFlip(FlipFault::WrongOdmSource);
+    scanoutFlip(FlipFault::DisabledOtg);
+    scanoutFlip(FlipFault::DifferentPinnedPitch);
+    scanoutFlip(FlipFault::GeometryAtLock);
+    scanoutFlip(FlipFault::GeometryAtRetire);
+    scanoutFlip(FlipFault::GeometryBeforeRetire);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }
