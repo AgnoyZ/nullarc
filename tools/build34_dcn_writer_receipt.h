@@ -41,24 +41,4 @@ struct WriterReceipt {
     }
 };
 
-inline bool matchesNominatedIb(const phx34_r3_submit_request &submit, const build34_dcn_writer_nomination &nomination) {
-    if (!build34_dcn_valid_writer_nomination(&nomination) || submit.submit.num_ibs > PHXN_MAX_IBS ||
-        nomination.ib.index >= submit.submit.num_ibs)
-        return false;
-    constexpr uint64_t vaMask = (1ull << 48) - 1;
-    for (uint32_t index = 0; index < submit.submit.num_ibs; ++index) {
-        const auto &ib = submit.ibs[index];
-        if (ib.ip_type != PHX_AMDGPU_HW_IP_GFX || ib.ip_instance || ib.ring)
-            return false;
-        if (index == nomination.ib.index) {
-            if (ib.va_start != nomination.ib.va || ib.ib_bytes != nomination.ib.bytes ||
-                (ib.flags & PHX_AMDGPU_IB_FLAG_PREAMBLE))
-                return false;
-        } else if ((ib.va_start & vaMask) == (nomination.ib.va & vaMask)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 }

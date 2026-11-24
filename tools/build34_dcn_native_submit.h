@@ -9,6 +9,16 @@ struct build34_dcn_ib {
    uint32_t index;
 };
 
+struct build34_dcn_writer_range {
+   uint64_t va, bytes;
+   uint32_t bo, reserved;
+};
+
+struct build34_dcn_writer_nomination {
+   struct build34_dcn_ib ib;
+   struct build34_dcn_writer_range range;
+};
+
 struct build34_dcn_native_submit {
    uint64_t sequence, owner, serial, generation;
    uint32_t slot, queue, context;

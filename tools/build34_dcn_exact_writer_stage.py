@@ -6,7 +6,7 @@ from build34_dcn_render_map_stage import ABI, ABI_SHA256, DRIVER, DRIVER_SHA256
 from build34_exact_binding import CLIENT_VALID
 from build34_exact_open import stage as exact_open
 from build34_exact_submit import once
-from build34_exact_submit_pressure import HANDLER, stage as pressure
+from build34_exact_submit_pressure import HANDLER, PROGRESS, stage as pressure
 from test_build34_exact_ownership import method
 
 
@@ -148,6 +148,7 @@ def stage(driver, abi):
             '        if (in.ctx_id == exactWriter.native.context) exactWriter = {};\n'
             '        ctx[in.ctx_id] = false;\n')
     replace(CLOSE, '    IOLockLock(lock);\n', '    IOLockLock(lock);\n    exactWriter = {};\n')
+    replace(PROGRESS, 'reply.flags = PHX34_R3_PRESSURE_FLAGS;', 'reply.flags = PHX34_R3_DCN_FLAGS;')
     replace(HANDLER, '        a->structureInputSize != sizeof(phx34_r3_submit_request) ||\n',
             '        (a->structureInputSize != sizeof(phx34_r3_submit_request) &&\n'
             '         a->structureInputSize != sizeof(build34_dcn_writer_request)) ||\n')
@@ -160,12 +161,13 @@ def stage(driver, abi):
     const auto &request = envelope.submit;
     if (request.version != PHX34_R3_WIRE_VERSION || request.size != bytes ||
 ''')
+    replace(HANDLER, '    bool receiptFull = false;\n', '    bool receiptFull = false, writerAccepted = false;\n')
     replace(HANDLER, '''        else result = submitExactReceipt(payload,
                     sizeof(request.submit) + request.submit.num_ibs * sizeof(phxn_cs_ib), ticket, receipt, receiptFull);
 ''', '''        else {
             exactWriter = {};
             build34::dcn::WriterMapping before{};
-            if (bytes == sizeof(envelope) && build34::dcn::matchesNominatedIb(request, envelope.writer))
+            if (bytes == sizeof(envelope) && build34_dcn_matches_writer_ib(&request, &envelope.writer))
                 before = exactWriterMapLocked(envelope.writer.range);
             result = submitExactReceipt(payload,
                 sizeof(request.submit) + request.submit.num_ibs * sizeof(phxn_cs_ib), ticket, receipt, receiptFull);
@@ -174,11 +176,15 @@ def stage(driver, abi):
                 const build34_dcn_native_submit native{receipt.sequence, ticket.owner, ticket.serial,
                     receipt.generation, ticket.slot, receipt.queue, request.submit.ctx_id};
                 if (build34::dcn::sameWriterReceipt(native, native) && before.identity.matches(after.identity) &&
-                    before.slice.descriptor == after.slice.descriptor && owner->exactWriterVmCurrent(after.identity, native, this))
+                    before.slice.descriptor == after.slice.descriptor && owner->exactWriterVmCurrent(after.identity, native, this)) {
                     exactWriter = {native, envelope.writer.range, after.identity, false};
+                    writerAccepted = true;
+                }
             }
         }
 ''')
+    replace(HANDLER, '        reply.status = PHX34_R3_REPLY_SUBMITTED;\n',
+            '        reply.status = writerAccepted ? PHX34_R3_REPLY_WRITER_SUBMITTED : PHX34_R3_REPLY_SUBMITTED;\n')
     replace(WAIT, '                 owner->observeExact(*exactOwnership, ticket, exactClientCallbacks, this);\n',
             '                 owner->observeExact(*exactOwnership, ticket, exactClientCallbacks, this);\n'
             '        if (result == phx34_exact::Status::Complete) completeExactWriterLocked(ticket, receipt);\n')

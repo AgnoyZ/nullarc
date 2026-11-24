@@ -222,7 +222,7 @@ struct Frame {
 
     build34_dcn_native_submit nominate() {
         const auto reply = submit();
-        assert(reply.status == PHX34_R3_REPLY_SUBMITTED);
+        assert(reply.status == PHX34_R3_REPLY_WRITER_SUBMITTED);
         return {reply.sequence, reply.owner, reply.serial, reply.generation, reply.slot, reply.queue, 1};
     }
     Status wait(build34_dcn_native_submit native) {
@@ -335,8 +335,7 @@ static void refusalAndInvalidation() {
     assert(frame.submit().status == PHX34_R3_REPLY_SUBMITTED && !frame.probe(last));
     frame.request = original;
     frame.client.device.beforeDispatch = [&] { ++frame.host.preparation; };
-    frame.nominate();
-    assert(!frame.client.exactWriter.native.sequence);
+    assert(frame.submit().status == PHX34_R3_REPLY_SUBMITTED && !frame.client.exactWriter.native.sequence);
 }
 
 static void remapCloseAndPressure() {

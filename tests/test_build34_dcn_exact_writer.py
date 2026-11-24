@@ -56,6 +56,8 @@ class ExactWriterTests(unittest.TestCase):
             self.assertEqual(method(self.source, signature), method(prior, signature))
         self.assertIn('    IOLockLock(lock);\n    exactWriter = {};\n', method(self.source, writer.CLOSE))
         self.assertIn('    return false;', method(self.source, 'bool PhxBringup::exactNativeOpenAdmitted('))
+        self.assertEqual(method(self.source, writer.PROGRESS), method(prior, writer.PROGRESS).replace(
+            'reply.flags = PHX34_R3_PRESSURE_FLAGS;', 'reply.flags = PHX34_R3_DCN_FLAGS;'))
         for driver, abi in ((DRIVER + b'\n', ABI), (DRIVER, ABI + b'\n')):
             with self.assertRaisesRegex(ValueError, 'source or ABI drift'):
                 writer.stage(driver, abi)

@@ -23,6 +23,9 @@ struct acd_exact_receipt { uint64_t sequence, owner, serial, generation; uint32_
 struct acd_cs_sync { uint32_t handle; uint64_t point; };
 struct acd_cs_plan {
    struct acd_exact_receipt *receipt_out;
+#ifdef TEST_NATIVE_NOMINATION
+   const struct build34_dcn_writer_nomination *dcn_nomination;
+#endif
    struct n48n_cs_ib *ibs;
    uint32_t n_ibs, n_waits, n_signals;
    struct acd_cs_sync *waits, *signals;
@@ -63,6 +66,12 @@ static int acd_kext_submit(void *kext, const struct acd_cs_plan *plan, uint64_t 
    assert(kext);
    ++called_submit;
    supplied = plan->receipt_out != NULL;
+#ifdef TEST_NATIVE_NOMINATION
+   assert(supplied == (plan->dcn_nomination != NULL));
+   if (supplied)
+      assert(plan->dcn_nomination->range.va == 0x40000 && plan->dcn_nomination->range.bo == 9 &&
+             plan->dcn_nomination->range.bytes == 8192);
+#endif
    if (submit_result)
       return submit_result;
    *seq = 19;
@@ -145,7 +154,12 @@ static void test_darwin_submit(void)
                expected_result = -EOPNOTSUPP; break;
       }
 
+#ifdef TEST_NATIVE_NOMINATION
+      const struct build34_dcn_writer_nomination nomination = {writer, {0x40000, 8192, 9, 0}};
+      assert(acd_dcn_cs_submit(&dev, &cs, &nomination, &out) == expected_result);
+#else
       assert(acd_dcn_cs_submit(&dev, &cs, &writer, &out) == expected_result);
+#endif
       if (!test) {
          assert(cs.out.handle == 19 && out.sequence == 19 && out.context == 23 && out.queue == 1);
          assert(out.owner == 28 && out.serial == 37 && out.generation == 46 && out.slot == 55);

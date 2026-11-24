@@ -514,12 +514,33 @@ walk. `BUILD34_KERNEL_HEADERS` enables a syntax-only check of the complete
 staged kernel source against the pinned SDK headers. Discarding the overlay
 is the rollback; no installation or runtime change is involved.
 
-RADV does not yet send this extension, and no consumer is registered with
-`performTransaction`. Before any copy bypass, the paired transport and
-retained present handoff must establish earlier-writer drain, later writer
-exclusion, actual native translation and HUBP visibility, and keep the
-backing alive through flip latch and old-page retirement. The exact-open
-gate, the R2a copy, and the `l10r` fallback remain unchanged.
+The [paired writer transport](../tools/build34_dcn_radv_writer_stage.py)
+now sends the nomination for the immediate retained-part submit, after
+revalidating its view, imported memory, BO and render range. The exact
+session negotiates the writer bit once, and prefix replies must retain the
+same flags. The previous exact peer still receives the ordinary envelope;
+the new peer receives an extension only if the nomination still matches
+the marshalled IB. A separate reply status confirms that the kernel stored
+the nomination. Ordinary submit success is not writer acceptance. A native
+refusal never triggers a second submission with a shorter envelope; only a
+well-formed no-dispatch capacity reply can retry the original envelope under
+the existing bound. A lost or malformed response remains uncertain.
+
+For a nominated writer, the transport does not treat a global prefix alone
+as a completed kernel writer record. It requires that exact ticket's native
+WaitReceipt or a successful ACK, and refuses an ACK in flight. The paired
+overlay checks the 19 source pins, syntax-checks the affected Darwin Mesa
+translation units, and runs the actual marshaller and extracted transport
+with CPU peers under ASan/UBSan. Covered cases include old peers, capability
+drift, a successful submit without nomination, an in-flight ACK, checked
+completion after a prefix, capacity retry, and malformed replies. Rollback
+is to discard the paired overlays; there is no installed wire change.
+
+No consumer is registered with `performTransaction`. Before any copy
+bypass, a retained present handoff must establish earlier-writer drain,
+later writer exclusion, actual native translation and HUBP visibility, and
+keep the backing alive through flip latch and old-page retirement. The
+exact-open gate, the R2a copy, and the `l10r` fallback remain unchanged.
 
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and

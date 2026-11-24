@@ -16,6 +16,7 @@ import build34_dcn_radv_binding_stage as binding
 import build34_dcn_radv_clear_stage as clear
 import build34_dcn_radv_part_stage as part
 import build34_dcn_radv_submit_stage as submit
+import build34_dcn_radv_writer_stage as writer
 
 
 class RenderBinding(unittest.TestCase):
@@ -43,12 +44,22 @@ class RenderBinding(unittest.TestCase):
         self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_submit.c")
 
     def test_pinned_mesa_native_syntax(self):
+        self.check_mesa_overlay(part)
+
+    def test_paired_mesa_writer_and_wire_syntax(self):
+        self.check_mesa_overlay(writer)
+
+    def check_mesa_overlay(self, stage):
         recipe = os.environ.get("BUILD34_RADV_COMPILE_COMMANDS")
         if not recipe:
             self.skipTest("set BUILD34_RADV_COMPILE_COMMANDS to the reviewed Darwin Meson recipe")
         rows = json.loads(Path(recipe).read_text())
         commands = {}
-        for name in (name for name in part.INPUTS if name.endswith(".c")):
+        names = [name for name in stage.INPUTS if name.endswith(".c")]
+        paired = stage is writer
+        if paired:
+            names.append("src/amd/common/darwin/ac_darwin_iokit.c")
+        for name in names:
             matches = [row for row in rows if row["file"].endswith("/" + name)]
             self.assertEqual(len(matches), 1, name)
             row = matches[0]
@@ -59,11 +70,11 @@ class RenderBinding(unittest.TestCase):
         for name, (_, source, _) in commands.items():
             self.assertEqual(mesa / name, source)
 
-        inputs = {name: (mesa / name).read_bytes() for name in part.INPUTS}
+        inputs = {name: (mesa / name).read_bytes() for name in stage.INPUTS}
         for name in inputs:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, name):
-                part.stage({**inputs, name: inputs[name] + b"\n"})
-        sources = part.stage(inputs)
+                stage.stage({**inputs, name: inputs[name] + b"\n"})
+        sources = stage.stage(inputs)
         BO, IMAGE = binding.BO, binding.IMAGE
         self.assertLess(sources[BO].index("goto error_va_map;", sources[BO].index("radv_amdgpu_winsys_bo_from_ptr(")),
                         sources[BO].index("bo->dcn_host_map = host_map;"))
@@ -83,13 +94,18 @@ class RenderBinding(unittest.TestCase):
             (out / "staged_darwin_submit.inc").write_text(
                 transport[transport.index("static bool\nacd_dcn_matches_plan("):transport.index("static int\nacd_cmd_ctx(")]
             )
-            self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_submit.c", ("-DTEST_DARWIN_SUBMIT", "-I" + tmp))
+            transport_flags = ("-DTEST_DARWIN_SUBMIT", "-I" + tmp)
+            self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_submit.c",
+                               transport_flags + (("-DTEST_NATIVE_NOMINATION",) if paired else ()))
             kext = sources[submit.KEXT]
             (out / "staged_exact_complete.inc").write_text(
                 kext[kext.index("enum acd_exact_phase"):kext.index("/* G6:")] +
                 kext[kext.index("static inline void\nacd_sfence("):kext.index("static bool\ntrace_enabled(")]
             )
-            for name in (binding.HEADER, clear.HEADER, submit.HEADER, submit.NATIVE_HEADER, part.HEADER):
+            headers = (binding.HEADER, clear.HEADER, submit.HEADER, submit.NATIVE_HEADER, part.HEADER)
+            if paired:
+                headers += (writer.WIRE_HEADER,)
+            for name in headers:
                 sources[name] = (ROOT / "tools" / Path(name).name).read_text()
             overlay = []
             for name, source in sources.items():
@@ -108,10 +124,12 @@ class RenderBinding(unittest.TestCase):
             cwd, _, words = commands[submit.KEXT]
             args = words[:words.index("-MD")]
             binary = str(out / "exact-completion")
+            harness = "test_build34_dcn_radv_writer.c" if paired else "test_build34_dcn_radv_complete.c"
+            wire = [str(mesa / writer.WIRE)] if paired else []
             self.run_checked([
                 *args, "-UNDEBUG", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
                 "-ivfsoverlay", str(manifest), "-I" + tmp, "-I" + str(mesa / Path(submit.KEXT).parent),
-                str(ROOT / "tests/test_build34_dcn_radv_complete.c"), "-o", binary,
+                str(ROOT / "tests" / harness), *wire, "-o", binary,
             ], cwd)
             self.run_checked([binary])
 

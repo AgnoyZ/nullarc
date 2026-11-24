@@ -3,15 +3,9 @@
 #include "build34_dcn_native_submit.h"
 #include "build34_exact_submit_wire.h"
 
-struct build34_dcn_writer_range {
-    uint64_t va, bytes;
-    uint32_t bo, reserved;
-};
-
-struct build34_dcn_writer_nomination {
-    struct build34_dcn_ib ib;
-    struct build34_dcn_writer_range range;
-};
+#define PHX34_R3_CAP_DCN_WRITER (1u << 3)
+#define PHX34_R3_DCN_FLAGS (PHX34_R3_PRESSURE_FLAGS | PHX34_R3_CAP_DCN_WRITER)
+#define PHX34_R3_REPLY_WRITER_SUBMITTED 5u
 
 struct build34_dcn_writer_request {
     struct phx34_r3_submit_request submit;
@@ -40,4 +34,26 @@ static inline bool build34_dcn_valid_writer_nomination(const struct build34_dcn_
 {
     return writer->ib.va && writer->ib.bytes && !(writer->ib.bytes & 3u) &&
         writer->ib.index < PHXN_MAX_IBS && build34_dcn_valid_writer_range(&writer->range);
+}
+
+static inline bool build34_dcn_matches_writer_ib(const struct phx34_r3_submit_request *submit,
+                                                const struct build34_dcn_writer_nomination *writer)
+{
+    if (!build34_dcn_valid_writer_nomination(writer) || submit->submit.num_ibs > PHXN_MAX_IBS ||
+        writer->ib.index >= submit->submit.num_ibs)
+        return false;
+    const uint64_t va_mask = (1ull << 48) - 1;
+    for (uint32_t index = 0; index < submit->submit.num_ibs; ++index) {
+        const struct phxn_cs_ib *ib = &submit->ibs[index];
+        if (ib->ip_type != PHX_AMDGPU_HW_IP_GFX || ib->ip_instance || ib->ring)
+            return false;
+        if (index == writer->ib.index) {
+            if (ib->va_start != writer->ib.va || ib->ib_bytes != writer->ib.bytes ||
+                (ib->flags & PHX_AMDGPU_IB_FLAG_PREAMBLE))
+                return false;
+        } else if ((ib->va_start & va_mask) == (writer->ib.va & va_mask)) {
+            return false;
+        }
+    }
+    return true;
 }
