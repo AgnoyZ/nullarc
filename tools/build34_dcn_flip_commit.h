@@ -1,7 +1,7 @@
 #pragma once
 
 #include "build34_dcn_flat_program.h"
-#include "build34_dcn_firmware_home.h"
+#include "build34_dcn_present_windows.h"
 #include "build34_dcn_scanout_dma.h"
 
 #define BUILD34_DCN_FLIP_BEGIN "phx34DcnFlipBeginV3"
@@ -38,11 +38,14 @@ public:
     };
 };
 
+struct HubpFlipRoute;
+
 struct ScanoutFlipIntent {
     HubpAddress previous, next;
     ScanoutPinToken nextPin, operation;
     ScanoutFlipResult result;
     IOService *framebuffer{nullptr};
+    const HubpFlipRoute *plannedRoute{nullptr};
 };
 
 struct ScanoutFlipPoll {
@@ -71,7 +74,15 @@ struct HubpFlipRoute {
     bool (*canClearFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
     DcnRetirement (*translationsRetired)(void *, const HubpFlipRequest &, const DcnFlatContext &);
     IOService *framebuffer;
+    DcnPresentWindowPair presentWindows{};
 };
+
+inline bool sameDcnPresentRoute(const HubpFlipRoute &first, const HubpFlipRoute &second) {
+    return first.owner && first.generation && first.lifetime && first.framebuffer &&
+        first.owner == second.owner && first.generation == second.generation && first.lifetime == second.lifetime &&
+        first.framebuffer == second.framebuffer && first.reader.context == second.reader.context &&
+        first.reader.current == second.reader.current && first.presentWindows == second.presentWindows;
+}
 
 class ScanoutFlipCommit {
 public:
@@ -79,6 +90,8 @@ public:
     ScanoutPinToken front() const { return front_; }
     HubpAddress frontAddress() const { return frontAddress_; }
     HubpAddress firmwareAddress() const { return firmwareHome_.scanout; }
+    FirmwareScanoutSample firmwareSample() const { return firmwareHome_; }
+    bool matchesPresentWindows(const DcnPresentWindowPair &windows) const { return !front_.serial || windows == frontWindows_; }
     bool matches(ScanoutPinToken token) const { return pending() && operation_ == token; }
 
     template<typename IsLive, typename WriterCurrent>
@@ -91,6 +104,9 @@ public:
             !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, pci, true) ||
             !validBinding(next, intent.next, operation.provider, pci, false) ||
+            (intent.plannedRoute && (!sameDcnPresentRoute(*intent.plannedRoute, route) || !next.pin ||
+                !(route.presentWindows.select(intent.previous, next.surface.mappedBytes) == intent.next) ||
+                (route.presentWindows.domain == DcnPresentDomain::Direct) != (mapping(next).direct != nullptr))) ||
             (old.pin && !route.flatFormat.complete(mapping(old))) || (next.pin && !route.flatFormat.complete(mapping(next))) ||
             (old.dma && next.dma && !(old.dma->qualified_.direct == next.dma->qualified_.direct)) ||
             ((old.pin || next.pin) && intent.previous.vmid == intent.next.vmid) ||
@@ -100,14 +116,15 @@ public:
                                             old.window - next.window < next.surface.mappedBytes))) ||
             (old.token.serial && (!(frontAddress_ == intent.previous) || route.owner != routeOwner_ ||
                                   route.generation != routeGeneration_ || route.lifetime != routeLifetime_ ||
-                                  route.framebuffer != framebuffer_ || pci != pci_)) ||
+                                  route.framebuffer != framebuffer_ || pci != pci_ || !matchesPresentWindows(route.presentWindows))) ||
             (next.pin && !writerCurrent(false)))
             return ScanoutFlipResult::Refused;
 
         const HubpFlipRequest request{route.owner, route.generation, operation.serial, intent.previous, intent.next,
                                       old.token, next.token};
         const auto surface = next.pin ? next.surface : old.surface;
-        const FirmwareFlatWindows windows{directWindow(old), directWindow(next)};
+        const auto windows = (intent.plannedRoute || (old.pin && frontWindows_.domain != DcnPresentDomain::None)) ?
+            route.presentWindows.exclusions() : FirmwareFlatWindows{directWindow(old), directWindow(next)};
         readback_.recycle();
         if (!routeLifetime_) {
             route.lifetime->retain();
@@ -235,6 +252,7 @@ public:
         front_ = request_.nextPin;
         frontAddress_ = request_.next;
         frontVm_ = nextVm_;
+        frontWindows_ = front_.serial ? route_.presentWindows : DcnPresentWindowPair{};
         routeOwner_ = request_.routeOwner;
         routeGeneration_ = request_.routeGeneration;
         operation_ = {};
@@ -325,6 +343,7 @@ private:
     void *pci_{nullptr};
     FirmwareScanoutSample firmwareHome_{};
     FirmwareFlatWindows windows_{};
+    DcnPresentWindowPair frontWindows_{};
     uint64_t routeGeneration_{0};
     HubpFlipRequest request_{};
     HubpFlipRoute route_{};

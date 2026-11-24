@@ -1228,13 +1228,19 @@ struct CommitFixture {
             assert(name->isEqualTo(BUILD34_DCN_CHECK_FIRMWARE));
             ++checks;
             assert(value.scanout == self.home && value.surface.height == 17 && value.barOffset == offset);
-            assert(bool(third) == self.directMode);
+            const bool planned = self.route.presentWindows.domain != DcnPresentDomain::None;
+            assert(bool(third) == (self.directMode || planned));
             if (third) {
                 const auto &windows = *static_cast<const FirmwareFlatWindows *>(third);
-                const bool returning = self.target == self.home;
-                const auto &pinWindow = returning ? windows.previous : windows.next;
-                const auto &homeWindow = returning ? windows.next : windows.previous;
-                assert(pinWindow.start == self.mapped.address && pinWindow.bytes == 2 * kPage && !homeWindow.start && !homeWindow.bytes);
+                if (planned) {
+                    assert(windows.previous.start == self.mapped.address && windows.previous.bytes == 2 * kPage &&
+                           windows.next.start == self.alternate.address && windows.next.bytes == 2 * kPage);
+                } else {
+                    const bool returning = self.target == self.home;
+                    const auto &pinWindow = returning ? windows.previous : windows.next;
+                    const auto &homeWindow = returning ? windows.next : windows.previous;
+                    assert(pinWindow.start == self.mapped.address && pinWindow.bytes == 2 * kPage && !homeWindow.start && !homeWindow.bytes);
+                }
                 if (self.flatWindowConflict) return kIOReturnNotReady;
             }
             return value.backing == backing && !(fault == FlipFault::HomeLostAtRetire && self.retireChecks == 3) &&
@@ -2271,6 +2277,61 @@ static void scanoutDirectFlip(DirectFlipFault fault) {
     assert(scanout.frame.host.wires == 1 && scanout.frame.present.wires == 1 && !DcnAllocationStub::live());
 }
 
+static void rejectChangedPresentWindows() {
+    CommitFixture fixture;
+    fixture.scanout.device.dcnQualifiedFlipRoute = [](IOPCIDevice *device) -> const HubpFlipRoute * { return device->route; };
+    fixture.route.presentWindows = {{fixture.mapped, 2 * kPage}, {fixture.alternate, 2 * kPage}, DcnPresentDomain::Mapped};
+    ScanoutFlipIntent request{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused, &fixture.framebuffer};
+    for (unsigned fault = 0; fault < 5; ++fault) {
+        auto planned = fixture.route;
+        request.plannedRoute = &planned;
+        if (fault == 0) ++planned.generation;
+        if (fault == 1) planned.presentWindows.second.bytes += kPage;
+        if (fault == 2) planned.reader.context = &planned;
+        if (fault == 3) request.next = fixture.alternate;
+        if (fault == 4) fixture.route.presentWindows.domain = planned.presentWindows.domain = DcnPresentDomain::Direct;
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial &&
+               !fixture.reads && !fixture.issues && !fixture.vmWrites && !fixture.writes);
+        request.next = fixture.mapped;
+    }
+    assert(fixture.scanout.cancelPin(fixture.pin) == kIOReturnSuccess);
+}
+
+static void presentWindowRetirement(bool conflict) {
+    CommitFixture fixture;
+    auto &device = fixture.scanout.device;
+    device.dcnQualifiedFlipRoute = [](IOPCIDevice *device) -> const HubpFlipRoute * { return device->route; };
+    fixture.route.presentWindows = {{fixture.mapped, 2 * kPage}, {fixture.alternate, 2 * kPage}, DcnPresentDomain::Mapped};
+    const auto planned = fixture.route;
+    ScanoutFlipIntent incoming{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused, &fixture.framebuffer, &planned};
+    assert(fixture.begin(incoming) == kIOReturnSuccess && incoming.result == ScanoutFlipResult::Issued);
+    ScanoutFlipPoll poll{incoming.operation, ScanoutFlipResult::Refused};
+    fixture.pending = false;
+    fixture.active = fixture.earliest = fixture.mapped;
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.flatWindowConflict = conflict;
+    fixture.step(poll, conflict ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
+    assert(fixture.command.prepared && !fixture.command.completes);
+    if (conflict) return;
+
+    assert(device.dcnFlip.matchesPresentWindows(planned.presentWindows));
+    ScanoutFlipIntent home{fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused, &fixture.framebuffer};
+    fixture.route.presentWindows.second.bytes -= kPage;
+    assert(fixture.begin(home) == kIOReturnNotReady && fixture.issues == 1 && !fixture.clearWrites);
+    fixture.route.presentWindows = planned.presentWindows;
+    assert(fixture.begin(home) == kIOReturnSuccess && home.result == ScanoutFlipResult::Issued);
+    poll.operation = home.operation;
+    fixture.target = fixture.active = fixture.earliest = fixture.home;
+    fixture.pending = false;
+    fixture.retire = false;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    assert(!device.dcnFlip.front().serial && fixture.command.completes == 1);
+}
+
 static void scanoutFlip(FlipFault fault) {
     CommitFixture fixture;
     auto &scanout = fixture.scanout;
@@ -2744,12 +2805,24 @@ static void exerciseDcnBar5() {
 #include "build34_dcn_transaction.h"
 
 struct TransactionFramebuffer : IOService {
-    unsigned samples = 0;
+    const FirmwareScanoutSample firmware{{0x80000000, 0}, {16, 32, 15, kDcnArgb8888, kPage}, 0, 0x80000000, 1};
+    unsigned samples = 0, checks = 0;
+    bool conflict = false;
     IOReturn callPlatformFunction(const OSSymbol *name, bool wait, void *device, void *out, void *third, void *fourth) override {
-        assert(name->isEqualTo(BUILD34_DCN_SAMPLE_FIRMWARE) && !wait && device == provider && out && !third && !fourth);
-        ++samples;
-        *static_cast<FirmwareScanoutSample *>(out) = {{0x80000000, 0}, {16, 32, 15, kDcnArgb8888, kPage}, 0, 0x80000000, 1};
-        return kIOReturnSuccess;
+        assert(!wait && device == provider && out && !fourth);
+        auto &sample = *static_cast<FirmwareScanoutSample *>(out);
+        if (name->isEqualTo(BUILD34_DCN_SAMPLE_FIRMWARE)) {
+            assert(!third);
+            ++samples;
+            sample = firmware;
+            return kIOReturnSuccess;
+        }
+        assert(name->isEqualTo(BUILD34_DCN_CHECK_FIRMWARE) && third && sample.scanout == firmware.scanout);
+        const auto &windows = *static_cast<const FirmwareFlatWindows *>(third);
+        assert(windows.previous.start == 0x90000000 && windows.previous.bytes == 2 * kPage &&
+               windows.next.start == 0xa0000000 && windows.next.bytes == 2 * kPage);
+        ++checks;
+        return conflict ? kIOReturnNotReady : kIOReturnSuccess;
     }
 };
 
@@ -2760,34 +2833,47 @@ struct TransactionFixture {
     // TRANSACTION_FIELDS
     struct {
         ScanoutPinToken token{};
-        HubpAddress address{}, home{0x80000000, 0};
+        HubpAddress address{};
+        FirmwareScanoutSample home{};
+        DcnPresentWindowPair windows{};
         bool waiting = false;
         ScanoutPinToken front() const { return token; }
         HubpAddress frontAddress() const { return address; }
-        HubpAddress firmwareAddress() const { return home; }
+        HubpAddress firmwareAddress() const { return home.scanout; }
+        FirmwareScanoutSample firmwareSample() const { return home; }
+        bool matchesPresentWindows(const DcnPresentWindowPair &pair) const { return !token.serial || pair == windows; }
         bool pending() const { return waiting; }
     } dcnFlip;
-    const HubpFlipRoute *(*dcnQualifiedFlipRoute)(IOPCIDevice *) = [](IOPCIDevice *) -> const HubpFlipRoute * { return nullptr; };
+    const HubpFlipRoute *(*dcnQualifiedFlipRoute)(IOPCIDevice *) = [](IOPCIDevice *device) -> const HubpFlipRoute * { return device->route; };
     DcnDirectDomain (*dcnQualifyDirect)(IOPCIDevice &) = [](IOPCIDevice &) { return DcnDirectDomain{}; };
     ScanoutDmaMapper (*dcnQualifyMapper)(IOPCIDevice &, IOMapper &) = nullptr;
     TransactionFramebuffer framebuffer;
+    OSObject lifetime;
+    HubpFlipRoute route{};
     ScanoutFlipIntent issued{};
     const PresentCopyBacking *mapped = nullptr;
     unsigned maps = 0, begins = 0, polls = 0, cancels = 0, waits = 0;
-    bool mapRefused = false, beginRefused = false, uncertainIssue = false, mismatch = false, timeout = false;
+    bool mapRefused = false, routeDrift = false, beginRefused = false, uncertainIssue = false, mismatch = false, timeout = false;
 
     TransactionFixture() {
         framebuffer.provider = pci;
         framebuffer.isPhxFramebuffer = true;
-        dcnPlacePresent = [](IOService &, const ScanoutSurface &, HubpAddress before) {
-            return DcnPresentPlacement{{before.vmid == 7 ? 0xa0000000ull : 0x90000000ull, before.vmid == 7 ? 6u : 7u}, true};
-        };
+        dcnFlip.home = framebuffer.firmware;
+        route.owner = this;
+        route.generation = 11;
+        route.lifetime = &lifetime;
+        route.framebuffer = &framebuffer;
+        route.presentWindows = {{{0x90000000, 7}, 2 * kPage}, {{0xa0000000, 6}, 2 * kPage}, DcnPresentDomain::Direct};
+        device.route = &route;
     }
 
     IOReturn mapDcnPin(ScanoutDmaRequest &map, bool direct) {
-        assert(direct && map.present == mapped && validScanoutDmaStorage(map, kPage));
+        assert(direct && map.present == mapped && validScanoutDmaStorage(map, kPage) && lifetime.references == 2);
+        const auto current = dcnFlip.front().serial ? dcnFlip.frontAddress() : dcnFlip.firmwareAddress();
+        assert(map.windowStart == route.presentWindows.select(current, kPage).address);
         ++maps;
         if (mapRefused) return kIOReturnNotReady;
+        if (routeDrift) ++route.generation;
         map.token = {this, 2 * maps};
         return kIOReturnSuccess;
     }
@@ -2797,10 +2883,18 @@ struct TransactionFixture {
         assert(intent.previous == (dcnFlip.front().serial ? dcnFlip.frontAddress() : dcnFlip.firmwareAddress()));
         assert(intent.nextPin.serial ? intent.nextPin.provider == this : intent.next == dcnFlip.firmwareAddress());
         ++begins;
+        if (intent.nextPin.serial) {
+            assert(intent.plannedRoute && lifetime.references == 2);
+            if (!sameDcnPresentRoute(*intent.plannedRoute, route)) return kIOReturnNotReady;
+        } else {
+            assert(!intent.plannedRoute);
+            if (!dcnFlip.matchesPresentWindows(route.presentWindows)) return kIOReturnNotReady;
+        }
         if (beginRefused) return kIOReturnNotReady;
         intent.operation = {this, 2 * begins + 1};
         intent.result = uncertainIssue ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Issued;
         issued = intent;
+        issued.plannedRoute = nullptr;
         dcnFlip.waiting = true;
         return kIOReturnSuccess;
     }
@@ -2823,6 +2917,7 @@ struct TransactionFixture {
         dcnFlip.waiting = false;
         dcnFlip.token = issued.nextPin;
         dcnFlip.address = issued.next;
+        dcnFlip.windows = issued.nextPin.serial ? route.presentWindows : DcnPresentWindowPair{};
         return kIOReturnSuccess;
     }
 
@@ -2845,11 +2940,31 @@ static void exerciseDcnTransaction() {
     DcnPresentTransaction request{&pipe, &fixture.framebuffer, &next, &backing, DcnPresentResult::Copy};
     assert(fixture.submitDcnPresent(request) == kIOReturnBadArgument && request.result == DcnPresentResult::Blocked && !fixture.maps);
     request.transaction = &first;
+    const auto pair = fixture.route.presentWindows;
+    assert(!pair.select({0x90000000, 6}, kPage).valid() && !pair.select(fixture.dcnFlip.home.scanout, 3 * kPage).valid());
+    for (unsigned fault = 0; fault < 6; ++fault) {
+        fixture.route.presentWindows = pair;
+        auto &windows = fixture.route.presentWindows;
+        if (fault == 0) windows.second.base.vmid = windows.first.base.vmid;
+        if (fault == 1) windows.second.base.vmid = 0;
+        if (fault == 2) windows.second.base.address = windows.first.base.address + kPage;
+        if (fault == 3) windows.second.base.address = kAddressLimit - kPage;
+        if (fault == 4) windows.domain = DcnPresentDomain::None;
+        if (fault == 5) windows.domain = DcnPresentDomain::Mapped;
+        assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && !fixture.maps);
+    }
+    fixture.route.presentWindows = pair;
+    fixture.framebuffer.conflict = true;
+    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && !fixture.maps);
+    fixture.framebuffer.conflict = false;
     fixture.mapRefused = true;
     assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && !fixture.begins);
     fixture.mapRefused = false;
-    fixture.beginRefused = true;
+    fixture.routeDrift = true;
     assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && fixture.cancels == 1);
+    fixture.routeDrift = false;
+    fixture.beginRefused = true;
+    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && fixture.cancels == 2);
     fixture.beginRefused = false;
     fixture.waits = 2;
     assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Direct && fixture.polls == 3);
@@ -2858,12 +2973,21 @@ static void exerciseDcnTransaction() {
     assert(fixture.submitDcnPresent(request) == kIOReturnNotReady && request.result == DcnPresentResult::Blocked && fixture.polls == 3);
     request.pipe = &pipe;
     request.transaction = &next;
+    backing.transaction = &next;
+    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Direct && fixture.polls == 4);
+    assert(fixture.dcnFlip.frontAddress() == pair.second.base && fixture.framebuffer.samples == 5);
+    request.transaction = &first;
+    backing.transaction = &first;
+    fixture.route.presentWindows.first.bytes -= kPage;
+    const auto maps = fixture.maps;
+    assert(fixture.submitDcnPresent(request) == kIOReturnNotReady && request.result == DcnPresentResult::Blocked && fixture.maps == maps);
+    fixture.route.presentWindows = pair;
     request.backing = nullptr;
     fixture.beginRefused = true;
-    assert(fixture.submitDcnPresent(request) == kIOReturnNotReady && request.result == DcnPresentResult::Blocked && fixture.polls == 3);
+    assert(fixture.submitDcnPresent(request) == kIOReturnNotReady && request.result == DcnPresentResult::Blocked && fixture.polls == 4);
     fixture.beginRefused = false;
-    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && fixture.polls == 4);
-    assert(!fixture.dcnFlip.front().serial && pipe.references == 1 && fixture.framebuffer.references == 1 && fixture.cancels == 1);
+    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && fixture.polls == 5);
+    assert(!fixture.dcnFlip.front().serial && pipe.references == 1 && fixture.framebuffer.references == 1 && fixture.cancels == 2);
 
     for (unsigned fault = 0; fault < 3; ++fault) {
         TransactionFixture faulted;
@@ -2955,6 +3079,9 @@ int main() {
          PixelFault::PresentPage, PixelFault::RenderGeneration, PixelFault::PresentGeneration, PixelFault::LateGeneration,
          PixelFault::WrongCommandSlice, PixelFault::SubstitutedDescriptor, PixelFault::LateEvidence, PixelFault::FrontRemap,
          PixelFault::None}) revalidateScanoutPixels(fault);
+    rejectChangedPresentWindows();
+    presentWindowRetirement(false);
+    presentWindowRetirement(true);
     scanoutFlip(FlipFault::None);
     scanoutFlip(FlipFault::Decline);
     scanoutFlip(FlipFault::ForeignLock);

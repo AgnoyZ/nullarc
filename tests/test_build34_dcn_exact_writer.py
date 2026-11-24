@@ -104,7 +104,10 @@ class ExactWriterTests(unittest.TestCase):
         self.assertLess(perform.index('if (!dcnAttempt)'), perform.index('nvAccelSurfCopyReady(s, head)'))
         self.assertIn('fDcnPresent.check(txn, complete)', method(accelerator, transaction.COMPLETE))
         self.assertIn('nvAccelDcnSleepable)(NVDisplayPipe &, IOService &){nullptr}', accelerator)
-        self.assertIn('build34::dcn::HubpAddress){nullptr}', source)
+        self.assertNotIn('dcnPlacePresent', source)
+        submit = method(source, transaction.NATIVE)
+        self.assertLess(submit.index('BUILD34_DCN_CHECK_FIRMWARE'), submit.index('mapDcnPin('))
+        self.assertIn('request.framebuffer, &route}', submit)
         self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True, present=source)
 
     def test_firmware_sample_keeps_existing_scanout_and_vbl(self):

@@ -11,8 +11,6 @@ NATIVE = 'IOReturn PhxBringup::submitDcnPresent('
 PERFORM = 'IOReturn NVDisplayPipe::performTransaction('
 COMPLETE = 'bool NVDisplayPipe::isTransactionComplete('
 FIELDS = '''    build34::dcn::DcnSubmitGate dcnPresentGate;
-    build34::dcn::DcnPresentPlacement (*dcnPlacePresent)(IOService &, const build34::dcn::ScanoutSurface &,
-        build34::dcn::HubpAddress){nullptr};
     OSObject *dcnPresentPipe{nullptr};
     IOService *dcnPresentFramebuffer{nullptr};
     bool dcnPresentUncertain{false};
@@ -63,29 +61,38 @@ METHOD = '''IOReturn PhxBringup::submitDcnPresent(build34::dcn::DcnPresentTransa
 
     const auto *present = request.backing;
     if (present && present->transaction != request.transaction) return kIOReturnBadArgument;
-    if (present && dcnPlacePresent && dcnQualifiedFlipRoute &&
+    if (present && dcnQualifiedFlipRoute &&
         validFlipGeometry(present->scanout) && present->scanout.mappedBytes == present->slice.bytes &&
         livePresentPreparation(present->slice) == present->preparation && present->preparation) {
-        FirmwareScanoutSample home{};
-        if (front.serial || (request.framebuffer->callPlatformFunction(BUILD34_DCN_SAMPLE_FIRMWARE, false,
-            pci, &home, nullptr, nullptr) == kIOReturnSuccess && home.valid())) {
+        const auto *qualified = dcnQualifiedFlipRoute(pci);
+        const auto route = qualified ? *qualified : HubpFlipRoute{};
+        const bool direct = route.presentWindows.domain == DcnPresentDomain::Direct;
+        if (route.owner && route.generation && route.lifetime && route.framebuffer == request.framebuffer &&
+            (direct ? dcnQualifyDirect != nullptr : dcnQualifyMapper != nullptr) &&
+            dcnFlip.matchesPresentWindows(route.presentWindows) && route.presentWindows.valid(present->slice.bytes)) {
+            Phx34ScopedReference routeLifetime(route.lifetime);
+            auto home = dcnFlip.firmwareSample();
+            if (!front.serial && request.framebuffer->callPlatformFunction(BUILD34_DCN_SAMPLE_FIRMWARE, false,
+                pci, &home, nullptr, nullptr) != kIOReturnSuccess) home = {};
             const auto previous = front.serial ? old : home.scanout;
-            const auto placement = dcnPlacePresent(*request.framebuffer, present->scanout, previous);
+            const auto next = route.presentWindows.select(previous, present->slice.bytes);
+            auto windows = route.presentWindows.exclusions();
             ScanoutPinToken pin{};
-            if (placement.next.valid() && placement.next.vmid && placement.next.vmid != previous.vmid &&
-                (placement.direct ? dcnQualifyDirect != nullptr : dcnQualifyMapper != nullptr)) {
+            if (next.valid() && home.valid() && sameFlipGeometry(home.surface, present->scanout) &&
+                request.framebuffer->callPlatformFunction(BUILD34_DCN_CHECK_FIRMWARE, false,
+                    pci, &home, &windows, nullptr) == kIOReturnSuccess) {
                 const size_t entries = present->slice.bytes / kPageBytes;
                 auto *runs = static_cast<DmaRun *>(IOMallocZero(entries * sizeof(DmaRun)));
                 auto *pages = static_cast<uint64_t *>(IOMallocZero(entries * sizeof(uint64_t)));
                 if (runs && pages) {
-                    ScanoutDmaRequest map{present, placement.next.address, runs, entries, pages, entries, {}, {}};
-                    if (mapDcnPin(map, placement.direct) == kIOReturnSuccess) pin = map.token;
+                    ScanoutDmaRequest map{present, next.address, runs, entries, pages, entries, {}, {}};
+                    if (mapDcnPin(map, direct) == kIOReturnSuccess) pin = map.token;
                 }
                 if (pages) IOFree(pages, entries * sizeof(uint64_t));
                 if (runs) IOFree(runs, entries * sizeof(DmaRun));
             }
             if (pin.serial) {
-                ScanoutFlipIntent intent{previous, placement.next, pin, {}, ScanoutFlipResult::Refused, request.framebuffer};
+                ScanoutFlipIntent intent{previous, next, pin, {}, ScanoutFlipResult::Refused, request.framebuffer, &route};
                 const auto result = submit(intent);
                 if (result == ScanoutFlipResult::Presented) {
                     request.result = DcnPresentResult::Direct;

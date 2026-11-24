@@ -1202,9 +1202,24 @@ to the exact PhxBringup provider. It replaces the observation-only caller,
 so the observer cannot consume the one-shot offer before pinning. The
 paired provider no longer dispatches isolated probe, map, begin, poll or
 cancel requests. One serialized call binds the exact pipe, framebuffer,
-transaction and returned pin. The native placement hook nominates an incoming
-window and VMID; the existing route, translation and write-exclusion checks
-still decide whether any register write is allowed.
+transaction and returned pin. The qualified route supplies two reserved flat
+windows and their nonzero DCN VMIDs, with one selected address domain. The
+[placement check](../tools/build34_dcn_present_windows.h) rejects duplicate
+VMIDs, intersecting reservations and windows that do not cover the full
+page-rounded footprint. The first present uses the first window; later
+presents alternate only from an exact known front. PhxFB checks the full
+extent of both windows against the live firmware apertures before the writer
+offer is consumed, for both direct and mapper-backed placement.
+
+The provider retains the route owner object while it maps, then requires
+the same route generation, framebuffer, reservation and address domain
+before issuing. The flip retains the pair while a front is live and repeats
+the full aperture exclusions during issue and retirement. Changing the
+pair under a live front cannot silently switch the address domain or admit
+an offscreen R2a copy. The existing inactive-context, translation and write-
+exclusion checks still decide whether any register write is allowed. A
+reserved window declaration by itself is not proof of route ownership or
+hardware address decoding.
 
 The caller borrows the transaction only for this synchronous call and holds
 no client or GPUVM lock while waiting. Flip readback uses the exact provider
@@ -1226,12 +1241,13 @@ runs only after that return on the opted-in path. Resource-only and `l10r`
 frames still take R2a, including existing conversion, after that check. The
 separate NVIDIA VRAM path is unchanged.
 
-Placement and the accelerator's sleepable-context qualification are null,
-as are the earlier native evidence hooks. The private family callback's
-actual execution context and native route ownership still need qualification;
+The native route provider and the accelerator's sleepable-context
+qualification are null, as are the earlier native evidence hooks. The private
+family callback's actual context and native route ownership still need qualification;
 no live use, loaded candidate or GPU result is implied. Rollback is to omit
 this paired overlay; it does not replace production inputs or alter existing
-exact-open admission. CPU doubles can establish refusal, completion matching
+exact-open admission. CPU doubles cover alternating windows, extent conflict
+before mapping, changed routes before any MMIO write, completion matching
 and retention, but not physical display of the GPU-rendered pages.
 
 ## Accepted baseline measurement, November 20

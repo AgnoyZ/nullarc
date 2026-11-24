@@ -16,11 +16,6 @@ struct DcnPresentTransaction {
     DcnPresentResult result;
 };
 
-struct DcnPresentPlacement {
-    HubpAddress next;
-    bool direct;
-};
-
 class DcnPresentCompletion {
 public:
     void legacy() { __atomic_store_n(&state_, uintptr_t{0}, __ATOMIC_RELEASE); }
