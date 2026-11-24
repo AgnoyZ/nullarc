@@ -139,14 +139,30 @@ surface or client, and a mapping that omits the rounded tail.
 
 Both binding inputs are kernel-side contracts, not a wire format. A native
 producer must associate the actual successful linear render binding with
-the retained surface, issue a new generation on every map replacement and
-hold the lifetime protection needed to validate the snapshot through lease
-acquisition. Retain the client identity across the comparison so a recycled
-client address cannot match a stale record. The current `doGemVa` can insert
-a `Map` record when the GPU is not ready. A record alone is not the required
-confirmation of a live mapping. The helper does not mint generations,
-attest a user claim about the image, or establish that the renderer completed
-the frame being presented.
+the retained surface and hold the lifetime protection needed to validate
+the snapshot through lease acquisition. Retain the client identity across
+the comparison so a recycled client address cannot match a stale record.
+
+The [isolated source stage](../tools/build34_dcn_render_map_stage.py) starts
+from the pinned build34 driver and ABI without modifying either. Its
+`doGemVa` assigns a fresh, per-client software generation only after the
+existing `vmMap` returns success for a host BO. GPU-not-ready bookkeeping
+maps, local BOs and failed GPUVM calls do not acquire a generation. VA and
+BO bounds use subtraction before the call. A lock-held lookup requires the
+entire page-aligned slice to fit one entry. Unmap, BO free and client close
+withdraw the generations before forwarding to the existing cleanup; close
+permanently disables new generations. Saturation disables new generations
+without changing legacy map results. Tests extract the actual staged
+methods and use CPU doubles. No selector, exported ABI, map call sequence,
+or page-table programming implementation is added or replaced.
+
+This generation identifies only a completed software page-table update.
+The legacy `vmMap` can return before the context has a hardware VMID and its
+TLB invalidation helper does not propagate timeout. A generation is not a
+`LiveHostRenderMap`: provider stop, power changes, checked invalidation,
+actual render binding and frame completion still need native evidence before
+any lease can be taken. No test treats an IOSurface property or other user
+claim as any of that evidence.
 
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or
 matching descriptor cannot rule out per-page bounce buffering. A null mapper
@@ -159,8 +175,8 @@ This stage does not encode PTE flags: the generic AMDGPU definitions alone
 do not establish which permissions and cache attributes work on the live
 DCN path.
 
-There is no native call site, MMIO or active page-table change. Keep the
-AMD flip guard and the accepted R2a copy fallback unchanged. The
+There is no live binding caller, new MMIO or active page-table change. Keep
+the AMD flip guard and the accepted R2a copy fallback unchanged. The
 [plugin's linear alias](../src/nmplugin/NVMTLDevice.m#L915) uses a
 [task-backed wired descriptor](../src/phxbringup/PhxBringup.cpp#L1674)
 through the native host import. The
