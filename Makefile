@@ -29,7 +29,7 @@ $(TEST_BIN_DIR)/test_rdna3_ip_dcn: src/amd/rdna3_ip_blocks.cpp src/amd/rdna3_dcn
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@
 
 $(TEST_BIN_DIR)/test_build34_dcn_page_layout: tests/test_build34_dcn_page_layout.cpp tools/build34_dcn_page_layout.h \
-        tools/build34_dcn_descriptor_backing.h tools/build34_dcn_render_lease.h \
+        tools/build34_dcn_descriptor_backing.h tools/build34_dcn_render_lease.h tools/build34_dcn_render_binding.h \
         tests/build34_dcn/IOKit/IOMemoryDescriptor.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) -Itests/build34_dcn $< -o $@
 

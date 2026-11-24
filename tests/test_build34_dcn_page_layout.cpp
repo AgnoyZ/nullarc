@@ -1,4 +1,4 @@
-#include "../tools/build34_dcn_render_lease.h"
+#include "../tools/build34_dcn_render_binding.h"
 
 #include <array>
 #include <cassert>
@@ -285,11 +285,14 @@ static void testPageIdentity() {
     auto targets = expected;
     DescriptorFixture renderPages{rendered.data(), surface.mappedBytes};
     DescriptorFixture presentPages{presented.data(), surface.mappedBytes};
-    PinnedDescriptorSlice renderSlice{&renderPages, 0, surface.mappedBytes};
     PinnedDescriptorSlice presentSlice{&presentPages, 0, surface.mappedBytes};
     BatchSource source{surface.mappedBytes, BatchResult::Normal, {targets.data(), targets.size()}, 0, true};
     RenderDescriptorLease renderLease;
-    assert(renderLease.acquire(renderSlice, renderPages.preparation));
+    const RenderMapIdentity identity{&renderPages, 17};
+    const BoundRenderImage image{identity, &presentPages, 0x80000, 0, kSurfaceBgra, 1024, 3, 4096};
+    const LiveHostRenderMap mappingSnapshot{identity, &renderPages, renderPages.preparation, surface.mappedBytes,
+                                          image.gpuAddress, 0, surface.mappedBytes};
+    assert(acquireBoundRenderBacking(image, mappingSnapshot, &presentPages, surface, renderLease));
     assert(renderPages.complete() == kIOReturnSuccess);
     renderPages.release();
     OriginalBacking renderBacking = renderLease.backing();
@@ -489,6 +492,90 @@ static void testRenderLeaseFailures() {
     assert(descriptor.references == 3 && descriptor.wires == 1 && descriptor.completes == 3);
 }
 
+static void testBoundRenderBacking() {
+    constexpr uint64_t page = kPageBytes;
+    constexpr uint64_t va = 0x80000;
+    const uint64_t addresses[] = {0x10000, 0x30000, 0x90000, 0x50000, 0x70000};
+    DescriptorFixture descriptor{addresses, 5 * page};
+    const unsigned client = 1, otherClient = 2, surfaceObject = 3, otherSurfaceObject = 4;
+    const RenderMapIdentity identity{&client, 17};
+    const BoundRenderImage image{identity, &surfaceObject, va + page, 2 * page, kSurfaceBgra, 1023, 2, 4092};
+    const LiveHostRenderMap mapping{identity, &descriptor, descriptor.preparation, 5 * page, va, page, 3 * page};
+    const ScanoutSurface scanout{image.width, image.height, 1022, kDcnArgb8888, 2 * page};
+
+    const auto refuse = [&](const BoundRenderImage &candidate, const LiveHostRenderMap &snapshot,
+                            const void *surface, const ScanoutSurface &target) {
+        RenderDescriptorLease lease;
+        assert(!acquireBoundRenderBacking(candidate, snapshot, surface, target, lease));
+        assert(!lease.backing().readPage && !lease.uncertain());
+        assert(!descriptor.prepares && !descriptor.completes && descriptor.references == 1 && descriptor.wires == 1);
+    };
+    refuse(image, mapping, nullptr, scanout);
+    refuse(image, mapping, &otherSurfaceObject, scanout);
+    for (const uint64_t stale : {uint64_t{0}, uint64_t{18}, UINT64_MAX}) {
+        auto candidate = image;
+        auto snapshot = mapping;
+        candidate.mapping.generation = stale;
+        refuse(candidate, snapshot, &surfaceObject, scanout);
+        if (stale != 18) {
+            snapshot.identity.generation = stale;
+            refuse(candidate, snapshot, &surfaceObject, scanout);
+        }
+    }
+    auto snapshot = mapping;
+    snapshot.identity.client = &otherClient;
+    refuse(image, snapshot, &surfaceObject, scanout);
+    snapshot = mapping;
+    snapshot.descriptor = nullptr;
+    refuse(image, snapshot, &surfaceObject, scanout);
+    snapshot = mapping;
+    ++snapshot.preparation;
+    refuse(image, snapshot, &surfaceObject, scanout);
+    snapshot = mapping;
+    snapshot.boBytes -= page;
+    refuse(image, snapshot, &surfaceObject, scanout);
+    snapshot = mapping;
+    snapshot.boOffset = UINT64_MAX & ~(page - 1);
+    refuse(image, snapshot, &surfaceObject, scanout);
+    snapshot = mapping;
+    snapshot.bytes -= page;
+    refuse(image, snapshot, &surfaceObject, scanout);
+    snapshot = mapping;
+    snapshot.gpuAddress = (1ull << 48) - page;
+    auto candidate = image;
+    candidate.gpuAddress = snapshot.gpuAddress;
+    candidate.boOffset = snapshot.boOffset;
+    refuse(candidate, snapshot, &surfaceObject, scanout);
+    candidate = image;
+    --candidate.gpuAddress;
+    refuse(candidate, mapping, &surfaceObject, scanout);
+    candidate = image;
+    candidate.boOffset -= page;
+    refuse(candidate, mapping, &surfaceObject, scanout);
+    candidate = image;
+    candidate.pixelFormat = 0x6c313072;
+    refuse(candidate, mapping, &surfaceObject, scanout);
+    candidate = image;
+    --candidate.height;
+    refuse(candidate, mapping, &surfaceObject, scanout);
+    candidate = image;
+    candidate.bytesPerRow -= 4;
+    refuse(candidate, mapping, &surfaceObject, scanout);
+    auto target = scanout;
+    target.mappedBytes -= page;
+    refuse(image, mapping, &surfaceObject, target);
+
+    RenderDescriptorLease lease;
+    assert(acquireBoundRenderBacking(image, mapping, &surfaceObject, scanout, lease));
+    const auto backing = lease.backing();
+    uint64_t physical = kUnwritten;
+    assert(backing.readPage(backing.context, 0, &physical) && physical == addresses[2]);
+    assert(backing.readPage(backing.context, page, &physical) && physical == addresses[3]);
+    assert(!backing.readPage(backing.context, 2 * page, &physical) && physical == addresses[3]);
+    assert(lease.releaseAfterRetirement());
+    assert(descriptor.prepares == 1 && descriptor.completes == 1 && descriptor.references == 1 && descriptor.wires == 1);
+}
+
 static void expectRefusal(uint64_t start, uint64_t bytes, const DmaRun *runs, size_t count,
                            size_t capacity = 4) {
     std::array<uint64_t, 4> pages;
@@ -597,6 +684,7 @@ int main() {
     testDescriptorSlice();
     testRenderLease();
     testRenderLeaseFailures();
+    testBoundRenderBacking();
     testFragmentedBacking();
     testAddressAndCapacityEdges();
     testRefusesMalformedRunsBeforeWriting();

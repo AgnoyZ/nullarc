@@ -125,6 +125,29 @@ lease after dropping the original BO's reference and preparation. Native
 integration needs a bounded number of leases and a retirement owner that
 survives the render client's close.
 
+The [render binding gate](../tools/build34_dcn_render_binding.h) checks a
+bound-image record against a live host-BO mapping snapshot before taking
+that lease. It requires the retained IOSurface object from the current
+presentation, the same client and non-reused mapping generation, and the
+qualified BGRA geometry and pitch. The full page-rounded image must be
+within one live GPU VA mapping, and its claimed BO offset must equal the
+mapping's BO offset plus the image's displacement within that mapping.
+The kernel's BO size must match the descriptor extent. The accepted slice
+then passes the existing preparation-ID check. The fixtures include offsets
+within both the BO and mapping, stale generations at the same VA, a different
+surface or client, and a mapping that omits the rounded tail.
+
+Both binding inputs are kernel-side contracts, not a wire format. A native
+producer must associate the actual successful linear render binding with
+the retained surface, issue a new generation on every map replacement and
+hold the lifetime protection needed to validate the snapshot through lease
+acquisition. Retain the client identity across the comparison so a recycled
+client address cannot match a stale record. The current `doGemVa` can insert
+a `Map` record when the GPU is not ready. A record alone is not the required
+confirmation of a live mapping. The helper does not mint generations,
+attest a user claim about the image, or establish that the renderer completed
+the frame being presented.
+
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or
 matching descriptor cannot rule out per-page bounce buffering. A null mapper
 does not establish identity, and the presence of `mapToPhysicalAddress()`
@@ -141,12 +164,15 @@ AMD flip guard and the accepted R2a copy fallback unchanged. The
 [plugin's linear alias](../src/nmplugin/NVMTLDevice.m#L915) uses a
 [task-backed wired descriptor](../src/phxbringup/PhxBringup.cpp#L1674)
 through the native host import. The
+[alias builder](../src/nmplugin/nvmtl_vk.c#L7545) can drop color-attachment
+usage when the linear format features do not support it and still create a
+sampleable alias. Neither `_hostOn` nor a successful bind proves that the
+frame was rendered into that alias. The
 [present path](../src/phxaccel/accel/nvrm-accel.cpp#L1150) retrieves its
-descriptor from the IOSurface. Native handoff needs kernel-owned evidence
-of the actual bound render BO and slice, tied to the same presentation
-transaction and retained descriptor. An IOSurface ID or user property can
-identify a candidate for lookup. Page comparison requires the live backing
-on both sides. PhxAccel currently has no such render binding handoff.
+descriptor from the IOSurface. PhxAccel still lacks a native producer and
+consumer for the binding record. An IOSurface ID or user property may locate
+a candidate, but cannot substitute for the retained object and the live
+mapping snapshot. Page comparison still requires live backing on both sides.
 
 Hardware acceptance requires proof of the actual device mapper,
 lease/reverse-lookup semantics and HUBP fetch domain. It also requires
