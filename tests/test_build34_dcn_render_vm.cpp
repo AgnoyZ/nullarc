@@ -1,4 +1,5 @@
 #include "build34_dcn_render_tlb.h"
+#include "build34_exact_callbacks.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -8,6 +9,7 @@ using IOReturn = int;
 using IOByteCount = uint64_t;
 using addr64_t = uint64_t;
 constexpr IOReturn kIOReturnSuccess = 0, kIOReturnNotReady = -1, kIOReturnVMError = -2, kIOReturnNoMemory = -3;
+constexpr IOReturn kIOReturnBadArgument = -4;
 constexpr IOReturn IOPMAckImplied = 0;
 constexpr unsigned kIOMemoryMapperNone = 0;
 
@@ -28,9 +30,9 @@ struct IOBufferMemoryDescriptor {
 struct IOLock { bool held = false; };
 static void IOLockLock(IOLock *lock) { assert(!lock->held); lock->held = true; }
 static void IOLockUnlock(IOLock *lock) { assert(lock->held); lock->held = false; }
-static void IODelay(unsigned) { assert(false); }
+static void IODelay(unsigned microseconds) { assert(microseconds == 1); }
 static void IOSleep(unsigned) { assert(false); }
-static void IOLog(const char *) {}
+static void IOLog(const char *, ...) {}
 static void flushLine(const volatile void *) {}
 static uint64_t testClock = 0, clockStep = 100;
 static uint64_t mach_absolute_time() { return testClock += clockStep; }
@@ -40,14 +42,21 @@ static void absolutetime_to_nanoseconds(uint64_t time, uint64_t *ns) { *ns = tim
 
 struct PhxBringup {
     // PHX34_VM_FIELDS
+    // PHX34_VM_QUEUES
     IOLock lock;
     IOLock *gpuLock = &lock;
     bool isSleeping = false;
     struct Mmio {
         uint64_t length = (kRegInvEng17Ack + 1) * 4;
+        uintptr_t address = 0;
         uint64_t getLength() const { return length; }
+        uintptr_t getVirtualAddress() const { return address; }
     } aperture;
     Mmio *mmio = &aperture;
+    uint64_t barStorage[1024]{};
+    Mmio bar{sizeof(barStorage), reinterpret_cast<uintptr_t>(barStorage)}, bell{16, 0};
+    Mmio *fbAper = &bar, *doorbellMap = &bell;
+    uint64_t fbMcBase = 0x100000, fbAperLen = sizeof(barStorage);
     IOBufferMemoryDescriptor root;
     mutable unsigned invalidations = 0;
     mutable uint32_t request = 0;
@@ -56,6 +65,8 @@ struct PhxBringup {
     mutable unsigned ownershipChecks = 0;
     bool engineIdleAndExclusive = false;
     std::function<uint32_t(unsigned)> ackRead;
+    std::function<void()> onRawWrite;
+    mutable uint32_t rawValue = 0;
     uint64_t ptes[2]{};
 
     bool gpuReady() const { return true; }
@@ -71,6 +82,13 @@ struct PhxBringup {
         return &ptes[(va / page) % 2];
     }
     void wreg(uint32_t reg, uint32_t value) const {
+        if (reg == 1) {
+            assert(!lock.held && renderRawWriters.active());
+            rawValue = value;
+            if (onRawWrite)
+                onRawWrite();
+            return;
+        }
         assert(lock.held);
         if (reg == kRegInvEng17Req) {
             request = value;
@@ -79,12 +97,17 @@ struct PhxBringup {
         }
     }
     uint32_t rreg(uint32_t reg) const {
+        if (reg == 1)
+            return rawValue;
         assert(lock.held && reg == kRegInvEng17Ack && request);
         ++ackReads;
         const auto index = requestReads++;
         return ackRead ? ackRead(index) : request & 0xff01u;
     }
+    void hdpFlush() const { assert(lock.held); }
 
+    IOReturn adoptQueue(const uint64_t in[6]);
+    IOReturn writeReg(uint32_t reg, uint32_t value, uint32_t *readback);
     void vmFlushTlb(uint32_t vmid);
     uint32_t vmidAlloc(const void *client);
     uint32_t vmBind(uint32_t handle);
@@ -115,11 +138,18 @@ struct PhxBringup {
     }
 
     void useFixtureEngineProof() {
-        renderEngine17IdleAndExclusive = [](const PhxBringup *service) {
+        renderEngine17HandoffProof = [](const PhxBringup *service) {
             assert(service->lock.held);
             ++service->ownershipChecks;
             return service->engineIdleAndExclusive;
         };
+    }
+
+    void adopt(unsigned index) {
+        assert(index < 2);
+        const uint64_t in[6] = {index * 4096ull, 256, index * 4096ull + 0x800, index * 8ull, 0,
+                                index * 4096ull + 0x840 + index};
+        assert(adoptQueue(in) == kIOReturnSuccess);
     }
 };
 
@@ -211,6 +241,9 @@ static void testCheckedRequest() {
     const auto attempt = [&] { return service.confirm(handle, mapping); };
     const auto current = [&] { return service.identity(handle, mapping); };
     assert(!attempt().matches(current()) && service.ackReads == 1);
+    service.adopt(0);
+    service.adopt(1);
+    assert(!attempt().matches(current()) && !service.renderRawWriters.closed());
     service.useFixtureEngineProof();
     assert(!attempt().matches(current()) && service.ownershipChecks == 1 && service.ackReads == 1);
     service.engineIdleAndExclusive = true;
@@ -243,9 +276,12 @@ static void testCheckedRequest() {
     assert(second.matches(current()) && current().invalidateGeneration > firstIdentity.invalidateGeneration);
     assert(!first.matches(current()));
 
-    service.ackRead = {};
+    service.ackRead = [&, nextRequest = service.invalidations + 1](unsigned read) {
+        assert(service.invalidations == nextRequest);
+        return read ? requestMask : 0u;
+    };
     assert(service.vmUnmap(handle, 0x10000, page) == kIOReturnSuccess);
-    assert(!current().invalidateGeneration && !second.matches(current()));
+    assert(!current().invalidateGeneration && !second.matches(current()) && !service.renderInvalidateUncertain);
     script();
     const auto third = attempt();
     assert(third.matches(current()));
@@ -264,6 +300,8 @@ static void testUncertainRequest() {
         const build34::dcn::RenderMapIdentity mapping{&client, 1};
         const auto handle = service.vmidAlloc(&client);
         assert(service.bind(handle) == kFirstUserVmid);
+        service.adopt(0);
+        service.adopt(1);
         service.useFixtureEngineProof();
         service.engineIdleAndExclusive = true;
         service.ackRead = [&](unsigned read) {
@@ -294,10 +332,65 @@ static void testUncertainRequest() {
     }
 }
 
+static void testRawHandoff() {
+    PhxBringup service;
+    const unsigned client = 1;
+    const build34::dcn::RenderMapIdentity mapping{&client, 1};
+    const auto handle = service.vmidAlloc(&client);
+    assert(service.bind(handle) == kFirstUserVmid);
+    const auto current = [&] { return service.identity(handle, mapping); };
+    const auto attempt = [&] { return service.confirm(handle, mapping); };
+    service.useFixtureEngineProof();
+    service.engineIdleAndExclusive = true;
+    service.adopt(0);
+    assert(!attempt().matches(current()) && !service.renderRawWriters.closed() && !service.ownershipChecks);
+    service.adopt(1);
+    service.onRawWrite = [&] {
+        assert(!attempt().matches(current()) && service.ackReads == 1 && service.invalidations == 1);
+        assert(service.renderRawWriters.closed() && !service.renderRawWriters.drained() && !service.ownershipChecks);
+    };
+    uint32_t readback = 0;
+    assert(service.writeReg(1, 99, &readback) == kIOReturnSuccess && readback == 99);
+    assert(service.renderRawWriters.drained() && !service.renderEngine17Owned);
+    assert(service.writeReg(1, 100, &readback) == kIOReturnNotReady && service.rawValue == 99);
+
+    service.ackRead = [&](unsigned read) {
+        return service.invalidations == 1 || read ? requestMask : 0u;
+    };
+    const auto ack = attempt();
+    assert(ack.matches(current()) && service.renderEngine17Owned && service.ownershipChecks == 1);
+    service.adopt(0);
+    assert(!ack.matches(current()) && !attempt().matches(current()) && service.invalidations == 2);
+    assert(service.renderRawWriters.drained() && service.ownershipChecks == 1);
+}
+
+static void testLegacyUncertainty() {
+    PhxBringup service;
+    const unsigned client = 1;
+    const build34::dcn::RenderMapIdentity mapping{&client, 1};
+    const auto handle = service.vmidAlloc(&client);
+    assert(service.bind(handle) == kFirstUserVmid);
+    service.adopt(0);
+    service.adopt(1);
+    service.useFixtureEngineProof();
+    service.engineIdleAndExclusive = true;
+    service.ackRead = [&](unsigned read) { return service.invalidations == 1 || read ? requestMask : 0u; };
+    const auto ack = service.confirm(handle, mapping);
+    assert(ack.matches(service.identity(handle, mapping)));
+    service.ackRead = [](unsigned) { return requestMask; };
+    assert(service.vmUnmap(handle, 0x10000, page) == kIOReturnSuccess);
+    assert(service.invalidations == 3 && service.requestReads == 1 && service.renderInvalidateUncertain);
+    const auto current = service.identity(handle, mapping);
+    assert(!ack.matches(current) && !service.confirm(handle, mapping).matches(current));
+    assert(service.invalidations == 3 && service.ownershipChecks == 1);
+}
+
 int main() {
     testIdentityLifetime();
     testPowerAndExhaustion();
     testCheckedRequest();
     testUncertainRequest();
+    testRawHandoff();
+    testLegacyUncertainty();
     std::puts("[PASS] staged build34 GPUVM identities (CPU only)");
 }

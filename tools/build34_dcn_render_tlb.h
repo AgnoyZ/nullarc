@@ -38,6 +38,27 @@ struct RenderTlbSample {
     uint32_t ackBits;
 };
 
+class RenderInvalidateEdges {
+public:
+    explicit RenderInvalidateEdges(uint32_t mask) : mask_(mask) {}
+
+    bool observe(uint32_t bits, uint64_t elapsed) {
+        if (!mask_ || bits == UINT32_MAX || elapsed < previous_ || elapsed >= 1000000) {
+            mask_ = 0;
+            return false;
+        }
+        previous_ = elapsed;
+        cleared_ |= ~bits & mask_;
+        return (cleared_ & bits) == mask_;
+    }
+
+    bool failed() const { return mask_ == 0; }
+
+private:
+    uint32_t mask_, cleared_{0};
+    uint64_t previous_{0};
+};
+
 class RenderTlbAck {
 public:
     RenderTlbAck() = default;
@@ -53,20 +74,18 @@ public:
         const uint32_t mask = (1u << request.vmid) | companionMask;
         if ((mask & 0xffffu) != mask)
             return {};
-        uint64_t previousElapsed = 0;
-        uint32_t cleared = 0;
+        RenderInvalidateEdges edges(mask);
         for (unsigned attempt = 0; attempt < 1000; ++attempt) {
             RenderTlbSample reading{};
-            if (!sample(context, &reading) || !sameRenderTranslation(request, reading.current) ||
-                reading.ackBits == UINT32_MAX || reading.elapsedNs < previousElapsed || reading.elapsedNs >= 1000000)
+            if (!sample(context, &reading) || !sameRenderTranslation(request, reading.current))
                 return {};
-            cleared |= ~reading.ackBits & mask;
-            if ((cleared & reading.ackBits) == mask) {
+            if (edges.observe(reading.ackBits, reading.elapsedNs)) {
                 RenderTlbAck result;
                 result.translation_ = request;
                 return result;
             }
-            previousElapsed = reading.elapsedNs;
+            if (edges.failed())
+                return {};
         }
         return {};
     }

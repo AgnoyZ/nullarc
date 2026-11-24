@@ -2,6 +2,9 @@
 
 import hashlib
 
+from build34_exact_raw_handoff import WRITERS
+from test_build34_exact_ownership import method
+
 
 DRIVER = "src/phxbringup/PhxBringup.cpp"
 DRIVER_SHA256 = "81f45aa2e8166bc6ebed4106129bebebfd70f9b4bbea6dbe389be46263e3c699"
@@ -69,7 +72,8 @@ def stage(driver, abi):
 
 """ + anchor)
     replace('#include "PhxNativeABI.h"\n',
-            '#include "PhxNativeABI.h"\n#include "build34_dcn_render_tlb.h"\n')
+            '#include "PhxNativeABI.h"\n#include "build34_dcn_render_tlb.h"\n'
+            '#include "build34_exact_callbacks.h"\n')
     replace("    uint32_t vmidAlloc();\n", "    uint32_t vmidAlloc(const void *client);\n")
     replace("owner->vmidAlloc()", "owner->vmidAlloc(this)")
     replace("        bool busy;\n", "        bool busy;\n"
@@ -81,7 +85,11 @@ def stage(driver, abi):
             "    bool renderVmClosed{false};\n"
             "    build34::dcn::RenderVmTranslation renderInvalidateRequest{};\n"
             "    bool renderInvalidateUncertain{false};\n"
-            "    bool (*renderEngine17IdleAndExclusive)(const PhxBringup *){nullptr};\n"
+            "    bool renderQueuesAdopted[2]{};\n"
+            "    bool renderEngine17Owned{false};\n"
+            "    phx34_exact::CallbackGate<> renderRawWriters;\n"
+            "    bool (*renderEngine17HandoffProof)(const PhxBringup *){nullptr};\n"
+            "    bool takeRenderEngine17Locked();\n"
             "    uint64_t nextRenderVmGenerationLocked();\n"
             "    build34::dcn::RenderVmTranslation renderVmIdentityLocked(\n"
             "        uint32_t handle, build34::dcn::RenderMapIdentity mapping);\n"
@@ -110,10 +118,55 @@ build34::dcn::RenderTlbAck IOAccelPhxNativeClient::confirmRenderTlbLocked(uint64
             "    __atomic_store_n(&renderVmClosed, true, __ATOMIC_RELEASE);\n")
     replace("    if (ordinal == 0) {\n", "    if (ordinal == 0) {\n"
             "        __atomic_store_n(&renderVmClosed, true, __ATOMIC_RELEASE);\n")
+    for name in WRITERS:
+        writer = method(source, "IOReturn PhxBringup::" + name + "(")
+        brace = writer.index("{\n") + 2
+        replace(writer, writer[:brace] +
+                "    phx34_exact::CallbackGate<>::Lease rawWriter(renderRawWriters);\n"
+                "    if (!rawWriter)\n        return kIOReturnNotReady;\n" + writer[brace:])
+    replace("    GpuQueue &q = gq[qi];\n    bzero(&q, sizeof(q));\n",
+            "    renderInvalidateRequest = {};\n"
+            "    if (renderQueuesAdopted[qi])\n"
+            "        renderInvalidateUncertain = true;\n"
+            "    renderQueuesAdopted[qi] = true;\n"
+            "    GpuQueue &q = gq[qi];\n    bzero(&q, sizeof(q));\n")
+    replace("void PhxBringup::killWaves(uint32_t vmid, bool all) {\n",
+            "void PhxBringup::killWaves(uint32_t vmid, bool all) {\n"
+            "    __atomic_store_n(&renderVmClosed, true, __ATOMIC_RELEASE);\n")
     replace("    void vmFlushTlb(uint32_t vmid) const;\n", "    void vmFlushTlb(uint32_t vmid);\n")
-    replace("void PhxBringup::vmFlushTlb(uint32_t vmid) const {\n",
-            "void PhxBringup::vmFlushTlb(uint32_t vmid) {\n"
-            "    renderInvalidateRequest = {};\n")
+    flush = method(source, "void PhxBringup::vmFlushTlb(")
+    replace(flush, """void PhxBringup::vmFlushTlb(uint32_t vmid) {
+    renderInvalidateRequest = {};
+    const uint32_t mask = (1u << vmid) | 1u;
+    const bool track = renderEngine17Owned && !renderInvalidateUncertain &&
+        !__atomic_load_n(&renderVmClosed, __ATOMIC_ACQUIRE);
+    const uint64_t start = track ? mach_absolute_time() : 0;
+    build34::dcn::RenderInvalidateEdges edges(mask);
+    __asm__ __volatile__("mfence" ::: "memory");
+    wreg(kRegInvEng17Req, 0x00F80000u | mask);
+    bool complete = false;
+    uint64_t previous = start;
+    for (int attempt = 0; attempt < 1000; ++attempt) {
+        const uint32_t bits = rreg(kRegInvEng17Ack);
+        if (track) {
+            const uint64_t now = mach_absolute_time();
+            if (now < previous) {
+                renderInvalidateUncertain = true;
+            } else {
+                uint64_t elapsed = 0;
+                absolutetime_to_nanoseconds(now - start, &elapsed);
+                complete = edges.observe(bits, elapsed);
+                previous = now;
+            }
+        }
+        if (bits & (1u << vmid))
+            break;
+        IODelay(1);
+    }
+    if (track && !complete)
+        renderInvalidateUncertain = true;
+}
+""")
     replace("uint32_t PhxBringup::vmidAlloc() {", """uint64_t PhxBringup::nextRenderVmGenerationLocked() {
     return renderVmSerial < UINT64_MAX - 1 ? ++renderVmSerial : 0;
 }
@@ -132,9 +185,24 @@ build34::dcn::RenderVmTranslation PhxBringup::renderVmIdentityLocked(
     build34::dcn::RenderVmTranslation result{mapping, this, context->renderContextGeneration,
         context->renderBindingGeneration, context->renderTableGeneration,
         renderInvalidateRequest.invalidateGeneration, handle, context->hw};
-    if (!build34::dcn::sameRenderTranslation(result, renderInvalidateRequest))
+    if (renderInvalidateUncertain || !build34::dcn::sameRenderTranslation(result, renderInvalidateRequest))
         result.invalidateGeneration = 0;
     return result;
+}
+
+bool PhxBringup::takeRenderEngine17Locked() {
+    if (__atomic_load_n(&renderVmClosed, __ATOMIC_ACQUIRE) || renderInvalidateUncertain)
+        return false;
+    if (renderEngine17Owned)
+        return true;
+    if (!renderQueuesAdopted[0] || !renderQueuesAdopted[1] || !renderEngine17HandoffProof)
+        return false;
+    renderRawWriters.close();
+    if (!renderRawWriters.drained() || !renderEngine17HandoffProof(this) ||
+        __atomic_load_n(&renderVmClosed, __ATOMIC_ACQUIRE))
+        return false;
+    renderEngine17Owned = true;
+    return true;
 }
 
 build34::dcn::RenderTlbAck PhxBringup::confirmRenderTlbLocked(
@@ -142,8 +210,8 @@ build34::dcn::RenderTlbAck PhxBringup::confirmRenderTlbLocked(
     using namespace build34::dcn;
     renderInvalidateRequest = {};
     auto request = renderVmIdentityLocked(handle, mapping);
-    if (!request.provider || renderInvalidateUncertain || !renderEngine17IdleAndExclusive ||
-        !mmio || mmio->getLength() < 4u * (kRegInvEng17Ack + 1u) || !renderEngine17IdleAndExclusive(this) ||
+    if (!request.provider || !mmio || mmio->getLength() < 4u * (kRegInvEng17Ack + 1u) ||
+        !takeRenderEngine17Locked() ||
         !sameRenderTranslation(request, renderVmIdentityLocked(handle, mapping)))
         return {};
     const uint32_t mask = (1u << request.vmid) | 1u;

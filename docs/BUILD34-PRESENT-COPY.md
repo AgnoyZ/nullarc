@@ -191,13 +191,19 @@ and rejection at the lease boundary.
 
 The isolated driver stage connects the sampler to the existing GFXHUB
 register accessors and monotonic clock. With the client and GPUVM locks held,
-it checks the live map and requires a trusted, lock-held engine-17
-idle/exclusive check **before** reading or writing MMIO. The proof hook is
-null in the staged driver; there is no runtime caller. The check must cover
-all prior invalidations and hold off competing MMIO, queue, and firmware
-writers across the transaction. Neither `gpuLock` alone nor a high ACK
-level establishes that guarantee. The caller must separately protect
-provider, power, and MMIO lifetimes through sampling and lease acquisition.
+it checks the live map and requires a one-way engine-17 handoff **before**
+reading or writing ACK/request MMIO. With both existing queues adopted and
+a proof provider installed, it closes all eleven raw debug writer paths
+using the existing callback gate. An admitted writer may finish, but the
+handoff refuses while it is active and does not wait under `gpuLock`.
+Draining CPU callbacks does not drain MMIO already posted or queue and
+firmware work already submitted. The handoff also needs a separate proof
+that prior invalidations have drained and that other paths cannot write
+engine 17, change its context programming or disturb ACK state while owned.
+The proof hook is null in the staged driver, so ordinary queue adoption
+does not close raw debug paths or enable any new writes. There is no
+runtime caller. The caller must separately protect provider, power, and
+MMIO lifetimes through sampling and lease acquisition.
 
 The sampler preserves the original request word, which selects the render
 VMID **and VMID 0**. Both ACK bits must be set in the pre-write sample.
@@ -206,17 +212,24 @@ be set in the same sample within 1 ms and 1,000 post-write reads. It
 rechecks the request identity before and after ACK reads. A failed issued
 request disables further checked requests for that provider; a timeout or
 a missed clear is not a drain proof and is never retried. A newer request
-or any legacy flush withdraws the previous request identity without
-changing the original flush's MMIO sequence or success behavior. The
+or any legacy flush withdraws the previous request identity. Once engine 17
+is owned, every legacy flush is observed within its existing polling loop
+for fresh transitions of both bits. It keeps the existing request word,
+read/delay schedule and caller-visible behavior. If it exits without fresh
+completion, the checked path stays disabled; a later high ACK cannot restore
+it. Re-adoption and watchdog recovery also revoke the checked path. The
 receipt must still match a freshly resolved live map at lease acquisition.
 
 CPU fixtures exercise the actual staged methods with scripted MMIO and
-clock reads, including denied ownership, a short register aperture,
-incomplete pre-write ACKs, separate bit transitions, a stale VMID 0 ACK,
-power/table changes and late or invalid reads. Linux v6.12 documents the
+clock reads, including an active raw writer during handoff, post-close raw
+refusal, re-adoption, legacy ACK uncertainty, denied proof, a short register
+aperture, incomplete pre-write ACKs, separate bit transitions, a stale VMID 0
+ACK, power/table changes and late or invalid reads. Linux v6.12 documents the
 [engine-17 request and ACK path](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c#L194-L277),
-including its power-gating considerations; no implementation was imported.
-Native engine handoff, ACK freshness, the actual render binding and frame
+including the KIQ/MES path and power-gating considerations; no implementation
+was imported. Neither adopted queue metadata nor the new CPU ownership bit
+proves this platform's firmware/scheduler state. Native engine handoff,
+ACK freshness, the actual render binding and frame
 completion still require device-path evidence.
 
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or

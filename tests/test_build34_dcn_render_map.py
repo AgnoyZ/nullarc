@@ -46,16 +46,19 @@ def render_vm_fixture(source):
     driver = source[source.index("class PhxBringup :"):source.index("OSDefineMetaClassAndStructors(PhxBringup,")]
     fields = driver[driver.index("    static constexpr uint32_t kPtChunkBytes"):
                     driver.index("    uint32_t vmBind(")]
+    queues = driver[driver.index("    struct GpuQueue {"):driver.index("    uint64_t queueFence(")]
     registers = source[source.index("static constexpr uint32_t kFirstUserVmid"):
                        source.index("static inline void flushLine(")]
     signatures = ("uint64_t PhxBringup::nextRenderVmGenerationLocked(",
                   "build34::dcn::RenderVmTranslation PhxBringup::renderVmIdentityLocked(",
+                  "bool PhxBringup::takeRenderEngine17Locked(",
                   "build34::dcn::RenderTlbAck PhxBringup::confirmRenderTlbLocked(",
+                  "IOReturn PhxBringup::adoptQueue(", "IOReturn PhxBringup::writeReg(",
                   "void PhxBringup::vmFlushTlb(",
                   "uint32_t PhxBringup::vmidAlloc(", "uint32_t PhxBringup::vmBind(", "void PhxBringup::vmidFree(",
                   "IOReturn PhxBringup::vmMap(", "IOReturn PhxBringup::vmUnmap(", "IOReturn PhxBringup::setPowerState(")
     fixture = Path(__file__).with_name("test_build34_dcn_render_vm.cpp").read_text()
-    for marker, code in {"// PHX34_VM_FIELDS": fields, "// PHX34_VM_REGISTERS": registers,
+    for marker, code in {"// PHX34_VM_FIELDS": fields, "// PHX34_VM_QUEUES": queues, "// PHX34_VM_REGISTERS": registers,
                          "// PHX34_VM_METHODS": "\n".join(method(source, signature) for signature in signatures)
                          }.items():
         if fixture.count(marker) != 1:
@@ -79,6 +82,16 @@ class RenderMapTests(unittest.TestCase):
     def test_staged_gpuvm_identities(self):
         source = stage((ROOT / DRIVER).read_bytes(), (ROOT / ABI).read_bytes())
         self.check_fixture(render_vm_fixture(source), "GPUVM identities", "-Wno-unused-parameter")
+
+    def test_all_raw_debug_writers_are_guarded(self):
+        source = stage((ROOT / DRIVER).read_bytes(), (ROOT / ABI).read_bytes())
+        writers = ("writeReg", "vramWrite", "doorbellWrite", "sysMem", "smuMessage", "pspRing",
+                   "pspSubmit", "fwStage", "loadIpFw", "pspCtl", "pspRaw")
+        for writer in writers:
+            with self.subTest(writer=writer):
+                body = method(source, "IOReturn PhxBringup::" + writer + "(").split("{\n", 1)[1]
+                self.assertTrue(body.startswith("    phx34_exact::CallbackGate<>::Lease rawWriter(renderRawWriters);\n"
+                                                "    if (!rawWriter)\n        return kIOReturnNotReady;\n"))
 
     def check_fixture(self, cpu_source, label, *additional_flags):
         with tempfile.TemporaryDirectory(prefix="phx34-render-map-CPU-") as directory:
