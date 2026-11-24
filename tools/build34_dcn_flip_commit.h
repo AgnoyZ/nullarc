@@ -1,7 +1,6 @@
 #pragma once
 
-#include "build34_dcn_flat_context.h"
-#include "build34_dcn_flip_program.h"
+#include "build34_dcn_flat_program.h"
 #include "build34_dcn_scanout_dma.h"
 
 #define BUILD34_DCN_FLIP_BEGIN "phx34DcnFlipBeginV1"
@@ -30,6 +29,11 @@ struct ScanoutFlipBinding {
     ScanoutSurface surface;
 };
 
+struct DcnFlatRoot {
+    uint64_t entry;
+    bool needsInstall;
+};
+
 struct HubpFlipRoute {
     const void *owner;
     uint64_t generation;
@@ -37,9 +41,10 @@ struct HubpFlipRoute {
     HubpFlipReader reader;
     HubpFlipWriter writer;
     bool (*qualify)(void *, const HubpFlipRequest &, const IODMACommand *, const IODMACommand *);
-    bool (*flatRoot)(void *, const HubpFlipRequest &, ScanoutPinToken, uint64_t &);
+    bool (*flatRoot)(void *, const HubpFlipRequest &, ScanoutPinToken, DcnFlatRoot &);
     bool (*readFlatPage)(void *, const HubpFlipRequest &, ScanoutPinToken, const DcnFlatContext &, size_t, uint64_t &);
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
+    bool (*canInstallFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
 };
 
 class ScanoutFlipCommit {
@@ -74,19 +79,31 @@ public:
             return withinBudget() && route.reader.current(route.reader.context, request) && withinBudget();
         };
         DcnFlatContext oldVm{}, nextVm{};
+        bool oldInstall = false, install = false;
+        auto inactive = [&] {
+            return install && intent.next.vmid != intent.previous.vmid && route.canInstallFlatVm && translationCurrent() &&
+                route.canInstallFlatVm(route.reader.context, request, nextVm) && translationCurrent();
+        };
         auto contextsCurrent = [&] {
             return contextCurrent(oldVm, route.reader, translationCurrent) &&
                 contextCurrent(nextVm, route.reader, translationCurrent);
         };
+        auto contextsPrepared = [&] {
+            return contextCurrent(oldVm, route.reader, translationCurrent) &&
+                (install ? DcnFlatProgram::empty(nextVm.vmid, route.reader, inactive) :
+                           contextCurrent(nextVm, route.reader, translationCurrent));
+        };
         if (!route.qualify(route.reader.context, request, old.dma ? old.dma->command_ : nullptr,
                            next.dma ? next.dma->command_ : nullptr) ||
             !live() || !readback_.begin(request, route.reader) ||
-            !resolveContext(old, intent.previous.vmid, route, request, oldVm, translationCurrent) || !(oldVm == frontVm_) ||
-            !resolveContext(next, intent.next.vmid, route, request, nextVm, translationCurrent) ||
+            !describeContext(old, intent.previous.vmid, route, request, oldVm, oldInstall, translationCurrent) ||
+            oldInstall || !(oldVm == frontVm_) ||
+            !describeContext(next, intent.next.vmid, route, request, nextVm, install, translationCurrent) ||
+            !contextsPrepared() ||
             !matchesTranslation(old, oldVm, route, request, translationCurrent) ||
             !matchesTranslation(next, nextVm, route, request, translationCurrent) ||
             !HubpFlipProgram::preflight(request, route.reader, route.writer, surface, withinBudget) ||
-            !contextsCurrent() || !live() ||
+            !contextsPrepared() || !live() ||
             (next.pin && !next.pin->beginDisplayUse())) {
             if (!routeLifetime_) route.lifetime->release();
             readback_.recycle();
@@ -100,7 +117,8 @@ public:
         old_ = old;
         nextVm_ = nextVm;
         surface_ = surface;
-        if (!HubpFlipProgram::issue(request_, route_.reader, route_.writer, surface_, withinBudget, contextsCurrent) ||
+        if ((install && !DcnFlatProgram::install(nextVm, route_.reader, route_.writer, inactive)) ||
+            !HubpFlipProgram::issue(request_, route_.reader, route_.writer, surface_, withinBudget, contextsCurrent) ||
             !route_.reader.current(route_.reader.context, request_) || !live())
             return fail();
         return ScanoutFlipResult::Issued;
@@ -166,13 +184,16 @@ private:
     }
 
     template<typename Current>
-    static bool resolveContext(const ScanoutFlipBinding &binding, uint32_t vmid, const HubpFlipRoute &route,
-                               const HubpFlipRequest &request, DcnFlatContext &context, const Current &current) {
+    static bool describeContext(const ScanoutFlipBinding &binding, uint32_t vmid, const HubpFlipRoute &route,
+                                const HubpFlipRequest &request, DcnFlatContext &context, bool &install,
+                                const Current &current) {
         if (!binding.dma) return true;
         const auto &layout = binding.dma->layout_;
-        context = {0, layout.firstLogicalPage, layout.lastLogicalPage, vmid};
-        return current() && route.flatRoot(route.reader.context, request, binding.token, context.rootEntry) &&
-            matchDcnFlatContext(context, route.reader, current);
+        DcnFlatRoot root{};
+        if (!current() || !route.flatRoot(route.reader.context, request, binding.token, root) || !current()) return false;
+        context = {root.entry, layout.firstLogicalPage, layout.lastLogicalPage, vmid};
+        install = root.needsInstall;
+        return context.valid();
     }
 
     template<typename Current>

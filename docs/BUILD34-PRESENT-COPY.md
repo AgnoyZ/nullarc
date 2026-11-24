@@ -725,7 +725,30 @@ qualification. The initial root and leaf checks run within the flip deadline
 without the GPU or client lock. A missing callback, root or range mismatch,
 read error, final-page mismatch, revoked route or elapsed deadline refuses
 before any register write. The contexts are rechecked after the page walks
-and under the OTG lock, before any VMID or surface address write.
+and under the OTG lock, before any HUBP VMID or surface address write.
+
+The route can explicitly nominate an incoming flat table that has not yet
+been installed. It must already own the published table and the inactive
+VMID, and prove that no pipe or outstanding translation can use that
+context. The [VMID programmer](../tools/build34_dcn_flat_program.h) rejects
+the current scanout VMID and requires all seven context registers to be zero.
+It compares the nominated table's leaves to the private DMA plan before any
+write. After it marks the new pin non-cancellable, the provider programs
+the start and end page numbers, flat control and root high word, then writes
+the root low word last. It requires zero in the low word immediately before
+that write, and the full expected context after at most ten ready samples.
+The route's inactive reservation is checked throughout. This checked sequence
+uses the AMD VMID setup above as a reference, not its implementation.
+
+Missing reservation, nonempty registers or a bad leaf refuse without writes.
+Once programming starts, revoked ownership, a possibly posted write, timeout
+or unexpected readback leaves the operation uncertain and keeps the table,
+route and DMA pin. No HUBP register is written on those paths. A fresh VMID
+readback is not a TLB invalidation or a proof that the walker can fetch the
+table; the live route still has to provide that evidence. The provider does
+not clear or recycle a partially installed context. CPU fixtures cover
+delayed ready, refusal before writes, mid-program revocation, an ambiguous
+last write, wrong ready word and timeout, plus a full return to firmware.
 
 A page match does not establish device visibility, total fetch coverage,
 or proof of retirement. The route still must hold translation stable from

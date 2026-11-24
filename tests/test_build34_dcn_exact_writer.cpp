@@ -878,7 +878,9 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        WrongContextBlock, WrongContextStart, WrongContextEnd, ContextAfterPageWalk, ContextAtLock,
                        ContextWhilePending, ContextDuringRetire, ReplacedFrontContext,
                        DualPins, DualContextDuringRetire, DifferentPinnedPitch, GeometryAtLock, GeometryAtRetire,
-                       GeometryBeforeRetire };
+                       GeometryBeforeRetire, Install, InstallDenied, InstallMissingProof, InstallSameVmid, InstallOccupied,
+                       InstallWrongLeaf,
+                       InstallRevoked, InstallWriteUncertain, InstallAckTimeout, InstallWrongAck };
 
 struct CommitFixture {
     ScanoutFixture scanout;
@@ -891,6 +893,7 @@ struct CommitFixture {
     uint32_t frame = 42;
     uint64_t now = 800;
     unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0, pageReads = 0;
+    unsigned vmWrites = 0, vmAckReads = 0;
     uint32_t lockSelect = 0, surfaceControl = 0;
     uint32_t surfaceFormat = 8, returnControl = 0x00e00000, swizzle = 0, start = 0;
     uint32_t dimensions = (17u << 16) | 64u, pitch = 63, odm = 0xfff00000, otg = 0x00010001;
@@ -907,7 +910,7 @@ struct CommitFixture {
     FlipFault translationFault = FlipFault::None;
     uint64_t outputPages[2]{};
     HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay},
-                       qualified, flatRoot, readFlatPage, retired};
+                       qualified, flatRoot, readFlatPage, retired, canInstallFlatVm};
     ScanoutPinToken pin{}, alternatePin{};
 
     CommitFixture() {
@@ -990,15 +993,25 @@ struct CommitFixture {
         return self.qualify;
     }
 
-    static bool flatRoot(void *context, const HubpFlipRequest &request, ScanoutPinToken token, uint64_t &root) {
+    static bool flatRoot(void *context, const HubpFlipRequest &request, ScanoutPinToken token, DcnFlatRoot &root) {
         const auto &self = *static_cast<CommitFixture *>(context);
         assert((token == self.pin || token == self.alternatePin) &&
                (request.previousPin == token || request.nextPin == token));
         assert(self.lifetime.references == 2 && !self.scanout.device.guard.held && !self.scanout.client.guard.held);
-        root = token == self.alternatePin ? self.alternateRoot :
+        root.entry = token == self.alternatePin ? self.alternateRoot :
             self.translationFault == FlipFault::ReplacedFrontContext && request.previousPin == token ?
                 self.contextRoot : self.ownedRoot;
+        root.needsInstall = self.translationFault >= FlipFault::Install && request.nextPin == token;
         return true;
+    }
+
+    static bool canInstallFlatVm(void *context, const HubpFlipRequest &request, const DcnFlatContext &vm) {
+        const auto &self = *static_cast<CommitFixture *>(context);
+        assert(request.nextPin == self.pin && vm.vmid == self.mapped.vmid && vm.rootEntry == self.ownedRoot);
+        assert(!self.lockRequested && !self.writes && self.command.prepared && self.lifetime.references == 2);
+        assert(!self.scanout.client.guard.held && !self.scanout.device.guard.held);
+        return self.translationFault != FlipFault::InstallDenied &&
+            !(self.translationFault == FlipFault::InstallRevoked && self.vmWrites == 3);
     }
 
     static bool readFlatPage(void *context, const HubpFlipRequest &request, ScanoutPinToken token,
@@ -1016,7 +1029,7 @@ struct CommitFixture {
                table.rootEntry == (alternate ? self.alternateRoot : self.ownedRoot));
         assert(table.firstPage == address.address / kPage && table.lastPage == table.firstPage + 1);
         dmaPage = alternate ? (last ? 0x901000 : 0x800000) : (last ? 0x601000 : 0x500000);
-        if (last && (self.translationFault == FlipFault::WrongLastPage ||
+        if (last && (self.translationFault == FlipFault::WrongLastPage || self.translationFault == FlipFault::InstallWrongLeaf ||
                      (previous && self.translationFault == FlipFault::WrongPreviousPage))) {
             dmaPage = self.outputPages[1];
         }
@@ -1030,6 +1043,30 @@ struct CommitFixture {
         auto &self = *static_cast<CommitFixture *>(context);
         assert(self.scanout.cancelPin(self.pin) == kIOReturnBusy);
         assert(self.lifetime.references == 2 && !self.scanout.device.guard.held);
+        if (address >= 0x03a4a && address <= 0x03a50) {
+            const uint32_t sequence[]{0x03a4d, 0x03a4e, 0x03a4f, 0x03a50, 0x03a4a, 0x03a4b, 0x03a4c};
+            const auto first = self.mapped.address / kPage, last = first + 1;
+            const uint32_t values[]{static_cast<uint32_t>(first >> 32), static_cast<uint32_t>(first),
+                static_cast<uint32_t>(last >> 32), static_cast<uint32_t>(last), 0,
+                static_cast<uint32_t>(self.ownedRoot >> 32), static_cast<uint32_t>(self.ownedRoot)};
+            const unsigned index = self.vmWrites++;
+            assert(index < 7 && sequence[index] == address && values[index] == value && !self.writes && !self.lockRequested);
+            assert(self.pageReads == 2 && self.translationFault >= FlipFault::Install);
+            switch (address) {
+            case 0x03a4a: self.contextControl = value; break;
+            case 0x03a4b: self.contextRoot = uint64_t{value} << 32; break;
+            case 0x03a4c:
+                self.contextRoot |= value & ~1u;
+                if (self.translationFault == FlipFault::InstallWrongAck) self.contextRoot ^= kPage;
+                return self.translationFault != FlipFault::InstallWriteUncertain;
+            case 0x03a4d: self.firstPage = uint64_t{value} << 32; break;
+            case 0x03a4e: self.firstPage |= value; break;
+            case 0x03a4f: self.lastPage = uint64_t{value} << 32; break;
+            case 0x03a50: self.lastPage |= value; break;
+            default: assert(false); return false;
+            }
+            return true;
+        }
         const auto target = self.target;
         const auto step = self.writes++ % 5;
         switch (address) {
@@ -1111,7 +1148,13 @@ struct CommitFixture {
         case 0x05001: value = self.otg; break;
         case 0x03a4a: value = self.contextControl; break;
         case 0x03a4b: value = static_cast<uint32_t>(self.contextRoot >> 32); break;
-        case 0x03a4c: value = static_cast<uint32_t>(self.contextRoot); break;
+        case 0x03a4c:
+            if (self.vmWrites == 7 && !(self.contextRoot & 1)) {
+                ++self.vmAckReads;
+                if (self.translationFault == FlipFault::Install && self.vmAckReads == 3) self.contextRoot |= 1;
+            }
+            value = static_cast<uint32_t>(self.contextRoot);
+            break;
         case 0x03a4d: value = static_cast<uint32_t>(self.firstPage >> 32); break;
         case 0x03a4e: value = static_cast<uint32_t>(self.firstPage); break;
         case 0x03a4f: value = static_cast<uint32_t>(self.lastPage >> 32); break;
@@ -1199,6 +1242,30 @@ static void scanoutFlip(FlipFault fault) {
     fixture.rewindAfterHigh = fault == FlipFault::ClockRewind;
     fixture.failIssue = fault == FlipFault::Issue;
     fixture.translationFault = fault;
+    if (fault >= FlipFault::Install && fault != FlipFault::InstallOccupied)
+        fixture.contextRoot = fixture.firstPage = fixture.lastPage = 0;
+    if (fault == FlipFault::InstallMissingProof) fixture.route.canInstallFlatVm = nullptr;
+    if (fault == FlipFault::InstallSameVmid) {
+        request.previous.vmid = fixture.mapped.vmid;
+        fixture.programmed = fixture.active = fixture.earliest = request.previous;
+    }
+    if (fault >= FlipFault::InstallDenied && fault <= FlipFault::InstallWrongLeaf) {
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+        assert(!fixture.writes && !fixture.vmWrites && fixture.pageReads == (fault == FlipFault::InstallWrongLeaf ? 2u : 0u));
+        assert(fixture.command.prepared && fixture.lifetime.references == 1);
+        return;
+    }
+    if (fault >= FlipFault::InstallRevoked) {
+        assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Uncertain);
+        assert(!fixture.writes && fixture.vmWrites == (fault == FlipFault::InstallRevoked ? 3u : 7u));
+        assert(fixture.delays == (fault == FlipFault::InstallAckTimeout ? 9u : 0u));
+        assert(fixture.command.prepared && fixture.lifetime.references == 2 && DcnAllocationStub::live() == 1);
+        assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
+        ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(!fixture.writes && !fixture.retireChecks);
+        return;
+    }
     if (fault == FlipFault::NoTranslationReader || fault == FlipFault::NoContextRoot) {
         if (fault == FlipFault::NoTranslationReader) fixture.route.readFlatPage = nullptr;
         else fixture.route.flatRoot = nullptr;
@@ -1236,6 +1303,8 @@ static void scanoutFlip(FlipFault fault) {
     }
     assert(fixture.begin(request) == kIOReturnSuccess && request.operation.serial != fixture.pin.serial);
     assert(fixture.writes && fixture.lifetime.references == 2 && !fixture.command.completes && fixture.pageReads == 2);
+    assert(fixture.vmWrites == (fault == FlipFault::Install ? 7u : 0u));
+    if (fault == FlipFault::Install) assert(fixture.vmAckReads == 3 && fixture.delays == 2);
     assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
     ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
     const bool afterHigh = fixture.failHigh || fixture.loseRouteAfterHigh || fixture.rewindAfterHigh;
@@ -1449,6 +1518,16 @@ int main() {
     scanoutFlip(FlipFault::GeometryAtLock);
     scanoutFlip(FlipFault::GeometryAtRetire);
     scanoutFlip(FlipFault::GeometryBeforeRetire);
+    scanoutFlip(FlipFault::Install);
+    scanoutFlip(FlipFault::InstallDenied);
+    scanoutFlip(FlipFault::InstallMissingProof);
+    scanoutFlip(FlipFault::InstallSameVmid);
+    scanoutFlip(FlipFault::InstallOccupied);
+    scanoutFlip(FlipFault::InstallWrongLeaf);
+    scanoutFlip(FlipFault::InstallRevoked);
+    scanoutFlip(FlipFault::InstallWriteUncertain);
+    scanoutFlip(FlipFault::InstallAckTimeout);
+    scanoutFlip(FlipFault::InstallWrongAck);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }
