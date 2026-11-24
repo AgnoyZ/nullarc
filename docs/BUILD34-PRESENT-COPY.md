@@ -657,6 +657,14 @@ this metadata, not the record used at flip time. At most two leases can
 retain up to 128 KiB of page addresses each. No pixel data is copied by this
 step. The addresses are not PTEs and do not leave the kernel.
 
+The DMA lease retains and takes its own preparation of the original present
+descriptor. The caller may end its preparation on return; the IOSurface
+reference alone does not substitute for a preparation. The render and
+present preparations stay held until retirement. After synchronous DMA
+unmap and command clear, the lease completes its present preparation and
+then the provider completes the render preparation. Uncertain present
+completion keeps the pin slot and is not retried.
+
 Unused cancellation completes the DMA command, independently confirms
 synchronous unmap of that exact command, then clears the command before
 releasing the address list and pin. Any route preparation for an unissued
@@ -760,10 +768,15 @@ sides remain outside the flat-context check and need independent address
 qualification. Both sides must use distinct VMIDs, including when returning
 to firmware, so the old context can be detached without affecting the new
 scanout. The initial root and leaf checks run within the flip deadline
-without the GPU or client lock. A missing callback, root or range mismatch,
-read error, final-page mismatch, revoked route or elapsed deadline refuses
-before any register write. The contexts are rechecked after the page walks
-and under the OTG lock, before any HUBP VMID or surface address write.
+without the GPU or client lock. Before a write, each pinned side rechecks the
+command's descriptor and exact prepared slice, both preparation IDs, and the
+mapper resolution of every pixel DMA page against both original backings.
+A stale page or command, read error, revoked route or elapsed deadline
+refuses the flip. The contexts are rechecked after the page walks and under
+the OTG lock, before any HUBP VMID or surface address write. The route and
+mapper still have to keep those translations stable after the walk. CPU
+fixtures cover incoming and front-page changes, command substitution,
+expired evidence and caller preparation release before a firmware round trip.
 
 Incoming pins cannot borrow preinstalled roots. Publication must make the
 table visible to the walker without installing any root, exposing a context

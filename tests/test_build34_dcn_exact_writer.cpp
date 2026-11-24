@@ -63,7 +63,7 @@ struct Descriptor final : IOMemoryDescriptor {
 #ifdef TEST_SCANOUT_PINS
     unsigned references = 1, wires = 1, prepares = 0, completes = 0;
     IOReturn prepareResult = kIOReturnSuccess, completeResult = kIOReturnSuccess;
-    std::function<void()> afterPrepare;
+    std::function<void()> afterPrepare, onComplete;
     IOReturn prepare() override {
         ++prepares;
         if (prepareResult != kIOReturnSuccess) return prepareResult;
@@ -73,6 +73,7 @@ struct Descriptor final : IOMemoryDescriptor {
     }
     IOReturn complete() override {
         assert(wires);
+        if (onComplete) onComplete();
         ++completes;
         if (completeResult == kIOReturnSuccess) --wires;
         return completeResult;
@@ -832,7 +833,7 @@ static void scanoutPinFailedPrepareAndRollback() {
 
 #ifdef TEST_SCANOUT_DMA
 enum class DmaFault { None, AlternateDescriptor, WrongOffset, WrongPage, NoMappedPage, FailedPrepare, ChangedEpoch, NoPlanMemory };
-enum class DmaCleanupFault { None, Complete, ConfirmUnmap, Clear };
+enum class DmaCleanupFault { None, Complete, ConfirmUnmap, Clear, PresentComplete };
 
 static ScanoutDmaMapper mapperContract(IOPCIDevice &device, IOMapper &mapper) {
     assert(device.mapper == &mapper && mapper.references >= 2);
@@ -910,6 +911,36 @@ static void scanoutDmaQualification() {
     IODMACommand::next = nullptr;
 }
 
+static void scanoutDmaPresentPreparation(bool uncertain) {
+    ScanoutFixture fixture;
+    auto &present = fixture.frame.present;
+    auto &host = fixture.frame.host;
+    if (uncertain) {
+        present.afterPrepare = [&] { ++present.preparation; };
+        present.completeResult = kIOReturnNotReady;
+    } else {
+        present.prepareResult = kIOReturnNotReady;
+    }
+    IOMapper mapper;
+    IODMACommand command;
+    IODMACommand::next = &command;
+    fixture.device.pci->mapper = &mapper;
+    fixture.device.dcnQualifyMapper = mapperContract;
+    fixture.offer();
+    DmaRun scratch[2]{};
+    uint64_t pages[2]{UINT64_MAX, UINT64_MAX};
+    ScanoutDmaRequest request{&fixture.frame.copy, 0x100000, scratch, 2, pages, 2, {}, {}};
+    const OSSymbol map{BUILD34_DCN_PIN_MAP};
+    assert(fixture.device.callPlatformFunction(&map, false, &request, nullptr, nullptr, nullptr) == kIOReturnNotReady);
+    assert(!command.created && mapper.references == 1 && !DcnAllocationStub::live());
+    assert(!request.layout.entryCount && !request.token.serial && pages[0] == UINT64_MAX && pages[1] == UINT64_MAX);
+    assert(present.prepares == 1 && present.completes == uncertain && host.prepares == 1 && host.completes == !uncertain);
+    assert(present.references == (uncertain ? 2u : 1u) && present.wires == present.references);
+    assert(host.references == (uncertain ? 2u : 1u) && host.wires == host.references);
+    assert(fixture.surface.references == (uncertain ? 2u : 1u) && fixture.client.references == fixture.surface.references);
+    IODMACommand::next = nullptr;
+}
+
 static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault::None) {
     ScanoutFixture fixture;
     DmaRun scratch[2]{};
@@ -941,6 +972,8 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
         return kIOReturnSuccess;
     };
     auto &host = fixture.frame.host;
+    auto &present = fixture.frame.present;
+    if (cleanup == DmaCleanupFault::PresentComplete) present.completeResult = kIOReturnNotReady;
     mapper.resolve = [&](const IODMACommand &mapped, uint64_t address, uint64_t &physical) {
         assert(&mapped == &command && command.prepared && command.memory == &host);
         assert(address == 0x400000 || address == 0x600000);
@@ -948,7 +981,9 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
         physical = host.base + (first ? 2 : fault == DmaFault::WrongPage ? 5 : 4) * kPage;
         return first || fault != DmaFault::NoMappedPage;
     };
-    command.onComplete = [&] { assert(host.wires == 2 && fixture.client.guard.held && !fixture.device.guard.held); };
+    command.onComplete = [&] {
+        assert(host.wires == 2 && present.wires == 2 && fixture.client.guard.held && !fixture.device.guard.held);
+    };
     unsigned confirmations = 0;
     mapper.confirmUnmap = [&](const IODMACommand &completed) {
         ++confirmations;
@@ -956,6 +991,7 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
         assert(!command.clears && host.wires == 2 && fixture.client.guard.held && !fixture.device.guard.held);
         return cleanup != DmaCleanupFault::ConfirmUnmap;
     };
+    present.onComplete = [&] { assert(command.clears == 1 && !command.memory && host.wires == 2); };
     auto *savedPages = request.pages;
     request.pages = reinterpret_cast<uint64_t *>(scratch);
     assert(dispatch() == kIOReturnBadArgument && !command.created && !fixture.device.pci->mapperLookups);
@@ -968,7 +1004,7 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
         assert(request.layout.entryCount == 2 && request.token.provider == &fixture.device && request.token.serial);
         assert(pages[0] == 0x400000 && pages[1] == 0x600000);
         assert(DcnAllocationStub::live() == 1);
-        assert(mapper.references == 2 && host.references == 3 && host.wires == 2);
+        assert(mapper.references == 2 && host.references == 3 && host.wires == 2 && present.wires == 2);
         assert(fixture.cancelPin(request.token) == (cleanup == DmaCleanupFault::None ? kIOReturnSuccess : kIOReturnNotReady));
         assert(fixture.cancelPin(request.token) == kIOReturnNotFound);
     } else {
@@ -977,10 +1013,13 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
     const bool completed = !command.failPrepare && !command.substitute;
     const bool confirmed = completed && !command.failComplete;
     const bool cleared = confirmed && cleanup != DmaCleanupFault::ConfirmUnmap;
-    const bool reserved = !cleared || command.failClear;
+    const bool presentCompleted = cleared && !command.failClear;
+    const bool reserved = !presentCompleted || cleanup == DmaCleanupFault::PresentComplete;
     assert(command.completes == completed && confirmations == confirmed);
     assert(command.clears == cleared && command.releases == !reserved);
     assert(mapper.references == (reserved ? 2u : 1u) && host.wires == (reserved ? 2u : 1u));
+    assert(present.prepares == 1 && present.completes == presentCompleted);
+    assert(present.references == (reserved ? 2u : 1u) && present.wires == present.references);
     assert(fixture.surface.references == (reserved ? 2u : 1u) && fixture.client.references == (reserved ? 2u : 1u));
     assert(DcnAllocationStub::live() == (!failedPlan && reserved ? 1u : 0u));
     IODMACommand::next = nullptr;
@@ -1056,6 +1095,8 @@ struct CommitFixture {
     uint32_t frame = 42;
     uint64_t now = 800;
     unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0, pageReads = 0;
+    unsigned pixelReads = 0;
+    std::function<bool(bool, uint64_t &)> pixelEvidence;
     unsigned vmWrites = 0, vmAckReads = 0, clearChecks = 0, clearWrites = 0, translationChecks = 0;
     uint32_t lockSelect = 0, surfaceControl = 0;
     uint32_t surfaceFormat = 8, returnControl = 0x00e00000, swizzle = 0, start = 0;
@@ -1115,13 +1156,13 @@ struct CommitFixture {
                 physical = table.physical + (translationFault == FlipFault::TableWrongPhysical ? kPage : 0);
                 return true;
             }
-            assert(&mapped == IODMACommand::next);
             const bool alternate = &mapped == &nextCommand;
-            assert(alternate || &mapped == &command);
+            assert((alternate || &mapped == &command) && mapped.prepared && mapped.memory == &scanout.frame.host);
             const bool first = address == (alternate ? 0x800000 : 0x500000);
             assert(first || address == (alternate ? 0x901000 : 0x601000));
             physical = scanout.frame.host.base + (first ? 2 : 4) * kPage;
-            return true;
+            ++pixelReads;
+            return !pixelEvidence || pixelEvidence(first, physical);
         };
         mapper.confirmUnmap = [&](const IODMACommand &completed) {
             if (&completed == &homeTable.dma || &completed == &alternateTable.dma) {
@@ -1496,6 +1537,75 @@ struct CommitFixture {
         assert(poll(request) == kIOReturnSuccess && request.result == expected);
     }
 };
+
+enum class PixelFault { MapperRemap, MapperUnavailable, RenderPage, PresentPage, RenderGeneration, PresentGeneration,
+                        LateGeneration, WrongCommandSlice, SubstitutedDescriptor, LateEvidence, FrontRemap, None };
+
+static void revalidateScanoutPixels(PixelFault fault) {
+    CommitFixture fixture;
+    auto &scanout = fixture.scanout;
+    auto &host = scanout.frame.host;
+    auto &present = scanout.frame.present;
+    assert(present.prepares == 1 && present.wires == 2 && present.references == 2);
+    assert(present.complete() == kIOReturnSuccess && present.wires == 1);
+    scanout.device.dcnQualifiedFlipRoute = [](IOPCIDevice *device) -> const HubpFlipRoute * { return device->route; };
+    ScanoutFlipIntent request{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    if (fault == PixelFault::RenderPage) host.wrongPage = 2 * kPage;
+    if (fault == PixelFault::PresentPage) present.wrongPage = kPage;
+    if (fault == PixelFault::RenderGeneration) ++host.preparation;
+    if (fault == PixelFault::PresentGeneration) ++present.preparation;
+    fixture.command.wrongOffset = fault == PixelFault::WrongCommandSlice;
+    if (fault == PixelFault::SubstitutedDescriptor) fixture.command.substitute = &present;
+    fixture.pixelEvidence = [&](bool first, uint64_t &physical) {
+        assert(!fixture.lockRequested && !scanout.device.guard.held && !scanout.client.guard.held);
+        if (first) return true;
+        if (fault == PixelFault::MapperRemap) physical ^= kPage;
+        if (fault == PixelFault::LateGeneration) ++present.preparation;
+        if (fault == PixelFault::LateEvidence) fixture.now += 100000000;
+        return fault != PixelFault::MapperUnavailable;
+    };
+    if (fault != PixelFault::FrontRemap && fault != PixelFault::None) {
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+        assert(!fixture.vmWrites && !fixture.writes && !fixture.issues && !fixture.command.completes);
+        const unsigned expectedReads = fault <= PixelFault::MapperUnavailable || fault == PixelFault::LateGeneration ||
+            fault == PixelFault::LateEvidence ? 2 : fault <= PixelFault::PresentPage ? 1 : 0;
+        assert(fixture.pixelReads == 2 + expectedReads && present.wires == 1 && present.references == 2);
+        fixture.command.substitute = nullptr;
+        assert(scanout.cancelPin(fixture.pin) == kIOReturnSuccess && fixture.command.completes == 1);
+        assert(present.wires == 0 && present.references == 1 && host.wires == 1);
+        return;
+    }
+    assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Issued);
+    assert(fixture.pixelReads == 4 && present.wires == 1 && present.references == 2);
+    ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
+    fixture.pending = false;
+    fixture.retire = true;
+    fixture.active = fixture.earliest = fixture.mapped;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
+    if (fault == PixelFault::FrontRemap) {
+        fixture.pixelEvidence = [](bool first, uint64_t &physical) {
+            if (!first) physical ^= kPage;
+            return true;
+        };
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+        assert(fixture.pixelReads == 6 && fixture.vmWrites == 7 && fixture.writes == 5 && !fixture.command.completes);
+        assert(present.wires == 1 && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
+        fixture.pixelEvidence = {};
+    }
+    assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Issued);
+    poll.operation = request.operation;
+    fixture.pending = false;
+    fixture.retire = false;
+    fixture.active = fixture.earliest = fixture.home;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    assert(!fixture.command.completes && present.wires == 1);
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    assert(fixture.command.completes == 1 && present.wires == 0 && present.references == 1 && host.wires == 1);
+}
 
 static void scanoutFlip(FlipFault fault) {
     CommitFixture fixture;
@@ -1972,6 +2082,8 @@ int main() {
 #endif
 #ifdef TEST_SCANOUT_DMA
     scanoutDmaQualification();
+    scanoutDmaPresentPreparation(false);
+    scanoutDmaPresentPreparation(true);
     scanoutDma(DmaFault::None);
     scanoutDma(DmaFault::AlternateDescriptor);
     scanoutDma(DmaFault::WrongOffset);
@@ -1983,9 +2095,14 @@ int main() {
     scanoutDma(DmaFault::None, DmaCleanupFault::Complete);
     scanoutDma(DmaFault::None, DmaCleanupFault::Clear);
     scanoutDma(DmaFault::None, DmaCleanupFault::ConfirmUnmap);
+    scanoutDma(DmaFault::None, DmaCleanupFault::PresentComplete);
     scanoutDma(DmaFault::WrongPage, DmaCleanupFault::ConfirmUnmap);
 #endif
 #ifdef TEST_SCANOUT_FLIP
+    for (const auto fault : {PixelFault::MapperRemap, PixelFault::MapperUnavailable, PixelFault::RenderPage,
+         PixelFault::PresentPage, PixelFault::RenderGeneration, PixelFault::PresentGeneration, PixelFault::LateGeneration,
+         PixelFault::WrongCommandSlice, PixelFault::SubstitutedDescriptor, PixelFault::LateEvidence, PixelFault::FrontRemap,
+         PixelFault::None}) revalidateScanoutPixels(fault);
     scanoutFlip(FlipFault::None);
     scanoutFlip(FlipFault::Decline);
     scanoutFlip(FlipFault::ForeignLock);

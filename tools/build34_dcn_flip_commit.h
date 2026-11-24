@@ -113,7 +113,7 @@ public:
             !HubpFlipProgram::preflight(request, route.reader, route.writer, surface, withinBudget) ||
             (nextTable && !nextTable->prepare(route.flatFormat, route.reader.context, *route.lifetime, request,
                 next.dma->qualified_, *next.dma->command_, next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
-            !nextEmpty() || !matchesTranslation(old.dma, translationCurrent) || !matchesTranslation(next.dma, translationCurrent) ||
+            !nextEmpty() || !matchesTranslation(old, translationCurrent) || !matchesTranslation(next, translationCurrent) ||
             !homeCurrent() || !oldInstalled() || !nextEmpty() || !peersIdle() ||
             (next.pin && !next.pin->beginDisplayUse())) {
             if (!routeLifetime_) {
@@ -250,8 +250,10 @@ private:
     }
 
     template<typename Current>
-    static bool matchesTranslation(const ScanoutDmaLease *dma, const Current &current) {
-        return !dma || dma->table_.matchesPages(dma->qualified_, *dma->command_, dma->layout_, dma->pages_, current);
+    static bool matchesTranslation(ScanoutFlipBinding binding, const Current &current) {
+        const auto *dma = binding.dma;
+        return !dma || (dma->table_.matchesPages(dma->qualified_, *dma->command_, dma->layout_, dma->pages_, current) &&
+                        dma->matchesPixels(*binding.pin, current));
     }
 
     ScanoutFlipResult fail() {

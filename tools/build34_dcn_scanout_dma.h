@@ -54,18 +54,20 @@ public:
     ScanoutDmaLease(const ScanoutDmaLease &) = delete;
     ScanoutDmaLease &operator=(const ScanoutDmaLease &) = delete;
 
-    bool uncertain() const { return uncertain_; }
+    bool uncertain() const { return uncertain_ || presentPin_.uncertain(); }
 
     size_t prepareRuns(ScanoutDescriptorPin &pin, const ScanoutDmaMapper &qualified, const PresentCopyBacking &present,
                        DmaRun *scratch, size_t capacity) {
-        if (command_ || !pin.cancellable() || !qualified.completeContract()) return 0;
+        if (command_ || presentPin_.bytes() || uncertain() || !pin.cancellable() || !qualified.completeContract()) return 0;
         auto &lease = pin.lease_;
         const auto &slice = lease.slice_;
         if (slice.bytes != present.slice.bytes || !present.preparation ||
             livePresentPreparation(present.slice) != present.preparation)
             return 0;
         const auto preparation = livePresentPreparation(slice);
-        if (!preparation) return 0;
+        if (!preparation || !presentPin_.acquire(present.slice, present.preparation)) return 0;
+        renderPreparation_ = preparation;
+        presentPreparation_ = present.preparation;
 
         command_ = IODMACommand::withSpecification(kIODMACommandOutputHost64, 48, 0, IODMACommand::kMapped,
                                                    slice.bytes, kPageBytes, qualified.mapper);
@@ -90,12 +92,11 @@ public:
             offset != slice.offset || bytes != slice.bytes)
             return 0;
 
-        auto presented = present.slice;
         const PreparedDmaMapping mapping{bytes, qualified_.mapper, this, readBatch, resolvePage};
         const auto count = collectScanoutRuns(bytes, mapping, qualified.mapper, lease.backing(),
-                                             {&presented, readPinnedDescriptorPage}, scratch, capacity);
+                                             presentPin_.backing(), scratch, capacity);
         return livePresentPreparation(slice) == preparation &&
-            livePresentPreparation(presented) == present.preparation ? count : 0;
+            livePresentPreparation(presentPin_.slice_) == presentPreparation_ ? count : 0;
     }
 
     bool releaseUnused(const ScanoutDescriptorPin &pin) {
@@ -103,7 +104,7 @@ public:
     }
 
     bool preparePlan(const ScanoutDmaRequest &request, uint64_t bytes, size_t runCount) {
-        if (!command_ || uncertain_ || pages_ || !validScanoutDmaStorage(request, bytes)) return false;
+        if (!command_ || uncertain() || pages_ || !validScanoutDmaStorage(request, bytes)) return false;
         const size_t entryCount = static_cast<size_t>(bytes / kPageBytes);
         const size_t tableBytes = entryCount * sizeof(uint64_t);
         auto *pages = static_cast<uint64_t *>(IOMallocZero(tableBytes));
@@ -119,7 +120,7 @@ public:
     }
 
     bool publishPlan(ScanoutDmaRequest &request, uint64_t bytes) const {
-        if (!pages_ || uncertain_ || !validScanoutDmaStorage(request, bytes) ||
+        if (!pages_ || uncertain() || !validScanoutDmaStorage(request, bytes) ||
             layout_.firstLogicalPage != request.windowStart / kPageBytes || layout_.entryCount != bytes / kPageBytes)
             return false;
         for (size_t index = 0; index < layout_.entryCount; ++index) request.pages[index] = pages_[index];
@@ -130,16 +131,42 @@ public:
 private:
     friend class ScanoutFlipCommit;
 
+    template<typename Current>
+    bool matchesPixels(const ScanoutDescriptorPin &pin, const Current &live) const {
+        auto render = pin.lease_.slice_;
+        auto present = presentPin_.slice_;
+        const auto current = [&] {
+            UInt64 offset = 0, bytes = 0;
+            return live() && !qualified_.mapper->isInactive() && command_->getIOMemoryDescriptor() == render.descriptor &&
+                command_->getPreparedOffsetAndLength(&offset, &bytes) == kIOReturnSuccess &&
+                offset == render.offset && bytes == render.bytes && livePresentPreparation(render) == renderPreparation_ &&
+                livePresentPreparation(present) == presentPreparation_ && live();
+        };
+        if (!command_ || !pages_ || uncertain() || !pin.held() || presentPin_.bytes() != render.bytes ||
+            layout_.entryCount != render.bytes / kPageBytes || !current()) return false;
+        for (size_t index = 0; index < layout_.entryCount; ++index) {
+            const uint64_t offset = index * kPageBytes;
+            uint64_t rendered = 0, presented = 0, resolved = 0;
+            if (!live() || !readPinnedDescriptorPage(&render, offset, &rendered) ||
+                !readPinnedDescriptorPage(&present, offset, &presented) || presented != rendered ||
+                !qualified_.resolveMappedPage(*qualified_.mapper, *command_, pages_[index], resolved) ||
+                resolved != rendered) return false;
+        }
+        return current();
+    }
+
     bool releaseUnmapped() {
-        if (uncertain_) return false;
-        if (!command_) return true;
-        if (!table_.withdraw(qualified_) || command_->complete(false, false) != kIOReturnSuccess ||
+        if (uncertain()) return false;
+        if (command_ && (!table_.withdraw(qualified_) || command_->complete(false, false) != kIOReturnSuccess ||
             !qualified_.confirmUnusedUnmap(*qualified_.mapper, *command_) ||
-            command_->clearMemoryDescriptor(false) != kIOReturnSuccess) {
+            command_->clearMemoryDescriptor(false) != kIOReturnSuccess)) {
             uncertain_ = true;
             return false;
         }
-        releaseObjects();
+        if (presentPin_.bytes() && !presentPin_.releaseAfterRetirement()) return false;
+        presentPin_.recycleClosed();
+        if (command_) releaseObjects();
+        renderPreparation_ = presentPreparation_ = 0;
         return true;
     }
 
@@ -180,6 +207,8 @@ private:
     uint64_t *pages_{nullptr};
     FlatPageLayout layout_{};
     DcnFlatTable table_;
+    RenderDescriptorLease presentPin_;
+    uint64_t renderPreparation_{0}, presentPreparation_{0};
     bool uncertain_{false};
 };
 
