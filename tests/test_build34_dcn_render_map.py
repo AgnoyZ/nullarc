@@ -19,13 +19,14 @@ from test_build34_exact_ownership import method
 def render_fixture(source):
     client = source[source.index("class IOAccelPhxNativeClient :"):source.index(
         "OSDefineMetaClassAndStructors(IOAccelPhxNativeClient,")]
-    constants = source[source.index("static constexpr uint64_t kVaMask"):
+    constants = source[source.index("static constexpr uint64_t kHostCap"):
                        source.index("class PhxBringup :")]
     staged_methods = ("static bool shape(", "IOAccelPhxNativeClient::Bo *IOAccelPhxNativeClient::findBo(",
-                      "IOReturn IOAccelPhxNativeClient::doGemVa(",
-                      "uint64_t IOAccelPhxNativeClient::softwareMappedHostGenerationLocked(",
-                      "build34::dcn::RenderVmTranslation IOAccelPhxNativeClient::renderTranslationLocked(",
+                      "IOReturn IOAccelPhxNativeClient::doBoImportHost(", "IOReturn IOAccelPhxNativeClient::doGemVa(",
+                      "const IOAccelPhxNativeClient::Map *IOAccelPhxNativeClient::softwareMappedHostRangeLocked(",
+                      "build34::dcn::LiveHostRenderMap IOAccelPhxNativeClient::liveHostRenderMapLocked(",
                       "build34::dcn::RenderTlbAck IOAccelPhxNativeClient::confirmRenderTlbLocked(",
+                      "bool IOAccelPhxNativeClient::acquireRenderBackingClientLocked(",
                       "IOReturn IOAccelPhxNativeClient::doBoFree(", "void IOAccelPhxNativeClient::boRelease(",
                       "void IOAccelPhxNativeClient::freeAll(", "IOReturn IOAccelPhxNativeClient::clientClose(")
     slots = {
@@ -103,6 +104,7 @@ class RenderMapTests(unittest.TestCase):
                 *additional_flags,
                 "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-I" + str(ROOT / "src/phxbringup"),
                 "-I" + str(ROOT / "tools"),
+                "-I" + str(ROOT / "tests/build34_dcn"),
                 str(fixture), "-o", str(binary),
             ], capture_output=True, text=True, timeout=90)
             self.assertEqual(compile_result.returncode, 0, compile_result.stderr)

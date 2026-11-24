@@ -26,11 +26,24 @@ def stage(driver, abi):
 
     replace("        uint64_t va, size, off;\n        uint32_t flags;\n",
             "        uint64_t va, size, off;\n        uint32_t flags;\n        uint64_t softwareGeneration;\n")
+    replace("        bool host;\n", "        bool host;\n        uint64_t renderPreparation{0};\n")
+    replace("    bos[h] = Bo{md, size, 2, 0, nullptr, true};\n",
+            "    bos[h] = Bo{md, size, 2, 0, nullptr, true};\n"
+            "    if (size <= build34::dcn::kMaxBackingBytes) {\n"
+            "        const uint64_t preparation = md->getPreparationID();\n"
+            "        if (preparation > kIOPreparationIDAlwaysPrepared && preparation != UINT64_MAX)\n"
+            "            bos[h].renderPreparation = preparation;\n"
+            "    }\n")
     replace("    Map *maps{nullptr};    // kMaxMaps entries\n",
             "    Map *maps{nullptr};    // kMaxMaps entries\n"
             "    uint64_t renderMapGeneration{0};\n"
             "    bool renderMapsClosed{false};\n"
-            "    uint64_t softwareMappedHostGenerationLocked(uint64_t va, uint64_t bytes) const;\n")
+            "    const Map *softwareMappedHostRangeLocked(uint64_t va, uint64_t bytes) const;\n"
+            "    build34::dcn::LiveHostRenderMap liveHostRenderMapLocked(uint64_t va, uint64_t bytes) const;\n"
+            "    build34::dcn::RenderTlbAck confirmRenderTlbLocked(uint64_t va, uint64_t bytes) const;\n"
+            "    bool acquireRenderBackingClientLocked(const build34::dcn::BoundRenderImage &image,\n"
+            "        const build34::dcn::RenderTlbAck &ack, const void *presentSurface,\n"
+            "        const build34::dcn::ScanoutSurface &scanout, build34::dcn::RenderDescriptorLease &lease) const;\n")
     replace("void IOAccelPhxNativeClient::freeAll() {\n",
             "void IOAccelPhxNativeClient::freeAll() {\n"
             "    renderMapsClosed = true;\n"
@@ -48,31 +61,36 @@ def stage(driver, abi):
             "    if (v->offset_in_bo > b->size || v->map_size > b->size - v->offset_in_bo)\n")
     replace("maps[freei] = Map{true, v->handle, va, v->map_size, v->offset_in_bo, v->flags};",
             "maps[freei] = Map{true, v->handle, va, v->map_size, v->offset_in_bo, v->flags, 0};")
+    replace("            const IOReturn r = ensureVmid() ? owner->vmMap(vmid, va, b->md, v->offset_in_bo, v->map_size) : kIOReturnNoResources;\n",
+            "            bool exactHostPages = false;\n"
+            "            const IOReturn r = ensureVmid() ? owner->vmMap(vmid, va, b->md, v->offset_in_bo,\n"
+            "                v->map_size, b->renderPreparation ? &exactHostPages : nullptr) : kIOReturnNoResources;\n")
     replace("                maps[freei].used = false;\n                return r;\n            }\n",
             "                maps[freei].used = false;\n                return r;\n            }\n"
-            "            if (b->host && !renderMapsClosed && renderMapGeneration < UINT64_MAX - 1)\n"
+            "            if (b->host && exactHostPages && !renderMapsClosed && renderMapGeneration < UINT64_MAX - 1)\n"
             "                maps[freei].softwareGeneration = ++renderMapGeneration;\n")
     replace("            maps[i].used = false;\n            if (vmid)\n",
             "            maps[i].softwareGeneration = 0;\n"
             "            maps[i].used = false;\n            if (vmid)\n")
     anchor = "IOReturn IOAccelPhxNativeClient::doCtx(IOExternalMethodArguments *a) {"
-    replace(anchor, """uint64_t IOAccelPhxNativeClient::softwareMappedHostGenerationLocked(uint64_t va, uint64_t bytes) const {
+    replace(anchor, """const IOAccelPhxNativeClient::Map *IOAccelPhxNativeClient::softwareMappedHostRangeLocked(
+    uint64_t va, uint64_t bytes) const {
     if (renderMapsClosed || !maps || !vmid || va > kVaMask || !bytes || ((va | bytes) & 4095))
-        return 0;
+        return nullptr;
     for (int i = 0; i < kMaxMaps; ++i) {
         const Map &entry = maps[i];
         if (!entry.used || !entry.softwareGeneration || va < entry.va)
             continue;
         const uint64_t offset = va - entry.va;
         if (offset < entry.size && bytes <= entry.size - offset)
-            return entry.softwareGeneration;
+            return &entry;
     }
-    return 0;
+    return nullptr;
 }
 
 """ + anchor)
     replace('#include "PhxNativeABI.h"\n',
-            '#include "PhxNativeABI.h"\n#include "build34_dcn_render_tlb.h"\n'
+            '#include "PhxNativeABI.h"\n#include "build34_dcn_render_binding.h"\n'
             '#include "build34_exact_callbacks.h"\n')
     replace("    uint32_t vmidAlloc();\n", "    uint32_t vmidAlloc(const void *client);\n")
     replace("owner->vmidAlloc()", "owner->vmidAlloc(this)")
@@ -95,21 +113,44 @@ def stage(driver, abi):
             "        uint32_t handle, build34::dcn::RenderMapIdentity mapping);\n"
             "    build34::dcn::RenderTlbAck confirmRenderTlbLocked(\n"
             "        uint32_t handle, build34::dcn::RenderMapIdentity mapping);\n")
-    replace("    uint64_t softwareMappedHostGenerationLocked(uint64_t va, uint64_t bytes) const;\n",
-            "    uint64_t softwareMappedHostGenerationLocked(uint64_t va, uint64_t bytes) const;\n"
-            "    build34::dcn::RenderVmTranslation renderTranslationLocked(uint64_t va, uint64_t bytes) const;\n"
-            "    build34::dcn::RenderTlbAck confirmRenderTlbLocked(uint64_t va, uint64_t bytes) const;\n")
-    replace(anchor, """build34::dcn::RenderVmTranslation IOAccelPhxNativeClient::renderTranslationLocked(
+    replace(anchor, """build34::dcn::LiveHostRenderMap IOAccelPhxNativeClient::liveHostRenderMapLocked(
     uint64_t va, uint64_t bytes) const {
-    const uint64_t generation = softwareMappedHostGenerationLocked(va, bytes);
-    return generation && owner ? owner->renderVmIdentityLocked(vmid, {this, generation})
-                               : build34::dcn::RenderVmTranslation{};
+    const Map *entry = softwareMappedHostRangeLocked(va, bytes);
+    if (!owner || !entry || !bos || !entry->handle || entry->handle >= PHXN_MAX_BOS)
+        return {};
+    const Bo &bo = bos[entry->handle];
+    if (!bo.host || !bo.md || !bo.renderPreparation || bo.size != bo.md->getLength() ||
+        bo.md->getPreparationID() != bo.renderPreparation)
+        return {};
+    const auto translation = owner->renderVmIdentityLocked(vmid, {this, entry->softwareGeneration});
+    if (!translation.provider)
+        return {};
+    return {translation, bo.md, bo.renderPreparation, bo.size, entry->va, entry->off, entry->size};
 }
 
 build34::dcn::RenderTlbAck IOAccelPhxNativeClient::confirmRenderTlbLocked(uint64_t va, uint64_t bytes) const {
-    const uint64_t generation = softwareMappedHostGenerationLocked(va, bytes);
-    return generation && owner ? owner->confirmRenderTlbLocked(vmid, {this, generation})
-                               : build34::dcn::RenderTlbAck{};
+    const auto mapping = liveHostRenderMapLocked(va, bytes);
+    return mapping.descriptor ? owner->confirmRenderTlbLocked(vmid, mapping.translation.mapping)
+                              : build34::dcn::RenderTlbAck{};
+}
+
+bool IOAccelPhxNativeClient::acquireRenderBackingClientLocked(const build34::dcn::BoundRenderImage &image,
+    const build34::dcn::RenderTlbAck &ack, const void *presentSurface, const build34::dcn::ScanoutSurface &scanout,
+    build34::dcn::RenderDescriptorLease &lease) const {
+    if (image.translation.mapping.client != this || image.translation.provider != owner || !owner || !owner->gpuLock)
+        return false;
+    IOLockLock(owner->gpuLock);
+    const auto snapshot = liveHostRenderMapLocked(image.gpuAddress, scanout.mappedBytes);
+    IOLockUnlock(owner->gpuLock);
+    if (!build34::dcn::acquireBoundRenderBacking(image, snapshot, ack, presentSurface, scanout, lease))
+        return false;
+    IOLockLock(owner->gpuLock);
+    const auto current = owner->renderVmIdentityLocked(vmid, snapshot.translation.mapping);
+    IOLockUnlock(owner->gpuLock);
+    if (ack.matches(current))
+        return true;
+    lease.releaseAfterRetirement();
+    return false;
 }
 
 """ + anchor)
@@ -282,6 +323,25 @@ uint32_t PhxBringup::vmidAlloc(const void *client) {""")
             "    IOLockLock(gpuLock);\n    VmCtx &c = vm[handle - 1];\n"
             "    c.renderClient = nullptr;\n"
             "    c.renderContextGeneration = c.renderBindingGeneration = c.renderTableGeneration = 0;\n")
+    replace("IOMemoryDescriptor *md, uint64_t off, uint64_t size)",
+            "IOMemoryDescriptor *md, uint64_t off, uint64_t size, bool *exactHostPages)", 2)
+    replace("    IOReturn vmMap(uint32_t vmid, uint64_t va, IOMemoryDescriptor *md, uint64_t off, uint64_t size, bool *exactHostPages);\n",
+            "    IOReturn vmMap(uint32_t vmid, uint64_t va, IOMemoryDescriptor *md, uint64_t off, uint64_t size,\n"
+            "                   bool *exactHostPages = nullptr);\n")
+    replace("    IOReturn r = kIOReturnSuccess;\n    IOLockLock(gpuLock);\n",
+            "    IOReturn r = kIOReturnSuccess;\n"
+            "    bool exact = exactHostPages && size && !((va | off | size) & 4095);\n"
+            "    IOLockLock(gpuLock);\n")
+    replace("        *pte = (pa & kPtAddrMask) | kPteSysFlags;\n",
+            "        exact = exact && segLen >= 4096 && (pa & kPtAddrMask) == pa;\n"
+            "        *pte = (pa & kPtAddrMask) | kPteSysFlags;\n")
+    replace("    if (c.hw)   // an unbound context is flushed when it is next bound\n",
+            "    if (exactHostPages)\n"
+            "        *exactHostPages = exact && r == kIOReturnSuccess;\n"
+            "    if (c.hw)   // an unbound context is flushed when it is next bound\n")
+    replace("IOReturn PhxBringup::vmMap(uint32_t handle, uint64_t va, IOMemoryDescriptor *md, uint64_t off, uint64_t size, bool *exactHostPages) {\n",
+            "IOReturn PhxBringup::vmMap(uint32_t handle, uint64_t va, IOMemoryDescriptor *md, uint64_t off, uint64_t size, bool *exactHostPages) {\n"
+            "    if (exactHostPages)\n        *exactHostPages = false;\n")
     replace("    IOLockLock(gpuLock);\n    for (uint64_t p = 0; p < size; p += 4096) {\n",
             "    IOLockLock(gpuLock);\n"
             "    if (c.renderTableGeneration)\n"

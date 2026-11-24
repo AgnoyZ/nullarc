@@ -17,10 +17,11 @@ static constexpr uint64_t page = 4096;
 struct IOService {};
 struct IOMemoryDescriptor {
     uint64_t validBytes = 2 * page;
+    uint64_t secondPageAddress = 0x81000, secondPageLength = page;
     uint64_t getPhysicalSegment(uint64_t offset, IOByteCount *bytes, unsigned options) const {
         assert(options == kIOMemoryMapperNone);
-        *bytes = offset < validBytes ? page : 0;
-        return *bytes ? 0x80000 + offset : 0;
+        *bytes = offset >= validBytes ? 0 : offset == page ? secondPageLength : page;
+        return *bytes ? (offset == page ? secondPageAddress : 0x80000 + offset) : 0;
     }
 };
 struct IOBufferMemoryDescriptor {
@@ -112,7 +113,8 @@ struct PhxBringup {
     uint32_t vmidAlloc(const void *client);
     uint32_t vmBind(uint32_t handle);
     void vmidFree(uint32_t handle, uint64_t lastSeq);
-    IOReturn vmMap(uint32_t handle, uint64_t va, IOMemoryDescriptor *descriptor, uint64_t offset, uint64_t bytes);
+    IOReturn vmMap(uint32_t handle, uint64_t va, IOMemoryDescriptor *descriptor, uint64_t offset, uint64_t bytes,
+                   bool *exactHostPages = nullptr);
     IOReturn vmUnmap(uint32_t handle, uint64_t va, uint64_t bytes);
     IOReturn setPowerState(unsigned long ordinal, IOService *whichDevice);
 
@@ -154,6 +156,27 @@ struct PhxBringup {
 };
 
 // PHX34_VM_METHODS
+
+static void testExactHostSegments() {
+    PhxBringup service;
+    const unsigned client = 1;
+    const auto handle = service.vmidAlloc(&client);
+    IOMemoryDescriptor descriptor;
+    bool exact = true;
+    assert(service.vmMap(0, 0x10000, &descriptor, 0, 2 * page, &exact) == kIOReturnNotReady && !exact);
+    assert(service.vmMap(handle, 0x10000, &descriptor, 0, 2 * page, &exact) == kIOReturnSuccess && exact);
+    descriptor.secondPageLength = page - 1;
+    assert(service.vmMap(handle, 0x10000, &descriptor, 0, 2 * page, &exact) == kIOReturnSuccess && !exact);
+    descriptor.secondPageLength = page;
+    for (const uint64_t address : {uint64_t{0x81001}, (1ull << 48) | uint64_t{0x81000}}) {
+        descriptor.secondPageAddress = address;
+        assert(service.vmMap(handle, 0x10000, &descriptor, 0, 2 * page, &exact) == kIOReturnSuccess && !exact);
+        assert(service.ptes[1] == (0x81000 | kPteSysFlags));
+    }
+    descriptor.validBytes = page;
+    exact = true;
+    assert(service.vmMap(handle, 0x10000, &descriptor, 0, 2 * page, &exact) == kIOReturnVMError && !exact);
+}
 
 static void testIdentityLifetime() {
     PhxBringup service;
@@ -386,6 +409,7 @@ static void testLegacyUncertainty() {
 }
 
 int main() {
+    testExactHostSegments();
     testIdentityLifetime();
     testPowerAndExhaustion();
     testCheckedRequest();

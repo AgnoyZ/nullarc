@@ -113,7 +113,7 @@ that protects its original prepare against BO free and client close. The
 concrete descriptor must be known to support nesting with the original
 direction. Serialize all lease operations and descriptor prepare/complete
 calls, including BO teardown, and keep the lease storage alive through its
-last callback. The helper has no native lock, call site or implicit destructor
+last callback. The lease helper has no internal lock or implicit destructor
 cleanup. Release only after the transaction never used the pages or has
 proved old display/mapping use retired. Readers are withdrawn before complete;
 a failing complete retains the descriptor reference and permanently refuses
@@ -144,17 +144,34 @@ the snapshot through lease acquisition. Retain the client identity across
 the comparison so a recycled client address cannot match a stale record.
 
 The [isolated source stage](../tools/build34_dcn_render_map_stage.py) starts
-from the pinned build34 driver and ABI without modifying either. Its
-`doGemVa` assigns a fresh, per-client software generation only after the
-existing `vmMap` returns success for a host BO. GPU-not-ready bookkeeping
-maps, local BOs and failed GPUVM calls do not acquire a generation. VA and
-BO bounds use subtraction before the call. A lock-held lookup requires the
-entire page-aligned slice to fit one entry. Unmap, BO free and client close
+from the pinned build34 driver and ABI without modifying either.
+`doBoImportHost` records the original preparation ID after successful
+prepare of a task-backed descriptor within the lease's wiring cap. `doGemVa`
+assigns a fresh, per-client software generation only after `vmMap` succeeds
+and every physical segment used for the PTEs covers a full 4 KiB page with
+an address that survives the PTE mask unchanged. GPU-not-ready bookkeeping
+maps, local BOs, inexact segments and failed GPUVM calls do not acquire a
+generation. A short segment or truncated address changes only zero-copy
+eligibility, not the legacy PTE or return value. VA and BO bounds use
+subtraction before the call. A lock-held lookup requires the entire
+page-aligned slice to fit one entry. Unmap, BO free and client close
 withdraw the generations before forwarding to the existing cleanup; close
 permanently disables new generations. Saturation disables new generations
 without changing legacy map results. Tests extract the actual staged
 methods and use CPU doubles. No selector, exported ABI, map call sequence,
-or page-table programming implementation is added or replaced.
+or page-table programming sequence is added or replaced.
+
+The staged client resolves the descriptor, preparation ID, BO size and
+mapping offsets directly from the current BO table while protecting the
+client and GPUVM state. It compares that snapshot to the bound image and
+its ACK receipt before acquiring a lease. Nested `prepare` runs under the
+client lock, without the GPUVM lock. The client rechecks the translation
+after `prepare`; if it changed, the unused lease is released or retained
+as uncertain if cleanup fails. The caller still must keep the client and
+provider alive and serialize final lease release with BO teardown. A
+successful lease pins backing pages, not the render VMID or future writes.
+CPU tests exercise stale preparation/length, a table change during prepare,
+BO handle reuse, and reading the original offset pages after BO free.
 
 The software map generation identifies a completed software page-table
 update. The legacy `vmMap` can return before the context has a hardware

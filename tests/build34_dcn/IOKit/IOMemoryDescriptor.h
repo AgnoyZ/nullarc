@@ -9,6 +9,7 @@ inline constexpr uint64_t kIOPreparationIDAlwaysPrepared = 2;
 inline constexpr IOReturn kIOReturnSuccess = 0;
 
 struct IOMemoryDescriptor {
+    static IOMemoryDescriptor *withAddressRange(uint64_t address, uint64_t bytes, unsigned direction, void *task);
     virtual IOByteCount getLength() const = 0;
     virtual uint64_t getPhysicalSegment(IOByteCount offset, IOByteCount *length, unsigned options) = 0;
     virtual uint64_t getPreparationID() = 0;
