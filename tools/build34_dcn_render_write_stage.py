@@ -28,6 +28,8 @@ def stage(inputs):
     header = "nvmtl_vk.h"
     replace(header, '#include "nvmtl_sample_positions.h"\n',
             '#include "nvmtl_sample_positions.h"\n#include "build34_dcn_render_write.h"\n')
+    replace(header, "htype; /* its memory type + 1 when known (0 = unknown) */ } nvk_buffer;",
+            "htype; /* its memory type + 1 when known (0 = unknown) */ unsigned dcn_host_allocation; } nvk_buffer;")
     replace(header, "uint64_t up_token; } nvk_image;",
             "uint64_t up_token; nvmtl_dcn_attachment dcn_attachment; } nvk_image;")
     replace(header, "               } nvk_cmdbuf;",
@@ -50,6 +52,12 @@ def stage(inputs):
 """)
 
     vk = "nvmtl_vk.c"
+    replace(vk, "    out->map = ptr; out->alloc = size; out->imported = 1; out->htype = mt + 1;\n",
+            "    out->map = ptr; out->alloc = size; out->imported = 1; out->htype = mt + 1;\n"
+            "    out->dcn_host_allocation = mr.size && mr.size <= size;\n")
+    replace(vk, "typedef struct { size_t off, len; } pool_range;",
+            '#include "build34_dcn_external_alias.h"\n\n'
+            "typedef struct { size_t off, len; } pool_range;")
     replace(vk, '    VKCK(nvmtl_opaque_CreateImageView(g_dev, &vci, NULL, &out->view), "vkCreateImageView(buffer texture)");\n',
             """    VKCK(nvmtl_opaque_CreateImageView(g_dev, &vci, NULL, &out->view), "vkCreateImageView(buffer texture)");
     if (b->imported && b->map && !b->placed && b->alloc == b->size && !at &&

@@ -307,19 +307,44 @@ pages. Before producing a frame receipt, account for all writers, including
 ineligible/alternate backing, later split parts, overlapping command buffers,
 GPU copy/compute operations, and external/CPU writes. Do not infer that
 ordering from an IOSurface seed, ready mark, or observation serial. The
-current imported-image alias also lacks `VkExternalMemoryImageCreateInfo`
-and uses `PREINITIALIZED`. Before any native trial, qualify the exact image
-usage and tiling for host-pointer import, declare that handle type, and
-handle the required `UNDEFINED` initial layout without losing IOSurface
-contents on the legacy sampling path. See the Vulkan valid-usage entries
+legacy imported-image alias lacks `VkExternalMemoryImageCreateInfo` and uses
+`PREINITIALIZED`. It is not a valid template for a native render-only alias.
+See the Vulkan valid-usage entries
 [`vkBindImageMemory-memory-02989`](https://docs.vulkan.org/refpages/latest/refpages/source/vkBindImageMemory.html)
 and [`VkImageCreateInfo-pNext-01443`](https://docs.vulkan.org/refpages/latest/refpages/source/VkImageCreateInfo.html).
+
+The same isolated stage now includes a separate
+[external render alias constructor](../tools/build34_dcn_external_alias.h).
+It uses only memory from the successful host-allocation import, not the
+generic `imported` flag shared by the family VRAM path. It queries the exact
+BGRA attachment usage, tiling, and external handle type before creation.
+Explicit linear DRM layout requires a reported single memory plane. The
+constructor declares the host handle and starts in `UNDEFINED`, then checks
+dedicated-allocation requirements, the actual memory type and extent, and
+the reported zero-offset layout before binding the existing memory. Failure
+leaves no alias and does not free the buffer's memory. Neither the staged
+plugin nor production calls the new constructor. In particular, it must not
+replace the legacy IOSurface image when the first consumer samples or loads
+existing pixels. A future render caller must establish full Clear/Store on
+first use, the required layout transitions, exclusive access, and a retained
+IOSurface and import range through completion. The Vulkan declaration also
+does not establish that the IOSurface's host pointer has the required native
+allocation provenance or that other mappings can safely read the payload.
+The ordinary render pass ends in `TRANSFER_SRC_OPTIMAL`, which does not
+establish host-accessible alias contents. A later handoff must establish the
+required layout, memory dependency, and native display visibility; see
+[Vulkan memory aliasing](https://docs.vulkan.org/spec/latest/chapters/resources.html#resources-memory-aliasing)
+and [host-pointer import](https://docs.vulkan.org/refpages/latest/refpages/source/VkImportMemoryHostPointerInfoEXT.html).
 
 CPU tests compile the actual staged alias, render begin/end, submit and
 completion blocks with doubles. They cover wrong backing/layout, unsupported
 attachments, conflicting passes, rejected submissions, serial saturation and
-out-of-order completion. The complete staged plugin passes x86_64 SDK syntax
-checking with the pinned Vulkan headers; no bundle was built, loaded or run.
+out-of-order completion. Set `VULKAN_HEADERS` to the pinned checkout's
+`include` directory to also compile the external-alias cases. These exercise
+both tiling paths, exact query and create chains, refusals before binding, and
+cleanup following bind or view failure. The complete staged plugin passes
+x86_64 SDK syntax checking with the pinned Vulkan headers; no bundle was
+built, loaded or run.
 Rollback is to discard the temporary source stage. The accepted source and
 installed images are unchanged.
 

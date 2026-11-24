@@ -10,6 +10,7 @@ typedef struct {
     const void *surface, *image, *view, *buffer, *memory;
     uint32_t width, height;
     uint64_t pitch, footprint, import_bytes, bind_bytes;
+    unsigned external_host;
 } nvmtl_dcn_attachment;
 
 typedef struct {
@@ -38,7 +39,7 @@ static inline void nvmtl_dcn_set_alias(nvmtl_dcn_attachment *out,
     if (actual_bytes > bind_bytes || actual_bytes < footprint - pitch + pixel_bytes)
         return;
     *out = (nvmtl_dcn_attachment){0, image, view, buffer, memory,
-        width, height, pitch, footprint, import_bytes, bind_bytes};
+        width, height, pitch, footprint, import_bytes, bind_bytes, 0};
 }
 
 static inline void nvmtl_dcn_set_surface(nvmtl_dcn_attachment *alias, const void *surface,
@@ -62,7 +63,7 @@ static inline int nvmtl_dcn_same_attachment(const nvmtl_dcn_attachment *first,
         first->view == second->view && first->buffer == second->buffer && first->memory == second->memory &&
         first->width == second->width && first->height == second->height && first->pitch == second->pitch &&
         first->footprint == second->footprint && first->import_bytes == second->import_bytes &&
-        first->bind_bytes == second->bind_bytes;
+        first->bind_bytes == second->bind_bytes && first->external_host == second->external_host;
 }
 
 static inline void nvmtl_dcn_record_attachment(nvmtl_dcn_recording *recording,

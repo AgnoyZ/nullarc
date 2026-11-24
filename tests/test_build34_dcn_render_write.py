@@ -48,6 +48,32 @@ class RenderWrite(unittest.TestCase):
         self.assertLess(finish.index("nvmtl_cmd_retire(c)"), finish.index("c->dcn_completed ="))
         self.assertNotIn("return -", finish[finish.index("c->dcn_completed ="):])
 
+    def test_external_alias_isolated_from_legacy_imports(self):
+        self.assertEqual(self.vk.count("out->dcn_host_allocation ="), 1)
+        imported = function(self.vk, "int nvmtl_vk_buffer_import_host(")
+        self.assertLess(imported.index("pvkBindBufferMemory"), imported.index("out->dcn_host_allocation ="))
+        self.assertIn('#include "build34_dcn_external_alias.h"', self.vk)
+        self.assertFalse(any("nvmtl_dcn_create_render_alias(" in text for text in self.sources.values()))
+
+    def test_external_alias_query_bind_and_cleanup(self):
+        headers = os.environ.get("VULKAN_HEADERS")
+        if not headers:
+            self.skipTest("set VULKAN_HEADERS to the Vulkan-Headers include directory")
+        self.assertTrue((Path(headers) / "vulkan/vulkan.h").is_file(), headers)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "nvmtl_vk.h").write_text(self.sources["nvmtl_vk.h"])
+            binary = out / "external-alias"
+            built = subprocess.run([
+                os.environ.get("CC", "clang"), "-std=c11", "-Wall", "-Wextra", "-Werror", "-g",
+                "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
+                "-I" + str(out), "-I" + str(PLUGIN), "-I" + str(ROOT / "tools"), "-I" + headers,
+                str(Path(__file__).with_name("test_build34_dcn_external_alias.c")), "-o", str(binary),
+            ], capture_output=True, text=True, timeout=60)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_compiled_recording_and_submission_callsites(self):
         alias = function(self.vk, "const nvk_buffer *b, size_t offset, size_t row_pitch, nvk_image *out)\n{")
         begin = function(self.vk, "static int nvmtl_vk_cmd_begin_pass_impl(")
