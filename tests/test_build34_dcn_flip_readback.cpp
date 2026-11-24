@@ -23,7 +23,7 @@ struct Fixture {
     uint32_t unstableReadAt = 0, failReadAt = 0, allOnesAt = 0;
     uint64_t now = 1000, endDelay = 0;
     bool clockFails = false, losesRouteDuringRead = false, routeLive = true;
-    HubpFlipReader reader{this, (uint64_t{0x0500c} + 1) * 4, current, read, clock};
+    HubpFlipReader reader{this, (uint64_t{0x0500c} + 1) * 4, current, read, clock, this};
 
     static bool current(void *context, const HubpFlipRequest &identity) {
         const auto &self = *static_cast<Fixture *>(context);

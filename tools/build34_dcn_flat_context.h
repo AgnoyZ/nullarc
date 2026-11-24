@@ -36,7 +36,7 @@ bool matchDcnFlatContext(const DcnFlatContext &expected, const HubpFlipReader &r
 
     const auto equal = [&](uint32_t offset, uint32_t value, uint32_t mask = UINT32_MAX) {
         uint32_t reg = 0;
-        return current() && reader.readDword(reader.context, base + offset, reg) && (reg & mask) == value;
+        return current() && reader.readDword(reader.ioContext, base + offset, reg) && (reg & mask) == value;
     };
     return equal(0, 0, dcnVm::kDepthAndBlock) &&
         equal(1, static_cast<uint32_t>(expected.rootEntry >> 32)) && equal(2, static_cast<uint32_t>(expected.rootEntry)) &&

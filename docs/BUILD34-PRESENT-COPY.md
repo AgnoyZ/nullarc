@@ -949,6 +949,29 @@ No route provider or production caller is enabled. PhxFB is syntax-checked
 against the pinned kernel SDK. Omit the overlays to roll back; copy, VBL and
 accepted runtime inputs stay unchanged.
 
+The separate [BAR5 overlay](../tools/build34_dcn_bar5_stage.py) supplies the
+flip engine's register and clock callbacks from the exact native PhxBringup
+instance. The route keeps its own qualification identity but cannot supply
+the engine's BAR pointer or write callbacks. The adapter requires a live
+operation lease and the already closed, drained raw-writer gate. It binds
+the existing kernel mapping to the exact Phoenix PCI device and BAR5
+resource, matching descriptor, address, extent and memory-space enablement.
+It checks the resource again at poll entry and around each posted write.
+An observed sleep request irreversibly revokes the adapter for that service
+instance; wake does not rearm it.
+
+Only the flip engine's HUBP0/OTG0 registers, peer observations and the two
+nominated nonzero VM contexts are accessible. Peer reads do not grant peer
+writes, and VMID 0, arbitrary offsets and short mappings refuse. Writes use
+an ordered store followed by a same-register read; this is not a replacement
+for latch, DMA or translation proofs. No new user selector is exposed. The
+qualified route hook and mapper remain null in the staged source. The RAM
+fixture executes the actual adapter methods and drives HUBP readback through
+the separate native I/O and route contexts; native syntax and these mocks
+do not establish real BAR cache attributes, platform power continuity,
+external writer exclusion or DCN fetch visibility. Omit this overlay to
+return to the callback-only flip fixture.
+
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of
 writers outside that history or exclude later GPU, CPU or external writes

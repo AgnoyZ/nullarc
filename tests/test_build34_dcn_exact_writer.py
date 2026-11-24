@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 
 import build34_dcn_exact_writer_stage as writer
+import build34_dcn_bar5_stage as bar5
 import build34_dcn_firmware_home_stage as firmware_home
 import build34_dcn_flip_commit_stage as flip_commit
 import build34_dcn_present_handoff_stage as handoff
@@ -81,7 +82,7 @@ class ExactWriterTests(unittest.TestCase):
         self.check_native_methods(paired=True, pins=True, dma=True)
 
     def test_extracted_scanout_flip_lifetime(self):
-        self.check_native_methods(paired=True, pins=True, dma=True, flip=True)
+        self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True)
 
     def test_firmware_sample_keeps_existing_scanout_and_vbl(self):
         original = (ROOT / firmware_home.FRAMEBUFFER).read_bytes()
@@ -112,18 +113,26 @@ class ExactWriterTests(unittest.TestCase):
         pinned = scanout_pin.stage_native(DRIVER, ABI)
         mapped = scanout_dma.stage_native(DRIVER, ABI)
         flipped = flip_commit.stage_native(DRIVER, ABI)
+        bound = bar5.stage_native(DRIVER, ABI)
         for signature in ('bool PhxBringup::exactNativeOpenAdmitted(', 'IOReturn PhxBringup::gpuSubmit(',
                           'IOReturn IOAccelPhxNativeClient::externalMethod(', 'IOReturn PhxBringup::vmMap(',
                           handoff.CLOSE, handoff.SEAL, handoff.GLOBAL, pressure.SUBMIT):
             self.assertEqual(method(pinned, signature), method(source, signature))
             self.assertEqual(method(mapped, signature), method(pinned, signature))
             self.assertEqual(method(flipped, signature), method(mapped, signature))
+            self.assertEqual(method(bound, signature), method(flipped, signature))
         self.assertEqual(mapped.count('dcnCopyQualifiedMapper)(IOPCIDevice *){nullptr}'), 1)
         self.assertNotIn('dcnCopyQualifiedMapper =', mapped)
         self.assertEqual(flipped.count('dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr}'), 1)
         self.assertNotIn('dcnQualifiedFlipRoute =', flipped)
+        self.assertNotIn('dcnQualifiedFlipRoute =', bound)
+        begin = method(bound, flip_commit.BEGIN)
+        self.assertLess(begin.index('bindDcnBar5(intent, boundRoute)'), begin.index('dcnFlip.begin('))
+        self.assertIn('return barLive && dcnBar5Live();', method(bound, flip_commit.POLL))
+        power = method(bound, 'IOReturn PhxBringup::setPowerState(')
+        self.assertLess(power.index('&dcnBar5Revoked'), power.index('invalidateExactQueues();'))
 
-    def check_native_methods(self, paired=False, pins=False, dma=False, flip=False):
+    def check_native_methods(self, paired=False, pins=False, dma=False, flip=False, bar5_adapter=False):
         fixture = Path(__file__).with_suffix('.cpp').read_text()
         source = scanout_pin.stage_native(DRIVER, ABI) if pins else handoff.stage_native(DRIVER, ABI) if paired else self.source
         if dma:
@@ -153,9 +162,14 @@ class ExactWriterTests(unittest.TestCase):
             signatures += (flip_commit.LOOKUP, flip_commit.BIND, flip_commit.BEGIN, flip_commit.POLL)
             fields = fields.replace(scanout_dma.DMA_FIELDS, scanout_dma.DMA_FIELDS + flip_commit.SLOT)
             fields = fields.replace(scanout_dma.MAPPER_GATE, scanout_dma.MAPPER_GATE + flip_commit.FIELDS)
+        extracted = '\n'.join(method(source, signature) for signature in signatures)
+        if bar5_adapter:
+            bound = bar5.stage_native(DRIVER, ABI)
+            fields += bar5.FIELDS
+            extracted += '\n' + '\n'.join(method(bound, signature) for signature in bar5.SIGNATURES)
         for marker, replacement in {
             '// WRITER_METHODS': ('static OwnerEpochs gDcnPinSerials;\n' if pins else '') +
-            '\n'.join(method(source, signature) for signature in signatures),
+            extracted,
             '// WRITER_SERVICE': handoff.DRAIN_DECL + handoff.PROVIDER_PUBLIC + fields
             if paired else writer.SERVICE_DECL,
             '// WRITER_CLIENT': writer.CLIENT_STATE + probe + (handoff.CLIENT_FIELDS if paired else ''),
@@ -171,6 +185,7 @@ class ExactWriterTests(unittest.TestCase):
                           *(['-DTEST_SCANOUT_PINS'] if pins else []),
                           *(['-DTEST_SCANOUT_DMA'] if dma else []),
                           *(['-DTEST_SCANOUT_FLIP'] if flip else []),
+                          *(['-DTEST_SCANOUT_BAR5'] if bar5_adapter else []),
                           '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable', '-O1', '-g',
                           '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I' + str(self.headers),
                           '-I' + str(ROOT / 'tests/build34_dcn'), '-I' + str(ROOT / 'tools'),
@@ -194,7 +209,7 @@ class ExactWriterTests(unittest.TestCase):
                  '-I' + os.environ['BUILD34_KERNEL_HEADERS'], '-I' + str(self.headers),
                  '-I' + str(ROOT / 'tools'), '-I' + str(src.parent)]
         for source in (self.source, handoff.stage_native(DRIVER, ABI), scanout_pin.stage_native(DRIVER, ABI),
-                       scanout_dma.stage_native(DRIVER, ABI), flip_commit.stage_native(DRIVER, ABI)):
+                       scanout_dma.stage_native(DRIVER, ABI), flip_commit.stage_native(DRIVER, ABI), bar5.stage_native(DRIVER, ABI)):
             src.write_text(source)
             self.run_checked([*flags, str(src)])
         accel = ROOT / ACCEL

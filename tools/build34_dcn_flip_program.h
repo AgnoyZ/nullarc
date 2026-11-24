@@ -74,11 +74,11 @@ class HubpFlipProgram {
         bool current() const { return live() && reader.current(reader.context, request) && live(); }
 
         bool read(uint32_t reg, uint32_t &value) const {
-            return current() && reader.readDword(reader.context, reg, value) && value != UINT32_MAX;
+            return current() && reader.readDword(reader.ioContext, reg, value) && value != UINT32_MAX;
         }
 
         bool write(uint32_t reg, uint32_t value, bool held) const {
-            return peersIdle() && lockCurrent(held) && current() && writer.writeDword(reader.context, reg, value);
+            return peersIdle() && lockCurrent(held) && current() && writer.writeDword(reader.ioContext, reg, value);
         }
 
         bool peersIdle() const {
@@ -116,7 +116,7 @@ class HubpFlipProgram {
                 uint32_t lock = 0, flip = 0;
                 if (!read(hubp0::kOtgUpdateLock, lock) || !read(hubp0::kFlip, flip)) return false;
                 if (lockMatches(lock, flip, held)) return current();
-                if (attempt < 9 && current()) writer.delayUs(reader.context, 1);
+                if (attempt < 9 && current()) writer.delayUs(reader.ioContext, 1);
             }
             return false;
         }

@@ -28,6 +28,7 @@ struct HubpFlipReader {
     bool (*current)(void *, const HubpFlipRequest &);
     bool (*readDword)(void *, uint32_t, uint32_t &);
     bool (*readClockNs)(void *, uint64_t &);
+    void *ioContext;
 };
 
 namespace hubp0 {
@@ -71,8 +72,8 @@ public:
             return false;
         Sample baseline{};
         uint64_t start = 0, end = 0;
-        if (!reader.readClockNs(reader.context, start) || snapshot(request, reader, baseline) != Read::Stable ||
-            !reader.readClockNs(reader.context, end) || end < start || end - start >= kBudgetNs ||
+        if (!reader.readClockNs(reader.ioContext, start) || snapshot(request, reader, baseline) != Read::Stable ||
+            !reader.readClockNs(reader.ioContext, end) || end < start || end - start >= kBudgetNs ||
             !reader.current(reader.context, request) || baseline.pending || !(baseline.programmed == request.previous) ||
             !(baseline.inUse == request.previous) || !(baseline.earliest == request.previous))
             return false;
@@ -91,12 +92,12 @@ public:
         if (progress_ == HubpFlipProgress::OldAddressAbsent)
             progress_ = HubpFlipProgress::Latched;
         uint64_t before = 0, after = 0;
-        if (polls_ == kMaxPolls || !reader_.readClockNs(reader_.context, before) || !inBudget(before, lastTime_))
+        if (polls_ == kMaxPolls || !reader_.readClockNs(reader_.ioContext, before) || !inBudget(before, lastTime_))
             return fail();
         ++polls_;
         Sample sample{};
         const auto result = snapshot(request_, reader_, sample);
-        if (result == Read::Invalid || !reader_.readClockNs(reader_.context, after) || !inBudget(after, before) ||
+        if (result == Read::Invalid || !reader_.readClockNs(reader_.ioContext, after) || !inBudget(after, before) ||
             !reader_.current(reader_.context, request_))
             return fail();
         lastTime_ = after;
@@ -137,7 +138,7 @@ private:
 
     bool stillInBudget() {
         uint64_t now = 0;
-        if (!reader_.readClockNs(reader_.context, now) || !inBudget(now, lastTime_)) return false;
+        if (!reader_.readClockNs(reader_.ioContext, now) || !inBudget(now, lastTime_)) return false;
         lastTime_ = now;
         return true;
     }
@@ -187,7 +188,7 @@ private:
     }
 
     static bool read(const HubpFlipReader &reader, uint32_t address, uint32_t &value) {
-        return reader.readDword(reader.context, address, value) && value != UINT32_MAX;
+        return reader.readDword(reader.ioContext, address, value) && value != UINT32_MAX;
     }
 
     template<typename ReadDword>

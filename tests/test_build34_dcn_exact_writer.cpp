@@ -146,10 +146,41 @@ struct Phx34ScopedReference {
 #ifdef TEST_SCANOUT_FLIP
 #include "build34_dcn_flip_commit.h"
 #endif
+#ifdef TEST_SCANOUT_BAR5
+#include "build34_dcn_bar5.h"
+constexpr uint32_t kIOPCIConfigBaseAddress5 = 0x24, kIOPCIConfigCommand = 4, kIOPCIConfigVendorID = 0;
+struct Bar5Resource : IOBufferMemoryDescriptor {
+    uint64_t bytes = dcnPeers::kMmioBytes;
+    uint64_t getPhysicalAddress() const { return physical; }
+    IOByteCount getLength() const override { return bytes; }
+};
+struct IOMemoryMap {
+    Bar5Resource *resource;
+    uint64_t address, bytes, physical;
+    task_t task = kernel_task;
+    uint64_t getVirtualAddress() const { return address; }
+    uint64_t getLength() const { return bytes; }
+    uint64_t getPhysicalAddress() const { return physical; }
+    IOMemoryDescriptor *getMemoryDescriptor() const { return resource; }
+    task_t getAddressTask() const { return task; }
+};
+static unsigned bar5Delays = 0;
+static void IODelay(unsigned us) { assert(us == 1); ++bar5Delays; }
+#endif
 struct IOPCIDevice {
     IOMapper *mapper = nullptr;
 #ifdef TEST_SCANOUT_FLIP
     HubpFlipRoute *route = nullptr;
+#endif
+#ifdef TEST_SCANOUT_BAR5
+    Bar5Resource *bar5 = nullptr;
+    uint16_t command = 2;
+    uint32_t identity = 0x19001002;
+    bool inactive = false;
+    bool isInactive() const { return inactive; }
+    uint16_t configRead16(uint32_t reg) const { assert(reg == kIOPCIConfigCommand); return command; }
+    uint32_t configRead32(uint32_t reg) const { assert(reg == kIOPCIConfigVendorID); return identity; }
+    Bar5Resource *getDeviceMemoryWithRegister(uint32_t reg) const { assert(reg == kIOPCIConfigBaseAddress5); return bar5; }
 #endif
 };
 #endif
@@ -162,6 +193,10 @@ struct PhxBringup
 #ifdef TEST_SCANOUT_DMA
     IOPCIDevice pciObject;
     IOPCIDevice *pci = &pciObject;
+#endif
+#ifdef TEST_SCANOUT_BAR5
+    IOMemoryMap *mmio = nullptr;
+    CallbackGate<1> exactRawWriters;
 #endif
     static constexpr uint32_t kMaxCtx = 2;
     struct VmCtx {
@@ -966,7 +1001,7 @@ struct CommitFixture {
     bool publicationCurrent = true;
     FlipFault translationFault = FlipFault::None;
     uint64_t outputPages[2]{};
-    HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay},
+    HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock, this}, {write, delay},
                        qualified, {encodeLeaf, decodeLeaf, encodeRoot, tableCurrent}, retired, canInstallFlatVm,
                        canClearFlatVm, translationsRetired, &framebuffer};
     ScanoutPinToken pin{}, alternatePin{};
@@ -1771,6 +1806,90 @@ static void scanoutFlip(FlipFault fault) {
 }
 #endif
 
+#ifdef TEST_SCANOUT_BAR5
+static void exerciseDcnBar5() {
+    PhxBringup device;
+    Bar5Resource resource;
+    uint32_t registers[dcnPeers::kMmioBytes / sizeof(uint32_t)]{};
+    IOMemoryMap mapping{&resource, reinterpret_cast<uintptr_t>(registers), sizeof(registers), resource.physical};
+    device.mmio = &mapping;
+    device.pci->bar5 = &resource;
+    device.provider = device.pci;
+    bool current = true;
+    HubpFlipRoute route{};
+    route.reader.context = &current;
+    route.reader.current = [](void *context, const HubpFlipRequest &) { return *static_cast<bool *>(context); };
+    const ScanoutFlipIntent intent{{0x80000000, 0}, {0x90000000, 7}, {}, {}, ScanoutFlipResult::Refused};
+    assert(!device.bindDcnBar5(intent, route));
+    CallbackGate<>::Lease life(device.exactCallbacks);
+    CallbackGate<1>::Lease operation(device.dcnPinOperation);
+    assert(life && operation);
+    {
+        CallbackGate<1>::Lease raw(device.exactRawWriters);
+        assert(raw && device.exactRawWriters.close());
+        assert(!device.bindDcnBar5(intent, route));
+    }
+    device.pci->identity ^= 1;
+    assert(!device.bindDcnBar5(intent, route));
+    device.pci->identity ^= 1;
+    mapping.task = &current;
+    assert(!device.bindDcnBar5(intent, route));
+    mapping.task = kernel_task;
+    --mapping.bytes;
+    assert(!device.bindDcnBar5(intent, route));
+    ++mapping.bytes;
+    mapping.physical += kPage;
+    assert(!device.bindDcnBar5(intent, route));
+    mapping.physical -= kPage;
+    assert(device.bindDcnBar5(intent, route) && route.reader.context == &current && route.reader.ioContext == &device);
+    auto *io = route.reader.ioContext;
+    const auto read = [&](uint32_t reg, uint32_t &value) { return route.reader.readDword(io, reg, value); };
+    const auto write = [&](uint32_t reg, uint32_t value) { return route.writer.writeDword(io, reg, value); };
+    uint32_t value = 0;
+    registers[hubp0::kFrame] = 22;
+    assert(read(hubp0::kFrame, value) && value == 22);
+    assert(!read(UINT32_MAX, value) && !read(0, value) && value == 22);
+    registers[hubp0::kFrame] = UINT32_MAX;
+    assert(!read(hubp0::kFrame, value) && value == 22);
+    assert(!write(hubp0::kFrame, 1) && !write(0, 1) && !write(dcnVm::base(0), 1) && !write(dcnVm::base(8), 1));
+    assert(!registers[dcnVm::base(0)] && !registers[dcnVm::base(8)]);
+    assert(write(dcnVm::base(7) + 2, 0x3001) && read(dcnVm::base(7) + 2, value) && value == 0x3001);
+    assert(write(hubp0::kProgrammedHigh, 0x90) && registers[hubp0::kProgrammedHigh] == 0x90);
+    registers[hubp0::kFrame] = 22;
+    registers[hubp0::kProgrammedHigh] = 0;
+    registers[hubp0::kProgrammedLow] = registers[hubp0::kInUseLow] = registers[hubp0::kEarliestLow] = intent.previous.address;
+    const HubpFlipRequest request{&current, 1, 2, intent.previous, intent.next, {}, {&device, 3}};
+    HubpFlipReadback readback;
+    assert(readback.begin(request, route.reader));
+    ++registers[hubp0::kFrame];
+    registers[hubp0::kVmid] = intent.next.vmid;
+    registers[hubp0::kInUseHigh] = registers[hubp0::kEarliestHigh] = intent.next.vmid << 28;
+    registers[hubp0::kProgrammedLow] = registers[hubp0::kInUseLow] = registers[hubp0::kEarliestLow] = intent.next.address;
+    assert(readback.poll() == HubpFlipProgress::Latched);
+    ++registers[hubp0::kFrame];
+    assert(readback.poll() == HubpFlipProgress::OldAddressAbsent);
+    current = false;
+    assert(readback.poll() == HubpFlipProgress::Uncertain);
+    assert(write(hubp0::kProgrammedHigh, 0x90));
+    uint64_t ns = 0;
+    assert(route.reader.readClockNs(io, ns) && ns == 1);
+    route.writer.delayUs(io, 2);
+    route.writer.delayUs(io, 1);
+    assert(bar5Delays == 1);
+    auto replacement = mapping;
+    device.mmio = &replacement;
+    assert(!read(hubp0::kControl, value) && !write(hubp0::kProgrammedHigh, 0));
+    device.mmio = &mapping;
+    device.pci->command = 0;
+    assert(!write(hubp0::kProgrammedHigh, 0) && registers[hubp0::kProgrammedHigh] == 0x90);
+    device.pci->command = 2;
+    __atomic_store_n(&device.dcnBar5Revoked, true, __ATOMIC_RELEASE);
+    assert(!device.bindDcnBar5(intent, route) && !route.reader.readClockNs(io, ns) && !read(hubp0::kControl, value));
+    route.writer.delayUs(io, 1);
+    assert(bar5Delays == 1);
+}
+#endif
+
 int main() {
     completionAndPages();
     newerAndRacingCompletions();
@@ -1909,6 +2028,9 @@ int main() {
     scanoutFlip(FlipFault::TranslationPending);
     scanoutFlip(FlipFault::TranslationLost);
     scanoutFlip(FlipFault::FrontRevertedDuringTranslations);
+#endif
+#ifdef TEST_SCANOUT_BAR5
+    exerciseDcnBar5();
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }
