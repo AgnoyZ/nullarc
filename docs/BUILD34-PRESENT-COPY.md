@@ -706,11 +706,26 @@ the exact prepared DMA commands. After baseline readback the provider
 requires the route to resolve each pinned side's logical 4 KiB pages in
 its requested VMID and compares them in order with the DMA lease's private
 list. The resolver must read the selected display translation under the
-current route lease, including verification of the accessible leaf and its
-address domain; it must not echo the published DMA plan. This check is
-within the flip deadline, before update locking, and holds neither the GPU
-nor the client lock. A missing resolver, read error, mismatched final page,
-revoked route or elapsed deadline refuses before any register write.
+current route lease and verify each leaf's permissions and address domain;
+it must not echo the published DMA plan. The [DCN flat-context check](../tools/build34_dcn_flat_context.h)
+binds that walk to the route's retained root entry, not a root derived
+from MMIO. It reads the selected DCN VMID's root, inclusive range and
+depth/block fields and requires the exact DMA window and a ready flat root.
+It passes that checked context and relative index to the leaf reader.
+The check uses the pinned DCN 3.1.4 register definitions above and the flat
+context fields in AMD's [HUBBUB setup](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubbub/dcn20/dcn20_hubbub.c#L381-L425)
+and [VMID setup](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/dcn20/dcn20_vmid.c).
+This does not infer a physical address from the encoded root, reserve a
+VMID, or attest the allocation or the live platform's PTE encoding.
+
+Only nonzero VMIDs qualify for pinned surfaces in this stage; each pin
+requires its own exact window. VMID 0 is not reprogrammed. Firmware-backed
+sides remain outside the flat-context check and need independent address
+qualification. The initial root and leaf checks run within the flip deadline
+without the GPU or client lock. A missing callback, root or range mismatch,
+read error, final-page mismatch, revoked route or elapsed deadline refuses
+before any register write. The contexts are rechecked after the page walks
+and under the OTG lock, before any VMID or surface address write.
 
 A page match does not establish device visibility, total fetch coverage,
 or proof of retirement. The route still must hold translation stable from
@@ -755,17 +770,20 @@ does not establish hardware latch, which still requires separate readback.
 Only fresh old-address absence plus the same route's independent fetch and
 old-translation retirement confirmation permits old DMA teardown. The live
 geometry and route must still match before and after that callback, within
-the same deadline. The client lock is try-only and no GPU lock is held
-across callbacks. The old command must complete, independently confirm
-unmap, and clear before the descriptor
-hold is released. The new front stays pinned. On timeout, observed close,
+the same deadline. Polling checks both expected VMIDs until old retirement
+begins, then checks the new VMID without requiring the old context to remain
+programmed. The root is retained as part of the front pin's identity; a
+replacement root cannot authorize the next flip. The client lock is try-only
+and no GPU lock is held across callbacks. The old command must complete,
+independently confirm unmap, and clear before the descriptor hold is released.
+The new front stays pinned. On timeout, observed close,
 an ambiguous write, or cleanup failure, the provider retains the reachable
 backing and route and admits no replacement commit. On success, a return to
 the verified firmware surface retires the last DMA pin and releases the route
 reference outside the client lock. The CPU tests use independent register
-offsets and cover both directions, different pinned pitches with the same
-page count, wrong geometry before issue, geometry changes at lock acquisition
-or retirement, and teardown faults. There is no hardware implementation of
+offsets for two VMIDs and cover round trips to firmware, pinned-to-pinned
+rotation, root changes during issue or retirement, mismatched layout, and
+teardown faults. There is no hardware implementation of
 the route callback, no active framebuffer caller, and no change to the R2a
 or `l10r` path. Omit the overlay to roll back this source-only step.
 

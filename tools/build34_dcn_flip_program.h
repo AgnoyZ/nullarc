@@ -30,15 +30,15 @@ class HubpFlipProgram {
         return access.baseline(surface, false, vmid);
     }
 
-    template<typename IsLive>
+    template<typename IsLive, typename ContextsCurrent>
     static bool issue(const HubpFlipRequest &request, const HubpFlipReader &reader, HubpFlipWriter writer,
-                      const ScanoutSurface &surface, IsLive live) {
+                      const ScanoutSurface &surface, IsLive live, ContextsCurrent contextsCurrent) {
         if (!preflight(request, reader, writer, surface, live)) return false;
         using namespace hubp0;
         Access<IsLive> access{request, reader, writer, live};
         uint32_t vmid = 0;
         if (!access.write(kOtgUpdateLock, kOtgLockRequest) || !access.waitLock(true) ||
-            !access.baseline(surface, true, vmid))
+            !access.baseline(surface, true, vmid) || !contextsCurrent() || !access.locked())
             return false;
         if (!access.write(kVmid, (vmid & ~0xfu) | request.next.vmid) ||
             !access.locked() || !access.write(kProgrammedHigh, static_cast<uint32_t>(request.next.address >> 32)) ||

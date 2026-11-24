@@ -873,22 +873,32 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        Issue, UnlockTimeout, Close, CloseDuringQualify, CloseDuringRetire, LateRetire, Unmap,
                        WrongFormat, SwappedChannels, AlphaPlane, Protected, Tiled, WrongPitch, Cropped, WrongViewport,
                        SplitInput, SplitOutput, WrongOdmSource, DisabledOtg,
-                       NoTranslationReader, TranslationError, WrongLastPage, LateTranslation, RevokedTranslation, WrongPreviousPage,
-                       DifferentPinnedPitch, GeometryAtLock, GeometryAtRetire, GeometryBeforeRetire };
+                       NoTranslationReader, TranslationError, WrongLastPage, LateTranslation, RevokedTranslation,
+                       WrongPreviousPage, NoContextRoot, UnreadyContext, WrongContextRoot, WrongContextDepth,
+                       WrongContextBlock, WrongContextStart, WrongContextEnd, ContextAfterPageWalk, ContextAtLock,
+                       ContextWhilePending, ContextDuringRetire, ReplacedFrontContext,
+                       DualPins, DualContextDuringRetire, DifferentPinnedPitch, GeometryAtLock, GeometryAtRetire,
+                       GeometryBeforeRetire };
 
 struct CommitFixture {
     ScanoutFixture scanout;
     IOMapper mapper;
     IODMACommand command, nextCommand;
     OSObject lifetime;
-    const HubpAddress home{0x800000000, 0}, mapped{0x100000, 7};
-    HubpAddress programmed = home, active = home, earliest = home;
+    const HubpAddress home{0x800000000, 0}, mapped{0xa00100100000, 7};
+    const HubpAddress alternate{mapped.address + 2 * kPage, 8};
+    HubpAddress programmed = home, active = home, earliest = home, target = home;
     uint32_t frame = 42;
     uint64_t now = 800;
     unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0, pageReads = 0;
     uint32_t lockSelect = 0, surfaceControl = 0;
     uint32_t surfaceFormat = 8, returnControl = 0x00e00000, swizzle = 0, start = 0;
     uint32_t dimensions = (17u << 16) | 64u, pitch = 63, odm = 0xfff00000, otg = 0x00010001;
+    const uint64_t ownedRoot = 0x123400005001;
+    uint64_t contextRoot = ownedRoot, firstPage = mapped.address / kPage, lastPage = firstPage + 1;
+    const uint64_t alternateRoot = 0x123400006001;
+    uint64_t alternateContextRoot = alternateRoot;
+    uint32_t contextControl = 0;
     bool lockRequested = false, lockHeld = false, lockTimeout = false, unlockTimeout = false;
     bool qualify = true, live = true, pending = false, failHigh = false, failIssue = false, retire = false, failUnmap = false;
     bool loseRouteAfterHigh = false, rewindAfterHigh = false;
@@ -897,8 +907,8 @@ struct CommitFixture {
     FlipFault translationFault = FlipFault::None;
     uint64_t outputPages[2]{};
     HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay},
-                       qualified, readTranslatedPage, retired};
-    ScanoutPinToken pin{};
+                       qualified, flatRoot, readFlatPage, retired};
+    ScanoutPinToken pin{}, alternatePin{};
 
     CommitFixture() {
         IODMACommand::next = &command;
@@ -919,15 +929,26 @@ struct CommitFixture {
             *cursor = 2 * kPage;
             return kIOReturnSuccess;
         };
-        nextCommand.segments = command.segments;
+        nextCommand.segments = [](UInt64 *cursor, IODMACommand::Segment64 *segments, UInt32 *count) {
+            assert(!*cursor && *count == 2);
+            segments[0] = {0x800000, kPage};
+            segments[1] = {0x901000, kPage};
+            *cursor = 2 * kPage;
+            return kIOReturnSuccess;
+        };
         mapper.resolve = [&](const IODMACommand &mapped, uint64_t address, uint64_t &physical) {
-            assert(&mapped == IODMACommand::next && (address == 0x500000 || address == 0x601000));
-            physical = scanout.frame.host.base + (address == 0x500000 ? 2 : 4) * kPage;
+            assert(&mapped == IODMACommand::next);
+            const bool alternate = &mapped == &nextCommand;
+            assert(alternate || &mapped == &command);
+            const bool first = address == (alternate ? 0x800000 : 0x500000);
+            assert(first || address == (alternate ? 0x901000 : 0x601000));
+            physical = scanout.frame.host.base + (first ? 2 : 4) * kPage;
             return true;
         };
         mapper.confirmUnmap = [&](const IODMACommand &completed) {
-            assert(&completed == &command && retire && retireChecks >= 3 && scanout.client.guard.held &&
-                   !scanout.device.guard.held && lifetime.references == 2 && scanout.frame.host.wires == 2);
+            assert(&completed == &command && retire && retireChecks >= (alternatePin.serial ? 2u : 3u) &&
+                   scanout.client.guard.held && !scanout.device.guard.held && lifetime.references == 2 &&
+                   scanout.frame.host.wires == (alternatePin.serial ? 3u : 2u));
             return !failUnmap;
         };
         scanout.offer();
@@ -958,26 +979,48 @@ struct CommitFixture {
                           const IODMACommand *next) {
         auto &self = *static_cast<CommitFixture *>(context);
         assert(self.lifetime.references == 2 && !self.scanout.device.guard.held);
-        assert((old == &self.command && !next && request.previousPin == self.pin) ||
-               (!old && next == &self.command && request.nextPin == self.pin));
+        const auto commandFor = [&](ScanoutPinToken token) -> const IODMACommand * {
+            if (!token.serial) return nullptr;
+            assert(token == self.pin || token == self.alternatePin);
+            return token == self.pin ? &self.command : &self.nextCommand;
+        };
+        assert(old == commandFor(request.previousPin) && next == commandFor(request.nextPin));
+        self.target = request.next;
         if (self.closeDuringQualify) self.scanout.device.exactCallbacks.close();
         return self.qualify;
     }
 
-    static bool readTranslatedPage(void *context, const HubpFlipRequest &request, ScanoutPinToken token,
-                                   HubpAddress address, uint64_t &dmaPage) {
+    static bool flatRoot(void *context, const HubpFlipRequest &request, ScanoutPinToken token, uint64_t &root) {
+        const auto &self = *static_cast<CommitFixture *>(context);
+        assert((token == self.pin || token == self.alternatePin) &&
+               (request.previousPin == token || request.nextPin == token));
+        assert(self.lifetime.references == 2 && !self.scanout.device.guard.held && !self.scanout.client.guard.held);
+        root = token == self.alternatePin ? self.alternateRoot :
+            self.translationFault == FlipFault::ReplacedFrontContext && request.previousPin == token ?
+                self.contextRoot : self.ownedRoot;
+        return true;
+    }
+
+    static bool readFlatPage(void *context, const HubpFlipRequest &request, ScanoutPinToken token,
+                             const DcnFlatContext &table, size_t index, uint64_t &dmaPage) {
         auto &self = *static_cast<CommitFixture *>(context);
         const bool previous = request.previousPin == token;
-        assert(token == self.pin && (previous ? request.previous : request.next) == self.mapped);
+        assert(token == self.pin || token == self.alternatePin);
+        const bool alternate = token == self.alternatePin;
+        const auto address = alternate ? self.alternate : self.mapped;
+        assert((previous ? request.previous : request.next) == address);
         assert(!self.scanout.device.guard.held && !self.scanout.client.guard.held && !self.lockRequested);
-        assert(self.command.prepared && self.lifetime.references == 2);
+        assert((alternate ? self.nextCommand : self.command).prepared && self.lifetime.references == 2);
         const bool last = (self.pageReads++ & 1) != 0;
-        assert(address.vmid == self.mapped.vmid && address.address == self.mapped.address + (last ? kPage : 0));
-        dmaPage = last ? 0x601000 : 0x500000;
+        assert(index == static_cast<size_t>(last) && table.vmid == address.vmid &&
+               table.rootEntry == (alternate ? self.alternateRoot : self.ownedRoot));
+        assert(table.firstPage == address.address / kPage && table.lastPage == table.firstPage + 1);
+        dmaPage = alternate ? (last ? 0x901000 : 0x800000) : (last ? 0x601000 : 0x500000);
         if (last && (self.translationFault == FlipFault::WrongLastPage ||
                      (previous && self.translationFault == FlipFault::WrongPreviousPage))) {
             dmaPage = self.outputPages[1];
         }
+        if (last && self.translationFault == FlipFault::ContextAfterPageWalk) self.contextRoot ^= kPage;
         if (self.translationFault == FlipFault::LateTranslation) self.now += 100000000;
         if (self.translationFault == FlipFault::RevokedTranslation) self.live = false;
         return self.translationFault != FlipFault::TranslationError;
@@ -987,7 +1030,7 @@ struct CommitFixture {
         auto &self = *static_cast<CommitFixture *>(context);
         assert(self.scanout.cancelPin(self.pin) == kIOReturnBusy);
         assert(self.lifetime.references == 2 && !self.scanout.device.guard.held);
-        const auto target = self.issues ? self.home : self.mapped;
+        const auto target = self.target;
         const auto step = self.writes++ % 5;
         switch (address) {
         case hubp0::kOtgUpdateLock:
@@ -996,9 +1039,10 @@ struct CommitFixture {
                 self.lockRequested = true;
                 self.lockHeld = !self.lockTimeout;
                 if (self.changeGeometryAtLock) ++self.pitch;
+                if (self.translationFault == FlipFault::ContextAtLock) self.contextRoot ^= kPage;
             } else {
                 assert(step == 4 && self.lockRequested && self.lockHeld && self.pending &&
-                       self.programmed == (self.issues == 1 ? self.mapped : self.home));
+                       self.programmed == target);
                 self.lockRequested = false;
                 self.lockHeld = self.unlockTimeout;
             }
@@ -1038,6 +1082,10 @@ struct CommitFixture {
         if (self.closeDuringRetire && request.previousPin.serial) self.scanout.device.exactCallbacks.close();
         if (self.lateRetire && request.previousPin.serial) self.now += 100000000;
         if (self.changeGeometryAtRetire && request.previousPin.serial) ++self.pitch;
+        if (request.previousPin.serial) self.contextRoot = 0;
+        if (self.translationFault == FlipFault::ContextDuringRetire && request.nextPin.serial) self.contextRoot ^= kPage;
+        if (self.translationFault == FlipFault::DualContextDuringRetire && request.nextPin == self.alternatePin)
+            self.alternateContextRoot ^= kPage;
         return self.retire;
     }
 
@@ -1061,6 +1109,20 @@ struct CommitFixture {
         case 0x03ac7: value = self.pitch; break;
         case 0x04f8b: value = self.odm; break;
         case 0x05001: value = self.otg; break;
+        case 0x03a4a: value = self.contextControl; break;
+        case 0x03a4b: value = static_cast<uint32_t>(self.contextRoot >> 32); break;
+        case 0x03a4c: value = static_cast<uint32_t>(self.contextRoot); break;
+        case 0x03a4d: value = static_cast<uint32_t>(self.firstPage >> 32); break;
+        case 0x03a4e: value = static_cast<uint32_t>(self.firstPage); break;
+        case 0x03a4f: value = static_cast<uint32_t>(self.lastPage >> 32); break;
+        case 0x03a50: value = static_cast<uint32_t>(self.lastPage); break;
+        case 0x03a51: value = 0; break;
+        case 0x03a52: value = static_cast<uint32_t>(self.alternateContextRoot >> 32); break;
+        case 0x03a53: value = static_cast<uint32_t>(self.alternateContextRoot); break;
+        case 0x03a54: value = static_cast<uint32_t>(self.alternate.address / kPage >> 32); break;
+        case 0x03a55: value = static_cast<uint32_t>(self.alternate.address / kPage); break;
+        case 0x03a56: value = static_cast<uint32_t>((self.alternate.address / kPage + 1) >> 32); break;
+        case 0x03a57: value = static_cast<uint32_t>(self.alternate.address / kPage + 1); break;
         case hubp0::kOtgLockSelect: value = self.lockSelect; break;
         case hubp0::kOtgUpdateLock:
             value = (self.lockRequested ? hubp0::kOtgLockRequest : 0) | (self.lockHeld ? hubp0::kOtgLockStatus : 0);
@@ -1137,9 +1199,22 @@ static void scanoutFlip(FlipFault fault) {
     fixture.rewindAfterHigh = fault == FlipFault::ClockRewind;
     fixture.failIssue = fault == FlipFault::Issue;
     fixture.translationFault = fault;
-    if (fault == FlipFault::NoTranslationReader) {
-        fixture.route.readTranslatedPage = nullptr;
+    if (fault == FlipFault::NoTranslationReader || fault == FlipFault::NoContextRoot) {
+        if (fault == FlipFault::NoTranslationReader) fixture.route.readFlatPage = nullptr;
+        else fixture.route.flatRoot = nullptr;
         assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.writes && !fixture.pageReads);
+        return;
+    }
+    if (fault == FlipFault::UnreadyContext) fixture.contextRoot &= ~uint64_t{1};
+    if (fault == FlipFault::WrongContextRoot) fixture.contextRoot ^= 1ull << 32;
+    if (fault == FlipFault::WrongContextDepth) fixture.contextControl |= 1u << 1;
+    if (fault == FlipFault::WrongContextBlock) fixture.contextControl |= 1u << 3;
+    if (fault == FlipFault::WrongContextStart) fixture.firstPage ^= 1ull << 32;
+    if (fault == FlipFault::WrongContextEnd) ++fixture.lastPage;
+    if (fault >= FlipFault::UnreadyContext && fault <= FlipFault::ContextAfterPageWalk) {
+        assert(fixture.begin(request) == kIOReturnNotReady && fixture.reads && !fixture.writes && !request.operation.serial);
+        assert(fixture.pageReads == (fault == FlipFault::ContextAfterPageWalk ? 2u : 0u));
+        assert(fixture.command.prepared && fixture.lifetime.references == 1);
         return;
     }
     if (fault >= FlipFault::TranslationError && fault <= FlipFault::RevokedTranslation) {
@@ -1164,14 +1239,20 @@ static void scanoutFlip(FlipFault fault) {
     assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
     ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
     const bool afterHigh = fixture.failHigh || fixture.loseRouteAfterHigh || fixture.rewindAfterHigh;
-    if (fixture.lockTimeout || fixture.changeGeometryAtLock || afterHigh || fixture.failIssue || fixture.unlockTimeout) {
-        const unsigned expectedWrites = (fixture.lockTimeout || fixture.changeGeometryAtLock) ? 1 :
-            afterHigh ? 3 : fixture.failIssue ? 4 : 5;
+    const bool atLock = fixture.lockTimeout || fixture.changeGeometryAtLock || fault == FlipFault::ContextAtLock;
+    if (atLock || afterHigh || fixture.failIssue || fixture.unlockTimeout) {
+        const unsigned expectedWrites = atLock ? 1 : afterHigh ? 3 : fixture.failIssue ? 4 : 5;
         assert(fixture.writes == expectedWrites && fixture.issues == (expectedWrites >= 4));
         assert(fixture.delays == (fixture.lockTimeout || fixture.unlockTimeout ? 9u : 0u));
         assert(request.result == ScanoutFlipResult::Uncertain);
         assert(fixture.poll(poll) == kIOReturnSuccess && poll.result == ScanoutFlipResult::Uncertain);
         assert(fixture.writes == expectedWrites && fixture.retireChecks == 0 && fixture.command.prepared);
+        return;
+    }
+    if (fault == FlipFault::ContextWhilePending) {
+        fixture.contextRoot ^= kPage;
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.writes == 5 && !fixture.retireChecks && fixture.command.prepared);
         return;
     }
     assert(request.result == ScanoutFlipResult::Issued && fixture.writes == 5 && fixture.issues == 1);
@@ -1186,6 +1267,11 @@ static void scanoutFlip(FlipFault fault) {
     fixture.active = fixture.earliest = fixture.mapped;
     fixture.retire = true;
     fixture.step(poll, ScanoutFlipResult::Waiting);
+    if (fault == FlipFault::ContextDuringRetire) {
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.writes == 5 && fixture.retireChecks == 1 && fixture.command.prepared && !fixture.command.completes);
+        return;
+    }
     fixture.step(poll, ScanoutFlipResult::Presented);
     assert(!fixture.command.completes && fixture.retireChecks == 1);
     assert(fixture.poll(poll) == kIOReturnNotFound && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
@@ -1207,10 +1293,37 @@ static void scanoutFlip(FlipFault fault) {
         return;
     }
 
+    if (fault == FlipFault::DualPins || fault == FlipFault::DualContextDuringRetire) {
+        IODMACommand::next = &fixture.nextCommand;
+        scanout.frame.copy.scanout = {64, 17, fixture.pitch, 8, 2 * kPage};
+        scanout.offer();
+        DmaRun scratch[2]{};
+        uint64_t pages[2]{};
+        ScanoutDmaRequest mapped{&scanout.frame.copy, fixture.alternate.address, scratch, 2, pages, 2, {}, {}};
+        const OSSymbol map{BUILD34_DCN_PIN_MAP};
+        assert(fixture.dispatch(map, &mapped) == kIOReturnSuccess && mapped.token.serial);
+        fixture.alternatePin = mapped.token;
+        request = {fixture.mapped, fixture.alternate, fixture.alternatePin, {}, ScanoutFlipResult::Refused};
+        assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Issued);
+        assert(fixture.pageReads == 6 && fixture.writes == 10 && DcnAllocationStub::live() == 2);
+        poll.operation = request.operation;
+        fixture.pending = false;
+        fixture.active = fixture.earliest = fixture.alternate;
+        fixture.step(poll, ScanoutFlipResult::Waiting);
+        const bool failed = fault == FlipFault::DualContextDuringRetire;
+        fixture.step(poll, failed ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
+        assert(fixture.retireChecks == 2 && fixture.command.completes == !failed && !fixture.nextCommand.completes);
+        assert(DcnAllocationStub::live() == (failed ? 2u : 1u));
+        assert(scanout.cancelPin(fixture.alternatePin) == kIOReturnNotFound);
+        return;
+    }
+
     request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
-    if (fault == FlipFault::WrongPreviousPage) {
+    if (fault == FlipFault::WrongPreviousPage || fault == FlipFault::ReplacedFrontContext) {
+        if (fault == FlipFault::ReplacedFrontContext) fixture.contextRoot ^= kPage;
         assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
-        assert(fixture.pageReads == 4 && fixture.writes == 5 && !fixture.command.completes);
+        assert(fixture.pageReads == (fault == FlipFault::WrongPreviousPage ? 4u : 2u));
+        assert(fixture.writes == 5 && !fixture.command.completes);
         assert(fixture.lifetime.references == 2 && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
         return;
     }
@@ -1318,6 +1431,20 @@ int main() {
     scanoutFlip(FlipFault::LateTranslation);
     scanoutFlip(FlipFault::RevokedTranslation);
     scanoutFlip(FlipFault::WrongPreviousPage);
+    scanoutFlip(FlipFault::NoContextRoot);
+    scanoutFlip(FlipFault::UnreadyContext);
+    scanoutFlip(FlipFault::WrongContextRoot);
+    scanoutFlip(FlipFault::WrongContextDepth);
+    scanoutFlip(FlipFault::WrongContextBlock);
+    scanoutFlip(FlipFault::WrongContextStart);
+    scanoutFlip(FlipFault::WrongContextEnd);
+    scanoutFlip(FlipFault::ContextAfterPageWalk);
+    scanoutFlip(FlipFault::ContextAtLock);
+    scanoutFlip(FlipFault::ContextWhilePending);
+    scanoutFlip(FlipFault::ContextDuringRetire);
+    scanoutFlip(FlipFault::ReplacedFrontContext);
+    scanoutFlip(FlipFault::DualPins);
+    scanoutFlip(FlipFault::DualContextDuringRetire);
     scanoutFlip(FlipFault::DifferentPinnedPitch);
     scanoutFlip(FlipFault::GeometryAtLock);
     scanoutFlip(FlipFault::GeometryAtRetire);
