@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import build34_dcn_exact_writer_stage as writer
 import build34_dcn_bar5_stage as bar5
 import build34_dcn_firmware_home_stage as firmware_home
+import build34_dcn_phxfb_lease_stage as fb_lease
 import build34_dcn_flip_commit_stage as flip_commit
 import build34_dcn_present_handoff_stage as handoff
 import build34_dcn_scanout_dma_stage as scanout_dma
@@ -110,6 +111,21 @@ class ExactWriterTests(unittest.TestCase):
         self.assertIn('request.framebuffer, &route}', submit)
         self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True, present=source)
 
+    def test_paired_framebuffer_route(self):
+        native = fb_lease.stage_native(DRIVER, ABI)
+        framebuffer = fb_lease.stage_framebuffer((ROOT / firmware_home.FRAMEBUFFER).read_bytes())
+        self.assertIn(fb_lease.FB_QUERY, framebuffer)
+        self.assertEqual(framebuffer.count('fDcnRoute.closeLocked();'), 2)
+        self.assertLess(method(framebuffer, 'void PhxAMDFB::stop(').index('closeDcnFirmwareSample();'),
+                        method(framebuffer, 'void PhxAMDFB::stop(').index('OSSafeReleaseNULL(fMmio)'))
+        submit = method(native, transaction.NATIVE)
+        self.assertLess(submit.index('acquireDcnFbRoute(route, home)'), submit.index('mapDcnPin('))
+        self.assertLess(submit.index('submit(home) != ScanoutFlipResult::Presented'), submit.index('releaseDcnFbRoute()'))
+        self.assertIn('dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr}', native)
+        self.assertEqual(method(native, 'bool PhxBringup::exactNativeOpenAdmitted('),
+                         method(self.source, 'bool PhxBringup::exactNativeOpenAdmitted('))
+        self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True, lease=native)
+
     def test_firmware_sample_keeps_existing_scanout_and_vbl(self):
         original = (ROOT / firmware_home.FRAMEBUFFER).read_bytes()
         with self.assertRaisesRegex(ValueError, 'firmware sample source drift'):
@@ -189,7 +205,7 @@ class ExactWriterTests(unittest.TestCase):
         power = method(bound, 'IOReturn PhxBringup::setPowerState(')
         self.assertLess(power.index('&dcnBar5Revoked'), power.index('invalidateExactQueues();'))
 
-    def check_native_methods(self, paired=False, pins=False, dma=False, flip=False, bar5_adapter=False, present=None):
+    def check_native_methods(self, paired=False, pins=False, dma=False, flip=False, bar5_adapter=False, present=None, lease=None):
         fixture = Path(__file__).with_suffix('.cpp').read_text()
         source = scanout_pin.stage_native(DRIVER, ABI) if pins else handoff.stage_native(DRIVER, ABI) if paired else self.source
         if dma:
@@ -232,9 +248,16 @@ class ExactWriterTests(unittest.TestCase):
             extracted += '\n' + method(source, flip_commit.MAP).replace('PhxBringup::vmMap(', 'PhxBringup::guardedVmMap(', 1)
             extracted += '\n' + method(source, flip_commit.VM_BIND)
         if bar5_adapter:
-            bound = bar5.stage_native(DRIVER, ABI)
+            bound = lease if lease is not None else bar5.stage_native(DRIVER, ABI)
             fields += bar5.FIELDS
             extracted += '\n' + '\n'.join(method(bound, signature) for signature in bar5.SIGNATURES)
+        if lease is not None:
+            fields += fb_lease.NATIVE_FIELDS
+            extracted += '\n' + '\n'.join(method(lease, signature) for signature in (fb_lease.ACQUIRE, fb_lease.RELEASE))
+            self.assertEqual(fixture.count('// FRAMEBUFFER_ROUTE_FIELDS'), 1)
+            self.assertEqual(fixture.count('// FRAMEBUFFER_ROUTE_QUERY'), 1)
+            fixture = fixture.replace('// FRAMEBUFFER_ROUTE_FIELDS', fb_lease.FB_FIELDS)
+            fixture = fixture.replace('// FRAMEBUFFER_ROUTE_QUERY', fb_lease.FB_QUERY)
         if present is not None:
             fixture = fixture.replace('// TRANSACTION_FIELDS', transaction.FIELDS)
             fixture = fixture.replace('// TRANSACTION_METHOD', method(present, transaction.NATIVE).replace(
@@ -259,6 +282,7 @@ class ExactWriterTests(unittest.TestCase):
                           *(['-DTEST_SCANOUT_FLIP'] if flip else []),
                           *(['-DTEST_SCANOUT_BAR5'] if bar5_adapter else []),
                           *(['-DTEST_SCANOUT_TRANSACTION'] if present is not None else []),
+                          *(['-DTEST_SCANOUT_FB_LEASE'] if lease is not None else []),
                           '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable', '-O1', '-g',
                           '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I' + str(self.headers),
                           '-I' + str(ROOT / 'tests/build34_dcn'), '-I' + str(ROOT / 'tools'),
@@ -283,7 +307,7 @@ class ExactWriterTests(unittest.TestCase):
                  '-I' + str(ROOT / 'tools'), '-I' + str(src.parent)]
         for source in (self.source, handoff.stage_native(DRIVER, ABI), scanout_pin.stage_native(DRIVER, ABI),
                        scanout_dma.stage_native(DRIVER, ABI), flip_commit.stage_native(DRIVER, ABI), bar5.stage_native(DRIVER, ABI),
-                       transaction.stage_native(DRIVER, ABI)):
+                       transaction.stage_native(DRIVER, ABI), fb_lease.stage_native(DRIVER, ABI)):
             src.write_text(source)
             self.run_checked([*flags, str(src)])
         accel = ROOT / ACCEL
@@ -298,9 +322,10 @@ class ExactWriterTests(unittest.TestCase):
         self.run_checked(accel_flags)
         framebuffer = ROOT / firmware_home.FRAMEBUFFER
         staged_framebuffer = self.directory / framebuffer.name
-        staged_framebuffer.write_text(firmware_home.stage(framebuffer.read_bytes()))
-        self.run_checked([*flags, '-DNMX_ACCEL', '-DNM_TAHOE', '-DPHX_FB', '-I' + str(framebuffer.parent),
-                          '-I' + str(framebuffer.parent.parent), str(staged_framebuffer)])
+        for stage in (firmware_home.stage, fb_lease.stage_framebuffer):
+            staged_framebuffer.write_text(stage(framebuffer.read_bytes()))
+            self.run_checked([*flags, '-DNMX_ACCEL', '-DNM_TAHOE', '-DPHX_FB', '-I' + str(framebuffer.parent),
+                              '-I' + str(framebuffer.parent.parent), str(staged_framebuffer)])
 
 
 if __name__ == '__main__':

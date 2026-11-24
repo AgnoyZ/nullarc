@@ -1250,6 +1250,37 @@ exact-open admission. CPU doubles cover alternating windows, extent conflict
 before mapping, changed routes before any MMIO write, completion matching
 and retention, but not physical display of the GPU-rendered pages.
 
+### Paired PhxFB route lease
+
+The [framebuffer lease overlay](../tools/build34_dcn_phxfb_lease_stage.py)
+requires PhxAMDFB to grant an exclusive local claim before the provider
+consumes a writer offer. Both services must be attached to the same exact
+Phoenix PCI device, PhxFB must be live and alone on its driver path, and the
+native raw-writer gate must already be closed and drained. A read-only BAR5
+check requires the saved firmware front, idle peer pipes, and two stable
+reads of all seven context registers for each reserved VMID. All four
+context snapshots must be empty within one physical frame. An occupied
+context, frame change or competing claim leaves the offer unused.
+
+The claim binds both services, route identity, generation and the exact
+two-window reservation to a nonreused serial. PhxBringup retains PhxFB while
+using the claim, and PhxFB retains that provider until exact release. BAR5
+loads, stores and the posted read run under a try-only claim check on PhxFB's
+existing firmware lock. PhxFB closes the claim under that same lock before
+its power-off and stop paths proceed. Wake does not reopen it. A refused
+pre-issue attempt can release the claim; an issued front keeps it until a
+verified firmware return. An uncertain attempt keeps its claim and backing.
+
+This serializes only the staged access paths and PhxFB lifecycle covered by
+the overlay. An empty context is not proof that earlier translations are
+retired, and the claim does not exclude a different firmware or kernel writer
+or prove PCI power continuity. The qualified route, translation, address
+domain and suspend evidence still have to be supplied independently. No
+production or exact-open inputs change. Omit this paired overlay to roll it
+back. CPU fixtures run the extracted native BAR5 and PhxFB claim methods
+with competing claims, stale tokens, a nonempty context, active peers,
+lock contention and revocation; SDK checks do not qualify the hardware.
+
 ## Accepted baseline measurement, November 20
 
 [R1b's bounded pressure proof](BUILD34-RING-BACKPRESSURE.md) passed before

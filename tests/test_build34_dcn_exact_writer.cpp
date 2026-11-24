@@ -120,10 +120,12 @@ struct IOService : OSObject {
     bool isInactive() const { return inactive; }
 #ifdef TEST_SCANOUT_FLIP
     const void *provider = nullptr;
-    bool isPhxFramebuffer = false;
+    bool isPhxFramebuffer = false, isPhxBringup = false;
     std::function<void()> onRelease;
     const void *getProvider() const { return provider; }
-    IOService *metaCast(const char *name) { return isPhxFramebuffer && !strcmp(name, "PhxAMDFB") ? this : nullptr; }
+    IOService *metaCast(const char *name) {
+        return ((isPhxFramebuffer && !strcmp(name, "PhxAMDFB")) || (isPhxBringup && !strcmp(name, "PhxBringup"))) ? this : nullptr;
+    }
     void release() {
         if (onRelease) onRelease();
         OSObject::release();
@@ -169,6 +171,9 @@ static void flushLine(const volatile void *) {}
 #endif
 #ifdef TEST_SCANOUT_BAR5
 #include "build34_dcn_bar5.h"
+#ifdef TEST_SCANOUT_FB_LEASE
+#include "build34_dcn_framebuffer_route.h"
+#endif
 constexpr uint32_t kIOPCIConfigBaseAddress5 = 0x24, kIOPCIConfigCommand = 4, kIOPCIConfigVendorID = 0;
 struct Bar5Resource : IOBufferMemoryDescriptor {
     uint64_t bytes = dcnPeers::kMmioBytes;
@@ -2717,7 +2722,7 @@ static void scanoutFlip(FlipFault fault) {
 }
 #endif
 
-#ifdef TEST_SCANOUT_BAR5
+#if defined(TEST_SCANOUT_BAR5) && !defined(TEST_SCANOUT_FB_LEASE)
 static void exerciseDcnBar5() {
     PhxBringup device;
     Bar5Resource resource;
@@ -2798,6 +2803,98 @@ static void exerciseDcnBar5() {
     assert(!device.bindDcnBar5(intent, route) && !route.reader.readClockNs(io, ns) && !read(hubp0::kControl, value));
     route.writer.delayUs(io, 1);
     assert(bar5Delays == 1);
+}
+#endif
+
+#ifdef TEST_SCANOUT_FB_LEASE
+struct LeaseFramebuffer : IOService {
+    IOLock guard;
+    IOLock *fDcnFirmwareLock = &guard;
+    IOPCIDevice *fPCI = nullptr;
+    IOMemoryMap *fMmio = nullptr, *fSurfMap = nullptr;
+    bool fDcnFirmwareReady = true, fDcnFirmwarePower = true, fDcnFirmwareClosed = false, fBeside = false;
+    // FRAMEBUFFER_ROUTE_FIELDS
+
+    IOReturn callPlatformFunction(const OSSymbol *fn, bool wait, void *p1, void *p2, void *p3, void *p4) override {
+        // FRAMEBUFFER_ROUTE_QUERY
+        return kIOReturnUnsupported;
+    }
+};
+
+static void exerciseDcnFramebufferRoute() {
+    PhxBringup device, other;
+    Bar5Resource resource;
+    uint32_t registers[dcnPeers::kMmioBytes / sizeof(uint32_t)]{};
+    IOMemoryMap mapping{&resource, reinterpret_cast<uintptr_t>(registers), sizeof(registers), resource.physical};
+    device.mmio = &mapping;
+    device.pci->bar5 = &resource;
+    device.provider = other.provider = device.pci;
+    device.isPhxBringup = other.isPhxBringup = true;
+    other.pci = device.pci;
+    assert(other.exactRawWriters.close());
+
+    LeaseFramebuffer framebuffer;
+    framebuffer.fPCI = device.pci;
+    framebuffer.provider = device.pci;
+    framebuffer.fMmio = framebuffer.fSurfMap = &mapping;
+    framebuffer.fDcnRoute.setLock(framebuffer.fDcnFirmwareLock);
+    bool live = true;
+    HubpFlipRoute route{};
+    route.owner = &live;
+    route.generation = 7;
+    route.framebuffer = &framebuffer;
+    route.reader.context = &live;
+    route.reader.current = [](void *state, const HubpFlipRequest &) { return *static_cast<bool *>(state); };
+    route.presentWindows = {{{0xa0000000, 7}, 2 * kPage}, {{0xb0000000, 15}, 2 * kPage}, DcnPresentDomain::Mapped};
+    FirmwareScanoutSample home{{0x80000000, 0}, {16, 32, 15, kDcnArgb8888, kPage}, 0, 0x180000000, 12};
+    registers[hubp0::kFrame] = home.frame;
+    registers[hubp0::kProgrammedLow] = registers[hubp0::kInUseLow] = registers[hubp0::kEarliestLow] = home.scanout.address;
+    for (unsigned index = 0; index < dcnPeers::kCount; ++index)
+        registers[dcnPeers::kPower1 + index * dcnPeers::kPowerStride] = dcnPeers::kGated;
+    unsigned frameReads = 0;
+    assert(!checkUnclaimedDcnContexts(route.presentWindows, home.scanout, kPage, sizeof(registers),
+        [&](uint32_t reg, uint32_t &value) {
+            value = registers[reg];
+            if (reg == hubp0::kFrame && ++frameReads > 4) ++value;
+            return true;
+        }));
+
+    assert(!device.acquireDcnFbRoute(route, home) && !device.dcnFbRouteService && device.references == 1);
+    assert(device.exactRawWriters.close());
+    registers[dcnVm::base(15) + 6] = kPage;
+    assert(!device.acquireDcnFbRoute(route, home) && device.references == 1);
+    registers[dcnVm::base(15) + 6] = 0;
+    registers[hubp0::kOtgControl + dcnPeers::kOtgStride] = hubp0::kOtgEnabled;
+    assert(!device.acquireDcnFbRoute(route, home) && !device.dcnFbRouteService);
+    registers[hubp0::kOtgControl + dcnPeers::kOtgStride] = 0;
+    IOLockLock(&framebuffer.guard);
+    assert(!device.acquireDcnFbRoute(route, home));
+    IOLockUnlock(&framebuffer.guard);
+    assert(device.acquireDcnFbRoute(route, home) && framebuffer.references == 2 && device.references == 2);
+    const auto old = device.dcnFbRoute;
+    assert(old.serial && old.gate && device.acquireDcnFbRoute(route, home) && device.dcnFbRoute.serial == old.serial);
+    assert(!other.acquireDcnFbRoute(route, home) && other.references == 1);
+    assert(device.releaseDcnFbRoute() && framebuffer.references == 1 && device.references == 1);
+    assert(device.acquireDcnFbRoute(route, home) && device.dcnFbRoute.serial > old.serial);
+    assert(framebuffer.releaseDcnRoute(device.pci, old) == kIOReturnNotFound);
+    assert(!old.gate->access(old, [] { assert(false); return true; }));
+
+    ScanoutFlipIntent intent{home.scanout, route.presentWindows.first.base, {}, {}, ScanoutFlipResult::Refused};
+    CallbackGate<>::Lease life(device.exactCallbacks);
+    CallbackGate<1>::Lease operation(device.dcnPinOperation);
+    assert(life && operation && device.bindDcnBar5(intent, route));
+    const auto read = [&](uint32_t &value) { return route.reader.readDword(route.reader.ioContext, hubp0::kProgrammedHigh, value); };
+    const auto write = [&](uint32_t value) { return route.writer.writeDword(route.reader.ioContext, hubp0::kProgrammedHigh, value); };
+    uint32_t value = 0;
+    assert(write(0x90) && read(value) && value == 0x90);
+    IOLockLock(&framebuffer.guard);
+    assert(!write(0xa0) && !read(value) && registers[hubp0::kProgrammedHigh] == 0x90);
+    framebuffer.fDcnRoute.closeLocked();
+    IOLockUnlock(&framebuffer.guard);
+    assert(!write(0xa0) && !read(value) && !device.acquireDcnFbRoute(route, home));
+    assert(device.releaseDcnFbRoute() && framebuffer.references == 1 && device.references == 1);
+    registers[hubp0::kProgrammedHigh] = 0;
+    assert(!device.acquireDcnFbRoute(route, home));
 }
 #endif
 
@@ -3192,7 +3289,9 @@ int main() {
     scanoutFlip(FlipFault::TranslationLost);
     scanoutFlip(FlipFault::FrontRevertedDuringTranslations);
 #endif
-#ifdef TEST_SCANOUT_BAR5
+#if defined(TEST_SCANOUT_FB_LEASE)
+    exerciseDcnFramebufferRoute();
+#elif defined(TEST_SCANOUT_BAR5)
     exerciseDcnBar5();
 #endif
 #ifdef TEST_SCANOUT_TRANSACTION
