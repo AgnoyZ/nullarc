@@ -10,7 +10,7 @@ using namespace build34::dcn;
 static constexpr uint64_t kUnwritten = UINT64_MAX;
 
 static SurfaceDescription bgraSurface() {
-    return {kSurfaceBgra, 2560, 1600, 10240, 0, 1, 40ull << 20, true, true, true};
+    return {kSurfaceBgra, 2560, 1600, 10240, 0, 0, 0, 40ull << 20, true, true, true};
 }
 
 static void testSurfaceQualifications() {
@@ -19,7 +19,7 @@ static void testSurfaceQualifications() {
     assert(validateScanoutSurface(surface, 2560, 1600, &scanout));
     assert(scanout.width == 2560 && scanout.height == 1600);
     assert(scanout.pitchPixelsMinusOne == 2559 && scanout.dcnPixelFormat == kDcnArgb8888);
-    assert(scanout.mappedBytes == 40ull << 20);
+    assert(scanout.mappedBytes == 4000 * kPageBytes);
 
     auto reject = [&](SurfaceDescription candidate, uint32_t width = 2560, uint32_t height = 1600) {
         ScanoutSurface unchanged{7, 11, 13, 17, 19};
@@ -42,6 +42,11 @@ static void testSurfaceQualifications() {
     reject(candidate);
     candidate = surface;
     candidate.planeIndex = 1;
+    reject(candidate);
+    candidate = surface;
+    candidate.planeCount = 1;
+    assert(validateScanoutSurface(candidate, 2560, 1600, &scanout));
+    candidate.planeOffset = kPageBytes;
     reject(candidate);
     candidate = surface;
     candidate.planeCount = 2;
@@ -72,8 +77,9 @@ static void testSurfaceQualifications() {
     candidate.allocationBytes = (uint64_t)candidate.bytesPerRow * candidate.height - 1;
     reject(candidate);
     candidate = surface;
-    candidate.allocationBytes = kMaxBackingBytes + 1;
-    reject(candidate);
+    candidate.height = 7000;
+    candidate.allocationBytes = (uint64_t)candidate.bytesPerRow * candidate.height;
+    reject(candidate, 2560, candidate.height);
     assert(!validateScanoutSurface(surface, 2560, 1600, nullptr));
 
     candidate = surface;
@@ -83,6 +89,90 @@ static void testSurfaceQualifications() {
     assert(validateScanoutSurface(candidate, 2560, 1600, &padded));
     assert(padded.pitchPixelsMinusOne == 2575);
     assert(padded.mappedBytes == ((candidate.allocationBytes + kPageBytes - 1) & ~(kPageBytes - 1)));
+}
+
+enum class BatchResult { Normal, Error, Empty, Excess, WrongOffset, TooLong, Unaligned, Short };
+
+struct BatchSource {
+    uint64_t total;
+    BatchResult result;
+    unsigned calls = 0;
+};
+
+static bool readBatch(void *context, uint64_t *offset, DmaSegment *segments, uint32_t *count) {
+    auto &source = *static_cast<BatchSource *>(context);
+    assert(*count && *count <= 8);
+    assert(*offset <= source.total && *offset % kPageBytes == 0);
+    ++source.calls;
+    if (*offset == source.total)
+        return false;
+    const uint32_t capacity = *count;
+    *count = 0;
+    while (*offset < source.total && *count < capacity) {
+        segments[(*count)++] = {0x80000000 + *offset * 3, kPageBytes};
+        *offset += kPageBytes;
+    }
+    if (source.calls == 2) {
+        switch (source.result) {
+        case BatchResult::Normal: break;
+        case BatchResult::Error: return false;
+        case BatchResult::Empty: *count = 0; break;
+        case BatchResult::Excess: *count = capacity + 1; break;
+        case BatchResult::WrongOffset: *offset -= kPageBytes; break;
+        case BatchResult::TooLong: segments[*count - 1].bytes = source.total; break;
+        case BatchResult::Unaligned: ++segments[*count - 1].address; break;
+        case BatchResult::Short: source.total = *offset; break;
+        }
+    }
+    return true;
+}
+
+static void testSegmentBatches() {
+    ScanoutSurface surface{};
+    assert(validateScanoutSurface(bgraSurface(), 2560, 1600, &surface));
+    const uint64_t windowStart = 0x100000000;
+    const size_t pageCount = surface.mappedBytes / kPageBytes;
+    std::vector<DmaRun> runs(pageCount);
+    std::vector<uint64_t> pages(pageCount + 1, kUnwritten);
+    BatchSource complete{surface.mappedBytes, BatchResult::Normal};
+    const auto layout = collectScanoutPages(windowStart, surface, surface.mappedBytes, readBatch, &complete,
+                                            runs.data(), runs.size(), pages.data(), pages.size());
+    assert(layout.entryCount == 4000 && layout.tableBytes == 32000 && complete.calls == 500);
+    assert(layout.firstLogicalPage == windowStart / kPageBytes);
+    for (size_t index = 0; index < pageCount; ++index)
+        assert(pages[index] == 0x80000000 + index * 3 * kPageBytes);
+    assert(pages.back() == kUnwritten);
+
+    const auto refuse = [&](BatchResult result, uint64_t preparedBytes, size_t runCapacity,
+                            size_t pageCapacity, unsigned expectedCalls) {
+        pages.assign(pages.size(), kUnwritten);
+        BatchSource source{surface.mappedBytes, result};
+        assert(!collectScanoutPages(windowStart, surface, preparedBytes, readBatch, &source,
+                                   runs.data(), runCapacity, pages.data(), pageCapacity).entryCount);
+        assert(source.calls == expectedCalls);
+        for (uint64_t address : pages)
+            assert(address == kUnwritten);
+    };
+    for (const auto result : {BatchResult::Error, BatchResult::Empty, BatchResult::Excess, BatchResult::WrongOffset,
+                              BatchResult::TooLong, BatchResult::Unaligned})
+        refuse(result, surface.mappedBytes, runs.size(), pages.size(), 2);
+    refuse(BatchResult::Short, surface.mappedBytes, runs.size(), pages.size(), 3);
+    refuse(BatchResult::Normal, surface.mappedBytes, 9, pages.size(), 2);
+    refuse(BatchResult::Normal, surface.mappedBytes - kPageBytes, runs.size(), pages.size(), 0);
+    refuse(BatchResult::Normal, surface.mappedBytes + kPageBytes, runs.size(), pages.size(), 0);
+    refuse(BatchResult::Normal, surface.mappedBytes, runs.size(), pageCount - 1, 0);
+
+    auto padded = bgraSurface();
+    padded.bytesPerRow += 64;
+    assert(validateScanoutSurface(padded, 2560, 1600, &surface));
+    assert(surface.mappedBytes == 4025 * kPageBytes);
+    runs.resize(4025);
+    pages.assign(4026, kUnwritten);
+    BatchSource tail{surface.mappedBytes, BatchResult::Normal};
+    const auto paddedLayout = collectScanoutPages(windowStart, surface, surface.mappedBytes, readBatch, &tail,
+                                                  runs.data(), runs.size(), pages.data(), pages.size());
+    assert(paddedLayout.entryCount == 4025 && tail.calls == 504);
+    assert(pages[4024] == 0x80000000 + 4024 * 3 * kPageBytes && pages.back() == kUnwritten);
 }
 
 static void expectRefusal(uint64_t start, uint64_t bytes, const DmaRun *runs, size_t count,
@@ -188,6 +278,7 @@ static void testPanelAndBoundedWork() {
 
 int main() {
     testSurfaceQualifications();
+    testSegmentBatches();
     testFragmentedBacking();
     testAddressAndCapacityEdges();
     testRefusesMalformedRunsBeforeWriting();

@@ -18,6 +18,7 @@ struct SurfaceDescription {
     uint32_t bytesPerRow;
     uint32_t planeIndex;
     uint32_t planeCount;
+    uint64_t planeOffset;
     uint64_t allocationBytes;
     bool directlyImportedForRendering;
     bool backingRetained;
@@ -35,24 +36,20 @@ struct ScanoutSurface {
 inline bool validateScanoutSurface(const SurfaceDescription &surface, uint32_t displayWidth,
                                    uint32_t displayHeight, ScanoutSurface *result) {
     if (!result || !surface.directlyImportedForRendering || !surface.backingRetained ||
-        !surface.linearLayout || surface.planeCount != 1 || surface.planeIndex != 0 ||
+        !surface.linearLayout || surface.planeCount > 1 || surface.planeIndex || surface.planeOffset ||
         surface.pixelFormat != kSurfaceBgra || !surface.width || !surface.height ||
         surface.width != displayWidth || surface.height != displayHeight ||
-        !surface.bytesPerRow || surface.bytesPerRow % 4 || !surface.allocationBytes ||
-        surface.allocationBytes > kMaxBackingBytes)
+        !surface.bytesPerRow || surface.bytesPerRow % 4)
         return false;
 
     const uint64_t minRowBytes = static_cast<uint64_t>(surface.width) * 4;
     const uint64_t pitchPixels = surface.bytesPerRow / 4;
     const uint64_t usedBytes = static_cast<uint64_t>(surface.bytesPerRow) * surface.height;
     if (surface.bytesPerRow < minRowBytes || pitchPixels > 0x4000 ||
-        usedBytes > surface.allocationBytes)
+        usedBytes > surface.allocationBytes || usedBytes > kMaxBackingBytes)
         return false;
 
-    const uint64_t mappedBytes = (surface.allocationBytes + kPageBytes - 1) & ~(kPageBytes - 1);
-    if (mappedBytes > kMaxBackingBytes)
-        return false;
-
+    const uint64_t mappedBytes = (usedBytes + kPageBytes - 1) & ~(kPageBytes - 1);
     *result = {surface.width, surface.height, static_cast<uint32_t>(pitchPixels - 1),
                kDcnArgb8888, mappedBytes};
     return true;
@@ -71,6 +68,12 @@ struct FlatPageLayout {
     size_t tableBytes;
 };
 
+inline bool validDmaSegment(uint64_t address, uint64_t bytes, uint64_t remaining) {
+    return bytes && bytes % kPageBytes == 0 && bytes <= remaining &&
+           address && address % kPageBytes == 0 && address < kAddressLimit &&
+           bytes <= kAddressLimit - address;
+}
+
 inline FlatPageLayout buildFlatPageLayout(uint64_t windowStart, uint64_t frameBytes,
                                           const DmaRun *runs, size_t runCount,
                                           uint64_t *pageAddresses, size_t pageCapacity) {
@@ -87,10 +90,7 @@ inline FlatPageLayout buildFlatPageLayout(uint64_t windowStart, uint64_t frameBy
     uint64_t covered = 0;
     for (size_t index = 0; index < runCount; ++index) {
         const auto &run = runs[index];
-        if (run.backingOffset != covered || !run.bytes || run.bytes % kPageBytes ||
-            run.bytes > mappedBytes - covered || !run.dmaAddress ||
-            run.dmaAddress % kPageBytes || run.dmaAddress >= kAddressLimit ||
-            run.bytes > kAddressLimit - run.dmaAddress)
+        if (run.backingOffset != covered || !validDmaSegment(run.dmaAddress, run.bytes, mappedBytes - covered))
             return {};
         covered += run.bytes;
     }
@@ -106,6 +106,49 @@ inline FlatPageLayout buildFlatPageLayout(uint64_t windowStart, uint64_t frameBy
 
     const uint64_t firstPage = windowStart / kPageBytes;
     return {firstPage, firstPage + entryCount - 1, entryCount, entryCount * sizeof(uint64_t)};
+}
+
+struct DmaSegment {
+    uint64_t address;
+    uint64_t bytes;
+};
+
+using ReadDmaBatch = bool (*)(void *context, uint64_t *offset, DmaSegment *segments, uint32_t *count);
+
+inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSurface &surface,
+                                          uint64_t preparedBytes, ReadDmaBatch readBatch, void *context,
+                                          DmaRun *scratch, size_t runCapacity,
+                                          uint64_t *pageAddresses, size_t pageCapacity) {
+    const uint64_t bytes = surface.mappedBytes;
+    if (!readBatch || !scratch || !runCapacity || !pageAddresses || !bytes || bytes > kMaxBackingBytes ||
+        bytes % kPageBytes || preparedBytes != bytes || pageCapacity < bytes / kPageBytes ||
+        windowStart % kPageBytes || windowStart >= kAddressLimit || bytes > kAddressLimit - windowStart)
+        return {};
+
+    uint64_t covered = 0;
+    size_t runCount = 0;
+    while (covered < bytes) {
+        constexpr uint32_t batchSize = 8;
+        DmaSegment segments[batchSize]{};
+        const size_t available = runCapacity - runCount;
+        const uint32_t capacity = available < batchSize ? static_cast<uint32_t>(available) : batchSize;
+        uint32_t count = capacity;
+        uint64_t next = covered;
+        if (!capacity || !readBatch(context, &next, segments, &count) || !count || count > capacity)
+            return {};
+
+        for (uint32_t index = 0; index < count; ++index) {
+            const auto &segment = segments[index];
+            if (!validDmaSegment(segment.address, segment.bytes, bytes - covered))
+                return {};
+            scratch[runCount++] = {covered, segment.address, segment.bytes};
+            covered += segment.bytes;
+        }
+        if (next != covered)
+            return {};
+    }
+
+    return buildFlatPageLayout(windowStart, bytes, scratch, runCount, pageAddresses, pageCapacity);
 }
 
 }  // namespace build34::dcn

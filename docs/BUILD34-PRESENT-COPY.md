@@ -31,25 +31,48 @@ segments of the exact rendered IOSurface. The tests include a synthetic
 malformed inputs that must leave output untouched.
 
 The same helper now has a separate surface-qualification gate. It accepts
-only one retained, linear, directly host-imported `BGRA` IOSurface plane
+only a retained, linear, directly host-imported `BGRA` IOSurface at byte
+offset zero (a nonplanar surface or a single explicit plane)
 whose dimensions exactly match the panel and whose byte pitch fits the full
-image in its allocation. It emits the inclusive DCN pitch in pixels minus
-one and the native `ARGB8888` surface-format value. This matches the current
-framebuffer's 8-bit channel layout and the pinned DCN field reference;
+image in its allocation. It emits the DCN pitch in pixels minus one and the
+native `ARGB8888` surface-format value, matching the 8-bit framebuffer
+layout and the pinned Linux [HUBP programming reference](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/display/dc/hubp/dcn20/dcn20_hubp.c);
 10-bit `l10r`, private Vulkan images, family VRAM backing, multi-plane images,
 unretained surfaces and unknown layouts are rejected for copy fallback.
 Padded byte rows are allowed only when word-aligned and within the DCN
-14-bit pitch field. The test also checks output is unchanged on refusal.
+14-bit pitch field. The intended DMA slice is the page-rounded footprint
+of the full pitched rows, not the entire IOSurface allocation. The caller
+must separately prove the last rounded page belongs to the descriptor and
+that this slice covers the actual HUBP fetch range.
+
+The [bounded segment collector](../tools/build34_dcn_page_layout.h) models
+the prepared-offset and returned-count semantics of the pinned XNU
+[`genIOVMSegments`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IODMACommand.cpp#L1272-L1314)
+interface. The callback must represent a leased mapping prepared for exactly
+that slice and return success only for a successful segment walk. The
+collector checks every reported length and device address and requires the
+next cursor to equal the accumulated length. It refuses errors, empty or
+oversized batches, premature exhaustion and mismatched extents without
+publishing any page addresses. The caller owns disposable run scratch and
+disjoint page output. CPU fixtures exercise 4,000 fragmented pages, a short
+last batch and errors injected after successful reads.
+
+This XNU reference is APSL 2.0 and no code was imported. A segment walk or
+matching descriptor does not prove zero-copy: XNU may substitute pages,
+and the macOS GPU's actual mapper and DCN address domain remain unverified.
+See [device DMA backing](BUILD34-SYSTEM-WRITEBACK.md#device-dma-backing).
+This stage does not encode PTE flags: the generic AMDGPU definitions alone
+do not establish which permissions and cache attributes work on the live
+DCN path.
 
 There is no native call site, MMIO or active page-table change. Keep the
-AMD flip guard and the accepted R2a copy fallback unchanged. Next prove
-that the retained IOSurface descriptor yields DCN-usable DMA segments and
-that the exact retained IOSurface descriptor yields DCN-usable DMA segments.
-The actual plugin does not yet publish this qualification metadata to
-PhxAccel; the gate is CPU-only and not wired to live surfaces. Still required:
-native mapping and invalidation, render completion and visibility, hardware latch
-confirmation before retiring old pages, and bounded fallback/recovery. Do
-not treat a successful plan as a valid hardware mapping, R3 acceptance or
+AMD flip guard and the accepted R2a copy fallback unchanged. Next correlate
+the plugin's actual direct import with that exact retained descriptor and
+prove a bounce-free, DCN-usable mapping. The plugin does not yet expose the
+qualification metadata to PhxAccel. Native invalidation, render completion
+and visibility, hardware latch confirmation before retiring old pages, and
+bounded fallback/recovery are still required. Do not treat a successful
+plan as a valid hardware mapping, R3 acceptance or
 permission to run any hardware trial. Source-only rollback is a revert of
 this prerequisite; no installed state needs restoration.
 
