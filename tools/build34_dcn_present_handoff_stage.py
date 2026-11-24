@@ -10,6 +10,7 @@ from test_build34_exact_ownership import method
 OFFER = 'IOReturn IOAccelPhxNativeClient::doDcnPresentOffer('
 ATTACH = 'bool PhxBringup::offerDcnPresent('
 CONSUME = 'bool PhxBringup::checkDcnPresent('
+GLOBAL = 'bool PhxBringup::exactGlobalRetiredLocked('
 DISPATCH = 'IOReturn PhxBringup::callPlatformFunction('
 CLIENT_MATCH = 'bool IOAccelPhxNativeClient::matchesDcnOfferLocked('
 CLOSE = 'bool PhxBringup::requestLegacyClose('
@@ -18,6 +19,16 @@ RESOLVE = 'static OSObject *nvAccelResolveDcnSurface('
 CALL = 'static void nvAccelCheckDcnCopyBacking('
 
 PROVIDER_PUBLIC = '''    bool offerDcnPresent(IOAccelPhxNativeClient *, OSObject *&, const build34_dcn_present_offer &);
+'''
+DRAIN_DECL = '''    struct DcnDrainStamp {
+        uint64_t epoch, computeGeneration, gfxGeneration;
+        bool matches(const DcnDrainStamp &other) const {
+            return epoch == other.epoch && computeGeneration == other.computeGeneration &&
+                gfxGeneration == other.gfxGeneration;
+        }
+    };
+    bool exactWriterVmCurrent(const build34::dcn::WriterMapIdentity &,
+        const build34_dcn_native_submit &, const IOAccelPhxNativeClient *, DcnDrainStamp * = nullptr);
 '''
 PROVIDER_FIELDS = '''    struct DcnPresent {
         IOAccelPhxNativeClient *client;
@@ -158,6 +169,27 @@ def stage_native(driver, abi):
     source = once(source, include, include + '#include "build34_dcn_present_route.h"\n#include <kern/task.h>\n')
     anchor = '    bool exactAdmissionClosed() const;\n'
     source = once(source, anchor, anchor + PROVIDER_PUBLIC)
+    source = once(source, writer.SERVICE_DECL, DRAIN_DECL)
+    replace(writer.CURRENT, '    const build34_dcn_native_submit &native, const IOAccelPhxNativeClient *client) {',
+            '    const build34_dcn_native_submit &native, const IOAccelPhxNativeClient *client, DcnDrainStamp *drain) {')
+    replace(writer.CURRENT, '    const bool current = context &&', '    bool current = context &&')
+    replace(writer.CURRENT, '    IOLockUnlock(gpuLock);\n',
+            '''    if (current && drain) {
+        ExactOverlapSnapshot snapshot{};
+        uint64_t retired = 0;
+        current = exactInvalidationEpoch < UINT64_MAX - 1 && gSeq == native.sequence &&
+            exactGlobalRetiredLocked(retired, &snapshot) && retired == native.sequence &&
+            snapshot.queues[1].generation == native.generation;
+        if (current) *drain = {exactInvalidationEpoch, snapshot.queues[0].generation, snapshot.queues[1].generation};
+    }
+    IOLockUnlock(gpuLock);
+''')
+    replace(writer.PROBE, '        auto mapping = exactWriterMapLocked(span);\n',
+            '        PhxBringup::DcnDrainStamp before{}, after{};\n        auto mapping = exactWriterMapLocked(span);\n')
+    replace(writer.PROBE, 'owner->exactWriterVmCurrent(mapping.identity, native, this)',
+            'owner->exactWriterVmCurrent(mapping.identity, native, this, &before)')
+    replace(writer.PROBE, 'owner->exactWriterVmCurrent(current.identity, native, this) &&\n',
+            'owner->exactWriterVmCurrent(current.identity, native, this, &after) && before.matches(after) &&\n')
     anchor = '    LegacyClientSlot legacyClients[kMaxCtx]{};\n'
     source = once(source, anchor, anchor + PROVIDER_FIELDS)
     source = once(source, writer.CLIENT_STATE, writer.CLIENT_STATE + CLIENT_FIELDS)

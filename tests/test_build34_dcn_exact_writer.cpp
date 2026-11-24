@@ -110,12 +110,17 @@ struct PhxBringup
     : IOService
 #endif
 {
+    static constexpr uint32_t kMaxCtx = 2;
     struct VmCtx {
         uint64_t generation = 5, newest = 0, queueSequence[2]{}, queueGeneration[2]{};
         const void *client = nullptr;
-        bool closing = false;
-    } vm;
-    struct GpuQueue { bool ready = true; } gq[2];
+        bool closing = false, busy = false;
+    } vm[kMaxCtx];
+    struct GpuQueue {
+        bool ready = true;
+        uint32_t head = 0, tail = 0;
+        uint64_t fseq[64]{};
+    } gq[2];
     struct { bool active = false, terminal = false; } watchdogRecovery;
     CallbackGate<> exactCallbacks;
     IOLock guard;
@@ -123,7 +128,18 @@ struct PhxBringup
     uint64_t gSeq = 0, exactQueueSubmitted[2]{}, exactQueueGeneration[2]{3, 4}, done[2]{};
     bool exactQueueLive[2]{true, true}, exactStopped = false, isSleeping = false, exactVMFault = false;
 #ifdef TEST_PRESENT_HANDOFF
-    static constexpr uint32_t kMaxCtx = 2;
+    uint64_t exactInvalidationEpoch = 0;
+    bool exactQueueAdopted[2]{true, true};
+    struct ExactOverlapSnapshot {
+        struct Queue { uint64_t generation, submitted, completed; } queues[2];
+    };
+    bool exactGlobalRetiredLocked(uint64_t &, ExactOverlapSnapshot *);
+    bool readExactFence32(uint32_t queue, uint64_t *out) const {
+        assert(guard.held);
+        if (!gq[queue].ready || !exactQueueLive[queue]) return false;
+        *out = done[queue];
+        return true;
+    }
     struct LegacyClientSlot { IOAccelPhxNativeClient *client; bool pending; } legacyClients[kMaxCtx]{};
     IOReturn callPlatformFunction(const OSSymbol *, bool, void *, void *, void *, void *) override;
     bool exactClaimCurrentLocked(void *) { assert(false); return false; }
@@ -138,7 +154,7 @@ struct PhxBringup
     bool exactAdmissionClosed() const { return exactCallbacks.closed(); }
     bool gpuReady() const { return true; }
     bool debugEnabled() const { return false; }
-    VmCtx *vmCtx(uint32_t handle) { return handle == 1 ? &vm : nullptr; }
+    VmCtx *vmCtx(uint32_t handle) { return handle == 1 ? &vm[0] : nullptr; }
     VmCtx *vmOwned(uint32_t, uint64_t, const void *, bool = false);
     bool vmWorkCurrent(const VmCtx &) const;
     // WRITER_SERVICE
@@ -147,6 +163,14 @@ struct PhxBringup
         return mapResult;
     }
     IOReturn vmUnmap(uint32_t, uint64_t, const void *, uint64_t, uint64_t) { return mapResult; }
+    uint64_t recordQueued(uint32_t queue) {
+        assert(guard.held);
+        auto &entry = gq[queue];
+        assert(entry.tail - entry.head < 63);
+        const uint64_t sequence = exactQueueSubmitted[queue] = ++gSeq;
+        entry.fseq[entry.tail++ & 63] = sequence;
+        return sequence;
+    }
     IOReturn gpuSubmit(uint32_t handle, uint64_t generation, const void *client, bool gfx, const uint64_t *,
                        const uint32_t *, uint32_t, uint64_t *seq, Registry *registry, Ticket ticket, const void *) {
         if (beforeDispatch) beforeDispatch();
@@ -154,8 +178,8 @@ struct PhxBringup
         IOLockLock(gpuLock);
         assert(vmOwned(handle, generation, client));
         const uint32_t queue = gfx ? 1 : 0;
-        vm.newest = vm.queueSequence[queue] = *seq = exactQueueSubmitted[queue] = ++gSeq;
-        vm.queueGeneration[queue] = exactQueueGeneration[queue];
+        vm[0].newest = vm[0].queueSequence[queue] = *seq = recordQueued(queue);
+        vm[0].queueGeneration[queue] = exactQueueGeneration[queue];
         assert(registry->publish(ticket, {*seq, exactQueueGeneration[queue], queue}) == Status::Ok);
         IOLockUnlock(gpuLock);
         ++dispatches;
@@ -198,7 +222,8 @@ struct IOAccelPhxNativeClient
 
     IOAccelPhxNativeClient() {
         assert(exactRegistry.bind(owner, this, owners) == Status::Ok);
-        device.vm.client = this;
+        device.vm[0].client = this;
+        device.vm[0].busy = true;
         ctx[1] = true;
 #ifdef TEST_PRESENT_HANDOFF
         device.legacyClients[0] = {this, false};
@@ -396,6 +421,10 @@ static void refusalAndInvalidation() {
     frame.request = original;
     const auto last = frame.nominate();
     frame.client.device.done[1] = last.sequence;
+#ifdef TEST_PRESENT_HANDOFF
+    assert(frame.wait(last) == Status::Complete && !frame.probe(last));
+    frame.client.device.done[0] = frame.client.device.exactQueueSubmitted[0];
+#endif
     assert(frame.ack(last) == Status::Ok && frame.probe(last));
     frame.request.submit.size = sizeof(frame.request.submit);
     assert(frame.submit().status == PHX34_R3_REPLY_SUBMITTED && !frame.probe(last));
@@ -437,6 +466,43 @@ static void remapCloseAndPressure() {
 }
 
 #ifdef TEST_PRESENT_HANDOFF
+static void drainAcrossPresent() {
+    Frame frame;
+    auto &device = frame.client.device;
+    auto otherComputeSubmit = [&] {
+        IOLockLock(device.gpuLock);
+        const auto sequence = device.recordQueued(0);
+        IOLockUnlock(device.gpuLock);
+        return sequence;
+    };
+    const auto older = otherComputeSubmit();
+    const auto writer = frame.nominate();
+    device.done[1] = writer.sequence;
+    assert(frame.wait(writer) == Status::Complete);
+    assert(!frame.probe(writer) && !frame.host.reads);
+    device.done[0] = older;
+    device.exactQueueAdopted[0] = false;
+    assert(!frame.probe(writer) && !frame.host.reads);
+    device.exactQueueAdopted[0] = true;
+    assert(frame.probe(writer) && frame.host.reads == 2);
+
+    frame.host.afterRead = [&] {
+        assert(frame.client.guard.held && !device.guard.held);
+        ++device.exactQueueGeneration[0];
+    };
+    assert(!frame.probe(writer) && frame.host.reads == 4);
+    frame.host.afterRead = [&] { ++device.exactInvalidationEpoch; };
+    assert(!frame.probe(writer) && frame.host.reads == 6);
+
+    frame.host.afterRead = [&] { device.done[0] = otherComputeSubmit(); };
+    assert(!frame.probe(writer) && frame.host.reads == 8);
+    frame.host.afterRead = nullptr;
+    assert(!frame.probe(writer) && frame.host.reads == 8);
+    const auto replacement = frame.nominate();
+    device.done[1] = replacement.sequence;
+    assert(frame.ack(replacement) == Status::Ok && frame.probe(replacement) && frame.host.reads == 10);
+}
+
 static void exercisePresentHandoff() {
     Frame frame;
     auto &client = frame.client;
@@ -560,6 +626,7 @@ int main() {
     refusalAndInvalidation();
     remapCloseAndPressure();
 #ifdef TEST_PRESENT_HANDOFF
+    drainAcrossPresent();
     exercisePresentHandoff();
     closeDuringPresent(true);
     closeDuringPresent(false);

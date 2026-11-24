@@ -568,11 +568,25 @@ close during lookup or comparison. No native open, kext, plugin or Mesa
 runtime is enabled by these stages, and no installed state changes.
 Rollback is to discard the three paired source overlays.
 
+The paired display probe also requires both adopted PhxBringup queues to
+be drained through the nominated writer. Under `gpuLock`, the existing
+checked global prefix must equal the writer's sequence, which must still
+be the service's latest submission. Check both before and after the page
+walk; compare the service invalidation epoch and both queue generations.
+There is no wait and the walk itself remains outside `gpuLock`. Since the
+driver does not know what pages another submission writes, even a newer
+already-completed submission on another client invalidates the observation.
+This does not change submission nomination, WaitReceipt, ACK or admission.
+CPU tests run the actual prefix and present methods with an older pending
+Compute submission, an unadopted queue, epoch or queue generation changes,
+and newer Compute work during comparison.
+
 Before any copy bypass, qualify the render-only alias on the actual
-compositor path. Establish earlier-writer drain and later GPU, CPU and
-external writer exclusion, actual device translation and HUBP visibility,
-then retain the backing through flip latch and old-page retirement. The
-page-match counter is not proof of any of those properties.
+compositor path. The adopted-queue snapshot cannot establish drain of
+writers outside that history or exclude later GPU, CPU or external writes
+after dropping the locks. Prove those properties, actual device translation
+and HUBP visibility, then retain the backing through flip latch and old-page
+retirement. The page-match counter is not proof of any of those properties.
 
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and

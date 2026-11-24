@@ -73,7 +73,7 @@ class ExactWriterTests(unittest.TestCase):
     def test_present_handoff_preserves_collecting_only_boundaries(self):
         source = handoff.stage_native(DRIVER, ABI)
         for signature in ('bool PhxBringup::exactNativeOpenAdmitted(', 'bool PhxBringup::captureExactOpenLocked(',
-                          'IOReturn PhxBringup::gpuSubmit(', writer.PROBE):
+                          'IOReturn PhxBringup::gpuSubmit(', pressure.SUBMIT, handoff.GLOBAL):
             self.assertEqual(method(source, signature), method(self.source, signature))
         accelerator = (ROOT / ACCEL).read_bytes()
         signature = 'IOReturn NVDisplayPipe::performTransaction('
@@ -87,11 +87,12 @@ class ExactWriterTests(unittest.TestCase):
         types = client[client.index('    struct Bo {'):client.index('    IOReturn doHello(')]
         signatures = SIGNATURES
         if paired:
-            signatures += (handoff.ATTACH, handoff.CONSUME, handoff.DISPATCH, handoff.CLIENT_MATCH, handoff.OFFER,
+            signatures += (handoff.GLOBAL, handoff.ATTACH, handoff.CONSUME, handoff.DISPATCH, handoff.CLIENT_MATCH, handoff.OFFER,
                            handoff.CLOSE, handoff.SEAL)
         for marker, replacement in {
             '// WRITER_METHODS': '\n'.join(method(source, signature) for signature in signatures),
-            '// WRITER_SERVICE': writer.SERVICE_DECL + (handoff.PROVIDER_PUBLIC + handoff.PROVIDER_FIELDS if paired else ''),
+            '// WRITER_SERVICE': handoff.DRAIN_DECL + handoff.PROVIDER_PUBLIC + handoff.PROVIDER_FIELDS
+            if paired else writer.SERVICE_DECL,
             '// WRITER_CLIENT': writer.CLIENT_STATE + writer.PROBE_DECL + (handoff.CLIENT_FIELDS if paired else ''),
             '// WRITER_TYPES': types,
         }.items():
