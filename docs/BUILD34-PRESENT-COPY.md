@@ -96,6 +96,35 @@ and reuse bound. Fixtures cover nonzero slice offsets, a descriptor shorter
 than the rounded extent, and a short physical segment despite sufficient
 descriptor length.
 
+The [render descriptor lease](../tools/build34_dcn_render_lease.h) stages an
+independent retain and nested prepare for the task-backed host import. The
+pinned XNU implementation [counts nested preparations](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L4439-L4475)
+and [unwires on final completion](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L4494-L4577).
+The lease checks the expected [preparation ID](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L2575-L2600)
+before and after prepare. It exposes the render page reader only after
+success. It applies the 64 MiB cap to the whole descriptor because a nested
+prepare keeps the whole BO wired. A descriptor reference alone would not
+keep its pages wired past BO cleanup. A preparation ID alone does not
+establish render BO or surface identity and is never accepted from userspace
+as such evidence.
+
+Callers must resolve the actual bound host BO and acquire under the lock
+that protects its original prepare against BO free and client close. The
+concrete descriptor must be known to support nesting with the original
+direction. Serialize all lease operations and descriptor prepare/complete
+calls, including BO teardown, and keep the lease storage alive through its
+last callback. The helper has no native lock, call site or implicit destructor
+cleanup. Release only after the transaction never used the pages or has
+proved old display/mapping use retired. Readers are withdrawn before complete;
+a failing complete retains the descriptor reference and permanently refuses
+reuse without claiming that the wire survived. Rollback after a changed
+preparation ID follows the same rule. CPU fixtures exercise both ownership
+release orders, stale IDs and callbacks, prepare failure, cleanup reentry and
+unrecoverable complete failure. The three-way page fixture walks the render
+lease after dropping the original BO's reference and preparation. Native
+integration needs a bounded number of leases and a retirement owner that
+survives the render client's close.
+
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or
 matching descriptor cannot rule out per-page bounce buffering. A null mapper
 does not establish identity, and the presence of `mapToPhysicalAddress()`

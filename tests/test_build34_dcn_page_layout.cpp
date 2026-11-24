@@ -1,4 +1,4 @@
-#include "../tools/build34_dcn_descriptor_backing.h"
+#include "../tools/build34_dcn_render_lease.h"
 
 #include <array>
 #include <cassert>
@@ -107,17 +107,52 @@ struct DescriptorFixture final : IOMemoryDescriptor {
     uint64_t bytes;
     uint64_t contiguous = kPageBytes;
     unsigned reads = 0;
+    uint64_t preparation = 42;
+    uint64_t replacementPreparation = 0;
+    unsigned references = 1;
+    unsigned wires = 1;
+    unsigned prepares = 0;
+    unsigned completes = 0;
+    IOReturn prepareResult = kIOReturnSuccess;
+    IOReturn completeResult = kIOReturnSuccess;
+    void (*onComplete)(void *) = nullptr;
+    void *completeContext = nullptr;
 
     DescriptorFixture(const uint64_t *addresses, uint64_t length) : pages(addresses), bytes(length) {}
 
     IOByteCount getLength() const override { return bytes; }
 
     uint64_t getPhysicalSegment(IOByteCount offset, IOByteCount *length, unsigned options) override {
-        assert(options == kIOMemoryMapperNone && offset < bytes && offset % kPageBytes == 0);
+        assert(references && wires && options == kIOMemoryMapperNone && offset < bytes && offset % kPageBytes == 0);
         ++reads;
         *length = contiguous;
         return pages[offset / kPageBytes];
     }
+
+    uint64_t getPreparationID() override { return wires ? preparation : 0; }
+
+    IOReturn prepare() override {
+        assert(references);
+        ++prepares;
+        if (prepareResult == kIOReturnSuccess) {
+            ++wires;
+            if (replacementPreparation)
+                preparation = replacementPreparation;
+        }
+        return prepareResult;
+    }
+
+    IOReturn complete() override {
+        assert(references && wires);
+        ++completes;
+        if (onComplete)
+            onComplete(completeContext);
+        --wires;
+        return completeResult;
+    }
+
+    void retain() override { assert(references); ++references; }
+    void release() override { assert(references); --references; }
 };
 
 static bool lookupPage(PhysicalPages &pages, uint64_t offset, uint64_t *physical) {
@@ -253,7 +288,11 @@ static void testPageIdentity() {
     PinnedDescriptorSlice renderSlice{&renderPages, 0, surface.mappedBytes};
     PinnedDescriptorSlice presentSlice{&presentPages, 0, surface.mappedBytes};
     BatchSource source{surface.mappedBytes, BatchResult::Normal, {targets.data(), targets.size()}, 0, true};
-    OriginalBacking renderBacking{&renderSlice, readPinnedDescriptorPage};
+    RenderDescriptorLease renderLease;
+    assert(renderLease.acquire(renderSlice, renderPages.preparation));
+    assert(renderPages.complete() == kIOReturnSuccess);
+    renderPages.release();
+    OriginalBacking renderBacking = renderLease.backing();
     OriginalBacking presentBacking{&presentSlice, readPinnedDescriptorPage};
     PreparedDmaMapping mapping{surface.mappedBytes, &kFixtureMapper, &source, readBatch, resolvePage};
     DmaRun scratch{};
@@ -321,9 +360,11 @@ static void testPageIdentity() {
     mapping.resolvePage = resolvePage;
     renderBacking.readPage = nullptr;
     check(&kFixtureMapper, 0, 0, 0, 0);
-    renderBacking.readPage = readPinnedDescriptorPage;
+    renderBacking = renderLease.backing();
     presentBacking.readPage = nullptr;
     check(&kFixtureMapper, 0, 0, 0, 0);
+    assert(renderLease.releaseAfterRetirement());
+    assert(!renderPages.references && !renderPages.wires);
 }
 
 static void testDescriptorSlice() {
@@ -356,6 +397,96 @@ static void testDescriptorSlice() {
     descriptor.contiguous = 0;
     refuse(slice);
     assert(descriptor.reads == 3);
+}
+
+static void testRenderLease() {
+    const uint64_t addresses[] = {0x30000, 0x70000};
+    constexpr uint64_t bytes = kPageBytes;
+    for (const bool ownerReleasesFirst : {false, true}) {
+        DescriptorFixture descriptor{addresses, 2 * bytes};
+        PinnedDescriptorSlice slice{&descriptor, bytes, bytes};
+        RenderDescriptorLease lease;
+        assert(!lease.backing().readPage && !lease.releaseAfterRetirement());
+        for (const uint64_t invalid : {uint64_t{0}, uint64_t{1}, kIOPreparationIDAlwaysPrepared, UINT64_MAX, uint64_t{41}})
+            assert(!lease.acquire(slice, invalid));
+        assert(!lease.acquire({&descriptor, bytes, 2 * bytes}, 42));
+        descriptor.bytes = kMaxBackingBytes + bytes;
+        assert(!lease.acquire(slice, 42));
+        descriptor.bytes = 2 * bytes;
+        assert(descriptor.references == 1 && descriptor.wires == 1 && !descriptor.prepares);
+
+        assert(lease.acquire(slice, 42));
+        assert(!lease.acquire(slice, 42));
+        assert(descriptor.references == 2 && descriptor.wires == 2 && descriptor.prepares == 1);
+        if (ownerReleasesFirst) {
+            assert(descriptor.complete() == kIOReturnSuccess);
+            descriptor.release();
+        }
+
+        const auto backing = lease.backing();
+        slice = {};
+        uint64_t physical = kUnwritten;
+        assert(backing.readPage(backing.context, 0, &physical) && physical == addresses[1]);
+        assert(lease.releaseAfterRetirement());
+        assert(!lease.backing().readPage && !lease.uncertain());
+        assert(!lease.releaseAfterRetirement() && !lease.acquire({&descriptor, 0, bytes}, 42));
+        physical = kUnwritten;
+        assert(!backing.readPage(backing.context, 0, &physical) && physical == kUnwritten);
+        if (!ownerReleasesFirst) {
+            assert(descriptor.references == 1 && descriptor.wires == 1);
+            assert(descriptor.complete() == kIOReturnSuccess);
+            descriptor.release();
+        }
+        assert(!descriptor.references && !descriptor.wires && descriptor.completes == 2 && descriptor.reads == 1);
+    }
+}
+
+static void testRenderLeaseFailures() {
+    const uint64_t address = 0x30000;
+    DescriptorFixture descriptor{&address, kPageBytes};
+    const PinnedDescriptorSlice slice{&descriptor, 0, kPageBytes};
+    RenderDescriptorLease lease;
+    descriptor.prepareResult = -1;
+    assert(!lease.acquire(slice, 42));
+    assert(!lease.backing().readPage && !lease.uncertain());
+    assert(descriptor.references == 1 && descriptor.wires == 1 && descriptor.prepares == 1 && !descriptor.completes);
+
+    descriptor.prepareResult = kIOReturnSuccess;
+    descriptor.replacementPreparation = 43;
+    assert(!lease.acquire(slice, 42));
+    assert(!lease.backing().readPage && !lease.uncertain());
+    assert(descriptor.references == 1 && descriptor.wires == 1 && descriptor.prepares == 2 && descriptor.completes == 1);
+
+    RenderDescriptorLease retiring;
+    assert(retiring.acquire(slice, 43));
+    const auto backing = retiring.backing();
+    struct CompletionCheck {
+        RenderDescriptorLease &lease;
+        const OriginalBacking &backing;
+        const PinnedDescriptorSlice &slice;
+        unsigned calls = 0;
+    } check{retiring, backing, slice};
+    descriptor.onComplete = [](void *context) {
+        auto &check = *static_cast<CompletionCheck *>(context);
+        ++check.calls;
+        assert(!check.lease.backing().readPage && !check.lease.releaseAfterRetirement());
+        assert(!check.lease.acquire(check.slice, 43));
+        uint64_t physical = kUnwritten;
+        assert(!check.backing.readPage(check.backing.context, 0, &physical) && physical == kUnwritten);
+    };
+    descriptor.completeContext = &check;
+    descriptor.completeResult = -1;
+    assert(!retiring.releaseAfterRetirement() && retiring.uncertain());
+    assert(!retiring.releaseAfterRetirement() && !retiring.acquire(slice, 43));
+    assert(!retiring.backing().readPage && check.calls == 1);
+    assert(descriptor.references == 2 && descriptor.wires == 1 && descriptor.completes == 2 && !descriptor.reads);
+
+    descriptor.onComplete = nullptr;
+    descriptor.replacementPreparation = 44;
+    RenderDescriptorLease rollback;
+    assert(!rollback.acquire(slice, 43) && rollback.uncertain());
+    assert(!rollback.backing().readPage && !rollback.releaseAfterRetirement());
+    assert(descriptor.references == 3 && descriptor.wires == 1 && descriptor.completes == 3);
 }
 
 static void expectRefusal(uint64_t start, uint64_t bytes, const DmaRun *runs, size_t count,
@@ -464,6 +595,8 @@ int main() {
     testSegmentBatches();
     testPageIdentity();
     testDescriptorSlice();
+    testRenderLease();
+    testRenderLeaseFailures();
     testFragmentedBacking();
     testAddressAndCapacityEdges();
     testRefusesMalformedRunsBeforeWriting();
