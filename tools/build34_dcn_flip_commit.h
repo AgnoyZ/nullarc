@@ -56,7 +56,7 @@ public:
             !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, true) ||
             !validBinding(next, intent.next, operation.provider, false) ||
-            (next.pin && intent.previous.vmid == intent.next.vmid) ||
+            ((old.pin || next.pin) && intent.previous.vmid == intent.next.vmid) ||
             (old.pin && next.pin && (!sameFlipGeometry(old.surface, next.surface) ||
                 (old.window <= next.window ? next.window - old.window < old.surface.mappedBytes :
                                             old.window - next.window < next.surface.mappedBytes))) ||
@@ -144,8 +144,11 @@ public:
         const bool retired = route_.fetchesRetired(route_.reader.context, request_);
         if (!nextCurrent() || !currentGeometry()) return fail();
         if (!retired) return ScanoutFlipResult::Waiting;
-        if (old_.pin && (!old_.dma->table_.withdraw(old_.dma->qualified_) || !nextCurrent() || !currentGeometry() ||
-                         !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse())) return fail();
+        if (old_.pin) {
+            auto detached = [&] { return DcnFlatProgram::empty(frontVm_.vmid, route_.reader, translationCurrent); };
+            if (!detached() || !old_.dma->table_.withdraw(old_.dma->qualified_) || !nextCurrent() || !currentGeometry() ||
+                !detached() || !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse()) return fail();
+        }
         front_ = request_.nextPin;
         frontAddress_ = request_.next;
         frontVm_ = nextVm_;

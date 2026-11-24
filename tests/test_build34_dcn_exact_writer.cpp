@@ -884,7 +884,8 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        NoTableMemory, ShortTable, EncodeError, PublishError, PublishBadRoot, PublishCorruptPadding,
                        PublicationLost, WithdrawError, CloseDuringWithdraw, CancelWithdrawError, SharedTable,
                        SharedRoot, RetryTable, TableWrongPhysical, TablePrepareUncertain, TableBadSegments,
-                       TableSubstituted };
+                       TableSubstituted, RetireRootStillInstalled, RetireRangeStillInstalled,
+                       RetireContextReappears, ReturnSameVmid };
 
 struct CommitFixture {
     struct Table : IOBufferMemoryDescriptor {
@@ -976,6 +977,7 @@ struct CommitFixture {
                        scanout.client.guard.held && !scanout.device.guard.held);
                 ++table.withdrawals;
                 if (translationFault == FlipFault::CloseDuringWithdraw) scanout.device.exactCallbacks.close();
+                if (translationFault == FlipFault::RetireContextReappears) contextRoot = ownedRoot;
                 return translationFault != FlipFault::WithdrawError && translationFault != FlipFault::CancelWithdrawError;
             }
             if (!issues) {
@@ -1198,7 +1200,11 @@ struct CommitFixture {
         if (self.closeDuringRetire && request.previousPin.serial) self.scanout.device.exactCallbacks.close();
         if (self.lateRetire && request.previousPin.serial) self.now += 100000000;
         if (self.changeGeometryAtRetire && request.previousPin.serial) ++self.pitch;
-        if (request.previousPin.serial) self.contextRoot = 0;
+        if (request.previousPin.serial && self.retire) {
+            if (self.translationFault != FlipFault::RetireRootStillInstalled) self.contextRoot = 0;
+            if (self.translationFault != FlipFault::RetireRangeStillInstalled) self.firstPage = self.lastPage = 0;
+            self.contextControl = 0;
+        }
         if (self.translationFault == FlipFault::ContextDuringRetire && request.nextPin.serial) self.contextRoot ^= kPage;
         if (self.translationFault == FlipFault::DualContextDuringRetire && request.nextPin == self.alternatePin)
             self.alternateContextRoot ^= kPage;
@@ -1389,7 +1395,7 @@ static void scanoutFlip(FlipFault fault) {
     }
     if (fault == FlipFault::CancelWithdrawError) fixture.publicationCurrent = false;
     if ((fault >= FlipFault::NoTableMemory && fault <= FlipFault::PublishCorruptPadding) ||
-        fault == FlipFault::CancelWithdrawError || fault >= FlipFault::TableWrongPhysical) {
+        fault == FlipFault::CancelWithdrawError || (fault >= FlipFault::TableWrongPhysical && fault <= FlipFault::TableSubstituted)) {
         const bool acquired = fault != FlipFault::NoTableMemory;
         const bool mapped = acquired && fault != FlipFault::ShortTable;
         const bool uncertain = fault == FlipFault::TablePrepareUncertain || fault == FlipFault::TableSubstituted;
@@ -1502,6 +1508,13 @@ static void scanoutFlip(FlipFault fault) {
     }
 
     request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
+    if (fault == FlipFault::ReturnSameVmid) {
+        request.next.vmid = request.previous.vmid;
+        const auto reads = fixture.reads;
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+        assert(reads == fixture.reads && fixture.writes == 5 && !fixture.command.completes);
+        return;
+    }
     if (fault == FlipFault::WrongPreviousPage || fault == FlipFault::ReplacedFrontContext) {
         if (fault == FlipFault::ReplacedFrontContext) fixture.contextRoot ^= kPage;
         else fixture.homeTable.words[1] ^= kPage;
@@ -1536,6 +1549,15 @@ static void scanoutFlip(FlipFault fault) {
     IOLockUnlock(scanout.client.lock);
     fixture.retire = true;
     fixture.failUnmap = fault == FlipFault::Unmap;
+    if (fault >= FlipFault::RetireRootStillInstalled && fault <= FlipFault::RetireContextReappears) {
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        const bool withdrew = fault == FlipFault::RetireContextReappears;
+        assert(fixture.homeTable.withdrawals == withdrew && fixture.homeTable.dma.prepared == !withdrew);
+        assert(fixture.command.prepared && !fixture.command.completes && fixture.lifetime.references == 3);
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.homeTable.withdrawals == withdrew && !fixture.command.completes);
+        return;
+    }
     if (fault == FlipFault::WithdrawError || fault == FlipFault::CloseDuringWithdraw) {
         fixture.step(poll, ScanoutFlipResult::Uncertain);
         assert(fixture.homeTable.withdrawals == 1 && !fixture.homeTable.dma.prepared &&
@@ -1671,6 +1693,10 @@ int main() {
     scanoutFlip(FlipFault::TablePrepareUncertain);
     scanoutFlip(FlipFault::TableBadSegments);
     scanoutFlip(FlipFault::TableSubstituted);
+    scanoutFlip(FlipFault::RetireRootStillInstalled);
+    scanoutFlip(FlipFault::RetireRangeStillInstalled);
+    scanoutFlip(FlipFault::RetireContextReappears);
+    scanoutFlip(FlipFault::ReturnSameVmid);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

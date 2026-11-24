@@ -739,7 +739,9 @@ has to establish actual DCN encoding, fetch visibility and VMID reservation.
 Only nonzero VMIDs qualify for pinned surfaces in this stage; each pin
 requires its own exact window. VMID 0 is not reprogrammed. Firmware-backed
 sides remain outside the flat-context check and need independent address
-qualification. The initial root and leaf checks run within the flip deadline
+qualification. Both sides must use distinct VMIDs, including when returning
+to firmware, so the old context can be detached without affecting the new
+scanout. The initial root and leaf checks run within the flip deadline
 without the GPU or client lock. A missing callback, root or range mismatch,
 read error, final-page mismatch, revoked route or elapsed deadline refuses
 before any register write. The contexts are rechecked after the page walks
@@ -828,9 +830,13 @@ the same deadline. Polling checks both expected VMIDs until old retirement
 begins, then checks the new VMID without requiring the old context to remain
 programmed. The root is retained as part of the front pin's identity; a
 replacement root cannot authorize the next flip. The client lock is try-only
-and no GPU lock is held across callbacks. After old fetch and translation
-retirement, the provider withdraws the old table and rechecks the live
-route before completing the pixel DMA command. The old command must
+and no GPU lock is held across callbacks. After the route confirms old fetch
+and translation retirement, the provider also checks that all seven old
+context words are zero, the same empty state required for a fresh install.
+It refuses to unmap a table if any old root or range word remains. After
+withdrawing the old table it rechecks that context, the new context and live
+route before completing the pixel DMA command. Empty registers are not a
+substitute for confirmed fetch drain or translation invalidation. The old command must
 complete, independently confirm unmap, and clear before the table allocation
 and descriptor hold are released. Withdrawal is also required before unused
 cancellation. These callbacks must be bounded and must not reenter the
