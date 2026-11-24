@@ -682,6 +682,38 @@ retirement and synchronous DMA unmap before relinquishing either lease.
 The observer has no hardware caller, writes no registers and does not
 change the framebuffer or copy path. Rollback is to omit the observer.
 
+The [flip-commit overlay](../tools/build34_dcn_flip_commit_stage.py) connects
+the mapper-backed provider slots to that observer. The provider snapshots
+the DMA plan's logical window and extent on successful preparation; an
+unmapped pin, stale token, substituted address or overlapping pinned window
+cannot be submitted. The initial previous address and any requested return
+to the firmware surface must be qualified by the route owner, not inferred
+from the framebuffer's CPU mapping. Only one commit can be outstanding.
+A provider operation serial is distinct from the two DMA pin serials.
+
+The route qualification hook is null. A future route must keep its context,
+power, exclusive display-writer lease, exact HUBP translation and render
+write exclusion valid through scanout. Qualification is read-only and sees
+the exact prepared DMA commands; an arbitrary logical address or a page
+match is not enough. After qualification and baseline readback, the provider
+marks the new pin as potentially displayed before allowing the address write.
+An issue failure can mean a posted write and is never retried or cancelled.
+`Issued` is not presentation, and ordinary CPU fallback cannot assume it is
+still updating the active framebuffer after that point.
+
+Only fresh old-address absence plus the same route's independent fetch and
+old-translation retirement confirmation permits old DMA teardown. The client
+lock is try-only and no GPU lock is held across callbacks. The old command
+must complete, independently confirm unmap, and clear before the descriptor
+hold is released. The new front stays pinned. On timeout, observed close,
+an ambiguous write, or cleanup failure, the provider retains the reachable
+backing and route and admits no replacement commit. On success, a return to
+the verified firmware surface retires the last DMA pin and releases the route
+reference outside the client lock. The CPU tests cover both directions and
+teardown faults. There is no hardware implementation of the route callback,
+no active framebuffer caller, and no change to the R2a or `l10r` path. Omit
+the overlay to roll back this source-only step.
+
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of
 writers outside that history or exclude later GPU, CPU or external writes

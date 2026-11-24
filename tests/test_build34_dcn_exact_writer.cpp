@@ -131,7 +131,15 @@ struct Phx34ScopedReference {
 
 #ifdef TEST_SCANOUT_DMA
 #include "build34_dcn_scanout_dma.h"
-struct IOPCIDevice { IOMapper *mapper = nullptr; };
+#ifdef TEST_SCANOUT_FLIP
+#include "build34_dcn_flip_commit.h"
+#endif
+struct IOPCIDevice {
+    IOMapper *mapper = nullptr;
+#ifdef TEST_SCANOUT_FLIP
+    HubpFlipRoute *route = nullptr;
+#endif
+};
 #endif
 
 struct PhxBringup
@@ -852,6 +860,225 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
 }
 #endif
 
+#ifdef TEST_SCANOUT_FLIP
+enum class FlipFault { None, Decline, Issue, Close, CloseDuringQualify, CloseDuringRetire, LateRetire, Unmap };
+
+struct CommitFixture {
+    ScanoutFixture scanout;
+    IOMapper mapper;
+    IODMACommand command;
+    OSObject lifetime;
+    const HubpAddress home{0x800000000, 0}, mapped{0x100000, 7};
+    HubpAddress programmed = home, active = home, earliest = home;
+    uint32_t frame = 42;
+    uint64_t now = 800;
+    unsigned issues = 0, reads = 0, retireChecks = 0;
+    bool qualify = true, live = true, pending = false, failIssue = false, retire = false, failUnmap = false;
+    bool closeDuringQualify = false, closeDuringRetire = false, lateRetire = false;
+    HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, qualified, issue, retired};
+    ScanoutPinToken pin{};
+
+    CommitFixture() {
+        IODMACommand::next = &command;
+        scanout.device.pci->mapper = &mapper;
+        scanout.device.pci->route = &route;
+        scanout.device.dcnCopyQualifiedMapper = [](IOPCIDevice *pci) -> ScanoutDmaMapper {
+            pci->mapper->retain();
+            return {pci->mapper,
+                [](IOMapper &mapper, const IODMACommand &command, uint64_t address, uint64_t &physical) {
+                    return mapper.resolve(command, address, physical);
+                },
+                [](IOMapper &mapper, const IODMACommand &command) { return mapper.confirmUnmap(command); }};
+        };
+        command.segments = [](UInt64 *cursor, IODMACommand::Segment64 *segments, UInt32 *count) {
+            assert(!*cursor && *count == 2);
+            segments[0] = {0x500000, 2 * kPage};
+            *count = 1;
+            *cursor = 2 * kPage;
+            return kIOReturnSuccess;
+        };
+        mapper.resolve = [&](const IODMACommand &mapped, uint64_t address, uint64_t &physical) {
+            assert(&mapped == &command && (address == 0x500000 || address == 0x501000));
+            physical = scanout.frame.host.base + (address == 0x500000 ? 2 : 4) * kPage;
+            return true;
+        };
+        mapper.confirmUnmap = [&](const IODMACommand &completed) {
+            assert(&completed == &command && retire && retireChecks >= 3 && scanout.client.guard.held &&
+                   !scanout.device.guard.held && lifetime.references == 2 && scanout.frame.host.wires == 2);
+            return !failUnmap;
+        };
+        scanout.offer();
+        DmaRun scratch[2]{};
+        uint64_t addresses[2]{};
+        ScanoutDmaRequest request{&scanout.frame.copy, mapped.address, scratch, 2, addresses, 2, {}, {}};
+        const OSSymbol symbol{BUILD34_DCN_PIN_MAP};
+        assert(dispatch(symbol, &request) == kIOReturnSuccess && request.token.serial);
+        assert(addresses[0] == 0x500000 && addresses[1] == 0x501000);
+        pin = request.token;
+    }
+
+    ~CommitFixture() { IODMACommand::next = nullptr; }
+
+    static bool routeCurrent(void *context, const HubpFlipRequest &request) {
+        const auto &self = *static_cast<CommitFixture *>(context);
+        return self.live && request.routeOwner == &self && request.routeGeneration == self.route.generation;
+    }
+
+    static bool qualified(void *context, const HubpFlipRequest &request, const IODMACommand *old,
+                          const IODMACommand *next) {
+        auto &self = *static_cast<CommitFixture *>(context);
+        assert(self.lifetime.references == 2 && !self.scanout.device.guard.held);
+        assert((old == &self.command && !next && request.previousPin == self.pin) ||
+               (!old && next == &self.command && request.nextPin == self.pin));
+        if (self.closeDuringQualify) self.scanout.device.exactCallbacks.close();
+        return self.qualify;
+    }
+
+    static bool issue(void *context, const HubpFlipRequest &request) {
+        auto &self = *static_cast<CommitFixture *>(context);
+        assert(self.scanout.cancelPin(self.pin) == kIOReturnBusy);
+        assert(self.lifetime.references == 2 && !self.scanout.device.guard.held);
+        self.programmed = request.next;
+        self.pending = true;
+        ++self.issues;
+        return !self.failIssue;
+    }
+
+    static bool retired(void *context, const HubpFlipRequest &request) {
+        auto &self = *static_cast<CommitFixture *>(context);
+        assert(self.active == request.next && self.earliest == request.next && !self.pending);
+        assert(self.scanout.client.guard.held == bool(request.previousPin.serial));
+        ++self.retireChecks;
+        if (self.closeDuringRetire && request.previousPin.serial) self.scanout.device.exactCallbacks.close();
+        if (self.lateRetire && request.previousPin.serial) self.now += 100000000;
+        return self.retire;
+    }
+
+    static bool read(void *context, uint32_t address, uint32_t &value) {
+        auto &self = *static_cast<CommitFixture *>(context);
+        const auto low = [](HubpAddress surface) { return static_cast<uint32_t>(surface.address); };
+        const auto high = [](HubpAddress surface) { return static_cast<uint32_t>(surface.address >> 32); };
+        ++self.reads;
+        switch (address) {
+        case hubp0::kControl: case hubp0::kFlip2: value = 0; break;
+        case hubp0::kFlip: value = self.pending ? hubp0::kPending : 0; break;
+        case hubp0::kVmid: value = self.programmed.vmid; break;
+        case hubp0::kProgrammedLow: value = low(self.programmed); break;
+        case hubp0::kProgrammedHigh: value = high(self.programmed); break;
+        case hubp0::kInUseLow: value = low(self.active); break;
+        case hubp0::kInUseHigh: value = high(self.active) | (self.active.vmid << 28); break;
+        case hubp0::kEarliestLow: value = low(self.earliest); break;
+        case hubp0::kEarliestHigh: value = high(self.earliest) | (self.earliest.vmid << 28); break;
+        case hubp0::kFrame: value = self.frame; break;
+        default: return false;
+        }
+        return true;
+    }
+
+    static bool clock(void *context, uint64_t &value) {
+        value = static_cast<CommitFixture *>(context)->now;
+        return true;
+    }
+
+    IOReturn dispatch(const OSSymbol &symbol, void *value) {
+        return scanout.device.callPlatformFunction(&symbol, false, value, nullptr, nullptr, nullptr);
+    }
+
+    IOReturn begin(ScanoutFlipIntent &request) {
+        const OSSymbol symbol{BUILD34_DCN_FLIP_BEGIN};
+        return dispatch(symbol, &request);
+    }
+
+    IOReturn poll(ScanoutFlipPoll &request) {
+        const OSSymbol symbol{BUILD34_DCN_FLIP_POLL};
+        return dispatch(symbol, &request);
+    }
+
+    void step(ScanoutFlipPoll &request, ScanoutFlipResult expected) {
+        ++frame;
+        now += 8000000;
+        assert(poll(request) == kIOReturnSuccess && request.result == expected);
+    }
+};
+
+static void scanoutFlip(FlipFault fault) {
+    CommitFixture fixture;
+    auto &scanout = fixture.scanout;
+    ScanoutFlipIntent request{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.issues);
+    scanout.device.dcnQualifiedFlipRoute = [](IOPCIDevice *device) -> const HubpFlipRoute * { return device->route; };
+    request.next.address += kPage;
+    assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.issues);
+    request.next = fixture.mapped;
+    fixture.qualify = fault != FlipFault::Decline;
+    fixture.closeDuringQualify = fault == FlipFault::CloseDuringQualify;
+    fixture.failIssue = fault == FlipFault::Issue;
+    if (!fixture.qualify || fixture.closeDuringQualify) {
+        assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.issues);
+        assert(!request.operation.serial && fixture.lifetime.references == 1);
+        return;
+    }
+    assert(fixture.begin(request) == kIOReturnSuccess && request.operation.serial != fixture.pin.serial);
+    assert(fixture.issues == 1 && fixture.lifetime.references == 2 && !fixture.command.completes);
+    assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
+    ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
+    if (fault == FlipFault::Issue) {
+        assert(request.result == ScanoutFlipResult::Uncertain);
+        assert(fixture.poll(poll) == kIOReturnSuccess && poll.result == ScanoutFlipResult::Uncertain);
+        assert(fixture.issues == 1 && fixture.retireChecks == 0 && fixture.command.prepared);
+        return;
+    }
+    assert(request.result == ScanoutFlipResult::Issued);
+    if (fault == FlipFault::Close) {
+        scanout.device.exactCallbacks.close();
+        const auto reads = fixture.reads;
+        assert(fixture.poll(poll) == kIOReturnNotReady && fixture.reads == reads && fixture.command.prepared);
+        return;
+    }
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.pending = false;
+    fixture.active = fixture.earliest = fixture.mapped;
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    assert(!fixture.command.completes && fixture.retireChecks == 1);
+    assert(fixture.poll(poll) == kIOReturnNotFound && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
+
+    request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Issued);
+    poll.operation = request.operation;
+    fixture.pending = fixture.retire = false;
+    fixture.active = fixture.earliest = fixture.home;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    if (fault == FlipFault::CloseDuringRetire || fault == FlipFault::LateRetire) {
+        fixture.retire = true;
+        fixture.closeDuringRetire = fault == FlipFault::CloseDuringRetire;
+        fixture.lateRetire = fault == FlipFault::LateRetire;
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.command.prepared && !fixture.command.completes && fixture.lifetime.references == 2);
+        return;
+    }
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    assert(fixture.retireChecks == 2 && !fixture.command.completes && scanout.frame.host.wires == 2);
+    IOLockLock(scanout.client.lock);
+    assert(fixture.poll(poll) == kIOReturnBusy && fixture.retireChecks == 2);
+    IOLockUnlock(scanout.client.lock);
+    fixture.retire = true;
+    fixture.failUnmap = fault == FlipFault::Unmap;
+    fixture.step(poll, fixture.failUnmap ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
+    assert(fixture.command.completes == 1 && fixture.command.clears == !fixture.failUnmap);
+    assert(scanout.frame.host.wires == (fixture.failUnmap ? 2u : 1u));
+    assert(fixture.lifetime.references == (fixture.failUnmap ? 2u : 1u));
+    assert(scanout.surface.references == (fixture.failUnmap ? 2u : 1u));
+    if (fixture.failUnmap) {
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.command.completes == 1);
+    } else {
+        assert(fixture.poll(poll) == kIOReturnNotFound && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
+    }
+}
+#endif
+
 int main() {
     completionAndPages();
     newerAndRacingCompletions();
@@ -879,6 +1106,16 @@ int main() {
     scanoutDma(DmaFault::None, DmaCleanupFault::Clear);
     scanoutDma(DmaFault::None, DmaCleanupFault::ConfirmUnmap);
     scanoutDma(DmaFault::WrongPage, DmaCleanupFault::ConfirmUnmap);
+#endif
+#ifdef TEST_SCANOUT_FLIP
+    scanoutFlip(FlipFault::None);
+    scanoutFlip(FlipFault::Decline);
+    scanoutFlip(FlipFault::Issue);
+    scanoutFlip(FlipFault::Close);
+    scanoutFlip(FlipFault::CloseDuringQualify);
+    scanoutFlip(FlipFault::CloseDuringRetire);
+    scanoutFlip(FlipFault::LateRetire);
+    scanoutFlip(FlipFault::Unmap);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

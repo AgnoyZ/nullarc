@@ -123,6 +123,22 @@ public:
     }
 
 private:
+    friend class ScanoutFlipCommit;
+
+    bool stillInBudget() const {
+        uint64_t now = 0;
+        return reader_.readClockNs(reader_.context, now) && inBudget(now, lastTime_);
+    }
+
+    void recycle() {
+        request_ = {};
+        reader_ = {};
+        progress_ = HubpFlipProgress::Idle;
+        polls_ = frame_ = drainFrame_ = 0;
+        start_ = lastTime_ = 0;
+        frameAdvanced_ = programmedNew_ = inUseNew_ = earliestNew_ = drainSeen_ = false;
+    }
+
     static constexpr uint64_t kBudgetNs = 100000000;
     static constexpr uint32_t kMaxPolls = 64, kMaxFrameStep = 32;
 

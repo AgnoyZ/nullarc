@@ -105,7 +105,14 @@ public:
     }
 
     bool releaseUnused(const ScanoutDescriptorPin &pin) {
-        if (uncertain_ || !pin.cancellable()) return false;
+        return pin.cancellable() && releaseUnmapped();
+    }
+
+private:
+    friend class ScanoutFlipCommit;
+
+    bool releaseUnmapped() {
+        if (uncertain_) return false;
         if (!command_) return true;
         if (command_->complete(false, false) != kIOReturnSuccess ||
             !qualified_.confirmUnusedUnmap(*qualified_.mapper, *command_) ||
@@ -117,7 +124,6 @@ public:
         return true;
     }
 
-private:
     void releaseObjects() {
         command_->release();
         qualified_.mapper->release();

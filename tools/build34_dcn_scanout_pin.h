@@ -10,6 +10,8 @@ namespace build34::dcn {
 struct ScanoutPinToken {
     const void *provider;
     uint64_t serial;
+
+    bool operator==(const ScanoutPinToken &other) const { return provider == other.provider && serial == other.serial; }
 };
 
 class ScanoutDescriptorPin {
@@ -39,6 +41,16 @@ public:
 
 private:
     friend class ScanoutDmaLease;
+    friend class ScanoutFlipCommit;
+
+    bool retireDisplayUse() {
+        if (!held() || !displayUse_) return false;
+        if (!lease_.releaseAfterRetirement()) return false;
+        displayUse_ = false;
+        lease_.recycleClosed();
+        return true;
+    }
+
     RenderDescriptorLease lease_;
     bool displayUse_{false};
 };
