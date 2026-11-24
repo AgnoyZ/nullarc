@@ -248,6 +248,10 @@ struct PhxBringup
     IOReturn dispatchResult = kIOReturnSuccess, mapResult = kIOReturnSuccess;
     unsigned dispatches = 0;
     std::function<void()> beforeDispatch;
+#ifdef TEST_SCANOUT_FLIP
+    uint64_t submitTime = 0;
+    std::function<void()> onSubmitSleep;
+#endif
 
     bool exactAdmissionClosed() const { return exactCallbacks.closed(); }
     bool gpuReady() const { return true; }
@@ -273,12 +277,27 @@ struct PhxBringup
                        const uint32_t *, uint32_t, uint64_t *seq, Registry *registry, Ticket ticket, const void *) {
         if (beforeDispatch) beforeDispatch();
         if (dispatchResult != kIOReturnSuccess) return dispatchResult;
+#ifdef TEST_SCANOUT_FLIP
+        const auto mach_absolute_time = [&] { return submitTime; };
+        const auto absolutetime_to_nanoseconds = [](uint64_t elapsed, uint64_t *out) { *out = elapsed; };
+        const auto IOSleep = [&](unsigned ms) {
+            assert(ms == 1 && !guard.held && onSubmitSleep);
+            onSubmitSleep();
+        };
+        const auto start = mach_absolute_time();
+        for (;;) {
+            IOLockLock(gpuLock);
+            // DCN_SUBMIT_GATE
+            break;
+        }
+#else
         IOLockLock(gpuLock);
+#endif
         assert(vmOwned(handle, generation, client));
         const uint32_t queue = gfx ? 1 : 0;
         vm[0].newest = vm[0].queueSequence[queue] = *seq = recordQueued(queue);
         vm[0].queueGeneration[queue] = exactQueueGeneration[queue];
-        assert(registry->publish(ticket, {*seq, exactQueueGeneration[queue], queue}) == Status::Ok);
+        assert(!registry || registry->publish(ticket, {*seq, exactQueueGeneration[queue], queue}) == Status::Ok);
         IOLockUnlock(gpuLock);
         ++dispatches;
         return kIOReturnSuccess;
@@ -1460,6 +1479,7 @@ struct CommitFixture {
             return self.translationFault != FlipFault::ClearWriteUncertain;
         }
         if (address >= 0x03a4a && address <= 0x03a57) {
+            assert(self.scanout.device.dcnSubmitGate.held());
             const bool alternate = address >= 0x03a51;
             const uint32_t base = alternate ? 0x03a51 : 0x03a4a;
             const uint32_t sequence[]{3, 4, 5, 6, 0, 1, 2};
@@ -1493,6 +1513,7 @@ struct CommitFixture {
             return true;
         }
         const auto target = self.target;
+        assert(self.scanout.device.dcnSubmitGate.held() == bool(target.vmid));
         const auto step = self.writes++ % 5;
         switch (address) {
         case hubp0::kOtgUpdateLock:
@@ -1700,6 +1721,7 @@ static void revalidateScanoutWriter(WriterFault fault, bool direct) {
     ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
     const bool issued = fault == WriterFault::AfterVmInstall || fault == WriterFault::UnderOtgLock;
     assert(fixture.begin(intent) == (issued ? kIOReturnSuccess : kIOReturnNotReady));
+    assert(!device.dcnSubmitGate.held());
     if (fault == WriterFault::ClientBusy) IOLockUnlock(client.lock);
     if (fault == WriterFault::GpuBusy) IOLockUnlock(device.gpuLock);
     assert(bool(intent.operation.serial) == issued && !fixture.issues);
@@ -1714,6 +1736,35 @@ static void revalidateScanoutWriter(WriterFault fault, bool direct) {
         assert(bool(fixture.reads) == (fault == WriterFault::DuringPageWalk));
         assert(fixture.scanout.cancelPin(fixture.pin) == kIOReturnSuccess && fixture.scanout.frame.host.wires == 1);
     }
+}
+
+static void scanoutSubmitReservation(bool direct) {
+    CommitFixture fixture(direct);
+    auto &device = fixture.scanout.device;
+    auto &client = fixture.scanout.client;
+    device.dcnQualifiedFlipRoute = [](IOPCIDevice *pci) -> const HubpFlipRoute * { return pci->route; };
+    const auto original = device.gSeq;
+    unsigned sleeps = 0;
+    device.onSubmitSleep = [&] {
+        ++sleeps;
+        assert(device.dcnSubmitGate.held());
+        device.submitTime += 2000000000ull;
+    };
+    const auto submit = [&](bool graphics) {
+        uint64_t sequence = UINT64_MAX;
+        assert(device.gpuSubmit(1, client.vmGeneration, &client, graphics, nullptr, nullptr, 1,
+                                &sequence, nullptr, {}, nullptr) == kIOReturnBusy);
+        assert(sequence == UINT64_MAX && device.gSeq == original);
+    };
+    fixture.afterVmInstall = [&] { submit(false); };
+    fixture.afterOtgLock = [&] { submit(true); };
+    ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    assert(sleeps == 2 && !device.dcnSubmitGate.held() && fixture.issues == 1);
+    uint64_t sequence = 0;
+    assert(device.gpuSubmit(1, client.vmGeneration, &client, true, nullptr, nullptr, 1,
+                            &sequence, nullptr, {}, nullptr) == kIOReturnSuccess);
+    assert(sequence == original + 1 && sleeps == 2);
 }
 
 enum class PixelFault { MapperRemap, MapperUnavailable, RenderPage, PresentPage, RenderGeneration, PresentGeneration,
@@ -2359,6 +2410,7 @@ int main() {
     scanoutDma(DmaFault::WrongPage, DmaCleanupFault::ConfirmUnmap);
 #endif
 #ifdef TEST_SCANOUT_FLIP
+    for (const bool direct : {false, true}) scanoutSubmitReservation(direct);
     for (const bool direct : {false, true})
         for (const auto fault : {WriterFault::NewerCompletedWork, WriterFault::ChangedEpoch, WriterFault::ChangedQueueGeneration,
              WriterFault::ReplacedWriterMap, WriterFault::ClientBusy, WriterFault::GpuBusy, WriterFault::DuringPageWalk,

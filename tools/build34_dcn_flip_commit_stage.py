@@ -11,10 +11,24 @@ POLL = 'IOReturn PhxBringup::pollDcnFlip('
 LOOKUP = 'PhxBringup::DcnPinSlot *PhxBringup::findDcnFlipPin('
 BIND = 'build34::dcn::ScanoutFlipBinding PhxBringup::dcnFlipBinding('
 WRITER_CURRENT = 'bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent('
-CLIENT = '''    bool dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescriptorPin &,
-        const build34::dcn::ScanoutDmaLease &);
+SUBMIT = 'IOReturn PhxBringup::gpuSubmit('
+SUBMIT_EPOCH = '        if (exact && !retried) admissionEpoch = exactInvalidationEpoch;\n'
+SUBMIT_GATE = '''        if (dcnSubmitGate.held()) {
+            IOLockUnlock(gpuLock);
+            uint64_t elapsed = 0;
+            absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsed);
+            if (elapsed >= 2000000000ull) return kIOReturnBusy;
+            IOSleep(1);
+            continue;
+        }
 '''
-FIELDS = '''    build34::dcn::ScanoutFlipCommit dcnFlip;
+DRAIN_DECL = once(dma.pin.handoff.DRAIN_DECL, 'DcnDrainStamp * = nullptr);', '''DcnDrainStamp * = nullptr,
+        build34::dcn::DcnSubmitGate::Lease * = nullptr, const DcnDrainStamp * = nullptr);''')
+CLIENT = '''    bool dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescriptorPin &,
+        const build34::dcn::ScanoutDmaLease &, build34::dcn::DcnSubmitGate::Lease *);
+'''
+FIELDS = '''    build34::dcn::DcnSubmitGate dcnSubmitGate;
+    build34::dcn::ScanoutFlipCommit dcnFlip;
     const build34::dcn::HubpFlipRoute *(*dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr};
     DcnPinSlot *findDcnFlipPin(build34::dcn::ScanoutPinToken);
     build34::dcn::ScanoutFlipBinding dcnFlipBinding(DcnPinSlot *);
@@ -26,7 +40,7 @@ SLOT = '''        uint64_t dmaWindow{0};
 '''
 
 METHODS = '''bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescriptorPin &pin,
-    const build34::dcn::ScanoutDmaLease &dma) {
+    const build34::dcn::ScanoutDmaLease &dma, build34::dcn::DcnSubmitGate::Lease *reserve) {
     using namespace build34::dcn;
     phx34_exact::CallbackGate<>::Lease callback(exactClientCallbacks);
     if (!callback || !lock || __atomic_load_n(&legacyState, __ATOMIC_ACQUIRE) != 2 || !IOLockTryLock(lock))
@@ -42,7 +56,7 @@ METHODS = '''bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent(const build34:
         PhxBringup::DcnDrainStamp drain{};
         return proof.writer.complete && exactWriter.matches(native, proof.writer.range, mapping.identity) &&
             proof.writer.map.matches(mapping.identity) && dma.matchesWriterBacking(pin, mapping) &&
-            owner->exactWriterVmCurrent(mapping.identity, native, this, &drain) && proof.drain.matches(drain) && live();
+            owner->exactWriterVmCurrent(mapping.identity, native, this, &drain, reserve, &proof.drain) && live();
     }();
     IOLockUnlock(lock);
     return current;
@@ -78,9 +92,19 @@ IOReturn PhxBringup::beginDcnFlip(build34::dcn::ScanoutFlipIntent &intent) {
         route->framebuffer->getProvider() != pci || !route->framebuffer->metaCast("PhxAMDFB") ||
         !gDcnPinSerials.take(serial)) return kIOReturnNotReady;
     const ScanoutPinToken token{this, serial};
+    DcnSubmitGate::Lease programming;
     const auto result = dcnFlip.begin(intent, token, *route, pci, dcnFlipBinding(old), dcnFlipBinding(next),
         [&] { return !exactCallbacks.closed(); },
-        [&] { return next && next->client->dcnScanoutWriterCurrent(next->descriptor, next->dma); });
+        [&](bool reserve) {
+            if (!next) return false;
+            if (!programming.held())
+                return next->client->dcnScanoutWriterCurrent(next->descriptor, next->dma, reserve ? &programming : nullptr);
+            const auto &proof = next->dma.writerProof();
+            DcnDrainStamp drain{};
+            return !reserve && !next->client->exactClientCallbacks.closed() &&
+                exactWriterVmCurrent(proof.writer.map, proof.writer.native, next->client, &drain, nullptr, &proof.drain) &&
+                !next->client->exactClientCallbacks.closed();
+        });
     if (result == ScanoutFlipResult::Refused) return kIOReturnNotReady;
     intent.operation = token;
     intent.result = result;
@@ -134,6 +158,17 @@ def stage_native(driver, abi):
     source = once(source, dma.DMA_FIELDS, dma.DMA_FIELDS + SLOT)
     source = once(source, dma.MAPPER_GATE, dma.MAPPER_GATE + FIELDS)
     source = once(source, dma.DMA_PROBE_DECL, dma.DMA_PROBE_DECL + CLIENT)
+    source = once(source, dma.pin.handoff.DRAIN_DECL, DRAIN_DECL)
+    writer = dma.pin.handoff.writer.CURRENT
+    replace(writer, 'DcnDrainStamp *drain) {', '''DcnDrainStamp *drain,
+    build34::dcn::DcnSubmitGate::Lease *reserve, const DcnDrainStamp *expected) {''')
+    replace(writer, '    IOLockUnlock(gpuLock);\n', '''    if (current && expected) current = drain && drain->matches(*expected);
+    if (current && reserve) current = expected && reserve->reserve(dcnSubmitGate);
+    IOLockUnlock(gpuLock);
+''')
+    submit_anchor = '        // Re-select and validate under the lock after every sleep: adoption,\n'
+    replace(SUBMIT, SUBMIT_EPOCH, '')
+    replace(SUBMIT, submit_anchor, SUBMIT_EPOCH + SUBMIT_GATE + submit_anchor)
     source = once(source, dma.MAP_METHOD, METHODS + dma.MAP_METHOD)
     replace(dma.pin.PREPARE, '    for (auto &slot : dcnPins) {\n', '''    const auto surface = request ? present.scanout : build34::dcn::ScanoutSurface{};
     if (request && (!build34::dcn::validFlipGeometry(surface) || surface.mappedBytes != present.slice.bytes))

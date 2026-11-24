@@ -12,6 +12,32 @@ namespace build34::dcn {
 enum class ScanoutFlipResult { Refused, Issued, Waiting, Presented, Uncertain };
 enum class DcnRetirement { Pending, Complete, Lost };
 
+class DcnSubmitGate {
+    uint32_t held_{0};
+
+public:
+    bool held() const { return __atomic_load_n(&held_, __ATOMIC_ACQUIRE) != 0; }
+
+    class Lease {
+    public:
+        Lease() = default;
+        Lease(const Lease &) = delete;
+        Lease &operator=(const Lease &) = delete;
+        ~Lease() { if (gate_) __atomic_store_n(&gate_->held_, 0, __ATOMIC_RELEASE); }
+
+        bool held() const { return gate_ != nullptr; }
+
+        bool reserve(DcnSubmitGate &gate) {
+            if (gate_ || __atomic_exchange_n(&gate.held_, 1, __ATOMIC_ACQ_REL)) return false;
+            gate_ = &gate;
+            return true;
+        }
+
+    private:
+        DcnSubmitGate *gate_{nullptr};
+    };
+};
+
 struct ScanoutFlipIntent {
     HubpAddress previous, next;
     ScanoutPinToken nextPin, operation;
@@ -71,7 +97,7 @@ public:
             (old.token.serial && (!(frontAddress_ == intent.previous) || route.owner != routeOwner_ ||
                                   route.generation != routeGeneration_ || route.lifetime != routeLifetime_ ||
                                   route.framebuffer != framebuffer_ || pci != pci_)) ||
-            (next.pin && !writerCurrent()))
+            (next.pin && !writerCurrent(false)))
             return ScanoutFlipResult::Refused;
 
         const HubpFlipRequest request{route.owner, route.generation, operation.serial, intent.previous, intent.next,
@@ -98,7 +124,7 @@ public:
         auto oldInstalled = [&] { return oldCurrent() && contextCurrent(frontVm_, route.reader, translationCurrent); };
         auto contextsCurrent = [&] {
             return oldInstalled() && nextCurrent() &&
-                (!nextTable || (contextCurrent(nextTable->vm_, route.reader, translationCurrent) && writerCurrent() && withinBudget()));
+                (!nextTable || (contextCurrent(nextTable->vm_, route.reader, translationCurrent) && writerCurrent(false) && withinBudget()));
         };
         FirmwareScanoutSample home = firmwareHome_;
         const auto captureHome = [&] {
@@ -118,7 +144,7 @@ public:
                 next.dma->qualified_, mapping(next), next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
             !nextEmpty() || !matchesTranslation(old, translationCurrent) || !matchesTranslation(next, translationCurrent) ||
             !homeCurrent() || !oldInstalled() || !nextEmpty() || !peersIdle() ||
-            (next.pin && (!writerCurrent() || !withinBudget() || !next.pin->beginDisplayUse()))) {
+            (next.pin && (!writerCurrent(true) || !withinBudget() || !next.pin->beginDisplayUse()))) {
             if (!routeLifetime_) {
                 route.framebuffer->release();
                 route.lifetime->release();
@@ -140,8 +166,9 @@ public:
         nextVm_ = nextTable ? nextTable->vm_ : DcnFlatContext{};
         surface_ = surface;
         if ((nextTable && (!DcnFlatProgram::install(nextVm_, route_.reader, route_.writer, inactive, peersIdle) ||
-                           !homeCurrent() || !writerCurrent() || !withinBudget())) ||
+                           !homeCurrent() || !writerCurrent(false) || !withinBudget())) ||
             !HubpFlipProgram::issue(request_, route_.reader, route_.writer, surface_, withinBudget, contextsCurrent) ||
+            (next.pin && (!writerCurrent(false) || !withinBudget())) ||
             !route_.reader.current(route_.reader.context, request_) || !live())
             return fail();
         return ScanoutFlipResult::Issued;

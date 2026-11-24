@@ -1082,6 +1082,20 @@ route must still exclude later writes to the displayed pages. CPU fixtures
 cover intervening Compute work, generation or map changes, and lock
 contention in both DMA modes. Revert the paired overlay change to roll back.
 
+The final pre-write check also reserves a short submission barrier under
+`gpuLock`, in the same critical section as the exact drain-stamp comparison.
+The staged Compute and GFX submit path checks that barrier on every entry
+under the same lock, before VM binding, receipt publication or ring writes.
+Contending submits wait outside `gpuLock` under their existing retry budget;
+the initial invalidation epoch is captured before they can wait. No client
+or GPU lock spans a DCN write. After reservation the remaining writer checks
+use the retained proof and service state, so a waiting submit holding its
+client lock cannot deadlock the flip. The barrier releases on every begin
+exit, including uncertainty; it is not held through display polling or
+front-buffer residence. CPU tests exercise blocked Compute and GFX
+submissions, failure release and normal submission after issue. This does
+not freeze external engines, CPU writers or future writes to the front.
+
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and
 out-of-order completion. Set `BUILD34_RADV_COMPILE_COMMANDS` to the

@@ -114,13 +114,22 @@ class ExactWriterTests(unittest.TestCase):
         mapped = scanout_dma.stage_native(DRIVER, ABI)
         flipped = flip_commit.stage_native(DRIVER, ABI)
         bound = bar5.stage_native(DRIVER, ABI)
-        for signature in ('bool PhxBringup::exactNativeOpenAdmitted(', 'IOReturn PhxBringup::gpuSubmit(',
+        for signature in ('bool PhxBringup::exactNativeOpenAdmitted(',
                           'IOReturn IOAccelPhxNativeClient::externalMethod(', 'IOReturn PhxBringup::vmMap(',
                           handoff.CLOSE, handoff.SEAL, handoff.GLOBAL, pressure.SUBMIT):
             self.assertEqual(method(pinned, signature), method(source, signature))
             self.assertEqual(method(mapped, signature), method(pinned, signature))
             self.assertEqual(method(flipped, signature), method(mapped, signature))
             self.assertEqual(method(bound, signature), method(flipped, signature))
+        mapped_submit = method(mapped, flip_commit.SUBMIT)
+        self.assertEqual(mapped_submit, method(source, flip_commit.SUBMIT))
+        staged_submit = method(flipped, flip_commit.SUBMIT)
+        self.assertEqual(staged_submit, method(bound, flip_commit.SUBMIT))
+        self.assertEqual(staged_submit.replace(flip_commit.SUBMIT_EPOCH + flip_commit.SUBMIT_GATE, ''),
+                         mapped_submit.replace(flip_commit.SUBMIT_EPOCH, ''))
+        self.assertLess(staged_submit.index('IOLockLock(gpuLock);'), staged_submit.index(flip_commit.SUBMIT_EPOCH))
+        self.assertLess(staged_submit.index(flip_commit.SUBMIT_GATE), staged_submit.index('vmBind('))
+        self.assertLess(staged_submit.index(flip_commit.SUBMIT_GATE), staged_submit.index('exact->publish('))
         for stage in (mapped, flipped, bound):
             self.assertEqual(stage.count('dcnQualifyMapper)(IOPCIDevice &, IOMapper &){nullptr}'), 1)
             self.assertNotIn('dcnQualifyMapper =', stage)
@@ -171,6 +180,11 @@ class ExactWriterTests(unittest.TestCase):
             fields = fields.replace(scanout_dma.DMA_FIELDS, scanout_dma.DMA_FIELDS + flip_commit.SLOT)
             fields = fields.replace(scanout_dma.MAPPER_GATE, scanout_dma.MAPPER_GATE + flip_commit.FIELDS)
             probe += flip_commit.CLIENT
+            submit_gate = method(source, flip_commit.SUBMIT)
+            self.assertEqual(submit_gate.count(flip_commit.SUBMIT_GATE), 1)
+            boundary = '            // DCN_SUBMIT_GATE\n'
+            self.assertEqual(fixture.count(boundary), 1)
+            fixture = fixture.replace(boundary, ''.join('    ' + line for line in flip_commit.SUBMIT_GATE.splitlines(True)))
         extracted = '\n'.join(method(source, signature) for signature in signatures)
         if bar5_adapter:
             bound = bar5.stage_native(DRIVER, ABI)
@@ -179,7 +193,7 @@ class ExactWriterTests(unittest.TestCase):
         for marker, replacement in {
             '// WRITER_METHODS': ('static OwnerEpochs gDcnPinSerials;\n' if pins else '') +
             extracted,
-            '// WRITER_SERVICE': handoff.DRAIN_DECL + handoff.PROVIDER_PUBLIC + fields
+            '// WRITER_SERVICE': (flip_commit.DRAIN_DECL if flip else handoff.DRAIN_DECL) + handoff.PROVIDER_PUBLIC + fields
             if paired else writer.SERVICE_DECL,
             '// WRITER_CLIENT': writer.CLIENT_STATE + probe + (handoff.CLIENT_FIELDS if paired else ''),
             '// WRITER_TYPES': types,
