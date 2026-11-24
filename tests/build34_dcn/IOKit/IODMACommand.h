@@ -35,7 +35,7 @@ struct IODMACommand {
     IOMemoryDescriptor *getIOMemoryDescriptor() const { return substitute ? substitute : memory; }
     IOReturn prepare(UInt64 start, UInt64 length, bool flush, bool synchronize) {
         assert(memory && !prepared && !flush && !synchronize && length == extent);
-        assert(start && start < memory->getLength() && length < memory->getLength() - start);
+        assert(start < memory->getLength() && length < memory->getLength() - start);
         offset = start;
         bytes = length;
         prepared = true;
@@ -43,7 +43,7 @@ struct IODMACommand {
     }
     IOReturn getPreparedOffsetAndLength(UInt64 *start, UInt64 *length) {
         assert(prepared);
-        *start = wrongOffset ? 0 : offset;
+        *start = wrongOffset ? offset ^ 4096 : offset;
         *length = bytes;
         return kIOReturnSuccess;
     }

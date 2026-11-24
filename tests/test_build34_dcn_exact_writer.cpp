@@ -883,22 +883,20 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        InstallRevoked, InstallWriteUncertain, InstallAckTimeout, InstallWrongAck,
                        NoTableMemory, ShortTable, EncodeError, PublishError, PublishBadRoot, PublishCorruptPadding,
                        PublicationLost, WithdrawError, CloseDuringWithdraw, CancelWithdrawError, SharedTable,
-                       SharedRoot, RetryTable };
+                       SharedRoot, RetryTable, TableWrongPhysical, TablePrepareUncertain, TableBadSegments,
+                       TableSubstituted };
 
 struct CommitFixture {
-    struct Table : OSObject {
-        CommitFixture *fixture;
-        const IODMACommand *command;
-        alignas(kPage) uint64_t words[kPage / sizeof(uint64_t)]{};
+    struct Table : IOBufferMemoryDescriptor {
+        IODMACommand dma;
         uint64_t root = 0;
-        unsigned publications = 0, withdrawals = 0;
-        bool published = false;
+        unsigned withdrawals = 0;
     };
     ScanoutFixture scanout;
     IOMapper mapper;
     IODMACommand command, nextCommand;
     OSObject lifetime;
-    Table homeTable{ {}, this, &command }, alternateTable{ {}, this, &nextCommand };
+    Table homeTable, alternateTable;
     const HubpAddress home{0x800000000, 0}, mapped{0xa00100100000, 7};
     const HubpAddress alternate{mapped.address + 2 * kPage, 8};
     HubpAddress programmed = home, active = home, earliest = home, target = home;
@@ -923,10 +921,13 @@ struct CommitFixture {
     FlipFault translationFault = FlipFault::None;
     uint64_t outputPages[2]{};
     HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay},
-                       qualified, allocateFlat, retired, canInstallFlatVm};
+                       qualified, {encodeLeaf, decodeLeaf, encodeRoot, tableCurrent}, retired, canInstallFlatVm};
     ScanoutPinToken pin{}, alternatePin{};
 
     CommitFixture() {
+        alternateTable.physical += 2 * kPage;
+        configureTable(homeTable, ownedRoot, 0x500091, 0x601091);
+        configureTable(alternateTable, alternateRoot, 0x800091, 0x901091);
         IODMACommand::next = &command;
         scanout.device.pci->mapper = &mapper;
         scanout.device.pci->route = &route;
@@ -953,6 +954,13 @@ struct CommitFixture {
             return kIOReturnSuccess;
         };
         mapper.resolve = [&](const IODMACommand &mapped, uint64_t address, uint64_t &physical) {
+            if (&mapped == &homeTable.dma || &mapped == &alternateTable.dma) {
+                const auto &table = &mapped == &homeTable.dma ? homeTable : alternateTable;
+                const auto root = &mapped == &homeTable.dma || translationFault == FlipFault::SharedTable ? ownedRoot : alternateRoot;
+                assert(mapped.prepared && mapped.memory == &table && address == (root & ~(kPage - 1)));
+                physical = table.physical + (translationFault == FlipFault::TableWrongPhysical ? kPage : 0);
+                return true;
+            }
             assert(&mapped == IODMACommand::next);
             const bool alternate = &mapped == &nextCommand;
             assert(alternate || &mapped == &command);
@@ -962,13 +970,21 @@ struct CommitFixture {
             return true;
         };
         mapper.confirmUnmap = [&](const IODMACommand &completed) {
+            if (&completed == &homeTable.dma || &completed == &alternateTable.dma) {
+                auto &table = &completed == &homeTable.dma ? homeTable : alternateTable;
+                assert(completed.memory == &table && !completed.prepared && table.references == 2 &&
+                       scanout.client.guard.held && !scanout.device.guard.held);
+                ++table.withdrawals;
+                if (translationFault == FlipFault::CloseDuringWithdraw) scanout.device.exactCallbacks.close();
+                return translationFault != FlipFault::WithdrawError && translationFault != FlipFault::CancelWithdrawError;
+            }
             if (!issues) {
                 assert(&completed == &command && scanout.client.guard.held && !scanout.device.guard.held);
                 return true;
             }
             assert(&completed == &command && retire && retireChecks >= (alternatePin.serial ? 2u : 3u) &&
                    scanout.client.guard.held && !scanout.device.guard.held && lifetime.references == (alternatePin.serial ? 4u : 3u) &&
-                   homeTable.withdrawals == 1 && !homeTable.published && homeTable.references == 2 &&
+                   homeTable.withdrawals == 1 && !homeTable.dma.prepared && homeTable.references == 1 &&
                    scanout.frame.host.wires == (alternatePin.serial ? 3u : 2u));
             return !failUnmap;
         };
@@ -989,7 +1005,26 @@ struct CommitFixture {
         scanout.frame.copy.scanout = {};
     }
 
-    ~CommitFixture() { IODMACommand::next = nullptr; }
+    ~CommitFixture() { IODMACommand::next = nullptr; IOBufferMemoryDescriptor::next = nullptr; }
+
+    void configureTable(Table &table, uint64_t root, uint64_t first, uint64_t second) {
+        table.root = root;
+        table.dma.segments = [&, root](UInt64 *cursor, IODMACommand::Segment64 *segments, UInt32 *count) {
+            assert(!*cursor && *count == 1);
+            const auto selected = translationFault == FlipFault::SharedTable ? ownedRoot : root;
+            segments[0] = {selected & ~(kPage - 1), kPage};
+            *cursor = translationFault == FlipFault::TableBadSegments ? 2 * kPage : kPage;
+            return kIOReturnSuccess;
+        };
+        table.onStore = [&, first, second] {
+            assert(table.words[0] == first && table.words[1] == second);
+            for (size_t index = 2; index < kPage / sizeof(uint64_t); ++index) assert(!table.words[index]);
+            assert(table.words[512] == UINT64_MAX);
+            if (translationFault == FlipFault::PublishCorruptPadding) table.words[511] = 1;
+            if (translationFault == FlipFault::WrongLastPage || translationFault == FlipFault::InstallWrongLeaf)
+                table.words[1] = outputPages[1] | 0x91;
+        };
+    }
 
     static bool routeCurrent(void *context, const HubpFlipRequest &request) {
         const auto &self = *static_cast<CommitFixture *>(context);
@@ -1006,71 +1041,48 @@ struct CommitFixture {
             return token == self.pin ? &self.command : &self.nextCommand;
         };
         assert(old == commandFor(request.previousPin) && next == commandFor(request.nextPin));
+        if (next) {
+            auto &table = next == &self.command ? self.homeTable : self.alternateTable;
+            table.failStore = self.translationFault == FlipFault::PublishError;
+            table.shortBuffer = self.translationFault == FlipFault::ShortTable;
+            table.dma.failPrepare = self.translationFault == FlipFault::TablePrepareUncertain;
+            if (self.translationFault == FlipFault::TableSubstituted) table.dma.substitute = &self.alternateTable;
+            IOBufferMemoryDescriptor::next = self.translationFault == FlipFault::NoTableMemory ? nullptr : &table;
+            IODMACommand::next = &table.dma;
+        }
         self.target = request.next;
         if (self.closeDuringQualify) self.scanout.device.exactCallbacks.close();
         return self.qualify;
     }
 
-    static DcnFlatAllocation allocateFlat(void *context, const HubpFlipRequest &request, const IODMACommand &command,
-                                         size_t bytes) {
-        auto &self = *static_cast<CommitFixture *>(context);
-        const bool alternate = request.nextPin == self.alternatePin;
-        assert(request.nextPin == self.pin || alternate);
-        assert(&command == (alternate ? &self.nextCommand : &self.command) && command.prepared && bytes == kPage);
-        assert(self.lifetime.references >= 2 && !self.scanout.device.guard.held && !self.scanout.client.guard.held);
-        if (self.translationFault == FlipFault::NoTableMemory) return {};
-        auto &table = alternate && self.translationFault != FlipFault::SharedTable ? self.alternateTable : self.homeTable;
-        table.retain();
-        if (self.translationFault != FlipFault::SharedTable)
-            for (auto &word : table.words) word = UINT64_MAX;
-        return {&table, table.words, self.translationFault == FlipFault::ShortTable ? bytes - 8 : bytes,
-            encodeLeaf, self.translationFault == FlipFault::NoTranslationReader ? nullptr : decodeLeaf,
-            publishTable, tableCurrent, withdrawTable};
+    const Table &tableFor(const DcnFlatMapping &mapping) const {
+        const auto &table = &mapping.pixels == &command ? homeTable : alternateTable;
+        assert((&mapping.pixels == &command || &mapping.pixels == &nextCommand) && mapping.pixels.prepared);
+        assert(&mapping.table == &table.dma && table.dma.prepared && table.references == 2);
+        assert(&mapping.mapper == &mapper && mapping.bytes == kPage && mapping.address == (table.root & ~(kPage - 1)));
+        return table;
     }
 
-    static bool encodeLeaf(const OSObject &object, uint64_t address, uint64_t &word) {
-        const auto &table = static_cast<const Table &>(object);
-        assert(!(address % kPage) && !table.published);
+    static bool encodeLeaf(void *context, const DcnFlatMapping &mapping, uint64_t address, uint64_t &word) {
+        const auto &self = *static_cast<CommitFixture *>(context);
+        assert(!(address % kPage) && !self.tableFor(mapping).stores);
         word = address | 0x91;
-        return table.fixture->translationFault != FlipFault::EncodeError;
+        return self.translationFault != FlipFault::EncodeError;
     }
 
-    static bool publishTable(OSObject &object, const IODMACommand &command, uint64_t &root) {
-        auto &table = static_cast<Table &>(object);
-        auto &self = *table.fixture;
-        assert(table.command == &command && !table.published && table.references == 2 && command.prepared);
-        assert(!self.scanout.device.guard.held && !self.scanout.client.guard.held);
-        const bool alternate = &table == &self.alternateTable;
-        assert(table.words[0] == (alternate ? 0x800091u : 0x500091u));
-        assert(table.words[1] == (alternate ? 0x901091u : 0x601091u));
-        for (size_t index = 2; index < kPage / sizeof(uint64_t); ++index) assert(!table.words[index]);
-        ++table.publications;
-        table.published = true;
-        table.root = root = alternate && self.translationFault != FlipFault::SharedRoot ? self.alternateRoot : self.ownedRoot;
+    static bool encodeRoot(void *context, const DcnFlatMapping &mapping, uint64_t &root) {
+        const auto &self = *static_cast<CommitFixture *>(context);
+        const auto &table = self.tableFor(mapping);
+        assert(!table.stores && !self.scanout.device.guard.held && !self.scanout.client.guard.held);
+        root = self.translationFault == FlipFault::SharedRoot ? self.ownedRoot : mapping.address | 1;
         if (self.translationFault == FlipFault::PublishBadRoot) root &= ~uint64_t{1};
-        if (self.translationFault == FlipFault::PublishCorruptPadding) table.words[511] = 1;
-        if (self.translationFault == FlipFault::WrongLastPage || self.translationFault == FlipFault::InstallWrongLeaf)
-            table.words[1] = self.outputPages[1] | 0x91;
-        return self.translationFault != FlipFault::PublishError;
-    }
-
-    static bool tableCurrent(const OSObject &object, const IODMACommand &command, uint64_t root) {
-        const auto &table = static_cast<const Table &>(object);
-        const auto &self = *table.fixture;
-        assert(table.command == &command && command.prepared);
-        return table.published && root == table.root && self.publicationCurrent;
-    }
-
-    static bool withdrawTable(OSObject &object, const IODMACommand &command) {
-        auto &table = static_cast<Table &>(object);
-        auto &self = *table.fixture;
-        assert(table.command == &command && command.prepared && self.scanout.client.guard.held && !self.scanout.device.guard.held);
-        assert(self.lifetime.references >= 2 && table.references == 2);
-        ++table.withdrawals;
-        if (self.translationFault == FlipFault::WithdrawError || self.translationFault == FlipFault::CancelWithdrawError) return false;
-        table.published = false;
-        if (self.translationFault == FlipFault::CloseDuringWithdraw) self.scanout.device.exactCallbacks.close();
         return true;
+    }
+
+    static bool tableCurrent(void *context, const DcnFlatMapping &mapping, const DcnFlatContext &vm) {
+        const auto &self = *static_cast<CommitFixture *>(context);
+        const auto &table = self.tableFor(mapping);
+        return table.stores == 1 && vm.rootEntry == table.root && self.publicationCurrent;
     }
 
     static bool canInstallFlatVm(void *context, const HubpFlipRequest &request, const DcnFlatContext &vm) {
@@ -1085,11 +1097,10 @@ struct CommitFixture {
             !(self.translationFault == FlipFault::InstallRevoked && self.vmWrites == 3);
     }
 
-    static bool decodeLeaf(const OSObject &object, uint64_t word, uint64_t &dmaPage) {
-        const auto &table = static_cast<const Table &>(object);
-        auto &self = *table.fixture;
+    static bool decodeLeaf(void *context, const DcnFlatMapping &mapping, uint64_t word, uint64_t &dmaPage) {
+        auto &self = *static_cast<CommitFixture *>(context);
         assert(!self.scanout.device.guard.held && !self.scanout.client.guard.held && !self.lockRequested);
-        assert(table.command->prepared && table.published && self.lifetime.references >= 3);
+        assert(self.tableFor(mapping).stores == 1 && self.lifetime.references >= 3);
         const bool last = (self.pageReads++ & 1) != 0;
         if ((word & (kPage - 1)) != 0x91) return false;
         dmaPage = word & ~(kPage - 1);
@@ -1113,7 +1124,7 @@ struct CommitFixture {
                 static_cast<uint32_t>(last >> 32), static_cast<uint32_t>(last), 0,
                 static_cast<uint32_t>(table.root >> 32), static_cast<uint32_t>(table.root)};
             const unsigned index = self.vmWrites++ % 7;
-            assert(sequence[index] == address - base && values[index] == value && !self.lockRequested && table.published);
+            assert(sequence[index] == address - base && values[index] == value && !self.lockRequested && table.stores == 1);
             assert(self.pageReads == (alternate ? 6u : 2u));
             auto &root = alternate ? self.alternateContextRoot : self.contextRoot;
             auto &firstPage = alternate ? self.alternateFirst : self.firstPage;
@@ -1319,7 +1330,7 @@ static void scanoutFlip(FlipFault fault) {
     if (fault == FlipFault::RetryTable) {
         fixture.translationFault = FlipFault::InstallDenied;
         assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial && !fixture.vmWrites);
-        assert(fixture.homeTable.publications == 1 && fixture.homeTable.published && fixture.homeTable.references == 2);
+        assert(fixture.homeTable.stores == 1 && fixture.homeTable.dma.prepared && fixture.homeTable.references == 2);
         fixture.translationFault = FlipFault::None;
     }
     if (fault >= FlipFault::InstallDenied && fault <= FlipFault::InstallWrongLeaf) {
@@ -1341,8 +1352,9 @@ static void scanoutFlip(FlipFault fault) {
         assert(!fixture.writes && !fixture.retireChecks);
         return;
     }
-    if (fault == FlipFault::NoContextRoot) {
-        fixture.route.allocateFlat = nullptr;
+    if (fault == FlipFault::NoContextRoot || fault == FlipFault::NoTranslationReader) {
+        if (fault == FlipFault::NoContextRoot) fixture.route.flatFormat.encodeRoot = nullptr;
+        else fixture.route.flatFormat.decodeLeaf = nullptr;
         assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.writes && !fixture.pageReads);
         return;
     }
@@ -1376,21 +1388,25 @@ static void scanoutFlip(FlipFault fault) {
         return;
     }
     if (fault == FlipFault::CancelWithdrawError) fixture.publicationCurrent = false;
-    if (fault == FlipFault::NoTranslationReader || (fault >= FlipFault::NoTableMemory && fault <= FlipFault::PublishCorruptPadding) ||
-        fault == FlipFault::CancelWithdrawError) {
+    if ((fault >= FlipFault::NoTableMemory && fault <= FlipFault::PublishCorruptPadding) ||
+        fault == FlipFault::CancelWithdrawError || fault >= FlipFault::TableWrongPhysical) {
         const bool acquired = fault != FlipFault::NoTableMemory;
-        const bool withdrawn = fault != FlipFault::CancelWithdrawError;
+        const bool mapped = acquired && fault != FlipFault::ShortTable;
+        const bool uncertain = fault == FlipFault::TablePrepareUncertain || fault == FlipFault::TableSubstituted;
+        const bool withdrawn = fault != FlipFault::CancelWithdrawError && !uncertain;
+        const bool confirmed = mapped && !uncertain;
         assert(fixture.begin(request) == kIOReturnNotReady && !fixture.vmWrites && !fixture.writes);
-        assert(fixture.homeTable.references == (acquired ? 2u : 1u) && !fixture.homeTable.withdrawals);
+        assert(fixture.homeTable.references == (mapped ? 2u : acquired ? 1u : 0u) && !fixture.homeTable.withdrawals);
         assert(scanout.cancelPin(fixture.pin) == (withdrawn ? kIOReturnSuccess : kIOReturnNotReady));
-        assert(fixture.homeTable.withdrawals == acquired && fixture.command.completes == withdrawn &&
+        assert(fixture.homeTable.withdrawals == confirmed && fixture.command.completes == withdrawn &&
                fixture.lifetime.references == (withdrawn ? 1u : 2u));
-        assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.homeTable.withdrawals == acquired);
+        assert(fixture.homeTable.references == (withdrawn ? 0u : 2u));
+        assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.homeTable.withdrawals == confirmed);
         return;
     }
     assert(fixture.begin(request) == kIOReturnSuccess && request.operation.serial != fixture.pin.serial);
     assert(fixture.writes && fixture.lifetime.references == 3 && !fixture.command.completes && fixture.pageReads == 2);
-    assert(fixture.vmWrites == 7 && fixture.homeTable.publications == 1 && fixture.homeTable.references == 2);
+    assert(fixture.vmWrites == 7 && fixture.homeTable.stores == 1 && fixture.homeTable.references == 2);
     if (fault == FlipFault::Install) assert(fixture.vmAckReads == 3 && fixture.delays == 2);
     assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
     ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
@@ -1463,10 +1479,9 @@ static void scanoutFlip(FlipFault fault) {
         fixture.alternatePin = mapped.token;
         request = {fixture.mapped, fixture.alternate, fixture.alternatePin, {}, ScanoutFlipResult::Refused};
         if (fault == FlipFault::SharedTable || fault == FlipFault::SharedRoot) {
-            const bool sharedStorage = fault == FlipFault::SharedTable;
             assert(fixture.begin(request) == kIOReturnNotReady && fixture.vmWrites == 7 && fixture.writes == 5);
-            assert(fixture.homeTable.references == (sharedStorage ? 3u : 2u) && fixture.homeTable.publications == 1 &&
-                   fixture.homeTable.published && fixture.alternateTable.published != sharedStorage);
+            assert(fixture.homeTable.references == 2 && fixture.homeTable.stores == 1 && fixture.homeTable.dma.prepared &&
+                   fixture.alternateTable.dma.prepared && !fixture.alternateTable.stores);
             assert(scanout.cancelPin(fixture.alternatePin) == kIOReturnNotReady && !fixture.homeTable.withdrawals &&
                    !fixture.alternateTable.withdrawals);
             return;
@@ -1481,7 +1496,7 @@ static void scanoutFlip(FlipFault fault) {
         fixture.step(poll, failed ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
         assert(fixture.retireChecks == 2 && fixture.command.completes == !failed && !fixture.nextCommand.completes);
         assert(DcnAllocationStub::live() == (failed ? 2u : 1u));
-        assert(fixture.homeTable.references == (failed ? 2u : 1u) && fixture.alternateTable.references == 2);
+        assert(fixture.homeTable.references == (failed ? 2u : 0u) && fixture.alternateTable.references == 2);
         assert(scanout.cancelPin(fixture.alternatePin) == kIOReturnNotFound);
         return;
     }
@@ -1523,8 +1538,8 @@ static void scanoutFlip(FlipFault fault) {
     fixture.failUnmap = fault == FlipFault::Unmap;
     if (fault == FlipFault::WithdrawError || fault == FlipFault::CloseDuringWithdraw) {
         fixture.step(poll, ScanoutFlipResult::Uncertain);
-        assert(fixture.homeTable.withdrawals == 1 && fixture.homeTable.published == (fault == FlipFault::WithdrawError) &&
-               fixture.homeTable.references == 2);
+        assert(fixture.homeTable.withdrawals == 1 && !fixture.homeTable.dma.prepared &&
+               fixture.homeTable.references == (fault == FlipFault::WithdrawError ? 2u : 1u));
         assert(fixture.command.prepared && !fixture.command.completes && scanout.frame.host.wires == 2);
         if (fault == FlipFault::WithdrawError) fixture.step(poll, ScanoutFlipResult::Uncertain);
         assert(fixture.homeTable.withdrawals == 1);
@@ -1535,8 +1550,8 @@ static void scanoutFlip(FlipFault fault) {
     assert(DcnAllocationStub::live() == (fixture.failUnmap ? 1u : 0u));
     assert(scanout.frame.host.wires == (fixture.failUnmap ? 2u : 1u));
     assert(fixture.lifetime.references == (fixture.failUnmap ? 3u : 1u));
-    assert(fixture.homeTable.withdrawals == 1 && !fixture.homeTable.published &&
-           fixture.homeTable.references == (fixture.failUnmap ? 2u : 1u));
+    assert(fixture.homeTable.withdrawals == 1 && !fixture.homeTable.dma.prepared &&
+           fixture.homeTable.references == (fixture.failUnmap ? 1u : 0u));
     assert(scanout.surface.references == (fixture.failUnmap ? 2u : 1u));
     if (fixture.failUnmap) {
         fixture.step(poll, ScanoutFlipResult::Uncertain);
@@ -1652,6 +1667,10 @@ int main() {
     scanoutFlip(FlipFault::SharedTable);
     scanoutFlip(FlipFault::SharedRoot);
     scanoutFlip(FlipFault::RetryTable);
+    scanoutFlip(FlipFault::TableWrongPhysical);
+    scanoutFlip(FlipFault::TablePrepareUncertain);
+    scanoutFlip(FlipFault::TableBadSegments);
+    scanoutFlip(FlipFault::TableSubstituted);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

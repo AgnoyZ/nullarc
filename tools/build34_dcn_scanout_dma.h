@@ -12,14 +12,6 @@
 
 namespace build34::dcn {
 
-struct ScanoutDmaMapper {
-    IOMapper *mapper;
-    bool (*resolveMappedPage)(IOMapper &, const IODMACommand &, uint64_t, uint64_t &);
-    bool (*confirmUnusedUnmap)(IOMapper &, const IODMACommand &);
-
-    bool completeContract() const { return mapper && resolveMappedPage && confirmUnusedUnmap; }
-};
-
 struct ScanoutDmaRequest {
     const PresentCopyBacking *present;
     uint64_t windowStart;
@@ -141,7 +133,7 @@ private:
     bool releaseUnmapped() {
         if (uncertain_) return false;
         if (!command_) return true;
-        if (!table_.withdraw(*command_) || command_->complete(false, false) != kIOReturnSuccess ||
+        if (!table_.withdraw(qualified_) || command_->complete(false, false) != kIOReturnSuccess ||
             !qualified_.confirmUnusedUnmap(*qualified_.mapper, *command_) ||
             command_->clearMemoryDescriptor(false) != kIOReturnSuccess) {
             uncertain_ = true;

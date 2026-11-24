@@ -36,7 +36,7 @@ struct HubpFlipRoute {
     HubpFlipReader reader;
     HubpFlipWriter writer;
     bool (*qualify)(void *, const HubpFlipRequest &, const IODMACommand *, const IODMACommand *);
-    AllocateDcnFlat allocateFlat;
+    DcnFlatFormat flatFormat;
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
     bool (*canInstallFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
 };
@@ -52,7 +52,7 @@ public:
                            ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
         if (pending() || !live() || !operation.provider || !operation.serial ||
             !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify ||
-            !route.allocateFlat || !route.canInstallFlatVm || !route.fetchesRetired ||
+            !route.flatFormat.complete() || !route.canInstallFlatVm || !route.fetchesRetired ||
             !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, true) ||
             !validBinding(next, intent.next, operation.provider, false) ||
@@ -92,8 +92,8 @@ public:
             !live() || !readback_.begin(request, route.reader) ||
             (oldTable && !oldTable->matches(request, *route.lifetime, old.token, intent.previous.vmid)) || !oldInstalled() ||
             !HubpFlipProgram::preflight(request, route.reader, route.writer, surface, withinBudget) ||
-            (nextTable && !nextTable->prepare(route.allocateFlat, route.reader.context, *route.lifetime, request,
-                *next.dma->command_, next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
+            (nextTable && !nextTable->prepare(route.flatFormat, route.reader.context, *route.lifetime, request,
+                next.dma->qualified_, *next.dma->command_, next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
             !nextEmpty() || !matchesTranslation(old.dma, translationCurrent) || !matchesTranslation(next.dma, translationCurrent) ||
             !oldInstalled() || !nextEmpty() || !live() ||
             (next.pin && !next.pin->beginDisplayUse())) {
@@ -144,7 +144,7 @@ public:
         const bool retired = route_.fetchesRetired(route_.reader.context, request_);
         if (!nextCurrent() || !currentGeometry()) return fail();
         if (!retired) return ScanoutFlipResult::Waiting;
-        if (old_.pin && (!old_.dma->table_.withdraw(*old_.dma->command_) || !nextCurrent() || !currentGeometry() ||
+        if (old_.pin && (!old_.dma->table_.withdraw(old_.dma->qualified_) || !nextCurrent() || !currentGeometry() ||
                          !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse())) return fail();
         front_ = request_.nextPin;
         frontAddress_ = request_.next;
@@ -186,7 +186,7 @@ private:
     template<typename Current>
     static bool tableCurrent(const ScanoutDmaLease *dma, const DcnFlatContext &context, const Current &current) {
         return !dma ? !context.vmid : current() && dma->table_.vm_ == context &&
-            dma->table_.current(*dma->command_) && current();
+            dma->table_.current(dma->qualified_, *dma->command_) && current();
     }
 
     template<typename Current>
@@ -196,7 +196,7 @@ private:
 
     template<typename Current>
     static bool matchesTranslation(const ScanoutDmaLease *dma, const Current &current) {
-        return !dma || dma->table_.matchesPages(*dma->command_, dma->layout_, dma->pages_, current);
+        return !dma || dma->table_.matchesPages(dma->qualified_, *dma->command_, dma->layout_, dma->pages_, current);
     }
 
     ScanoutFlipResult fail() {

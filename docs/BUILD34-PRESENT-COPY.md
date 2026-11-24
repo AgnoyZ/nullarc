@@ -703,24 +703,38 @@ The route qualification hook is null. A future route must keep its context,
 power, exclusive display-writer lease, exact HUBP translation and render
 write exclusion valid through scanout. Qualification is read-only and sees
 the exact prepared DMA commands. After baseline readback and geometry
-preflight, the [flat-table lease](../tools/build34_dcn_flat_table.h) takes
-ownership of the route's fresh allocation and retains the route for as long
-as it is held. It binds the table to the exact DMA command, pin token, route
-identity and generation, and requested VMID. The route must supply exclusive
-4 KiB-aligned storage and certify its encodings and device address domain.
-The provider encodes leaves from its private DMA plan, zeroes the rest of
-the allocation, publishes it through the owner, and reads back the actual
-words from that allocation. The route decodes each word and must validate
-its permissions; the provider compares every decoded address and checks all
-padding is still zero. Caller output is not an input to the table or proof.
+preflight, the [flat-table lease](../tools/build34_dcn_flat_table.h) binds
+the table to the exact pixel DMA command, pin token, retained route identity
+and generation, and requested VMID. It no longer accepts storage from the
+route. The [IOKit table adapter](../tools/build34_dcn_flat_dma.h) allocates
+a wired, kernel-only, 4 KiB-aligned `IOBufferMemoryDescriptor` and creates a
+separate read-direction `IODMACommand` on the exact pixel mapper. It prepares
+only the table extent, excluding an extra page in the descriptor so that
+the [pinned XNU descriptor code](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L2852-L2901)
+does not cache the mapping as a whole-buffer mapping. The existing mapper
+contract must independently prove synchronous removal of this command too.
+This uses the SDK interfaces and does not copy XNU implementation code.
+
+The adapter rejects a substituted descriptor, an inexact prepared extent,
+nonlinear DMA segments, and any page the mapper cannot resolve to the
+descriptor's original CPU page. This establishes a contiguous DMA range,
+not contiguous physical memory. The route supplies root and leaf encoding
+for that exact mapping: it sees both commands, the mapper and the table's
+DMA extent, not the CPU buffer or caller-published page list. The provider
+fills leaves from its private DMA plan, zeroes padding, and requires the
+descriptor's cache-store operation to succeed before requesting the route's
+DCN visibility proof. The provider rechecks table mappings, reads back the
+actual words, compares each decoded address, and checks that all padding is
+still zero. The route decoder must validate permissions. Successful CPU
+cache maintenance is not itself proof of what DCN fetches.
 The [DCN flat-context check](../tools/build34_dcn_flat_context.h) matches the
 installed root, inclusive range and depth/block fields to the retained
 table, not to a root derived from MMIO.
 The check uses the pinned DCN 3.1.4 register definitions above and the flat
 context fields in AMD's [HUBBUB setup](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubbub/dcn20/dcn20_hubbub.c#L381-L425)
 and [VMID setup](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/dcn20/dcn20_vmid.c).
-This does not infer a physical address from the encoded root or provide
-the actual allocation, DCN encoding, visibility or VMID reservation.
+This does not infer a physical address from the encoded root. The route still
+has to establish actual DCN encoding, fetch visibility and VMID reservation.
 
 Only nonzero VMIDs qualify for pinned surfaces in this stage; each pin
 requires its own exact window. VMID 0 is not reprogrammed. Firmware-backed
@@ -755,18 +769,17 @@ not clear or recycle a partially installed context. CPU fixtures cover
 delayed ready, refusal before writes, mid-program revocation, an ambiguous
 last write, wrong ready word and timeout, plus a full return to firmware.
 
-The allocation callback returns an owned lease. A prepared table may only
-be reused by the same pin, VMID and route generation, with fresh proof of
-publication and reservation. The allocation must not alias another live
-table. The software checks the front lease, CPU ranges and encoded root
-for detectable collisions and never withdraws a colliding lease. The
-route must establish exclusivity in the device address domain separately.
-On a pre-issue refusal, the table stays with the cancellable pin. Its
-withdraw callback must handle a never-published or ambiguously published
-allocation as well as a visible but never-installed table. It must prove
-synchronous removal from the device's table fetch domain, not just release
-the CPU mapping. Failure quarantines the bounded slot without repeating
-the uncertain withdrawal or completing the pixel DMA command.
+A prepared table may only be reused by the same pin, VMID and route
+generation, with fresh proofs of visibility and reservation. The software
+rejects a DMA range or encoded root that aliases the front table and never
+withdraws a colliding lease. The route must establish exclusivity in the
+DCN fetch domain separately. On a pre-issue refusal, the table stays with
+the cancellable pin. Clean cancellation completes the table command,
+requires independent unmap confirmation, and clears the descriptor before
+completing pixel DMA. Uncertain prepare or unmap quarantines the bounded
+slot without repeating the operation or completing the pixel DMA command.
+Allocation, mapping and teardown can block; invoke begin, poll and cancel
+in a sleepable context outside a workloop gate, not from an interrupt.
 
 A page match does not establish device visibility, total fetch coverage,
 or proof of retirement. The route still must hold translation stable from
@@ -829,8 +842,9 @@ the verified firmware surface retires the last DMA pin and releases the route
 reference outside the client lock. The CPU tests use independent register
 offsets for two VMIDs and cover round trips to firmware, pinned-to-pinned
 rotation, root changes during issue or retirement, mismatched layout,
-missing allocation or encoding, malformed publication, corrupt padding,
-lost publication, overlapping ownership and teardown faults. The fixture
+missing allocation or encoding, anomalous segments, substituted DMA pages,
+cache-store failure, corrupt padding, lost visibility, overlapping mappings
+and teardown faults. The fixture
 leaf flags and root words are synthetic, not a DCN encoding claim. There is
 no hardware implementation of the route callback, no active framebuffer
 caller, and no change to the R2a
