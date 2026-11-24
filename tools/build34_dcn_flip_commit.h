@@ -4,12 +4,13 @@
 #include "build34_dcn_firmware_home.h"
 #include "build34_dcn_scanout_dma.h"
 
-#define BUILD34_DCN_FLIP_BEGIN "phx34DcnFlipBeginV2"
-#define BUILD34_DCN_FLIP_POLL "phx34DcnFlipPollV1"
+#define BUILD34_DCN_FLIP_BEGIN "phx34DcnFlipBeginV3"
+#define BUILD34_DCN_FLIP_POLL "phx34DcnFlipPollV2"
 
 namespace build34::dcn {
 
 enum class ScanoutFlipResult { Refused, Issued, Waiting, Presented, Uncertain };
+enum class DcnRetirement { Pending, Complete, Lost };
 
 struct ScanoutFlipIntent {
     HubpAddress previous, next;
@@ -40,6 +41,8 @@ struct HubpFlipRoute {
     DcnFlatFormat flatFormat;
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
     bool (*canInstallFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
+    bool (*canClearFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
+    DcnRetirement (*translationsRetired)(void *, const HubpFlipRequest &, const DcnFlatContext &);
     IOService *framebuffer;
 };
 
@@ -54,7 +57,8 @@ public:
                            void *pci, ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
         if (pending() || !live() || !operation.provider || !operation.serial ||
             !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify ||
-            !route.flatFormat.complete() || !route.canInstallFlatVm || !route.fetchesRetired || !route.framebuffer || !pci ||
+            !route.flatFormat.complete() || !route.canInstallFlatVm || !route.fetchesRetired ||
+            !route.canClearFlatVm || !route.translationsRetired || !route.framebuffer || !pci ||
             !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, true) ||
             !validBinding(next, intent.next, operation.provider, false) ||
@@ -150,27 +154,41 @@ public:
         auto nextCurrent = [&] {
             return tableCurrent(nextDma_, nextVm_, translationCurrent) && contextCurrent(nextVm_, route_.reader, translationCurrent);
         };
-        auto oldCurrent = [&] {
-            return retirementStarted_ || (tableCurrent(old_.dma, frontVm_, translationCurrent) &&
-                contextCurrent(frontVm_, route_.reader, translationCurrent));
+        const auto detached = [&] { return DcnFlatProgram::empty(frontVm_.vmid, route_.reader, translationCurrent); };
+        const auto oldCurrent = [&] {
+            return tableCurrent(old_.dma, frontVm_, translationCurrent) &&
+                (contextCleared_ ? detached() : contextCurrent(frontVm_, route_.reader, translationCurrent));
         };
-        if (!HubpFlipProgram::peersIdle(request_, route_.reader, withinBudget) || !nextCurrent() || !oldCurrent()) return fail();
+        const auto peersIdle = [&] { return HubpFlipProgram::peersIdle(request_, route_.reader, withinBudget); };
+        if (!peersIdle() || !nextCurrent() || !oldCurrent()) return fail();
         const auto progress = readback_.poll();
         if (progress == HubpFlipProgress::Uncertain || !live()) return fail();
         if (progress != HubpFlipProgress::OldAddressAbsent) return ScanoutFlipResult::Waiting;
-        auto currentGeometry = [&] {
-            return HubpFlipProgram::geometryCurrent(request_, route_.reader, surface_, withinBudget);
+        const auto displayCurrent = [&] {
+            return nextCurrent() && checkFirmware(*framebuffer_, pci_, firmwareHome_, translationCurrent) &&
+                HubpFlipProgram::frontCurrent(request_, route_.reader, surface_, withinBudget);
         };
-        const auto homeCurrent = [&] { return checkFirmware(*framebuffer_, pci_, firmwareHome_, translationCurrent); };
-        if (!currentGeometry() || !oldCurrent() || !nextCurrent() || !homeCurrent()) return fail();
-        retirementStarted_ = true;
-        const bool retired = route_.fetchesRetired(route_.reader.context, request_);
-        if (!nextCurrent() || !currentGeometry() || !homeCurrent()) return fail();
-        if (!retired) return ScanoutFlipResult::Waiting;
+        if (!displayCurrent() || !oldCurrent()) return fail();
+        if (!contextCleared_) {
+            const bool retired = route_.fetchesRetired(route_.reader.context, request_);
+            if (!displayCurrent() || !oldCurrent()) return fail();
+            if (!retired) return ScanoutFlipResult::Waiting;
+            if (old_.pin) {
+                const auto writeAllowed = [&] {
+                    return translationCurrent() && route_.canClearFlatVm(route_.reader.context, request_, frontVm_) &&
+                        HubpFlipProgram::frontCurrent(request_, route_.reader, surface_, withinBudget);
+                };
+                if (!DcnFlatProgram::clear(frontVm_, route_.reader, route_.writer, translationCurrent, writeAllowed)) return fail();
+                contextCleared_ = true;
+            }
+        }
         if (old_.pin) {
-            auto detached = [&] { return DcnFlatProgram::empty(frontVm_.vmid, route_.reader, translationCurrent); };
-            if (!detached() || !old_.dma->table_.withdraw(old_.dma->qualified_) || !nextCurrent() || !currentGeometry() ||
-                !homeCurrent() || !detached() || !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse()) return fail();
+            if (!displayCurrent() || !oldCurrent()) return fail();
+            const auto translations = route_.translationsRetired(route_.reader.context, request_, frontVm_);
+            if (!displayCurrent() || !oldCurrent()) return fail();
+            if (translations == DcnRetirement::Pending) return ScanoutFlipResult::Waiting;
+            if (translations != DcnRetirement::Complete || !old_.dma->table_.withdraw(old_.dma->qualified_) ||
+                !displayCurrent() || !detached() || !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse()) return fail();
         }
         front_ = request_.nextPin;
         frontAddress_ = request_.next;
@@ -184,7 +202,7 @@ public:
         nextDma_ = nullptr;
         nextVm_ = {};
         surface_ = {};
-        retirementStarted_ = false;
+        contextCleared_ = false;
         readback_.recycle();
         if (!front_.serial) {
             releaseRoute = routeLifetime_;
@@ -256,7 +274,7 @@ private:
     ScanoutFlipBinding old_{};
     ScanoutDmaLease *nextDma_{nullptr};
     ScanoutSurface surface_{};
-    bool retirementStarted_{false};
+    bool contextCleared_{false};
     bool uncertain_{false};
 };
 

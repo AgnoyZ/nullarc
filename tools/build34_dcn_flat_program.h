@@ -42,6 +42,28 @@ class DcnFlatProgram {
         }
         return false;
     }
+
+    template<typename Current, typename WriteAllowed>
+    static bool clear(const DcnFlatContext &context, const HubpFlipReader &reader, HubpFlipWriter writer,
+                      const Current &current, const WriteAllowed &writeAllowed) {
+        if (!writer.writeDword || !context.valid() || !canReadDcnContext(context.vmid, reader)) return false;
+        const uint32_t base = dcnVm::base(context.vmid);
+        constexpr uint32_t order[]{3, 4, 5, 6, 0, 1, 2};
+        uint32_t expected[]{0, static_cast<uint32_t>(context.rootEntry >> 32), static_cast<uint32_t>(context.rootEntry),
+            static_cast<uint32_t>(context.firstPage >> 32), static_cast<uint32_t>(context.firstPage),
+            static_cast<uint32_t>(context.lastPage >> 32), static_cast<uint32_t>(context.lastPage)};
+        for (const auto field : order) {
+            if (!writeAllowed()) return false;
+            for (uint32_t offset = 0; offset < dcnVm::kStride; ++offset) {
+                uint32_t value = 0;
+                if (!current() || !reader.readDword(reader.context, base + offset, value) || value != expected[offset])
+                    return false;
+            }
+            if (!current() || !writer.writeDword(reader.context, base + field, 0)) return false;
+            expected[field] = 0;
+        }
+        return empty(context.vmid, reader, current);
+    }
 };
 
 }

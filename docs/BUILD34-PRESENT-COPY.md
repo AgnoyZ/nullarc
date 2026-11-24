@@ -848,24 +848,32 @@ is safe. CPU tests verify the register order in both directions and no
 low write or unlock after a partial or revoked issue. Register acceptance
 does not establish hardware latch, which still requires separate readback.
 
-Only fresh old-address absence plus the same route's independent fetch and
-old-translation retirement confirmation permits old DMA teardown. The live
-geometry and route must still match before and after that callback, within
-the same deadline. Polling checks both expected VMIDs until old retirement
-begins, then checks the new VMID without requiring the old context to remain
-programmed. The root is retained as part of the front pin's identity; a
-replacement root cannot authorize the next flip. The client lock is try-only
-and no GPU lock is held across callbacks. After the route confirms old fetch
-and translation retirement, the provider also checks that all seven old
-context words are zero, the same empty state required for a fresh install.
-It refuses to unmap a table if any old root or range word remains. After
-withdrawing the old table it rechecks that context, the new context and live
-route before completing the pixel DMA command. Empty registers are not a
-substitute for confirmed fetch drain or translation invalidation. The old command must
-complete, independently confirm unmap, and clear before the table allocation
-and descriptor hold are released. Withdrawal is also required before unused
-cancellation. These callbacks must be bounded and must not reenter the
-provider or acquire its client or GPU locks.
+Old DMA teardown now has separate fetch drain, context clear and translation
+retirement steps. After fresh old-address absence, the route must confirm
+fetch drain without mutating the context. The old root remains bound to its
+pin and a replacement root refuses. For an old pinned surface only, the
+provider clears its nonzero VMID through the normal checked MMIO writer. It
+compares all seven words before each write, checks the exact new front and
+idle peers, and requires the route to authorize clearing that VMID. It clears
+the range, control and root high word before the low word, then requires all
+seven words to read zero. A lost reservation, a partial write or nonzero
+readback is not retried. Firmware VMID 0 is never cleared.
+
+The low-word order follows the linked AMD context programming example. That
+example does not document a zero-root invalidate operation. The route must
+separately qualify the empty-image operation for this display engine and
+confirm that the exact old pin/VMID/root can no longer be reached by a
+translation or outstanding walk. An empty register image alone cannot
+confirm this. A pending translation proof leaves both mappings pinned and
+polls again without clearing the context twice. The provider rechecks the
+exact new front, peer state, firmware backing and empty old context after
+that confirmation and again after withdrawing the table before completing
+pixel DMA. The table and pixel commands each must complete, independently
+confirm unmap, and clear before releasing their respective backing holds.
+Withdrawal is also required before unused cancellation. The client lock is
+try-only, no GPU lock is held, and callbacks must be bounded and must not
+reenter the provider or acquire its client or GPU locks. The staged kernel
+selectors are flip begin V3 and poll V2.
 The new front stays pinned. On timeout, observed close,
 an ambiguous write, or cleanup failure, the provider retains the reachable
 backing and route and admits no replacement commit. On success, a return to
@@ -915,7 +923,7 @@ The decode was checked against AMD's [DCN register definitions](https://github.c
 and [MC-to-physical conversion](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c#L1051-L1054);
 no implementation was copied.
 
-The staged V2 flip begin requires an active `PhxAMDFB` service attached to the
+The staged flip begin requires an active `PhxAMDFB` service attached to the
 exact PCI provider. The first transition away from firmware captures the V2
 sample and requires its address and geometry to match the flip. While an
 IOSurface is front, the same route and PhxFB service must remain in use and a

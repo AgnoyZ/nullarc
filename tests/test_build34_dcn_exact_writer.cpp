@@ -900,7 +900,9 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        RetireContextReappears, ReturnSameVmid, MissingFramebuffer, WrongFramebufferPci,
                        WrongFramebufferType, InactiveFramebuffer, NoHomeSample, WrongHomeAddress, WrongHomeGeometry,
                        WrongHomeBacking, HomeLostAfterInstall, HomeLostAtRetire, WrongReturnAddress, ReplacedFramebuffer,
-                       PeerActive, PeerShortWindow, PeerDuringInstall, PeerAfterHigh, PeerDuringRetire, PeerAfterWithdraw };
+                       PeerActive, PeerShortWindow, PeerDuringInstall, PeerAfterHigh, PeerDuringRetire, PeerAfterWithdraw,
+                       NoRetirementProof, ClearDenied, ClearWriteUncertain, ReplacedDuringFetchDrain,
+                       TranslationPending, TranslationLost, FrontRevertedDuringTranslations };
 
 struct CommitFixture {
     struct Table : IOBufferMemoryDescriptor {
@@ -947,7 +949,7 @@ struct CommitFixture {
     uint32_t frame = 42;
     uint64_t now = 800;
     unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0, pageReads = 0;
-    unsigned vmWrites = 0, vmAckReads = 0;
+    unsigned vmWrites = 0, vmAckReads = 0, clearChecks = 0, clearWrites = 0, translationChecks = 0;
     uint32_t lockSelect = 0, surfaceControl = 0;
     uint32_t surfaceFormat = 8, returnControl = 0x00e00000, swizzle = 0, start = 0;
     uint32_t dimensions = (17u << 16) | 64u, pitch = 63, odm = 0xfff00000, otg = 0x00010001;
@@ -965,7 +967,8 @@ struct CommitFixture {
     FlipFault translationFault = FlipFault::None;
     uint64_t outputPages[2]{};
     HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay},
-                       qualified, {encodeLeaf, decodeLeaf, encodeRoot, tableCurrent}, retired, canInstallFlatVm, &framebuffer};
+                       qualified, {encodeLeaf, decodeLeaf, encodeRoot, tableCurrent}, retired, canInstallFlatVm,
+                       canClearFlatVm, translationsRetired, &framebuffer};
     ScanoutPinToken pin{}, alternatePin{};
 
     CommitFixture() {
@@ -1035,6 +1038,7 @@ struct CommitFixture {
                 return true;
             }
             assert(&completed == &command && retire && retireChecks >= (alternatePin.serial ? 2u : 3u) &&
+                   clearWrites == 7 && translationChecks &&
                    scanout.client.guard.held && !scanout.device.guard.held && lifetime.references == (alternatePin.serial ? 4u : 3u) &&
                    homeTable.withdrawals == 1 && !homeTable.dma.prepared && homeTable.references == 1 &&
                    scanout.frame.host.wires == (alternatePin.serial ? 3u : 2u));
@@ -1166,6 +1170,27 @@ struct CommitFixture {
         auto &self = *static_cast<CommitFixture *>(context);
         assert(self.scanout.cancelPin(self.pin) == kIOReturnBusy);
         assert(self.lifetime.references >= 3 && !self.scanout.device.guard.held);
+        if (self.scanout.client.guard.held) {
+            const uint32_t sequence[]{3, 4, 5, 6, 0, 1, 2};
+            assert(self.retire && !self.lockRequested && !self.translationChecks && self.clearWrites < 7 &&
+                   self.clearChecks == self.clearWrites + 1 && address == 0x03a4a + sequence[self.clearWrites++] && !value);
+            assert(self.homeTable.dma.prepared && !self.homeTable.withdrawals && self.command.prepared);
+            switch (address - 0x03a4a) {
+            case 0: self.contextControl = 0; break;
+            case 1: self.contextRoot &= UINT32_MAX; break;
+            case 2:
+                if (self.translationFault != FlipFault::RetireRootStillInstalled) self.contextRoot = 0;
+                break;
+            case 3: self.firstPage &= UINT32_MAX; break;
+            case 4:
+                if (self.translationFault != FlipFault::RetireRangeStillInstalled) self.firstPage = 0;
+                break;
+            case 5: self.lastPage &= UINT32_MAX; break;
+            case 6: self.lastPage = 0; break;
+            default: assert(false); return false;
+            }
+            return self.translationFault != FlipFault::ClearWriteUncertain;
+        }
         if (address >= 0x03a4a && address <= 0x03a57) {
             const bool alternate = address >= 0x03a51;
             const uint32_t base = alternate ? 0x03a51 : 0x03a4a;
@@ -1250,15 +1275,35 @@ struct CommitFixture {
         if (self.closeDuringRetire && request.previousPin.serial) self.scanout.device.exactCallbacks.close();
         if (self.lateRetire && request.previousPin.serial) self.now += 100000000;
         if (self.changeGeometryAtRetire && request.previousPin.serial) ++self.pitch;
-        if (request.previousPin.serial && self.retire) {
-            if (self.translationFault != FlipFault::RetireRootStillInstalled) self.contextRoot = 0;
-            if (self.translationFault != FlipFault::RetireRangeStillInstalled) self.firstPage = self.lastPage = 0;
-            self.contextControl = 0;
-        }
+        if (request.previousPin.serial && self.retire && self.translationFault == FlipFault::ReplacedDuringFetchDrain)
+            self.contextRoot ^= kPage;
         if (self.translationFault == FlipFault::ContextDuringRetire && request.nextPin.serial) self.contextRoot ^= kPage;
         if (self.translationFault == FlipFault::DualContextDuringRetire && request.nextPin == self.alternatePin)
             self.alternateContextRoot ^= kPage;
         return self.retire;
+    }
+
+    static bool canClearFlatVm(void *context, const HubpFlipRequest &request, const DcnFlatContext &old) {
+        auto &self = *static_cast<CommitFixture *>(context);
+        assert(self.scanout.client.guard.held && !self.scanout.device.guard.held && self.retire &&
+               request.previous == self.mapped && request.previousPin == self.pin && request.next == self.active &&
+               old.vmid == self.mapped.vmid && old.rootEntry == self.ownedRoot && old.firstPage == self.mapped.address / kPage &&
+               old.lastPage == old.firstPage + 1 && !self.translationChecks);
+        ++self.clearChecks;
+        return self.translationFault != FlipFault::ClearDenied;
+    }
+
+    static DcnRetirement translationsRetired(void *context, const HubpFlipRequest &request, const DcnFlatContext &old) {
+        auto &self = *static_cast<CommitFixture *>(context);
+        assert(self.scanout.client.guard.held && !self.scanout.device.guard.held && self.retire &&
+               request.previousPin == self.pin && request.next == self.active && old.vmid == self.mapped.vmid &&
+               old.rootEntry == self.ownedRoot && self.clearWrites == 7 && !self.contextRoot && !self.firstPage &&
+               !self.lastPage && !self.contextControl && self.homeTable.dma.prepared && self.command.prepared);
+        ++self.translationChecks;
+        if (self.translationFault == FlipFault::TranslationLost) return DcnRetirement::Lost;
+        if (self.translationFault == FlipFault::TranslationPending && self.translationChecks == 1) return DcnRetirement::Pending;
+        if (self.translationFault == FlipFault::FrontRevertedDuringTranslations) self.earliest = request.previous;
+        return DcnRetirement::Complete;
     }
 
     static bool read(void *context, uint32_t address, uint32_t &value) {
@@ -1386,8 +1431,9 @@ static void scanoutFlip(FlipFault fault) {
     fixture.rewindAfterHigh = fault == FlipFault::ClockRewind;
     fixture.failIssue = fault == FlipFault::Issue;
     fixture.translationFault = fault;
-    if (fault == FlipFault::PeerActive || fault == FlipFault::PeerShortWindow) {
+    if (fault == FlipFault::PeerActive || fault == FlipFault::PeerShortWindow || fault == FlipFault::NoRetirementProof) {
         if (fault == FlipFault::PeerShortWindow) fixture.route.reader.apertureBytes = 0x05181 * sizeof(uint32_t);
+        if (fault == FlipFault::NoRetirementProof) fixture.route.translationsRetired = nullptr;
         assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
         assert(!fixture.writes && !fixture.vmWrites && !fixture.issues && !fixture.homeTable.stores &&
                fixture.command.prepared && fixture.framebuffer.references == 1);
@@ -1649,7 +1695,8 @@ static void scanoutFlip(FlipFault fault) {
         return;
     }
     fixture.step(poll, ScanoutFlipResult::Waiting);
-    assert(fixture.retireChecks == 2 && !fixture.command.completes && scanout.frame.host.wires == 2);
+    assert(fixture.retireChecks == 2 && !fixture.clearWrites && !fixture.translationChecks && !fixture.command.completes &&
+           scanout.frame.host.wires == 2);
     IOLockLock(scanout.client.lock);
     assert(fixture.poll(poll) == kIOReturnBusy && fixture.retireChecks == 2);
     IOLockUnlock(scanout.client.lock);
@@ -1676,6 +1723,23 @@ static void scanoutFlip(FlipFault fault) {
         assert(fixture.homeTable.withdrawals == withdrew && !fixture.command.completes);
         return;
     }
+    if (fault == FlipFault::ClearDenied || fault == FlipFault::ClearWriteUncertain || fault == FlipFault::ReplacedDuringFetchDrain ||
+        fault == FlipFault::TranslationLost || fault == FlipFault::FrontRevertedDuringTranslations) {
+        const bool afterClear = fault == FlipFault::TranslationLost || fault == FlipFault::FrontRevertedDuringTranslations;
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.clearWrites == (afterClear ? 7u : fault == FlipFault::ClearWriteUncertain ? 1u : 0u) &&
+               fixture.translationChecks == afterClear && !fixture.homeTable.withdrawals && fixture.homeTable.dma.prepared &&
+               fixture.command.prepared && !fixture.command.completes && fixture.framebuffer.references == 2);
+        const auto writes = fixture.clearWrites;
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.clearWrites == writes && fixture.translationChecks == afterClear);
+        return;
+    }
+    if (fault == FlipFault::TranslationPending) {
+        fixture.step(poll, ScanoutFlipResult::Waiting);
+        assert(fixture.clearWrites == 7 && fixture.retireChecks == 3 && fixture.translationChecks == 1 &&
+               !fixture.homeTable.withdrawals && fixture.homeTable.dma.prepared && fixture.command.prepared);
+    }
     if (fault == FlipFault::WithdrawError || fault == FlipFault::CloseDuringWithdraw) {
         fixture.step(poll, ScanoutFlipResult::Uncertain);
         assert(fixture.homeTable.withdrawals == 1 && !fixture.homeTable.dma.prepared &&
@@ -1686,6 +1750,8 @@ static void scanoutFlip(FlipFault fault) {
         return;
     }
     fixture.step(poll, fixture.failUnmap ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
+    assert(fixture.clearWrites == 7 && fixture.retireChecks == 3 &&
+           fixture.translationChecks == (fault == FlipFault::TranslationPending ? 2u : 1u));
     assert(fixture.command.completes == 1 && fixture.command.clears == !fixture.failUnmap);
     assert(DcnAllocationStub::live() == (fixture.failUnmap ? 1u : 0u));
     assert(scanout.frame.host.wires == (fixture.failUnmap ? 2u : 1u));
@@ -1836,6 +1902,13 @@ int main() {
     scanoutFlip(FlipFault::PeerAfterHigh);
     scanoutFlip(FlipFault::PeerDuringRetire);
     scanoutFlip(FlipFault::PeerAfterWithdraw);
+    scanoutFlip(FlipFault::NoRetirementProof);
+    scanoutFlip(FlipFault::ClearDenied);
+    scanoutFlip(FlipFault::ClearWriteUncertain);
+    scanoutFlip(FlipFault::ReplacedDuringFetchDrain);
+    scanoutFlip(FlipFault::TranslationPending);
+    scanoutFlip(FlipFault::TranslationLost);
+    scanoutFlip(FlipFault::FrontRevertedDuringTranslations);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

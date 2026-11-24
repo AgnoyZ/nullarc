@@ -53,11 +53,15 @@ class HubpFlipProgram {
     }
 
     template<typename IsLive>
-    static bool geometryCurrent(const HubpFlipRequest &request, const HubpFlipReader &reader,
-                                const ScanoutSurface &surface, IsLive live) {
+    static bool frontCurrent(const HubpFlipRequest &request, const HubpFlipReader &reader,
+                             const ScanoutSurface &surface, IsLive live) {
         if (reader.apertureBytes < dcnPeers::kMmioBytes) return false;
         Access<IsLive> access{request, reader, {}, live};
-        return access.geometry(surface) && access.peersIdle();
+        HubpAddress front{};
+        uint32_t frame = 0;
+        return access.geometry(surface) && access.peersIdle() && access.lockCurrent(false) &&
+            HubpFlipReadback::observeQuiescent([&](uint32_t reg, uint32_t &value) { return access.read(reg, value); },
+                front, frame) && front == request.next && access.current();
     }
 
     template<typename IsLive>
