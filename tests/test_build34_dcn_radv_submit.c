@@ -34,7 +34,7 @@ static struct acd_exact_receipt receipt;
 static struct acd_cs_sync sync;
 static bool exact_enabled, supplied;
 static int parse_result, wait_result, submit_result, attach_result;
-static unsigned called_submit, called_attach, called_wait;
+static unsigned called_submit, called_attach, called_wait, called_discard;
 
 struct acd_core { void *kext; };
 typedef struct acd_device { struct acd_core *core; void *sync; bool host_bo; } *acd_device_handle;
@@ -85,6 +85,12 @@ static int acd_sync_cs_attach(void *provider, uint32_t handle, uint64_t point, u
    return attach_result;
 }
 
+static void acd_kext_dcn_discard(void *kext, const struct build34_dcn_native_submit *writer)
+{
+   assert(kext && writer->sequence == 19 && writer->context == 23);
+   ++called_discard;
+}
+
 static int acd_ioctl(acd_device_handle dev, unsigned command, void *data, unsigned size)
 {
    assert(dev->host_bo && command == DRM_AMDGPU_CS && data && size == sizeof(union drm_amdgpu_cs));
@@ -116,7 +122,7 @@ static void test_darwin_submit(void)
       chunk = (struct drm_amdgpu_cs_chunk){0};
       struct build34_dcn_native_submit out = {2, 3, 4, 5, 6, 1, 8};
       parse_result = wait_result = submit_result = attach_result = 0;
-      called_submit = called_attach = called_wait = 0;
+      called_submit = called_attach = called_wait = called_discard = 0;
       int expected_result = 0;
 
       switch (test) {
@@ -150,6 +156,7 @@ static void test_darwin_submit(void)
       assert(called_attach == (called_submit && test != 9));
       assert(called_wait == (test <= 5 || (test >= 8 && test < 14)));
       assert(supplied == (!test || (test >= 9 && test <= 13)));
+      assert(called_discard == (test == 10 || test == 11));
    }
 }
 #endif

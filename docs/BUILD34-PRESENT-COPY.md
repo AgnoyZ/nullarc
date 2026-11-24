@@ -406,14 +406,35 @@ from repeating that exact submit. The queue clears its previous
 observation on entry and installs the new one only if the submission
 succeeds. A missing observation can accompany a native dispatch after an
 attachment failure. The queue snapshot holds historical write identity.
-It needs checked native completion and exclusion of later and overlapping
-writers before the display can take a lease.
+
+The [exact completion stage](../tools/build34_dcn_radv_complete_stage.py)
+adds a private poll for one accepted writer in the active Darwin transport.
+It requires a match on the full native receipt and submitted context;
+the raw WaitCS rule that accepts anonymous sequence holes below the global
+prefix is not used. An authenticated receipt can complete either through a
+matching native WaitReceipt reply or a genuine global prefix covering its
+sequence. Retaining that one local record does not block native ACK, and
+does not retain the image or its pages. Starting another exact admission
+on the same connection, including compute work or an ultimately refused
+submission, invalidates the earlier observation. Failed syncobj attachment
+discards only the matching record and leaves any newer one untouched.
+
+The poll does not wait for the submit lock. It refuses lock contention,
+stale identity and poisoned sessions; a pending record uses a zero-time
+native query and the poll itself does not flush ACKs. Its result remains
+historical after the lock is released. It does not exclude earlier
+overlapping writes, another connection, CPU writes or a later remap, nor
+does it grant ownership to scanout. A caller still needs live object
+lifetimes, exclusion of other writers and a retained display lease, along
+with visibility in the HUBP fetch domain.
 
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles. Set `BUILD34_RADV_COMPILE_COMMANDS` to the
 reviewed Darwin Meson recipe to check all 17 input digests, syntax-check
-nine Mesa translation units, and run extracted Darwin submission logic
-against CPU doubles. Discarding the overlay rolls back both stages.
+nine Mesa translation units, and run extracted Darwin submission and
+exact completion logic against CPU doubles. Discarding the overlay rolls
+back these stages. The installed R2a path, including `l10r` conversion,
+remains unchanged.
 
 Hardware acceptance requires proof of the actual device mapper,
 lease/reverse-lookup semantics and HUBP fetch domain. It also requires

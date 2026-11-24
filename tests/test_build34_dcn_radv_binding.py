@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import build34_dcn_radv_binding_stage as binding
 import build34_dcn_radv_clear_stage as clear
+import build34_dcn_radv_complete_stage as complete
 import build34_dcn_radv_submit_stage as submit
 
 
@@ -47,7 +48,7 @@ class RenderBinding(unittest.TestCase):
             self.skipTest("set BUILD34_RADV_COMPILE_COMMANDS to the reviewed Darwin Meson recipe")
         rows = json.loads(Path(recipe).read_text())
         commands = {}
-        for name in (name for name in submit.INPUTS if name.endswith(".c")):
+        for name in (name for name in complete.INPUTS if name.endswith(".c")):
             matches = [row for row in rows if row["file"].endswith("/" + name)]
             self.assertEqual(len(matches), 1, name)
             row = matches[0]
@@ -58,11 +59,11 @@ class RenderBinding(unittest.TestCase):
         for name, (_, source, _) in commands.items():
             self.assertEqual(mesa / name, source)
 
-        inputs = {name: (mesa / name).read_bytes() for name in submit.INPUTS}
+        inputs = {name: (mesa / name).read_bytes() for name in complete.INPUTS}
         for name in inputs:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, name):
-                submit.stage({**inputs, name: inputs[name] + b"\n"})
-        sources = submit.stage(inputs)
+                complete.stage({**inputs, name: inputs[name] + b"\n"})
+        sources = complete.stage(inputs)
         BO, IMAGE = binding.BO, binding.IMAGE
         self.assertLess(sources[BO].index("goto error_va_map;", sources[BO].index("radv_amdgpu_winsys_bo_from_ptr(")),
                         sources[BO].index("bo->dcn_host_map = host_map;"))
@@ -78,6 +79,11 @@ class RenderBinding(unittest.TestCase):
                 transport[transport.index("static bool\nacd_dcn_matches_plan("):transport.index("static int\nacd_cmd_ctx(")]
             )
             self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_submit.c", ("-DTEST_DARWIN_SUBMIT", "-I" + tmp))
+            kext = sources[submit.KEXT]
+            (out / "staged_exact_complete.inc").write_text(
+                kext[kext.index("enum acd_exact_phase"):kext.index("/* G6:")] +
+                kext[kext.index("static inline void\nacd_sfence("):kext.index("static bool\ntrace_enabled(")]
+            )
             for name in (binding.HEADER, clear.HEADER, submit.HEADER, submit.NATIVE_HEADER):
                 sources[name] = (ROOT / "tools" / Path(name).name).read_text()
             overlay = []
@@ -93,6 +99,16 @@ class RenderBinding(unittest.TestCase):
                     self.assertTrue(any(word.startswith("-DHAVE_AMDGPU_DARWIN") for word in words))
                     args = words[:words.index("-MD")]
                     self.run_checked([*args, "-fsyntax-only", "-ivfsoverlay", str(manifest), str(source)], cwd)
+
+            cwd, _, words = commands[submit.KEXT]
+            args = words[:words.index("-MD")]
+            binary = str(out / "exact-completion")
+            self.run_checked([
+                *args, "-UNDEBUG", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
+                "-ivfsoverlay", str(manifest), "-I" + tmp, "-I" + str(mesa / Path(submit.KEXT).parent),
+                str(ROOT / "tests/test_build34_dcn_radv_complete.c"), "-o", binary,
+            ], cwd)
+            self.run_checked([binary])
 
 
 if __name__ == "__main__":
