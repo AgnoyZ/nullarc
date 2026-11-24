@@ -17,6 +17,48 @@ inline constexpr uint32_t kUnsafeSurface = 0x000f1313;
 inline constexpr uint32_t kOtgEnabled = 0x00010001, kOdmSinglePipeMask = 0x000f0303;
 }
 
+namespace dcnPeers {
+inline constexpr uint32_t kPower1 = 0x03543, kPowerStride = 2;
+inline constexpr uint32_t kHubpStride = 0xdc, kOtgStride = 0x80;
+inline constexpr uint32_t kPowerMask = 0xc0000000, kGated = 0x80000000;
+inline constexpr uint32_t kHubpIdle = 0x1003;
+inline constexpr uint32_t kCount = 3;
+inline constexpr uint64_t kMmioBytes = (hubp0::kOtgControl + kCount * kOtgStride + 1ull) * sizeof(uint32_t);
+}
+
+template<typename Read>
+bool matchIdleDcnPeers(const Read &read) {
+    using namespace dcnPeers;
+    using namespace hubp0;
+    const auto checkedRead = [&](uint32_t reg, uint32_t &value) { return read(reg, value) && value != UINT32_MAX; };
+    const auto sample = [&](uint32_t (&powerStates)[kCount]) {
+        for (unsigned index = 0; index < kCount; ++index) {
+            uint32_t otg = 0, power = 0;
+            const auto pipe = index + 1;
+            if (!checkedRead(kOtgControl + pipe * kOtgStride, otg) || (otg & kOtgEnabled) ||
+                !checkedRead(kPower1 + index * kPowerStride, power)) return false;
+            powerStates[index] = power & kPowerMask;
+            if (powerStates[index] == kGated) continue;
+            uint32_t control = 0, flip = 0;
+            if (powerStates[index] || !checkedRead(kControl + pipe * kHubpStride, control) ||
+                (control & kHubpIdle) != kHubpIdle || !checkedRead(kFlip + pipe * kHubpStride, flip) ||
+                (flip & (kPending | kUpdateLocked))) return false;
+        }
+        return true;
+    };
+    for (unsigned attempt = 0; attempt < 2; ++attempt) {
+        uint32_t before = 0, after = 0, beforePower[kCount]{}, afterPower[kCount]{};
+        if (!checkedRead(kFrame, before) || !sample(beforePower) || !sample(afterPower) || !checkedRead(kFrame, after))
+            return false;
+        for (unsigned index = 0; index < kCount; ++index)
+            if (beforePower[index] != afterPower[index]) return false;
+        const uint32_t frames = (after - before) & kFrameMask;
+        if (!frames) return true;
+        if (frames != 1) return false;
+    }
+    return false;
+}
+
 inline bool validFlipGeometry(const ScanoutSurface &surface) {
     using namespace hubp0;
     if (!surface.width || surface.width > kStrideMask || !surface.height || surface.height > kStrideMask ||

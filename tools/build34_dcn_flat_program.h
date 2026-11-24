@@ -19,13 +19,13 @@ class DcnFlatProgram {
         return true;
     }
 
-    template<typename Inactive>
+    template<typename Inactive, typename WriteAllowed>
     static bool install(const DcnFlatContext &context, const HubpFlipReader &reader, HubpFlipWriter writer,
-                        const Inactive &inactive) {
+                        const Inactive &inactive, const WriteAllowed &writeAllowed) {
         if (!context.valid() || !writer.writeDword || !writer.delayUs || !empty(context.vmid, reader, inactive)) return false;
         const uint32_t base = dcnVm::base(context.vmid);
         const auto write = [&](uint32_t field, uint32_t value) {
-            return inactive() && writer.writeDword(reader.context, base + field, value);
+            return writeAllowed() && inactive() && writer.writeDword(reader.context, base + field, value);
         };
         const uint32_t rootLow = static_cast<uint32_t>(context.rootEntry);
         uint32_t low = 0;

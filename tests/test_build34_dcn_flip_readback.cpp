@@ -309,6 +309,88 @@ static void testFirmwareSample(FirmwareFault fault) {
     assert(check() && checked.backing == sample.backing);
 }
 
+static void testIdleDcnPeers() {
+    constexpr uint32_t otg[]{0x05081, 0x05101, 0x05181};
+    constexpr uint32_t power[]{0x03543, 0x03545, 0x03547};
+    constexpr uint32_t hubp[]{0x03b8f, 0x03c6b, 0x03d47};
+    constexpr uint32_t flip[]{0x03bb7, 0x03c93, 0x03d6f};
+    static_assert(dcnPeers::kMmioBytes == (0x05181 + 1) * sizeof(uint32_t));
+    for (unsigned peer = 0; peer < 3; ++peer) {
+        uint32_t peerOtg = 0, peerPower = 0, peerHubp = 0x1003, peerFlip = 0;
+        unsigned frame = 12, frameReads = 0, powerReads = 0, pipeReads = 0;
+        unsigned crossedFrames = 0, frameJump = 1;
+        bool changedPower = false, failedRead = false;
+        const auto read = [&](uint32_t reg, uint32_t &value) {
+            if (reg == 0x0500c) {
+                if (++frameReads % 2 == 0 && crossedFrames) {
+                    --crossedFrames;
+                    frame += frameJump;
+                }
+                value = frame;
+                return true;
+            }
+            for (unsigned index = 0; index < 3; ++index) {
+                if (reg == otg[index]) {
+                    value = index == peer ? peerOtg : 0;
+                    return true;
+                }
+                if (reg == power[index]) {
+                    value = index == peer && !(++powerReads == 2 && changedPower) ? peerPower : 0x80000000;
+                    return index != peer || !failedRead;
+                }
+                if (reg == hubp[index] || reg == flip[index]) {
+                    assert(index == peer && !peerPower);
+                    ++pipeReads;
+                    value = reg == hubp[index] ? peerHubp : peerFlip;
+                    return true;
+                }
+            }
+            assert(false);
+            return false;
+        };
+        const auto check = [&] {
+            frameReads = powerReads = pipeReads = 0;
+            return matchIdleDcnPeers(read);
+        };
+        assert(check() && pipeReads == 4 && frameReads == 2);
+        for (const auto bit : {1u, 2u, 0x1000u}) {
+            peerHubp = 0x1003 & ~bit;
+            assert(!check());
+        }
+        peerHubp = 0x1003;
+        for (const auto bit : {0x100u, 0x200u}) {
+            peerFlip = bit;
+            assert(!check());
+        }
+        peerFlip = 0;
+        changedPower = true;
+        assert(!check() && pipeReads == 2);
+        changedPower = false;
+        peerPower = 0x80000000;
+        assert(check() && !pipeReads);
+        for (const auto value : {1u, 0x10000u, UINT32_MAX}) {
+            peerOtg = value;
+            assert(!check());
+        }
+        peerOtg = 0;
+        for (const auto value : {0x40000000u, 0xc0000000u, UINT32_MAX}) {
+            peerPower = value;
+            assert(!check() && !pipeReads);
+        }
+        peerPower = 0x80000000;
+        failedRead = true;
+        assert(!check());
+        failedRead = false;
+        crossedFrames = 1;
+        assert(check() && frameReads == 4);
+        crossedFrames = 2;
+        assert(!check() && frameReads == 4);
+        crossedFrames = 1;
+        frameJump = 2;
+        assert(!check() && frameReads == 2);
+    }
+}
+
 int main() {
     testFlipAndOldBacking();
     testNoSyntheticVblOrStalePending();
@@ -318,6 +400,7 @@ int main() {
                              Fault::SerialChanged, Fault::ClockFailed, Fault::BackwardsClock, Fault::Late})
         testFault(fault);
     testPollBoundAndTornRead();
+    testIdleDcnPeers();
     for (const auto fault : {FirmwareFault::None, FirmwareFault::DisjointGart, FirmwareFault::WrongVmid, FirmwareFault::BadLength, FirmwareFault::BarOffset,
             FirmwareFault::ConsoleMap, FirmwareFault::Geometry, FirmwareFault::ChangedGeometry, FirmwareFault::Lock,
             FirmwareFault::LockSelect, FirmwareFault::Stereo, FirmwareFault::Pending, FirmwareFault::TornAddress,

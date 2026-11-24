@@ -899,7 +899,8 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        TableSubstituted, RetireRootStillInstalled, RetireRangeStillInstalled,
                        RetireContextReappears, ReturnSameVmid, MissingFramebuffer, WrongFramebufferPci,
                        WrongFramebufferType, InactiveFramebuffer, NoHomeSample, WrongHomeAddress, WrongHomeGeometry,
-                       WrongHomeBacking, HomeLostAfterInstall, HomeLostAtRetire, WrongReturnAddress, ReplacedFramebuffer };
+                       WrongHomeBacking, HomeLostAfterInstall, HomeLostAtRetire, WrongReturnAddress, ReplacedFramebuffer,
+                       PeerActive, PeerShortWindow, PeerDuringInstall, PeerAfterHigh, PeerDuringRetire, PeerAfterWithdraw };
 
 struct CommitFixture {
     struct Table : IOBufferMemoryDescriptor {
@@ -1280,6 +1281,15 @@ struct CommitFixture {
         case 0x03ac7: value = self.pitch; break;
         case 0x04f8b: value = self.odm; break;
         case 0x05001: value = self.otg; break;
+        case 0x03543: case 0x03545: case 0x03547: value = 0x80000000; break;
+        case 0x05081: case 0x05101: value = 0; break;
+        case 0x05181:
+            value = self.translationFault == FlipFault::PeerActive ||
+                (self.translationFault == FlipFault::PeerDuringInstall && self.vmWrites >= 3) ||
+                (self.translationFault == FlipFault::PeerAfterHigh && self.writes >= 3) ||
+                (self.translationFault == FlipFault::PeerDuringRetire && self.retireChecks >= 3) ||
+                (self.translationFault == FlipFault::PeerAfterWithdraw && self.homeTable.withdrawals) ? 0x10000 : 0;
+            break;
         case 0x03a4a: value = self.contextControl; break;
         case 0x03a4b: value = static_cast<uint32_t>(self.contextRoot >> 32); break;
         case 0x03a4c:
@@ -1376,6 +1386,13 @@ static void scanoutFlip(FlipFault fault) {
     fixture.rewindAfterHigh = fault == FlipFault::ClockRewind;
     fixture.failIssue = fault == FlipFault::Issue;
     fixture.translationFault = fault;
+    if (fault == FlipFault::PeerActive || fault == FlipFault::PeerShortWindow) {
+        if (fault == FlipFault::PeerShortWindow) fixture.route.reader.apertureBytes = 0x05181 * sizeof(uint32_t);
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+        assert(!fixture.writes && !fixture.vmWrites && !fixture.issues && !fixture.homeTable.stores &&
+               fixture.command.prepared && fixture.framebuffer.references == 1);
+        return;
+    }
     if (fault >= FlipFault::MissingFramebuffer && fault <= FlipFault::WrongHomeBacking) {
         if (fault == FlipFault::MissingFramebuffer) fixture.route.framebuffer = nullptr;
         if (fault == FlipFault::WrongFramebufferPci) fixture.framebuffer.provider = &fixture;
@@ -1475,11 +1492,13 @@ static void scanoutFlip(FlipFault fault) {
     }
     assert(fixture.begin(request) == kIOReturnSuccess && request.operation.serial != fixture.pin.serial);
     assert(fixture.framebuffer.references == 2 && fixture.framebuffer.releases == (fault == FlipFault::RetryTable));
-    if (fault == FlipFault::HomeLostAfterInstall) {
-        assert(request.result == ScanoutFlipResult::Uncertain && !fixture.writes && fixture.vmWrites == 7);
+    if (fault == FlipFault::HomeLostAfterInstall || fault == FlipFault::PeerDuringInstall) {
+        const bool installed = fault == FlipFault::HomeLostAfterInstall;
+        assert(request.result == ScanoutFlipResult::Uncertain && !fixture.writes && fixture.vmWrites == (installed ? 7u : 3u));
         ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
         fixture.step(poll, ScanoutFlipResult::Uncertain);
-        assert(fixture.framebuffer.samples == 1 && fixture.framebuffer.checks == 3 && fixture.framebuffer.references == 2);
+        assert(fixture.framebuffer.samples == 1 && fixture.framebuffer.checks == (installed ? 3u : 2u) &&
+               fixture.framebuffer.references == 2);
         assert(fixture.homeTable.dma.prepared && fixture.command.prepared && !fixture.command.completes);
         assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
         return;
@@ -1489,7 +1508,7 @@ static void scanoutFlip(FlipFault fault) {
     if (fault == FlipFault::Install) assert(fixture.vmAckReads == 3 && fixture.delays == 2);
     assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
     ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
-    const bool afterHigh = fixture.failHigh || fixture.loseRouteAfterHigh || fixture.rewindAfterHigh;
+    const bool afterHigh = fixture.failHigh || fixture.loseRouteAfterHigh || fixture.rewindAfterHigh || fault == FlipFault::PeerAfterHigh;
     const bool atLock = fixture.lockTimeout || fixture.changeGeometryAtLock || fault == FlipFault::ContextAtLock;
     if (atLock || afterHigh || fixture.failIssue || fixture.unlockTimeout) {
         const unsigned expectedWrites = atLock ? 1 : afterHigh ? 3 : fixture.failIssue ? 4 : 5;
@@ -1636,10 +1655,12 @@ static void scanoutFlip(FlipFault fault) {
     IOLockUnlock(scanout.client.lock);
     fixture.retire = true;
     fixture.failUnmap = fault == FlipFault::Unmap;
-    if (fault == FlipFault::HomeLostAtRetire) {
+    if (fault == FlipFault::HomeLostAtRetire || fault == FlipFault::PeerDuringRetire || fault == FlipFault::PeerAfterWithdraw) {
+        const bool withdrew = fault == FlipFault::PeerAfterWithdraw;
         fixture.step(poll, ScanoutFlipResult::Uncertain);
         assert(fixture.retireChecks == 3 && fixture.command.prepared && !fixture.command.completes &&
-               fixture.homeTable.dma.prepared && !fixture.homeTable.withdrawals && scanout.frame.host.wires == 2);
+               fixture.homeTable.dma.prepared == !withdrew && fixture.homeTable.withdrawals == withdrew &&
+               scanout.frame.host.wires == 2);
         assert(fixture.framebuffer.samples == 1 && fixture.framebuffer.references == 2 && !fixture.framebuffer.releases);
         const auto checks = fixture.framebuffer.checks;
         fixture.step(poll, ScanoutFlipResult::Uncertain);
@@ -1809,6 +1830,12 @@ int main() {
     scanoutFlip(FlipFault::HomeLostAtRetire);
     scanoutFlip(FlipFault::WrongReturnAddress);
     scanoutFlip(FlipFault::ReplacedFramebuffer);
+    scanoutFlip(FlipFault::PeerActive);
+    scanoutFlip(FlipFault::PeerShortWindow);
+    scanoutFlip(FlipFault::PeerDuringInstall);
+    scanoutFlip(FlipFault::PeerAfterHigh);
+    scanoutFlip(FlipFault::PeerDuringRetire);
+    scanoutFlip(FlipFault::PeerAfterWithdraw);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

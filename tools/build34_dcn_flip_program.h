@@ -23,11 +23,11 @@ class HubpFlipProgram {
     static bool preflight(const HubpFlipRequest &request, const HubpFlipReader &reader, HubpFlipWriter writer,
                           const ScanoutSurface &surface, IsLive live) {
         if (!request.previous.valid() || !request.next.valid() || !reader.current || !reader.readDword ||
-            !writer.writeDword || !writer.delayUs || reader.apertureBytes < (uint64_t{hubp0::kOtgLockSelect} + 1) * 4)
+            !writer.writeDword || !writer.delayUs || reader.apertureBytes < dcnPeers::kMmioBytes)
             return false;
         Access<IsLive> access{request, reader, writer, live};
         uint32_t vmid = 0;
-        return access.baseline(surface, false, vmid);
+        return access.baseline(surface, false, vmid) && access.peersIdle();
     }
 
     template<typename IsLive, typename ContextsCurrent>
@@ -37,23 +37,27 @@ class HubpFlipProgram {
         using namespace hubp0;
         Access<IsLive> access{request, reader, writer, live};
         uint32_t vmid = 0;
-        if (!access.write(kOtgUpdateLock, kOtgLockRequest) || !access.waitLock(true) ||
-            !access.baseline(surface, true, vmid) || !contextsCurrent() || !access.locked())
+        if (!access.write(kOtgUpdateLock, kOtgLockRequest, false) || !access.waitLock(true) ||
+            !access.baseline(surface, true, vmid) || !contextsCurrent())
             return false;
-        if (!access.write(kVmid, (vmid & ~0xfu) | request.next.vmid) ||
-            !access.locked() || !access.write(kProgrammedHigh, static_cast<uint32_t>(request.next.address >> 32)) ||
-            !access.locked() || !access.write(kProgrammedLow, static_cast<uint32_t>(request.next.address)) ||
-            !access.locked())
+        if (!access.write(kVmid, (vmid & ~0xfu) | request.next.vmid, true) ||
+            !access.write(kProgrammedHigh, static_cast<uint32_t>(request.next.address >> 32), true) ||
+            !access.write(kProgrammedLow, static_cast<uint32_t>(request.next.address), true))
             return false;
-        return access.write(kOtgUpdateLock, 0) && access.waitLock(false);
+        return access.write(kOtgUpdateLock, 0, true) && access.waitLock(false);
+    }
+
+    template<typename IsLive>
+    static bool peersIdle(const HubpFlipRequest &request, const HubpFlipReader &reader, const IsLive &live) {
+        return Access<IsLive>{request, reader, {}, live}.peersIdle();
     }
 
     template<typename IsLive>
     static bool geometryCurrent(const HubpFlipRequest &request, const HubpFlipReader &reader,
                                 const ScanoutSurface &surface, IsLive live) {
-        if (reader.apertureBytes < (uint64_t{hubp0::kOtgControl} + 1) * 4) return false;
+        if (reader.apertureBytes < dcnPeers::kMmioBytes) return false;
         Access<IsLive> access{request, reader, {}, live};
-        return access.geometry(surface) && access.current();
+        return access.geometry(surface) && access.peersIdle();
     }
 
     template<typename IsLive>
@@ -69,8 +73,13 @@ class HubpFlipProgram {
             return current() && reader.readDword(reader.context, reg, value) && value != UINT32_MAX;
         }
 
-        bool write(uint32_t reg, uint32_t value) const {
-            return current() && writer.writeDword(reader.context, reg, value);
+        bool write(uint32_t reg, uint32_t value, bool held) const {
+            return peersIdle() && lockCurrent(held) && current() && writer.writeDword(reader.context, reg, value);
+        }
+
+        bool peersIdle() const {
+            return reader.apertureBytes >= dcnPeers::kMmioBytes &&
+                matchIdleDcnPeers([&](uint32_t reg, uint32_t &value) { return read(reg, value); }) && current();
         }
 
         bool geometry(const ScanoutSurface &surface) const {
@@ -91,11 +100,11 @@ class HubpFlipProgram {
                 ((uint64_t{high & 0xffffu} << 32) | low) == request.previous.address;
         }
 
-        bool locked() const {
+        bool lockCurrent(bool held) const {
             uint32_t select = 0;
             uint32_t lock = 0, flip = 0;
             return read(hubp0::kOtgLockSelect, select) && !(select & hubp0::kOtgLockSelectMask) &&
-                read(hubp0::kOtgUpdateLock, lock) && read(hubp0::kFlip, flip) && lockMatches(lock, flip, true);
+                read(hubp0::kOtgUpdateLock, lock) && read(hubp0::kFlip, flip) && lockMatches(lock, flip, held);
         }
 
         bool waitLock(bool held) const {

@@ -100,6 +100,7 @@ public:
                 (old.pin || intent.previous == home.scanout) && (next.pin || intent.next == home.scanout);
         };
         const auto homeCurrent = [&] { return checkFirmware(*route.framebuffer, pci, home, translationCurrent); };
+        const auto peersIdle = [&] { return HubpFlipProgram::peersIdle(request, route.reader, withinBudget); };
         const auto nextEmpty = [&] { return !nextTable || DcnFlatProgram::empty(intent.next.vmid, route.reader, inactive); };
         if (!route.qualify(route.reader.context, request, old.dma ? old.dma->command_ : nullptr,
                            next.dma ? next.dma->command_ : nullptr) ||
@@ -109,7 +110,7 @@ public:
             (nextTable && !nextTable->prepare(route.flatFormat, route.reader.context, *route.lifetime, request,
                 next.dma->qualified_, *next.dma->command_, next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
             !nextEmpty() || !matchesTranslation(old.dma, translationCurrent) || !matchesTranslation(next.dma, translationCurrent) ||
-            !homeCurrent() || !oldInstalled() || !nextEmpty() || !live() ||
+            !homeCurrent() || !oldInstalled() || !nextEmpty() || !peersIdle() ||
             (next.pin && !next.pin->beginDisplayUse())) {
             if (!routeLifetime_) {
                 route.framebuffer->release();
@@ -130,7 +131,7 @@ public:
         nextDma_ = next.dma;
         nextVm_ = nextTable ? nextTable->vm_ : DcnFlatContext{};
         surface_ = surface;
-        if ((nextTable && (!DcnFlatProgram::install(nextVm_, route_.reader, route_.writer, inactive) ||
+        if ((nextTable && (!DcnFlatProgram::install(nextVm_, route_.reader, route_.writer, inactive, peersIdle) ||
                            !homeCurrent())) ||
             !HubpFlipProgram::issue(request_, route_.reader, route_.writer, surface_, withinBudget, contextsCurrent) ||
             !route_.reader.current(route_.reader.context, request_) || !live())
@@ -153,7 +154,7 @@ public:
             return retirementStarted_ || (tableCurrent(old_.dma, frontVm_, translationCurrent) &&
                 contextCurrent(frontVm_, route_.reader, translationCurrent));
         };
-        if (!live() || !nextCurrent() || !oldCurrent()) return fail();
+        if (!HubpFlipProgram::peersIdle(request_, route_.reader, withinBudget) || !nextCurrent() || !oldCurrent()) return fail();
         const auto progress = readback_.poll();
         if (progress == HubpFlipProgress::Uncertain || !live()) return fail();
         if (progress != HubpFlipProgress::OldAddressAbsent) return ScanoutFlipResult::Waiting;

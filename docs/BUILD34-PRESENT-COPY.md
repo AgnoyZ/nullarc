@@ -812,8 +812,33 @@ references; no implementation was copied.
 The read-only layout checks use AMD's [HUBP size and format programming](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubp/dcn20/dcn20_hubp.c#L346-L460),
 [viewport fields](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubp/dcn10/dcn10_hubp.c#L833-L839)
 and [ODM bypass](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/optc/dcn314/dcn314_optc.c#L163-L183)
-as references. Matching those registers does not identify the full display
-topology, fetch envelope or address translation.
+as references. Matching those registers alone does not exclude another
+pipe using a VMID or identify the fetch envelope or address translation.
+
+The flip provider now checks every other DCN 3.1.4 pipe, not just the OTG0
+ODM selection. OTG1 through OTG3 must be disabled both in the requested
+and current enable fields. Each corresponding HUBP must be power-gated or
+report blank, TTU disabled and no outstanding requests, with neither a
+pending flip nor a held update lock. Two samples must agree on the power
+state within one OTG0 frame. A single frame increment between otherwise
+valid samples permits one immediate resample; any further drift refuses.
+No register inside a gated HUBP is read. Transitional power, a short BAR,
+inaccessible registers and inconsistent samples fail closed. The offsets
+and masks use the pinned DCN 3.1.4 definitions above; AMD's
+[HUBP power-gate status check](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hwss/dcn31/dcn31_hwseq.c#L441-L477)
+distinguishes the stable on and gated states. No implementation was copied.
+
+The provider samples the peers before permitting its VM-context and HUBP
+writes and checks them again when polling, after the route's retirement
+callback and after old table withdrawal. Loss of proof after a possible
+write makes the flip uncertain. In particular the old pixel DMA mapping
+is not released if a peer becomes active during table withdrawal. CPU
+fixtures cover both stationary idle states, power/frame transitions, a
+peer already active and a peer becoming active during context programming,
+after the HUBP high word, or during retirement. These observations can
+reject an incompatible topology but cannot prevent another writer from
+enabling a pipe between reads. They do not replace exclusive route ownership
+or proof of fetch drain and translation retirement.
 
 Both lock transitions have a ten-sample bound. Loss of route, write
 uncertainty or a missing lock acknowledgement stops all further writes.
