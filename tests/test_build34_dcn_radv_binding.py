@@ -12,7 +12,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from build34_dcn_radv_binding_stage import BO, HEADER, IMAGE, INPUTS, stage
+import build34_dcn_radv_binding_stage as binding
+import build34_dcn_radv_clear_stage as clear
 
 
 class RenderBinding(unittest.TestCase):
@@ -20,15 +21,21 @@ class RenderBinding(unittest.TestCase):
         result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_binding_ranges_and_handle_reuse(self):
+    def run_sanitized(self, source):
         with tempfile.TemporaryDirectory() as tmp:
-            binary = str(Path(tmp) / "binding")
+            binary = str(Path(tmp) / source.stem)
             self.run_checked([
                 os.environ.get("CC", "clang"), "-std=c11", "-Wall", "-Wextra", "-Werror",
                 "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer",
-                "-I" + str(ROOT / "tools"), str(Path(__file__).with_suffix(".c")), "-o", binary,
+                "-I" + str(ROOT / "tools"), str(source), "-o", binary,
             ])
             self.run_checked([binary])
+
+    def test_binding_ranges_and_handle_reuse(self):
+        self.run_sanitized(Path(__file__).with_suffix(".c"))
+
+    def test_clear_recording_lifetime(self):
+        self.run_sanitized(ROOT / "tests/test_build34_dcn_radv_clear.c")
 
     def test_pinned_mesa_native_syntax(self):
         recipe = os.environ.get("BUILD34_RADV_COMPILE_COMMANDS")
@@ -36,20 +43,23 @@ class RenderBinding(unittest.TestCase):
             self.skipTest("set BUILD34_RADV_COMPILE_COMMANDS to the reviewed Darwin Meson recipe")
         rows = json.loads(Path(recipe).read_text())
         commands = {}
-        for name in (BO, IMAGE):
+        for name in (binding.BO, binding.IMAGE, clear.CMD, clear.META):
             matches = [row for row in rows if row["file"].endswith("/" + name)]
             self.assertEqual(len(matches), 1, name)
             row = matches[0]
             cwd = Path(row["directory"])
             source = (cwd / row["file"]).resolve(strict=True)
             commands[name] = (cwd, source, shlex.split(row["command"]))
-        mesa = commands[IMAGE][1].parents[3]
-        self.assertEqual(mesa / BO, commands[BO][1])
+        mesa = commands[binding.IMAGE][1].parents[3]
+        for name, (_, source, _) in commands.items():
+            self.assertEqual(mesa / name, source)
 
-        inputs = {name: (mesa / name).read_bytes() for name in INPUTS}
-        with self.assertRaises(ValueError):
-            stage({**inputs, BO: inputs[BO] + b"\n"})
-        sources = stage(inputs)
+        inputs = {name: (mesa / name).read_bytes() for name in clear.INPUTS}
+        for name in inputs:
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, name):
+                clear.stage({**inputs, name: inputs[name] + b"\n"})
+        sources = clear.stage(inputs)
+        BO, IMAGE = binding.BO, binding.IMAGE
         self.assertLess(sources[BO].index("goto error_va_map;", sources[BO].index("radv_amdgpu_winsys_bo_from_ptr(")),
                         sources[BO].index("bo->dcn_host_map = host_map;"))
         self.assertLess(sources[IMAGE].index("      radv_bind_image_memory(device, image, bind_idx,"),
@@ -59,7 +69,8 @@ class RenderBinding(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            sources[HEADER] = (ROOT / "tools" / Path(HEADER).name).read_text()
+            for name in (binding.HEADER, clear.HEADER):
+                sources[name] = (ROOT / "tools" / Path(name).name).read_text()
             overlay = []
             for name, source in sources.items():
                 destination = out / Path(name).name

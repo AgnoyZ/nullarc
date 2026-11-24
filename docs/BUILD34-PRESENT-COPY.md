@@ -367,13 +367,37 @@ The RADV record is not exported or accepted by PhxBringup. Its generation
 does not replace the kernel map/table generations, and a successful map
 return does not prove native TLB completion. Retain the image, memory and
 winsys during any future use and revalidate the matching live kernel map.
-The next consumer must associate the actual recorded RADV attachment and
-its accepted native submission with this binding, then account for later
-writes before the display can take a lease. Tests exercise the bounds and
-reuse rules with ASan/UBSan. Set `BUILD34_RADV_COMPILE_COMMANDS` to the
-reviewed Darwin Meson recipe to additionally syntax-check the two edited
-Mesa translation units with a temporary overlay. No Mesa source copy or
-binary is published; rollback is to discard the overlay.
+
+The separate [RADV load-clear stage](../tools/build34_dcn_radv_clear_stage.py)
+extends that binding overlay with three pinned MIT Mesa inputs. It records
+only the load clear that took the ordinary graphics draw path, after the
+draw has been recorded without a command-buffer error. Fast clear,
+explicit `vkCmdClearAttachments`, and render entry alone do not qualify.
+It checks the actual view after RADV's substitutions and re-reads the BO
+map generation from the installed binding. It requires a full-image
+single-sample linear BGRA color attachment at mip and layer zero, with
+Clear and Store, on a primary GFX stream. It does not qualify another view
+used for a resolve or a render-to-single-sampled transient. It conservatively
+rejects secondary execution, suspended/resumed rendering, multi-subpass
+render passes, resolves, gang streams, and conflicting eligible clears.
+
+The observation closes only at the corresponding rendering end with the
+same stream, view, BO and map generation. Only successful command-stream
+finalization and command-buffer end stamp a process-local recording serial;
+reset or re-recording erases the observation. The serial identifies a
+recording, not a submission, and the record does not retain any object or
+establish that a clear has reached the GPU. The next step is to carry this
+identity only into the actual native request containing its IB, rejecting
+unsupported chaining, splitting and partial submission before using any
+completion evidence. Later or overlapping writes still need separate
+exclusion before the display can take a lease.
+
+Tests exercise binding bounds, generation reuse and clear record lifecycle
+with ASan/UBSan. Set `BUILD34_RADV_COMPILE_COMMANDS` to the reviewed Darwin
+Meson recipe to check all seven input digests and syntax-check the four
+edited Mesa translation units with a temporary overlay. No Mesa source copy
+or binary is published; rollback is to discard the overlay. No runtime hook
+consumes this record, and R2a, including `l10r` conversion, is unchanged.
 
 Hardware acceptance requires proof of the actual device mapper,
 lease/reverse-lookup semantics and HUBP fetch domain. It also requires
