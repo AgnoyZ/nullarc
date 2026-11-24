@@ -29,11 +29,6 @@ struct ScanoutFlipBinding {
     ScanoutSurface surface;
 };
 
-struct DcnFlatRoot {
-    uint64_t entry;
-    bool needsInstall;
-};
-
 struct HubpFlipRoute {
     const void *owner;
     uint64_t generation;
@@ -41,8 +36,7 @@ struct HubpFlipRoute {
     HubpFlipReader reader;
     HubpFlipWriter writer;
     bool (*qualify)(void *, const HubpFlipRequest &, const IODMACommand *, const IODMACommand *);
-    bool (*flatRoot)(void *, const HubpFlipRequest &, ScanoutPinToken, DcnFlatRoot &);
-    bool (*readFlatPage)(void *, const HubpFlipRequest &, ScanoutPinToken, const DcnFlatContext &, size_t, uint64_t &);
+    AllocateDcnFlat allocateFlat;
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
     bool (*canInstallFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
 };
@@ -58,10 +52,11 @@ public:
                            ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
         if (pending() || !live() || !operation.provider || !operation.serial ||
             !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify ||
-            !route.flatRoot || !route.readFlatPage || !route.fetchesRetired ||
+            !route.allocateFlat || !route.canInstallFlatVm || !route.fetchesRetired ||
             !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, true) ||
             !validBinding(next, intent.next, operation.provider, false) ||
+            (next.pin && intent.previous.vmid == intent.next.vmid) ||
             (old.pin && next.pin && (!sameFlipGeometry(old.surface, next.surface) ||
                 (old.window <= next.window ? next.window - old.window < old.surface.mappedBytes :
                                             old.window - next.window < next.surface.mappedBytes))) ||
@@ -78,32 +73,29 @@ public:
         auto translationCurrent = [&] {
             return withinBudget() && route.reader.current(route.reader.context, request) && withinBudget();
         };
-        DcnFlatContext oldVm{}, nextVm{};
-        bool oldInstall = false, install = false;
+        auto *oldTable = old.dma ? &old.dma->table_ : nullptr;
+        auto *nextTable = next.dma ? &next.dma->table_ : nullptr;
+        const auto nextCurrent = [&] { return !nextTable || tableCurrent(next.dma, nextTable->vm_, translationCurrent); };
+        const auto oldCurrent = [&] { return tableCurrent(old.dma, frontVm_, translationCurrent); };
         auto inactive = [&] {
-            return install && intent.next.vmid != intent.previous.vmid && route.canInstallFlatVm && translationCurrent() &&
-                route.canInstallFlatVm(route.reader.context, request, nextVm) && translationCurrent();
+            return nextTable && nextCurrent() &&
+                route.canInstallFlatVm(route.reader.context, request, nextTable->vm_) && translationCurrent();
         };
+        auto oldInstalled = [&] { return oldCurrent() && contextCurrent(frontVm_, route.reader, translationCurrent); };
         auto contextsCurrent = [&] {
-            return contextCurrent(oldVm, route.reader, translationCurrent) &&
-                contextCurrent(nextVm, route.reader, translationCurrent);
+            return oldInstalled() && nextCurrent() &&
+                (!nextTable || contextCurrent(nextTable->vm_, route.reader, translationCurrent));
         };
-        auto contextsPrepared = [&] {
-            return contextCurrent(oldVm, route.reader, translationCurrent) &&
-                (install ? DcnFlatProgram::empty(nextVm.vmid, route.reader, inactive) :
-                           contextCurrent(nextVm, route.reader, translationCurrent));
-        };
+        const auto nextEmpty = [&] { return !nextTable || DcnFlatProgram::empty(intent.next.vmid, route.reader, inactive); };
         if (!route.qualify(route.reader.context, request, old.dma ? old.dma->command_ : nullptr,
                            next.dma ? next.dma->command_ : nullptr) ||
             !live() || !readback_.begin(request, route.reader) ||
-            !describeContext(old, intent.previous.vmid, route, request, oldVm, oldInstall, translationCurrent) ||
-            oldInstall || !(oldVm == frontVm_) ||
-            !describeContext(next, intent.next.vmid, route, request, nextVm, install, translationCurrent) ||
-            !contextsPrepared() ||
-            !matchesTranslation(old, oldVm, route, request, translationCurrent) ||
-            !matchesTranslation(next, nextVm, route, request, translationCurrent) ||
+            (oldTable && !oldTable->matches(request, *route.lifetime, old.token, intent.previous.vmid)) || !oldInstalled() ||
             !HubpFlipProgram::preflight(request, route.reader, route.writer, surface, withinBudget) ||
-            !contextsPrepared() || !live() ||
+            (nextTable && !nextTable->prepare(route.allocateFlat, route.reader.context, *route.lifetime, request,
+                *next.dma->command_, next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
+            !nextEmpty() || !matchesTranslation(old.dma, translationCurrent) || !matchesTranslation(next.dma, translationCurrent) ||
+            !oldInstalled() || !nextEmpty() || !live() ||
             (next.pin && !next.pin->beginDisplayUse())) {
             if (!routeLifetime_) route.lifetime->release();
             readback_.recycle();
@@ -115,9 +107,10 @@ public:
         request_ = request;
         route_ = route;
         old_ = old;
-        nextVm_ = nextVm;
+        nextDma_ = next.dma;
+        nextVm_ = nextTable ? nextTable->vm_ : DcnFlatContext{};
         surface_ = surface;
-        if ((install && !DcnFlatProgram::install(nextVm, route_.reader, route_.writer, inactive)) ||
+        if ((nextTable && !DcnFlatProgram::install(nextVm_, route_.reader, route_.writer, inactive)) ||
             !HubpFlipProgram::issue(request_, route_.reader, route_.writer, surface_, withinBudget, contextsCurrent) ||
             !route_.reader.current(route_.reader.context, request_) || !live())
             return fail();
@@ -132,8 +125,13 @@ public:
         auto translationCurrent = [&] {
             return withinBudget() && route_.reader.current(route_.reader.context, request_) && withinBudget();
         };
-        auto nextCurrent = [&] { return contextCurrent(nextVm_, route_.reader, translationCurrent); };
-        auto oldCurrent = [&] { return retirementStarted_ || contextCurrent(frontVm_, route_.reader, translationCurrent); };
+        auto nextCurrent = [&] {
+            return tableCurrent(nextDma_, nextVm_, translationCurrent) && contextCurrent(nextVm_, route_.reader, translationCurrent);
+        };
+        auto oldCurrent = [&] {
+            return retirementStarted_ || (tableCurrent(old_.dma, frontVm_, translationCurrent) &&
+                contextCurrent(frontVm_, route_.reader, translationCurrent));
+        };
         if (!live() || !nextCurrent() || !oldCurrent()) return fail();
         const auto progress = readback_.poll();
         if (progress == HubpFlipProgress::Uncertain || !live()) return fail();
@@ -146,7 +144,8 @@ public:
         const bool retired = route_.fetchesRetired(route_.reader.context, request_);
         if (!nextCurrent() || !currentGeometry()) return fail();
         if (!retired) return ScanoutFlipResult::Waiting;
-        if (old_.pin && (!old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse())) return fail();
+        if (old_.pin && (!old_.dma->table_.withdraw(*old_.dma->command_) || !nextCurrent() || !currentGeometry() ||
+                         !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse())) return fail();
         front_ = request_.nextPin;
         frontAddress_ = request_.next;
         frontVm_ = nextVm_;
@@ -156,6 +155,7 @@ public:
         old_ = {};
         request_ = {};
         route_ = {};
+        nextDma_ = nullptr;
         nextVm_ = {};
         surface_ = {};
         retirementStarted_ = false;
@@ -184,16 +184,9 @@ private:
     }
 
     template<typename Current>
-    static bool describeContext(const ScanoutFlipBinding &binding, uint32_t vmid, const HubpFlipRoute &route,
-                                const HubpFlipRequest &request, DcnFlatContext &context, bool &install,
-                                const Current &current) {
-        if (!binding.dma) return true;
-        const auto &layout = binding.dma->layout_;
-        DcnFlatRoot root{};
-        if (!current() || !route.flatRoot(route.reader.context, request, binding.token, root) || !current()) return false;
-        context = {root.entry, layout.firstLogicalPage, layout.lastLogicalPage, vmid};
-        install = root.needsInstall;
-        return context.valid();
+    static bool tableCurrent(const ScanoutDmaLease *dma, const DcnFlatContext &context, const Current &current) {
+        return !dma ? !context.vmid : current() && dma->table_.vm_ == context &&
+            dma->table_.current(*dma->command_) && current();
     }
 
     template<typename Current>
@@ -202,16 +195,8 @@ private:
     }
 
     template<typename Current>
-    static bool matchesTranslation(const ScanoutFlipBinding &binding, const DcnFlatContext &context,
-                                   const HubpFlipRoute &route, const HubpFlipRequest &request, const Current &current) {
-        if (!binding.dma) return true;
-        const auto &dma = *binding.dma;
-        for (size_t index = 0; index < dma.layout_.entryCount; ++index) {
-            uint64_t observed = 0;
-            if (!current() || !route.readFlatPage(route.reader.context, request, binding.token, context, index, observed) ||
-                observed != dma.pages_[index]) return false;
-        }
-        return current();
+    static bool matchesTranslation(const ScanoutDmaLease *dma, const Current &current) {
+        return !dma || dma->table_.matchesPages(*dma->command_, dma->layout_, dma->pages_, current);
     }
 
     ScanoutFlipResult fail() {
@@ -229,6 +214,7 @@ private:
     HubpFlipRequest request_{};
     HubpFlipRoute route_{};
     ScanoutFlipBinding old_{};
+    ScanoutDmaLease *nextDma_{nullptr};
     ScanoutSurface surface_{};
     bool retirementStarted_{false};
     bool uncertain_{false};

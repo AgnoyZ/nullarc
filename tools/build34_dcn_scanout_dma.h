@@ -6,6 +6,7 @@
 
 #include "build34_dcn_present_backing.h"
 #include "build34_dcn_scanout_pin.h"
+#include "build34_dcn_flat_table.h"
 
 #define BUILD34_DCN_PIN_MAP "phx34DcnPinMapV1"
 
@@ -140,7 +141,7 @@ private:
     bool releaseUnmapped() {
         if (uncertain_) return false;
         if (!command_) return true;
-        if (command_->complete(false, false) != kIOReturnSuccess ||
+        if (!table_.withdraw(*command_) || command_->complete(false, false) != kIOReturnSuccess ||
             !qualified_.confirmUnusedUnmap(*qualified_.mapper, *command_) ||
             command_->clearMemoryDescriptor(false) != kIOReturnSuccess) {
             uncertain_ = true;
@@ -151,6 +152,7 @@ private:
     }
 
     void releaseObjects() {
+        table_.release();
         command_->release();
         qualified_.mapper->release();
         if (pages_) IOFree(pages_, layout_.tableBytes);
@@ -185,6 +187,7 @@ private:
     ScanoutDmaMapper qualified_{};
     uint64_t *pages_{nullptr};
     FlatPageLayout layout_{};
+    DcnFlatTable table_;
     bool uncertain_{false};
 };
 
