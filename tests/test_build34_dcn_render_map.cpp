@@ -1,5 +1,5 @@
 #include "PhxNativeABI.h"
-#include "build34_dcn_render_binding.h"
+#include "build34_dcn_present_backing.h"
 #include <cassert>
 #include <cstdio>
 #include <functional>
@@ -29,13 +29,19 @@ static void IOLockUnlock(IOLock *lock) { assert(lock->held); lock->held = false;
 struct Descriptor final : IOMemoryDescriptor {
     unsigned completes = 0, releases = 0, prepares = 0, references = 1, wires = 0;
     uint64_t bytes = 4 * page, preparation = 17;
+    uint64_t physicalBase = 0x80000, changedPage = UINT64_MAX;
+    IOByteCount segmentLength = page;
+    unsigned reads = 0;
     std::function<void()> beforeComplete, beforePrepare;
+    std::function<void()> afterRead;
     IOByteCount getLength() const override { return bytes; }
     uint64_t getPreparationID() override { return wires ? preparation : 0; }
     uint64_t getPhysicalSegment(IOByteCount offset, IOByteCount *length, unsigned options) override {
         assert(wires && offset < bytes && options == kIOMemoryMapperNone);
-        *length = page;
-        return 0x80000 + offset * 2;
+        *length = segmentLength;
+        ++reads;
+        if (afterRead) afterRead();
+        return physicalBase + offset * 2 + (offset == changedPage ? page : 0);
     }
     IOReturn prepare() override { if (beforePrepare) beforePrepare(); ++prepares; ++wires; return kIOReturnSuccess; }
     IOReturn complete() override {
@@ -380,10 +386,127 @@ static void testLiveRenderBacking() {
     assert(lease.releaseAfterRetirement() && !host.wires && !host.references);
 }
 
+struct PresentSurface {
+    IOMemoryDescriptor *descriptor;
+    uint32_t format = build34::dcn::kSurfaceBgra;
+    uint32_t pitch = 4092;
+    IOMemoryDescriptor *getMemoryDescriptor() const { return descriptor; }
+    uint32_t getWidth() const { return 1023; }
+    uint32_t getHeight() const { return 2; }
+    uint32_t getBytesPerRow() const { return pitch; }
+    uint32_t getPixelFormat() const { return format; }
+};
+
+struct PresentTransaction {
+    PresentSurface *surface;
+    PresentSurface *getPlaneIOSurface(unsigned plane, unsigned layer) const {
+        assert(!plane && !layer);
+        return surface;
+    }
+};
+
+static void runPresentProbe(PresentTransaction *txn, PresentSurface *s, IOMemoryDescriptor *copyDescriptor,
+                            bool fromRes, bool l10r,
+                            const std::function<void(const build34::dcn::PresentCopyBacking &)> &nvAccelObserveDcnCopyBacking) {
+    const uint32_t w = 1023, h = 2, pitch = 4092;
+    const struct { uint32_t width, height; } q{w, h};
+    // PHX34_PRESENT_BACKING_PROBE
+}
+
+static void testPresentedRenderBacking() {
+    using namespace build34::dcn;
+    IOAccelPhxNativeClient client;
+    Descriptor host, presentPages, otherPages;
+    presentPages.physicalBase += page * 4;
+    presentPages.wires = 1;
+    const auto handle = client.importHost(host, 4 * page);
+    assert(client.changeMap(mapOp, start, handle, page, 3 * page) == kIOReturnSuccess);
+    const uint64_t address = start + page;
+    auto ack = client.confirm(address, 2 * page);
+    PresentSurface surface{&presentPages}, otherSurface{&otherPages};
+    PresentTransaction txn{&surface};
+    BoundRenderImage image{client.snapshot(address, 2 * page).translation, &surface,
+                           address, 2 * page, kSurfaceBgra, 1023, 2, 4092};
+    const auto acquire = [&](const BoundRenderImage &bound, uint32_t bo, const PresentCopyBacking &present,
+                             RenderDescriptorLease &lease) {
+        IOLockLock(client.lock);
+        const bool result = client.acquirePresentBackingClientLocked(bound, ack, bo, present, lease);
+        IOLockUnlock(client.lock);
+        return result;
+    };
+
+    const auto unexpected = [](const PresentCopyBacking &) { assert(false); };
+    runPresentProbe(&txn, &surface, &presentPages, true, false, unexpected);
+    runPresentProbe(&txn, &surface, &presentPages, false, true, unexpected);
+    runPresentProbe(&txn, &surface, &otherPages, false, false, unexpected);
+    runPresentProbe(&txn, &otherSurface, &otherPages, false, false, unexpected);
+    runPresentProbe(&txn, nullptr, nullptr, false, false, unexpected);
+    runPresentProbe(&txn, &surface, &presentPages, false, false, {});
+    surface.format = 0x6c313072;
+    runPresentProbe(&txn, &surface, &presentPages, false, false, unexpected);
+    surface.format = kSurfaceBgra;
+    ++surface.pitch;
+    runPresentProbe(&txn, &surface, &presentPages, false, false, unexpected);
+    --surface.pitch;
+    presentPages.bytes = 2 * 4092;
+    runPresentProbe(&txn, &surface, &presentPages, false, false, unexpected);
+    presentPages.bytes = 2 * page;
+    presentPages.preparation = kIOPreparationIDAlwaysPrepared;
+    runPresentProbe(&txn, &surface, &presentPages, false, false, unexpected);
+    presentPages.preparation = 700;
+    assert(!host.reads && !presentPages.reads && host.prepares == 1 && presentPages.prepares == 0);
+
+    for (unsigned scenario = 0; scenario < 10; ++scenario) {
+        unsigned observations = 0;
+        runPresentProbe(&txn, &surface, &presentPages, false, false, [&](const PresentCopyBacking &present) {
+            ++observations;
+            assert(present.transaction == &txn && present.surface == &surface && present.preparation == 700);
+            assert(present.slice.descriptor == &presentPages && present.slice.bytes == 2 * page && !present.slice.offset);
+            assert(present.scanout.pitchPixelsMinusOne == 1022 && present.scanout.dcnPixelFormat == kDcnArgb8888);
+            auto candidate = image;
+            auto observed = present;
+            uint32_t writerBo = handle;
+            bool walk = true;
+            switch (scenario) {
+            case 1: ++writerBo; walk = false; break;
+            case 2: candidate.surface = &otherSurface; walk = false; break;
+            case 3: ++observed.preparation; walk = false; break;
+            case 4: observed.slice.bytes -= page; walk = false; break;
+            case 5: presentPages.changedPage = page; break;
+            case 6: --presentPages.segmentLength; break;
+            case 7: presentPages.afterRead = [&] { ++presentPages.preparation; }; break;
+            case 8: host.afterRead = [&] { ++client.device.table; }; break;
+            case 9: ++candidate.translation.mapping.generation; walk = false; break;
+            }
+            const unsigned oldPrepares = host.prepares;
+            RenderDescriptorLease lease;
+            assert(acquire(candidate, writerBo, observed, lease) == (scenario == 0));
+            assert(host.prepares == oldPrepares + walk);
+            if (scenario == 0) {
+                assert(lease.bytes() == present.slice.bytes && host.wires == 2);
+                assert(lease.releaseAfterRetirement());
+            }
+            assert(!lease.backing().readPage && !lease.bytes() && !lease.uncertain());
+            assert(host.wires == 1 && host.references == 1 && presentPages.wires == 1 && presentPages.references == 1);
+            assert(presentPages.prepares == 0 && presentPages.completes == 0);
+            assert(host.reads == (!walk ? 0 : scenario == 6 ? 1 : 2) && presentPages.reads == host.reads);
+        });
+        assert(observations == 1);
+        host.reads = presentPages.reads = 0;
+        host.afterRead = presentPages.afterRead = {};
+        presentPages.preparation = 700;
+        presentPages.changedPage = UINT64_MAX;
+        presentPages.segmentLength = page;
+        ack = client.confirm(address, 2 * page);
+        image.translation = client.snapshot(address, 2 * page).translation;
+    }
+}
+
 int main() {
     testPublicationAndReuse();
     testCloseAndExhaustion();
     testRangeBoundaries();
     testLiveRenderBacking();
+    testPresentedRenderBacking();
     std::puts("[PASS] staged build34 host-map generations (CPU only)");
 }

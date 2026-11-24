@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from build34_dcn_render_map_stage import ABI, DRIVER, stage
+from build34_dcn_present_backing_stage import ACCEL, stage as present_stage
 from test_build34_exact_ownership import method
 
 
@@ -27,13 +28,18 @@ def render_fixture(source):
                       "build34::dcn::LiveHostRenderMap IOAccelPhxNativeClient::liveHostRenderMapLocked(",
                       "build34::dcn::RenderTlbAck IOAccelPhxNativeClient::confirmRenderTlbLocked(",
                       "bool IOAccelPhxNativeClient::acquireRenderBackingClientLocked(",
+                      "bool IOAccelPhxNativeClient::acquirePresentBackingClientLocked(",
                       "IOReturn IOAccelPhxNativeClient::doBoFree(", "void IOAccelPhxNativeClient::boRelease(",
                       "void IOAccelPhxNativeClient::freeAll(", "IOReturn IOAccelPhxNativeClient::clientClose(")
+    copy = method(present_stage((ROOT / ACCEL).read_bytes()), "IOReturn NVDisplayPipe::performTransaction(")
+    start = copy.index("    if (nvAccelObserveDcnCopyBacking &&")
+    end = copy.index("    nvAccelIopHome(fb, head);", start)
     slots = {
         "// PHX34_RENDER_MAP_CONSTANTS": constants,
         "    // PHX34_RENDER_MAP_TYPES": client[client.index("    struct Bo {"):client.index("    IOReturn doHello(")],
         "    // PHX34_RENDER_MAP_FIELDS": client[client.index("    uint32_t vmid{"):client.index("    task_t task{")],
         "// PHX34_RENDER_MAP_METHODS": "\n".join(method(source, signature) for signature in staged_methods),
+        "    // PHX34_PRESENT_BACKING_PROBE": copy[start:end],
     }
     fixture = Path(__file__).with_suffix(".cpp").read_text()
     for marker, code in slots.items():
@@ -79,6 +85,18 @@ class RenderMapTests(unittest.TestCase):
     def test_staged_methods(self):
         source = stage((ROOT / DRIVER).read_bytes(), (ROOT / ABI).read_bytes())
         self.check_fixture(render_fixture(source), "host-map generations")
+
+    def test_present_backing_stage_keeps_copy_and_flip(self):
+        original = (ROOT / ACCEL).read_bytes()
+        with self.assertRaisesRegex(ValueError, "backing source drift"):
+            present_stage(original + b"\n")
+        before = method(original.decode(), "IOReturn NVDisplayPipe::performTransaction(")
+        after = method(present_stage(original), "IOReturn NVDisplayPipe::performTransaction(")
+        start = after.index("    if (nvAccelObserveDcnCopyBacking &&")
+        self.assertLess(after.index("iopMapSurface(s->getSurfaceID(), md, H * P)"), start)
+        self.assertLess(after.index("if (w != q.width || h != q.height)"), start)
+        home = "    nvAccelIopHome(fb, head);"
+        self.assertEqual(before[before.index(home):], after[after.index(home):])
 
     def test_staged_gpuvm_identities(self):
         source = stage((ROOT / DRIVER).read_bytes(), (ROOT / ABI).read_bytes())

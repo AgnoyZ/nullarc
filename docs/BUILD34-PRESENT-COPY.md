@@ -451,10 +451,38 @@ Busy, stale or unobserved submits do not produce a completed writer record.
 
 This stage does not activate the render-only alias constructor, export the
 part record to PhxAccel, or treat a userspace address as page identity. It
-does not change ready marks, fence behavior, or the R2a copy. Next bind the
-observed writer to the retained IOSurface descriptor in `performTransaction`
-using the live kernel mapping and the exact page-rounded render range, then
-establish writer exclusion and display retirement before bypassing any copy.
+does not change ready marks, fence behavior, or the R2a copy.
+
+The isolated [present backing stage](../tools/build34_dcn_present_backing_stage.py)
+observes the descriptor used by `performTransaction` after the existing
+copy path has prepared it and matched the source to panel geometry. It
+rechecks the transaction's plane-zero object, descriptor and geometry. It
+uses the copy's zero-offset BGRA range, including the last rounded page,
+not the IOSurface ID or allocation size. Resource-only and `l10r` paths are
+excluded. An unsupported, unprepared or changed preparation ID does not
+qualify. The descriptor and transaction are borrowed for one synchronous
+call under the existing copy serialization; no new present pin or callback
+registration is added, and the observer is null by default.
+
+The staged native client now checks that the writer's BO handle names the
+actual mapping entry and acquires the existing confirmed render lease. It
+compares the two original backings at every page offset of the exact range,
+including a nonzero render BO offset when applicable. The walk holds the
+client lock but not the GPUVM lock. It rechecks the present preparation and
+then resolves the native translation again under the GPUVM lock. Any
+mismatch rejects the unused render lease through the existing cleanup path.
+The comparison requires descriptors known to return original pages in the
+same physical domain. It does not prove that domain for the actual
+IOSurface descriptor or carry the present pin beyond the call. No page
+addresses are exposed, and matching pages do not authorize DMA or scanout.
+
+CPU tests exercise the extracted present probe and native method together,
+including a short rounded tail, wrong surface or BO, a substituted last
+page, a short physical segment and a translation change during the walk.
+The original copy and flip paths are unchanged. Native frame association
+still needs to connect the completed writer with this synchronous probe,
+establish writer exclusion, and retain backing through hardware retirement
+before any copy may be bypassed.
 
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and

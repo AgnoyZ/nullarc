@@ -43,7 +43,10 @@ def stage(driver, abi):
             "    build34::dcn::RenderTlbAck confirmRenderTlbLocked(uint64_t va, uint64_t bytes) const;\n"
             "    bool acquireRenderBackingClientLocked(const build34::dcn::BoundRenderImage &image,\n"
             "        const build34::dcn::RenderTlbAck &ack, const void *presentSurface,\n"
-            "        const build34::dcn::ScanoutSurface &scanout, build34::dcn::RenderDescriptorLease &lease) const;\n")
+            "        const build34::dcn::ScanoutSurface &scanout, build34::dcn::RenderDescriptorLease &lease) const;\n"
+            "    bool acquirePresentBackingClientLocked(const build34::dcn::BoundRenderImage &image,\n"
+            "        const build34::dcn::RenderTlbAck &ack, uint32_t writerBo,\n"
+            "        const build34::dcn::PresentCopyBacking &present, build34::dcn::RenderDescriptorLease &lease) const;\n")
     replace("void IOAccelPhxNativeClient::freeAll() {\n",
             "void IOAccelPhxNativeClient::freeAll() {\n"
             "    renderMapsClosed = true;\n"
@@ -90,7 +93,7 @@ def stage(driver, abi):
 
 """ + anchor)
     replace('#include "PhxNativeABI.h"\n',
-            '#include "PhxNativeABI.h"\n#include "build34_dcn_render_binding.h"\n'
+            '#include "PhxNativeABI.h"\n#include "build34_dcn_present_backing.h"\n'
             '#include "build34_exact_callbacks.h"\n')
     replace("    uint32_t vmidAlloc();\n", "    uint32_t vmidAlloc(const void *client);\n")
     replace("owner->vmidAlloc()", "owner->vmidAlloc(this)")
@@ -149,6 +152,29 @@ bool IOAccelPhxNativeClient::acquireRenderBackingClientLocked(const build34::dcn
     IOLockUnlock(owner->gpuLock);
     if (ack.matches(current))
         return true;
+    lease.releaseAfterRetirement();
+    return false;
+}
+
+bool IOAccelPhxNativeClient::acquirePresentBackingClientLocked(const build34::dcn::BoundRenderImage &image,
+    const build34::dcn::RenderTlbAck &ack, uint32_t writerBo, const build34::dcn::PresentCopyBacking &present,
+    build34::dcn::RenderDescriptorLease &lease) const {
+    if (!present.transaction || !present.surface || present.slice.offset ||
+        !present.preparation || present.slice.bytes != present.scanout.mappedBytes ||
+        build34::dcn::livePresentPreparation(present.slice) != present.preparation)
+        return false;
+    const Map *entry = softwareMappedHostRangeLocked(image.gpuAddress, present.scanout.mappedBytes);
+    if (!entry || !writerBo || entry->handle != writerBo ||
+        !acquireRenderBackingClientLocked(image, ack, present.surface, present.scanout, lease))
+        return false;
+
+    if (build34::dcn::comparePreparedCopyBacking(present, lease)) {
+        IOLockLock(owner->gpuLock);
+        const auto current = liveHostRenderMapLocked(image.gpuAddress, present.scanout.mappedBytes);
+        IOLockUnlock(owner->gpuLock);
+        if (ack.matches(current.translation))
+            return true;
+    }
     lease.releaseAfterRetirement();
     return false;
 }

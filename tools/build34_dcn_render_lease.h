@@ -44,6 +44,8 @@ public:
         return state_ == State::Held ? OriginalBacking{this, readPage} : OriginalBacking{};
     }
 
+    uint64_t bytes() const { return state_ == State::Held ? slice_.bytes : 0; }
+
     bool releaseAfterRetirement() {
         if (state_ != State::Held)
             return false;
