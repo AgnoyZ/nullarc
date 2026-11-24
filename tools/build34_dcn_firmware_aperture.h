@@ -48,9 +48,8 @@ public:
         if (start < window || (last >> kUnitShift) > dcnTop_ || start - window != barOffset ||
             rangeIntersects(start >> kUnitShift, last >> kUnitShift, agpBottom_, agpTop_)) return false;
 
-        if (context_[0] | context_[1] | context_[2] | context_[3] | context_[4] | context_[5] | context_[6]) {
-            const uint64_t firstPage = (uint64_t{context_[3]} << 32) | context_[4];
-            const uint64_t lastPage = (uint64_t{context_[5]} << 32) | context_[6];
+        if (hasContext()) {
+            const uint64_t firstPage = contextPage(3), lastPage = contextPage(5);
             const uint64_t root = (uint64_t{context_[1]} << 32) | context_[2];
             if ((context_[0] & ~dcnVm::kDepthAndBlock) || !(root & 1) || root == UINT64_MAX || !(root & ~(kPageBytes - 1)) ||
                 firstPage > lastPage || lastPage >= kAddressLimit / kPageBytes ||
@@ -62,7 +61,25 @@ public:
         return true;
     }
 
+    bool excludesFlatWindow(uint64_t start, uint64_t bytes) const {
+        using namespace firmwareAperture;
+        if (!bytes) return !start;
+        if (!start || start >= kAddressLimit || start % kPageBytes || bytes % kPageBytes ||
+            bytes > kMaxBackingBytes || bytes > kAddressLimit - start) return false;
+        const uint64_t last = start + bytes - 1;
+        const uint64_t firstUnit = start >> kUnitShift, lastUnit = last >> kUnitShift;
+        return !rangeIntersects(firstUnit, lastUnit, dcnBase_, dcnTop_) &&
+            !rangeIntersects(firstUnit, lastUnit, agpBottom_, agpTop_) &&
+            (!hasContext() || !rangeIntersects(start / kPageBytes, last / kPageBytes, contextPage(3), contextPage(5)));
+    }
+
 private:
+    bool hasContext() const {
+        return context_[0] | context_[1] | context_[2] | context_[3] | context_[4] | context_[5] | context_[6];
+    }
+
+    uint64_t contextPage(size_t high) const { return (uint64_t{context_[high]} << 32) | context_[high + 1]; }
+
     static bool rangeIntersects(uint64_t first, uint64_t last, uint64_t otherFirst, uint64_t otherLast) {
         return otherFirst <= otherLast && first <= otherLast && otherFirst <= last;
     }

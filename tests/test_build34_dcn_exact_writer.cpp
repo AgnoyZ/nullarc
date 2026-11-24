@@ -1138,13 +1138,14 @@ struct CommitFixture {
         CommitFixture *fixture = nullptr;
         unsigned samples = 0, checks = 0, releases = 0;
         IOReturn callPlatformFunction(const OSSymbol *name, bool wait, void *pci, void *record, void *third, void *fourth) override {
-            assert(!wait && pci == provider && record && !third && !fourth && references == 2 && fixture);
+            assert(!wait && pci == provider && record && !fourth && references == 2 && fixture);
             auto &self = *fixture;
             assert(!self.lockRequested && !self.scanout.device.guard.held);
             const auto fault = self.translationFault;
             auto &value = *static_cast<FirmwareScanoutSample *>(record);
             constexpr uint64_t backing = 0x18004000, offset = 0x4000;
             if (name->isEqualTo(BUILD34_DCN_SAMPLE_FIRMWARE)) {
+                assert(!third);
                 ++samples;
                 if (fault == FlipFault::NoHomeSample) return kIOReturnNotReady;
                 assert(self.active == self.home);
@@ -1157,6 +1158,15 @@ struct CommitFixture {
             assert(name->isEqualTo(BUILD34_DCN_CHECK_FIRMWARE));
             ++checks;
             assert(value.scanout == self.home && value.surface.height == 17 && value.barOffset == offset);
+            assert(bool(third) == self.directMode);
+            if (third) {
+                const auto &windows = *static_cast<const FirmwareFlatWindows *>(third);
+                const bool returning = self.target == self.home;
+                const auto &pinWindow = returning ? windows.previous : windows.next;
+                const auto &homeWindow = returning ? windows.next : windows.previous;
+                assert(pinWindow.start == self.mapped.address && pinWindow.bytes == 2 * kPage && !homeWindow.start && !homeWindow.bytes);
+                if (self.flatWindowConflict) return kIOReturnNotReady;
+            }
             return value.backing == backing && !(fault == FlipFault::HomeLostAtRetire && self.retireChecks == 3) &&
                 !(fault == FlipFault::HomeLostAfterInstall && self.vmWrites) ? kIOReturnSuccess : kIOReturnNotReady;
         }
@@ -1191,6 +1201,7 @@ struct CommitFixture {
     bool changeGeometryAtLock = false, changeGeometryAtRetire = false;
     bool publicationCurrent = true;
     bool directMode = false;
+    bool flatWindowConflict = false;
     FlipFault translationFault = FlipFault::None;
     uint64_t outputPages[2]{};
     HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock, this}, {write, delay},
@@ -1723,7 +1734,8 @@ static void revalidateScanoutPixels(PixelFault fault) {
     assert(fixture.command.completes == 1 && present.wires == 0 && present.references == 1 && host.wires == 1);
 }
 
-enum class DirectFlipFault { None, DeniedTable, ShortTable, DomainLost, ReplacedPci, WriteableLeaf, DomainLostAfterIssue };
+enum class DirectFlipFault { None, DeniedTable, ShortTable, DomainLost, ReplacedPci, WriteableLeaf, WindowConflict,
+                             DomainLostAfterIssue, WindowConflictAtRetirement };
 
 static void scanoutDirectFlip(DirectFlipFault fault) {
     CommitFixture fixture(true);
@@ -1739,6 +1751,7 @@ static void scanoutDirectFlip(DirectFlipFault fault) {
     }
     if (fault == DirectFlipFault::ShortTable) fixture.homeTable.shortPhysical = true;
     if (fault == DirectFlipFault::DomainLost) ++pci.directGeneration;
+    fixture.flatWindowConflict = fault == DirectFlipFault::WindowConflict;
     if (fault == DirectFlipFault::WriteableLeaf) {
         const auto verifyStored = fixture.homeTable.onStore;
         fixture.homeTable.onStore = [&, verifyStored] {
@@ -1753,7 +1766,8 @@ static void scanoutDirectFlip(DirectFlipFault fault) {
         scanout.device.pci = &replacement;
     }
     ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
-    if (fault != DirectFlipFault::None && fault != DirectFlipFault::DomainLostAfterIssue) {
+    if (fault != DirectFlipFault::None && fault != DirectFlipFault::DomainLostAfterIssue &&
+        fault != DirectFlipFault::WindowConflictAtRetirement) {
         assert(fixture.begin(intent) == kIOReturnNotReady && !intent.operation.serial && !fixture.writes && !fixture.vmWrites);
         assert(!fixture.command.created && !fixture.homeTable.dma.created && !pci.mapperLookups);
         assert(fixture.homeTable.stores == (fault == DirectFlipFault::WriteableLeaf));
@@ -1786,6 +1800,13 @@ static void scanoutDirectFlip(DirectFlipFault fault) {
     fixture.step(poll, ScanoutFlipResult::Waiting);
     assert(fixture.homeTable.references == 1 && pci.references == 2 && !fixture.clearWrites);
     fixture.retire = true;
+    if (fault == DirectFlipFault::WindowConflictAtRetirement) {
+        fixture.flatWindowConflict = true;
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(!fixture.clearWrites && !fixture.translationChecks && pci.references == 2 && fixture.homeTable.references == 1);
+        assert(scanout.frame.host.wires == 2 && scanout.frame.present.wires == 2);
+        return;
+    }
     fixture.step(poll, ScanoutFlipResult::Presented);
     assert(fixture.clearWrites == 7 && fixture.translationChecks && fixture.pixelReads == 6 && !fixture.homeTable.references);
     assert(!fixture.command.created && !fixture.homeTable.dma.created && !pci.mapperLookups && pci.references == 1);
@@ -2288,7 +2309,8 @@ int main() {
 #ifdef TEST_SCANOUT_FLIP
     for (const auto fault : {DirectFlipFault::None, DirectFlipFault::DeniedTable, DirectFlipFault::ShortTable,
          DirectFlipFault::DomainLost, DirectFlipFault::ReplacedPci, DirectFlipFault::WriteableLeaf,
-         DirectFlipFault::DomainLostAfterIssue}) scanoutDirectFlip(fault);
+         DirectFlipFault::WindowConflict, DirectFlipFault::DomainLostAfterIssue,
+         DirectFlipFault::WindowConflictAtRetirement}) scanoutDirectFlip(fault);
     for (const auto fault : {PixelFault::MapperRemap, PixelFault::MapperUnavailable, PixelFault::RenderPage,
          PixelFault::PresentPage, PixelFault::RenderGeneration, PixelFault::PresentGeneration, PixelFault::LateGeneration,
          PixelFault::WrongCommandSlice, PixelFault::SubstitutedDescriptor, PixelFault::LateEvidence, PixelFault::FrontRemap,

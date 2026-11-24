@@ -1008,6 +1008,18 @@ selector revalidates geometry, BAR0 offset and UMA backing within a single
 frame without sampling the active HUBP address. It works with a nonzero VMID
 active and does not claim firmware is still displayed.
 
+The V2 check selector also receives the provider's previous and next
+direct flat windows, when present. It checks their entire page-rounded
+extents, not just their starts, against the same two matching reads of
+the DCN local framebuffer aperture, AGP aperture and live VMID 0 range.
+An overlap or malformed window refuses before the first write. If the
+check fails after issue, the provider keeps the affected backings pinned
+and stops retirement. Mapper-backed flips do not request this extra check.
+The CPU tests cover inclusive aperture edges, both window slots, refusal
+before issue and conflict discovery before retirement. A disjoint window
+does not prove which address decoder DCN selects or that the host root
+is readable. Roll back this check by reverting the paired overlay change.
+
 The commit checks the saved backing before any MMIO write, after installing a
 new context and around old fetch and table retirement. Lock contention, a
 crossed frame or a mismatch fails closed. Once a write may have happened,

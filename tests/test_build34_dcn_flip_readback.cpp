@@ -215,7 +215,9 @@ static void testFirmwareSample(FirmwareFault fault) {
     if (fault == FirmwareFault::Pending) fixture.flip = hubp0::kPending;
     if (fault == FirmwareFault::Stereo) fixture.flip = hubp0::kStereoFlip;
     const bool gart = fault == FirmwareFault::DisjointGart || fault == FirmwareFault::GartOverlap || fault == FirmwareFault::GartInvalid;
-    const auto gartStart = !gart ? 0u : static_cast<uint32_t>(scanout / kPageBytes + (fault == FirmwareFault::GartOverlap ? 1 : 0x1000));
+    const auto gartStart = !gart ? 0u : static_cast<uint32_t>(scanout / kPageBytes + (fault == FirmwareFault::GartOverlap ? 1 : 0x2000));
+    uint32_t agpBottom = fault == FirmwareFault::AgpOverlap ? fbBase : 0xffffff;
+    uint32_t agpTop = fault == FirmwareFault::AgpOverlap ? fbBase : 0;
     unsigned reads = 0, pitchReads = 0, frameReads = 0, offsetReads = 0, addressReads = 0;
     uint32_t pitch = 63;
     bool updateLocked = false, crossCheckFrame = false;
@@ -227,8 +229,8 @@ static void testFirmwareSample(FirmwareFault fault) {
         case 0x03937:
             value = physicalBase + (++offsetReads == 2 && fault == FirmwareFault::ChangedAperture);
             return true;
-        case 0x03938: value = fault == FirmwareFault::AgpOverlap ? fbBase : 0xffffff; return true;
-        case 0x03939: value = fault == FirmwareFault::AgpOverlap ? fbBase : 0; return true;
+        case 0x03938: value = agpBottom; return true;
+        case 0x03939: value = agpTop; return true;
         case 0x1a8ec: value = fbBase + (fault == FirmwareFault::DifferentBase); return true;
         case 0x1a8ed: value = fbTop + (fault == FirmwareFault::DifferentTop); return true;
         case 0x1a8d7: value = physicalBase + (fault == FirmwareFault::DifferentOffset); return true;
@@ -280,6 +282,36 @@ static void testFirmwareSample(FirmwareFault fault) {
         assert(!sample.scanout.address && !sample.barOffset && !sample.backing && !sample.surface.mappedBytes && !sample.frame);
         if (fault == FirmwareFault::BarOffset || fault == FirmwareFault::ConsoleMap || fault == FirmwareFault::BadLength)
             assert(!reads);
+    }
+    if (accepted) {
+        const uint64_t fbStart = uint64_t{fbBase} << 24;
+        const auto checkWindows = [&](FirmwareFlatWindows windows) {
+            FirmwareScanoutSample checked{};
+            reads = 0;
+            const bool matched = sampleFirmwareScanout(bar + offset, bar, barBytes, visible, 64, 17, 256, mmio,
+                read, checked, &sample, &windows);
+            assert(reads <= 80 && checked.valid() == matched);
+            return matched;
+        };
+        const FirmwareFlatWindow adjacent{fbStart - kPageBytes, kPageBytes};
+        constexpr FirmwareFlatWindow highWindow{kAddressLimit - kPageBytes, kPageBytes};
+        assert(checkWindows({adjacent, highWindow}));
+        assert(!checkWindows({{adjacent.start, 2 * kPageBytes}, highWindow}));
+        assert(!checkWindows({adjacent, {uint64_t{fbTop + 1} << 24, 1}}));
+        assert(!checkWindows({adjacent, {highWindow.start, 2 * kPageBytes}}));
+        assert(!checkWindows({{adjacent.start, 0}, {}}));
+        assert(!checkWindows({{}, {0, kPageBytes}}));
+        assert(!checkWindows({{}, {adjacent.start + 1, kPageBytes}}));
+        agpBottom = agpTop = fbBase - 1;
+        assert(!checkWindows({{}, adjacent}));
+        agpBottom = 0xffffff;
+        agpTop = 0;
+        assert(checkWindows({{}, adjacent}));
+        if (gart) {
+            const uint64_t gartEnd = (uint64_t{gartStart} + 9) * kPageBytes;
+            assert(checkWindows({{}, {gartEnd, kPageBytes}}));
+            assert(!checkWindows({{gartEnd - kPageBytes, 2 * kPageBytes}, {}}));
+        }
     }
     if (fault != FirmwareFault::None) return;
     assert(sample.valid());

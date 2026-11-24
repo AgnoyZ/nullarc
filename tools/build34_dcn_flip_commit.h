@@ -76,6 +76,7 @@ public:
         const HubpFlipRequest request{route.owner, route.generation, operation.serial, intent.previous, intent.next,
                                       old.token, next.token};
         const auto surface = next.pin ? next.surface : old.surface;
+        const FirmwareFlatWindows windows{directWindow(old), directWindow(next)};
         readback_.recycle();
         if (!routeLifetime_) {
             route.lifetime->retain();
@@ -105,7 +106,7 @@ public:
             return home.valid() && sameFlipGeometry(home.surface, surface) &&
                 (old.pin || intent.previous == home.scanout) && (next.pin || intent.next == home.scanout);
         };
-        const auto homeCurrent = [&] { return checkFirmware(*route.framebuffer, pci, home, translationCurrent); };
+        const auto homeCurrent = [&] { return checkFirmware(*route.framebuffer, pci, home, windows, translationCurrent); };
         const auto peersIdle = [&] { return HubpFlipProgram::peersIdle(request, route.reader, withinBudget); };
         const auto nextEmpty = [&] { return !nextTable || DcnFlatProgram::empty(intent.next.vmid, route.reader, inactive); };
         if (!route.qualify(route.reader.context, request, mapping(old), mapping(next)) ||
@@ -129,6 +130,7 @@ public:
         framebuffer_ = route.framebuffer;
         pci_ = pci;
         firmwareHome_ = home;
+        windows_ = windows;
         operation_ = operation;
         request_ = request;
         route_ = route;
@@ -166,7 +168,7 @@ public:
         if (progress == HubpFlipProgress::Uncertain || !live()) return fail();
         if (progress != HubpFlipProgress::OldAddressAbsent) return ScanoutFlipResult::Waiting;
         const auto displayCurrent = [&] {
-            return nextCurrent() && checkFirmware(*framebuffer_, pci_, firmwareHome_, translationCurrent) &&
+            return nextCurrent() && checkFirmware(*framebuffer_, pci_, firmwareHome_, windows_, translationCurrent) &&
                 HubpFlipProgram::frontCurrent(request_, route_.reader, surface_, withinBudget);
         };
         if (!displayCurrent() || !oldCurrent()) return fail();
@@ -203,6 +205,7 @@ public:
         nextDma_ = nullptr;
         nextVm_ = {};
         surface_ = {};
+        windows_ = {};
         contextCleared_ = false;
         readback_.recycle();
         if (!front_.serial) {
@@ -220,10 +223,11 @@ public:
 
 private:
     template<typename Current>
-    static bool checkFirmware(IOService &framebuffer, void *pci, const FirmwareScanoutSample &home, const Current &current) {
+    static bool checkFirmware(IOService &framebuffer, void *pci, const FirmwareScanoutSample &home,
+                              FirmwareFlatWindows windows, const Current &current) {
         auto expected = home;
         return current() && framebuffer.callPlatformFunction(BUILD34_DCN_CHECK_FIRMWARE, false, pci, &expected,
-            nullptr, nullptr) == kIOReturnSuccess && current();
+            windows.empty() ? nullptr : &windows, nullptr) == kIOReturnSuccess && current();
     }
 
     static bool validBinding(ScanoutFlipBinding binding, HubpAddress address, const void *provider,
@@ -243,6 +247,10 @@ private:
 
     static DcnPixelMapping mapping(ScanoutFlipBinding binding) {
         return binding.dma ? binding.dma->mapping() : DcnPixelMapping{};
+    }
+
+    static FirmwareFlatWindow directWindow(ScanoutFlipBinding binding) {
+        return mapping(binding).direct ? FirmwareFlatWindow{binding.window, binding.surface.mappedBytes} : FirmwareFlatWindow{};
     }
 
     template<typename Current>
@@ -277,6 +285,7 @@ private:
     IOService *framebuffer_{nullptr};
     void *pci_{nullptr};
     FirmwareScanoutSample firmwareHome_{};
+    FirmwareFlatWindows windows_{};
     uint64_t routeGeneration_{0};
     HubpFlipRequest request_{};
     HubpFlipRoute route_{};

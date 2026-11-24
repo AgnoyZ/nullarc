@@ -26,7 +26,8 @@ FIELDS = '''    IOLock *fDcnFirmwareLock = nullptr;
     }
 
     IOReturn sampleDcnFirmware(const void *expectedPci, build34::dcn::FirmwareScanoutSample &out,
-                              const build34::dcn::FirmwareScanoutSample *expected = nullptr) {
+                              const build34::dcn::FirmwareScanoutSample *expected = nullptr,
+                              const build34::dcn::FirmwareFlatWindows *windows = nullptr) {
         out = {};
         if (!fDcnFirmwareLock) return kIOReturnNotReady;
         if (!IOLockTryLock(fDcnFirmwareLock)) return kIOReturnBusy;
@@ -46,7 +47,7 @@ FIELDS = '''    IOLock *fDcnFirmwareLock = nullptr;
             const auto barBytes = bar->getLength();
             if (!build34::dcn::sampleFirmwareScanout(fBase, barBase, barBytes,
                 fSurfMap->getLength(), fWidth, fHeight, fRowBytes, fMmio->getLength(),
-                [&](uint32_t reg, uint32_t &value) { value = mmio[reg]; return true; }, out, expected) || !accessible()) return false;
+                [&](uint32_t reg, uint32_t &value) { value = mmio[reg]; return true; }, out, expected, windows) || !accessible()) return false;
             auto *currentBar = fPCI->getDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
             return currentBar == bar && currentBar->getPhysicalAddress() == barBase && currentBar->getLength() == barBytes;
         }();
@@ -73,9 +74,10 @@ QUERY = '''        if (fn && fn->isEqualTo(BUILD34_DCN_SAMPLE_FIRMWARE)) {
             return sampleDcnFirmware(p1, *static_cast<build34::dcn::FirmwareScanoutSample *>(p2));
         }
         if (fn && fn->isEqualTo(BUILD34_DCN_CHECK_FIRMWARE)) {
-            if (wait || !p1 || !p2 || p3 || p4) return kIOReturnBadArgument;
+            if (wait || !p1 || !p2 || p4) return kIOReturnBadArgument;
             build34::dcn::FirmwareScanoutSample checked{};
-            return sampleDcnFirmware(p1, checked, static_cast<const build34::dcn::FirmwareScanoutSample *>(p2));
+            return sampleDcnFirmware(p1, checked, static_cast<const build34::dcn::FirmwareScanoutSample *>(p2),
+                static_cast<const build34::dcn::FirmwareFlatWindows *>(p3));
         }
 '''
 

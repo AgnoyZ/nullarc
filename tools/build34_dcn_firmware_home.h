@@ -4,7 +4,7 @@
 #include "build34_dcn_firmware_aperture.h"
 
 #define BUILD34_DCN_SAMPLE_FIRMWARE "phx34DcnSampleFirmwareV2"
-#define BUILD34_DCN_CHECK_FIRMWARE "phx34DcnCheckFirmwareV1"
+#define BUILD34_DCN_CHECK_FIRMWARE "phx34DcnCheckFirmwareV2"
 
 namespace build34::dcn {
 
@@ -22,11 +22,21 @@ struct FirmwareScanoutSample {
     }
 };
 
+struct FirmwareFlatWindow {
+    uint64_t start, bytes;
+};
+
+struct FirmwareFlatWindows {
+    FirmwareFlatWindow previous, next;
+
+    bool empty() const { return !previous.start && !previous.bytes && !next.start && !next.bytes; }
+};
+
 template<typename ReadDword>
 bool sampleFirmwareScanout(uint64_t consoleBase, uint64_t barBase, uint64_t barBytes, uint64_t mappedBytes,
                            uint32_t width, uint32_t height, uint32_t rowBytes, uint64_t mmioBytes,
                            const ReadDword &readDword, FirmwareScanoutSample &out,
-                           const FirmwareScanoutSample *expected = nullptr) {
+                           const FirmwareScanoutSample *expected = nullptr, const FirmwareFlatWindows *windows = nullptr) {
     using namespace hubp0;
     out = {};
     if (!barBase || barBase % kPageBytes || barBytes > UINT64_MAX - barBase || consoleBase < barBase ||
@@ -59,6 +69,8 @@ bool sampleFirmwareScanout(uint64_t consoleBase, uint64_t barBase, uint64_t barB
     if (!matchHubpFlipGeometry(surface, read) ||
         !after.sample(read) || !before.same(after) || !before.bind(address, offset, bytes, backing) || !unlocked() ||
         (expected && backing != expected->backing) ||
+        (windows && (!before.excludesFlatWindow(windows->previous.start, windows->previous.bytes) ||
+                     !before.excludesFlatWindow(windows->next.start, windows->next.bytes))) ||
         !read(kFrame, lastFrame) || (firstFrame & kFrameMask) != sampledFrame ||
         (lastFrame & kFrameMask) != sampledFrame) return false;
 
