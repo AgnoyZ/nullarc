@@ -890,15 +890,31 @@ The decode was checked against AMD's [DCN register definitions](https://github.c
 and [MC-to-physical conversion](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c#L1051-L1054);
 no implementation was copied.
 
-This is register evidence for a local firmware backing, not a read of DCN
-fetches or a proof of the live BAR decoder, cache visibility or absence of
-stale translations. A future route must retain and revalidate the backing,
-exclude other display writers, and handle power and uncertain-flip recovery.
-No route provider or production caller is enabled. CPU fixtures cover the
-matching offset, disjoint GART, conflicting or changing windows, a wrong BAR
-offset, final-page overlap, overflow and torn reads. PhxFB is syntax-checked
-against the pinned kernel SDK. Roll back by omitting the overlay; copy, VBL
-and accepted runtime inputs stay unchanged.
+The staged V2 flip begin requires an active `PhxAMDFB` service attached to the
+exact PCI provider. The first transition away from firmware captures the V2
+sample and requires its address and geometry to match the flip. While an
+IOSurface is front, the same route and PhxFB service must remain in use and a
+return to firmware must target the exact saved address. The read-only check
+selector revalidates geometry, BAR0 offset and UMA backing within a single
+frame without sampling the active HUBP address. It works with a nonzero VMID
+active and does not claim firmware is still displayed.
+
+The commit checks the saved backing before any MMIO write, after installing a
+new context and around old fetch and table retirement. Lock contention, a
+crossed frame or a mismatch fails closed. Once a write may have happened,
+loss of proof leaves the framebuffer service and reachable backing retained;
+only a verified return releases the framebuffer reference outside the client
+lock. CPU tests exercise the two-VMID round trip and refuse a missing, foreign,
+inactive or replaced framebuffer, a mismatched sample or return address, or
+loss of proof after installation or during retirement.
+
+These are register checks, not proof of DCN fetches, the live BAR decoder,
+cache visibility or absence of stale translations. A retained PhxFB service
+does not exclude other display writers or prevent power transitions. A real
+route still needs those guarantees and a recovery owner for uncertain flips.
+No route provider or production caller is enabled. PhxFB is syntax-checked
+against the pinned kernel SDK. Omit the overlays to roll back; copy, VBL and
+accepted runtime inputs stay unchanged.
 
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of

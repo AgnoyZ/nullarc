@@ -105,6 +105,18 @@ struct OSSymbol {
 };
 struct IOService : OSObject {
     std::function<IOReturn(task_t, uint32_t, OSObject **)> lookup;
+#ifdef TEST_SCANOUT_FLIP
+    const void *provider = nullptr;
+    bool inactive = false, isPhxFramebuffer = false;
+    std::function<void()> onRelease;
+    const void *getProvider() const { return provider; }
+    bool isInactive() const { return inactive; }
+    IOService *metaCast(const char *name) { return isPhxFramebuffer && !strcmp(name, "PhxAMDFB") ? this : nullptr; }
+    void release() {
+        if (onRelease) onRelease();
+        OSObject::release();
+    }
+#endif
     static IOService *accelerator;
     static const char *serviceMatching(const char *service) { return service; }
     static IOService *copyMatchingService(const char *service) {
@@ -885,7 +897,9 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        PublicationLost, WithdrawError, CloseDuringWithdraw, CancelWithdrawError, SharedTable,
                        SharedRoot, RetryTable, TableWrongPhysical, TablePrepareUncertain, TableBadSegments,
                        TableSubstituted, RetireRootStillInstalled, RetireRangeStillInstalled,
-                       RetireContextReappears, ReturnSameVmid };
+                       RetireContextReappears, ReturnSameVmid, MissingFramebuffer, WrongFramebufferPci,
+                       WrongFramebufferType, InactiveFramebuffer, NoHomeSample, WrongHomeAddress, WrongHomeGeometry,
+                       WrongHomeBacking, HomeLostAfterInstall, HomeLostAtRetire, WrongReturnAddress, ReplacedFramebuffer };
 
 struct CommitFixture {
     struct Table : IOBufferMemoryDescriptor {
@@ -893,10 +907,38 @@ struct CommitFixture {
         uint64_t root = 0;
         unsigned withdrawals = 0;
     };
+    struct Framebuffer : IOService {
+        CommitFixture *fixture = nullptr;
+        unsigned samples = 0, checks = 0, releases = 0;
+        IOReturn callPlatformFunction(const OSSymbol *name, bool wait, void *pci, void *record, void *third, void *fourth) override {
+            assert(!wait && pci == provider && record && !third && !fourth && references == 2 && fixture);
+            auto &self = *fixture;
+            assert(!self.lockRequested && !self.scanout.device.guard.held);
+            const auto fault = self.translationFault;
+            auto &value = *static_cast<FirmwareScanoutSample *>(record);
+            constexpr uint64_t backing = 0x18004000, offset = 0x4000;
+            if (name->isEqualTo(BUILD34_DCN_SAMPLE_FIRMWARE)) {
+                ++samples;
+                if (fault == FlipFault::NoHomeSample) return kIOReturnNotReady;
+                assert(self.active == self.home);
+                value = {self.home, {64, 17, 63, 8, 2 * kPage}, offset, backing, self.frame};
+                if (fault == FlipFault::WrongHomeAddress) value.scanout.address += kPage;
+                if (fault == FlipFault::WrongHomeGeometry) --value.surface.height;
+                if (fault == FlipFault::WrongHomeBacking) value.backing += kPage;
+                return kIOReturnSuccess;
+            }
+            assert(name->isEqualTo(BUILD34_DCN_CHECK_FIRMWARE));
+            ++checks;
+            assert(value.scanout == self.home && value.surface.height == 17 && value.barOffset == offset);
+            return value.backing == backing && !(fault == FlipFault::HomeLostAtRetire && self.retireChecks == 3) &&
+                !(fault == FlipFault::HomeLostAfterInstall && self.vmWrites) ? kIOReturnSuccess : kIOReturnNotReady;
+        }
+    };
     ScanoutFixture scanout;
     IOMapper mapper;
     IODMACommand command, nextCommand;
     OSObject lifetime;
+    Framebuffer framebuffer;
     Table homeTable, alternateTable;
     const HubpAddress home{0x800000000, 0}, mapped{0xa00100100000, 7};
     const HubpAddress alternate{mapped.address + 2 * kPage, 8};
@@ -922,10 +964,17 @@ struct CommitFixture {
     FlipFault translationFault = FlipFault::None;
     uint64_t outputPages[2]{};
     HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay},
-                       qualified, {encodeLeaf, decodeLeaf, encodeRoot, tableCurrent}, retired, canInstallFlatVm};
+                       qualified, {encodeLeaf, decodeLeaf, encodeRoot, tableCurrent}, retired, canInstallFlatVm, &framebuffer};
     ScanoutPinToken pin{}, alternatePin{};
 
     CommitFixture() {
+        framebuffer.fixture = this;
+        framebuffer.provider = scanout.device.pci;
+        framebuffer.isPhxFramebuffer = true;
+        framebuffer.onRelease = [&] {
+            assert(!scanout.client.guard.held && !scanout.device.guard.held);
+            ++framebuffer.releases;
+        };
         alternateTable.physical += 2 * kPage;
         configureTable(homeTable, ownedRoot, 0x500091, 0x601091);
         configureTable(alternateTable, alternateRoot, 0x800091, 0x901091);
@@ -1327,6 +1376,20 @@ static void scanoutFlip(FlipFault fault) {
     fixture.rewindAfterHigh = fault == FlipFault::ClockRewind;
     fixture.failIssue = fault == FlipFault::Issue;
     fixture.translationFault = fault;
+    if (fault >= FlipFault::MissingFramebuffer && fault <= FlipFault::WrongHomeBacking) {
+        if (fault == FlipFault::MissingFramebuffer) fixture.route.framebuffer = nullptr;
+        if (fault == FlipFault::WrongFramebufferPci) fixture.framebuffer.provider = &fixture;
+        if (fault == FlipFault::WrongFramebufferType) fixture.framebuffer.isPhxFramebuffer = false;
+        if (fault == FlipFault::InactiveFramebuffer) fixture.framebuffer.inactive = true;
+        const bool admitted = fault >= FlipFault::NoHomeSample;
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+        assert(!fixture.writes && !fixture.vmWrites && !fixture.issues && !fixture.command.completes);
+        assert(bool(fixture.reads) == admitted && fixture.framebuffer.samples == admitted);
+        assert(fixture.framebuffer.checks == (fault == FlipFault::WrongHomeBacking ? 1u : 0u));
+        assert(fixture.framebuffer.references == 1 && fixture.framebuffer.releases == admitted &&
+               fixture.lifetime.references == 1);
+        return;
+    }
     if (fault == FlipFault::InstallOccupied) fixture.contextRoot = fixture.ownedRoot;
     if (fault == FlipFault::InstallMissingProof) fixture.route.canInstallFlatVm = nullptr;
     if (fault == FlipFault::InstallSameVmid) {
@@ -1411,6 +1474,16 @@ static void scanoutFlip(FlipFault fault) {
         return;
     }
     assert(fixture.begin(request) == kIOReturnSuccess && request.operation.serial != fixture.pin.serial);
+    assert(fixture.framebuffer.references == 2 && fixture.framebuffer.releases == (fault == FlipFault::RetryTable));
+    if (fault == FlipFault::HomeLostAfterInstall) {
+        assert(request.result == ScanoutFlipResult::Uncertain && !fixture.writes && fixture.vmWrites == 7);
+        ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.framebuffer.samples == 1 && fixture.framebuffer.checks == 3 && fixture.framebuffer.references == 2);
+        assert(fixture.homeTable.dma.prepared && fixture.command.prepared && !fixture.command.completes);
+        assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
+        return;
+    }
     assert(fixture.writes && fixture.lifetime.references == 3 && !fixture.command.completes && fixture.pageReads == 2);
     assert(fixture.vmWrites == 7 && fixture.homeTable.stores == 1 && fixture.homeTable.references == 2);
     if (fault == FlipFault::Install) assert(fixture.vmAckReads == 3 && fixture.delays == 2);
@@ -1453,6 +1526,7 @@ static void scanoutFlip(FlipFault fault) {
     }
     fixture.step(poll, ScanoutFlipResult::Presented);
     assert(!fixture.command.completes && fixture.retireChecks == 1);
+    assert(fixture.framebuffer.samples == (fault == FlipFault::RetryTable ? 2u : 1u) && fixture.framebuffer.references == 2);
     assert(fixture.poll(poll) == kIOReturnNotFound && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
 
     if (fault == FlipFault::DifferentPinnedPitch) {
@@ -1508,6 +1582,19 @@ static void scanoutFlip(FlipFault fault) {
     }
 
     request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
+    if (fault == FlipFault::WrongReturnAddress || fault == FlipFault::ReplacedFramebuffer) {
+        CommitFixture::Framebuffer replacement;
+        replacement.provider = scanout.device.pci;
+        replacement.isPhxFramebuffer = true;
+        if (fault == FlipFault::WrongReturnAddress) request.next.address += kPage;
+        else fixture.route.framebuffer = &replacement;
+        const auto checks = fixture.framebuffer.checks;
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+        assert(fixture.writes == 5 && fixture.vmWrites == 7 && !fixture.command.completes && fixture.command.prepared);
+        assert(fixture.framebuffer.samples == 1 && fixture.framebuffer.checks == checks && fixture.framebuffer.references == 2);
+        assert(replacement.references == 1 && !replacement.samples && !replacement.checks);
+        return;
+    }
     if (fault == FlipFault::ReturnSameVmid) {
         request.next.vmid = request.previous.vmid;
         const auto reads = fixture.reads;
@@ -1549,6 +1636,16 @@ static void scanoutFlip(FlipFault fault) {
     IOLockUnlock(scanout.client.lock);
     fixture.retire = true;
     fixture.failUnmap = fault == FlipFault::Unmap;
+    if (fault == FlipFault::HomeLostAtRetire) {
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.retireChecks == 3 && fixture.command.prepared && !fixture.command.completes &&
+               fixture.homeTable.dma.prepared && !fixture.homeTable.withdrawals && scanout.frame.host.wires == 2);
+        assert(fixture.framebuffer.samples == 1 && fixture.framebuffer.references == 2 && !fixture.framebuffer.releases);
+        const auto checks = fixture.framebuffer.checks;
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.framebuffer.checks == checks && !fixture.command.completes);
+        return;
+    }
     if (fault >= FlipFault::RetireRootStillInstalled && fault <= FlipFault::RetireContextReappears) {
         fixture.step(poll, ScanoutFlipResult::Uncertain);
         const bool withdrew = fault == FlipFault::RetireContextReappears;
@@ -1572,6 +1669,9 @@ static void scanoutFlip(FlipFault fault) {
     assert(DcnAllocationStub::live() == (fixture.failUnmap ? 1u : 0u));
     assert(scanout.frame.host.wires == (fixture.failUnmap ? 2u : 1u));
     assert(fixture.lifetime.references == (fixture.failUnmap ? 3u : 1u));
+    assert(fixture.framebuffer.samples == (fault == FlipFault::RetryTable ? 2u : 1u));
+    assert(fixture.framebuffer.references == (fixture.failUnmap ? 2u : 1u) &&
+           fixture.framebuffer.releases == (fault == FlipFault::RetryTable) + unsigned(!fixture.failUnmap));
     assert(fixture.homeTable.withdrawals == 1 && !fixture.homeTable.dma.prepared &&
            fixture.homeTable.references == (fixture.failUnmap ? 1u : 0u));
     assert(scanout.surface.references == (fixture.failUnmap ? 2u : 1u));
@@ -1697,6 +1797,18 @@ int main() {
     scanoutFlip(FlipFault::RetireRangeStillInstalled);
     scanoutFlip(FlipFault::RetireContextReappears);
     scanoutFlip(FlipFault::ReturnSameVmid);
+    scanoutFlip(FlipFault::MissingFramebuffer);
+    scanoutFlip(FlipFault::WrongFramebufferPci);
+    scanoutFlip(FlipFault::WrongFramebufferType);
+    scanoutFlip(FlipFault::InactiveFramebuffer);
+    scanoutFlip(FlipFault::NoHomeSample);
+    scanoutFlip(FlipFault::WrongHomeAddress);
+    scanoutFlip(FlipFault::WrongHomeGeometry);
+    scanoutFlip(FlipFault::WrongHomeBacking);
+    scanoutFlip(FlipFault::HomeLostAfterInstall);
+    scanoutFlip(FlipFault::HomeLostAtRetire);
+    scanoutFlip(FlipFault::WrongReturnAddress);
+    scanoutFlip(FlipFault::ReplacedFramebuffer);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

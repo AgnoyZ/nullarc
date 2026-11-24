@@ -1,9 +1,10 @@
 #pragma once
 
 #include "build34_dcn_flat_program.h"
+#include "build34_dcn_firmware_home.h"
 #include "build34_dcn_scanout_dma.h"
 
-#define BUILD34_DCN_FLIP_BEGIN "phx34DcnFlipBeginV1"
+#define BUILD34_DCN_FLIP_BEGIN "phx34DcnFlipBeginV2"
 #define BUILD34_DCN_FLIP_POLL "phx34DcnFlipPollV1"
 
 namespace build34::dcn {
@@ -39,6 +40,7 @@ struct HubpFlipRoute {
     DcnFlatFormat flatFormat;
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
     bool (*canInstallFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
+    IOService *framebuffer;
 };
 
 class ScanoutFlipCommit {
@@ -49,10 +51,10 @@ public:
 
     template<typename IsLive>
     ScanoutFlipResult begin(ScanoutFlipIntent intent, ScanoutPinToken operation, HubpFlipRoute route,
-                           ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
+                           void *pci, ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
         if (pending() || !live() || !operation.provider || !operation.serial ||
             !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify ||
-            !route.flatFormat.complete() || !route.canInstallFlatVm || !route.fetchesRetired ||
+            !route.flatFormat.complete() || !route.canInstallFlatVm || !route.fetchesRetired || !route.framebuffer || !pci ||
             !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, true) ||
             !validBinding(next, intent.next, operation.provider, false) ||
@@ -61,14 +63,18 @@ public:
                 (old.window <= next.window ? next.window - old.window < old.surface.mappedBytes :
                                             old.window - next.window < next.surface.mappedBytes))) ||
             (old.token.serial && (!(frontAddress_ == intent.previous) || route.owner != routeOwner_ ||
-                                  route.generation != routeGeneration_ || route.lifetime != routeLifetime_)))
+                                  route.generation != routeGeneration_ || route.lifetime != routeLifetime_ ||
+                                  route.framebuffer != framebuffer_ || pci != pci_)))
             return ScanoutFlipResult::Refused;
 
         const HubpFlipRequest request{route.owner, route.generation, operation.serial, intent.previous, intent.next,
                                       old.token, next.token};
         const auto surface = next.pin ? next.surface : old.surface;
         readback_.recycle();
-        if (!routeLifetime_) route.lifetime->retain();
+        if (!routeLifetime_) {
+            route.lifetime->retain();
+            route.framebuffer->retain();
+        }
         auto withinBudget = [&] { return live() && readback_.stillInBudget(); };
         auto translationCurrent = [&] {
             return withinBudget() && route.reader.current(route.reader.context, request) && withinBudget();
@@ -86,23 +92,37 @@ public:
             return oldInstalled() && nextCurrent() &&
                 (!nextTable || contextCurrent(nextTable->vm_, route.reader, translationCurrent));
         };
+        FirmwareScanoutSample home = firmwareHome_;
+        const auto captureHome = [&] {
+            if (!old.pin && (!translationCurrent() || route.framebuffer->callPlatformFunction(BUILD34_DCN_SAMPLE_FIRMWARE,
+                false, pci, &home, nullptr, nullptr) != kIOReturnSuccess || !translationCurrent())) return false;
+            return home.valid() && sameFlipGeometry(home.surface, surface) &&
+                (old.pin || intent.previous == home.scanout) && (next.pin || intent.next == home.scanout);
+        };
+        const auto homeCurrent = [&] { return checkFirmware(*route.framebuffer, pci, home, translationCurrent); };
         const auto nextEmpty = [&] { return !nextTable || DcnFlatProgram::empty(intent.next.vmid, route.reader, inactive); };
         if (!route.qualify(route.reader.context, request, old.dma ? old.dma->command_ : nullptr,
                            next.dma ? next.dma->command_ : nullptr) ||
-            !live() || !readback_.begin(request, route.reader) ||
+            !live() || !readback_.begin(request, route.reader) || !captureHome() || !homeCurrent() ||
             (oldTable && !oldTable->matches(request, *route.lifetime, old.token, intent.previous.vmid)) || !oldInstalled() ||
             !HubpFlipProgram::preflight(request, route.reader, route.writer, surface, withinBudget) ||
             (nextTable && !nextTable->prepare(route.flatFormat, route.reader.context, *route.lifetime, request,
                 next.dma->qualified_, *next.dma->command_, next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
             !nextEmpty() || !matchesTranslation(old.dma, translationCurrent) || !matchesTranslation(next.dma, translationCurrent) ||
-            !oldInstalled() || !nextEmpty() || !live() ||
+            !homeCurrent() || !oldInstalled() || !nextEmpty() || !live() ||
             (next.pin && !next.pin->beginDisplayUse())) {
-            if (!routeLifetime_) route.lifetime->release();
+            if (!routeLifetime_) {
+                route.framebuffer->release();
+                route.lifetime->release();
+            }
             readback_.recycle();
             return ScanoutFlipResult::Refused;
         }
 
         routeLifetime_ = route.lifetime;
+        framebuffer_ = route.framebuffer;
+        pci_ = pci;
+        firmwareHome_ = home;
         operation_ = operation;
         request_ = request;
         route_ = route;
@@ -110,7 +130,8 @@ public:
         nextDma_ = next.dma;
         nextVm_ = nextTable ? nextTable->vm_ : DcnFlatContext{};
         surface_ = surface;
-        if ((nextTable && !DcnFlatProgram::install(nextVm_, route_.reader, route_.writer, inactive)) ||
+        if ((nextTable && (!DcnFlatProgram::install(nextVm_, route_.reader, route_.writer, inactive) ||
+                           !homeCurrent())) ||
             !HubpFlipProgram::issue(request_, route_.reader, route_.writer, surface_, withinBudget, contextsCurrent) ||
             !route_.reader.current(route_.reader.context, request_) || !live())
             return fail();
@@ -118,7 +139,7 @@ public:
     }
 
     template<typename IsLive>
-    ScanoutFlipResult poll(ScanoutPinToken operation, IsLive live, OSObject *&releaseRoute) {
+    ScanoutFlipResult poll(ScanoutPinToken operation, IsLive live, OSObject *&releaseRoute, IOService *&releaseFramebuffer) {
         if (!matches(operation)) return ScanoutFlipResult::Refused;
         if (uncertain_) return ScanoutFlipResult::Uncertain;
         auto withinBudget = [&] { return live() && readback_.stillInBudget(); };
@@ -139,15 +160,16 @@ public:
         auto currentGeometry = [&] {
             return HubpFlipProgram::geometryCurrent(request_, route_.reader, surface_, withinBudget);
         };
-        if (!currentGeometry() || !oldCurrent() || !nextCurrent()) return fail();
+        const auto homeCurrent = [&] { return checkFirmware(*framebuffer_, pci_, firmwareHome_, translationCurrent); };
+        if (!currentGeometry() || !oldCurrent() || !nextCurrent() || !homeCurrent()) return fail();
         retirementStarted_ = true;
         const bool retired = route_.fetchesRetired(route_.reader.context, request_);
-        if (!nextCurrent() || !currentGeometry()) return fail();
+        if (!nextCurrent() || !currentGeometry() || !homeCurrent()) return fail();
         if (!retired) return ScanoutFlipResult::Waiting;
         if (old_.pin) {
             auto detached = [&] { return DcnFlatProgram::empty(frontVm_.vmid, route_.reader, translationCurrent); };
             if (!detached() || !old_.dma->table_.withdraw(old_.dma->qualified_) || !nextCurrent() || !currentGeometry() ||
-                !detached() || !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse()) return fail();
+                !homeCurrent() || !detached() || !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse()) return fail();
         }
         front_ = request_.nextPin;
         frontAddress_ = request_.next;
@@ -165,7 +187,11 @@ public:
         readback_.recycle();
         if (!front_.serial) {
             releaseRoute = routeLifetime_;
+            releaseFramebuffer = framebuffer_;
             routeLifetime_ = nullptr;
+            framebuffer_ = nullptr;
+            pci_ = nullptr;
+            firmwareHome_ = {};
             routeOwner_ = nullptr;
             routeGeneration_ = 0;
         }
@@ -173,6 +199,13 @@ public:
     }
 
 private:
+    template<typename Current>
+    static bool checkFirmware(IOService &framebuffer, void *pci, const FirmwareScanoutSample &home, const Current &current) {
+        auto expected = home;
+        return current() && framebuffer.callPlatformFunction(BUILD34_DCN_CHECK_FIRMWARE, false, pci, &expected,
+            nullptr, nullptr) == kIOReturnSuccess && current();
+    }
+
     static bool validBinding(ScanoutFlipBinding binding, HubpAddress address, const void *provider, bool displayed) {
         if (!binding.token.serial)
             return !binding.token.provider && !binding.pin && !binding.dma && !binding.surface.mappedBytes;
@@ -213,6 +246,9 @@ private:
     DcnFlatContext frontVm_{}, nextVm_{};
     const void *routeOwner_{nullptr};
     OSObject *routeLifetime_{nullptr};
+    IOService *framebuffer_{nullptr};
+    void *pci_{nullptr};
+    FirmwareScanoutSample firmwareHome_{};
     uint64_t routeGeneration_{0};
     HubpFlipRequest request_{};
     HubpFlipRoute route_{};

@@ -4,6 +4,7 @@
 #include "build34_dcn_firmware_aperture.h"
 
 #define BUILD34_DCN_SAMPLE_FIRMWARE "phx34DcnSampleFirmwareV2"
+#define BUILD34_DCN_CHECK_FIRMWARE "phx34DcnCheckFirmwareV1"
 
 namespace build34::dcn {
 
@@ -13,12 +14,19 @@ struct FirmwareScanoutSample {
     uint64_t barOffset;
     uint64_t backing;
     uint32_t frame;
+
+    bool valid() const {
+        return scanout.valid() && !scanout.vmid && validFlipGeometry(surface) &&
+            surface.mappedBytes <= kAddressLimit - scanout.address && barOffset % kPageBytes == 0 &&
+            backing && backing < kAddressLimit && backing % kPageBytes == 0 && surface.mappedBytes <= kAddressLimit - backing;
+    }
 };
 
 template<typename ReadDword>
 bool sampleFirmwareScanout(uint64_t consoleBase, uint64_t barBase, uint64_t barBytes, uint64_t mappedBytes,
                            uint32_t width, uint32_t height, uint32_t rowBytes, uint64_t mmioBytes,
-                           const ReadDword &readDword, FirmwareScanoutSample &out) {
+                           const ReadDword &readDword, FirmwareScanoutSample &out,
+                           const FirmwareScanoutSample *expected = nullptr) {
     using namespace hubp0;
     out = {};
     if (!barBase || barBase % kPageBytes || barBytes > UINT64_MAX - barBase || consoleBase < barBase ||
@@ -29,7 +37,8 @@ bool sampleFirmwareScanout(uint64_t consoleBase, uint64_t barBase, uint64_t barB
     const auto bytes = (visible + kPageBytes - 1) & ~(kPageBytes - 1);
     if (bytes > barBytes - offset) return false;
     const ScanoutSurface surface{width, height, rowBytes / 4 - 1, kDcnArgb8888, bytes};
-    if (!validFlipGeometry(surface)) return false;
+    if (!validFlipGeometry(surface) || (expected && (!expected->valid() || expected->barOffset != offset ||
+        !sameFlipGeometry(expected->surface, surface)))) return false;
 
     const auto read = [&](uint32_t reg, uint32_t &value) { return readDword(reg, value) && value != UINT32_MAX; };
     const auto unlocked = [&] {
@@ -42,9 +51,14 @@ bool sampleFirmwareScanout(uint64_t consoleBase, uint64_t barBase, uint64_t barB
     uint64_t backing = 0;
     HubpAddress address{};
     FirmwareLocalAperture before, after;
-    if (!read(kFrame, firstFrame) || !unlocked() || !before.sample(read) || !matchHubpFlipGeometry(surface, read) ||
-        !HubpFlipReadback::observeQuiescent(read, address, sampledFrame) || !matchHubpFlipGeometry(surface, read) ||
+    if (!read(kFrame, firstFrame) || !unlocked() || !before.sample(read) || !matchHubpFlipGeometry(surface, read)) return false;
+    if (expected) {
+        address = expected->scanout;
+        sampledFrame = firstFrame & kFrameMask;
+    } else if (!HubpFlipReadback::observeQuiescent(read, address, sampledFrame)) return false;
+    if (!matchHubpFlipGeometry(surface, read) ||
         !after.sample(read) || !before.same(after) || !before.bind(address, offset, bytes, backing) || !unlocked() ||
+        (expected && backing != expected->backing) ||
         !read(kFrame, lastFrame) || (firstFrame & kFrameMask) != sampledFrame ||
         (lastFrame & kFrameMask) != sampledFrame) return false;
 

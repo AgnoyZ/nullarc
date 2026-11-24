@@ -46,9 +46,11 @@ IOReturn PhxBringup::beginDcnFlip(build34::dcn::ScanoutFlipIntent &intent) {
         return kIOReturnNotFound;
     auto *route = dcnQualifiedFlipRoute(pci);
     uint64_t serial = 0;
-    if (!route || !gDcnPinSerials.take(serial)) return kIOReturnNotReady;
+    if (!route || !route->framebuffer || route->framebuffer->isInactive() ||
+        route->framebuffer->getProvider() != pci || !route->framebuffer->metaCast("PhxAMDFB") ||
+        !gDcnPinSerials.take(serial)) return kIOReturnNotReady;
     const ScanoutPinToken token{this, serial};
-    const auto result = dcnFlip.begin(intent, token, *route, dcnFlipBinding(old), dcnFlipBinding(next),
+    const auto result = dcnFlip.begin(intent, token, *route, pci, dcnFlipBinding(old), dcnFlipBinding(next),
         [&] { return !exactCallbacks.closed(); });
     if (result == ScanoutFlipResult::Refused) return kIOReturnNotReady;
     intent.operation = token;
@@ -68,7 +70,8 @@ IOReturn PhxBringup::pollDcnFlip(build34::dcn::ScanoutFlipPoll &poll) {
     if (current.serial && !old) return kIOReturnNotReady;
     if (old && !IOLockTryLock(old->client->lock)) return kIOReturnBusy;
     OSObject *route = nullptr;
-    const auto result = dcnFlip.poll(poll.operation, [&] { return !exactCallbacks.closed(); }, route);
+    IOService *framebuffer = nullptr;
+    const auto result = dcnFlip.poll(poll.operation, [&] { return !exactCallbacks.closed(); }, route, framebuffer);
     if (old) IOLockUnlock(old->client->lock);
     if (old && result == ScanoutFlipResult::Presented) {
         auto *surface = old->surface;
@@ -80,6 +83,7 @@ IOReturn PhxBringup::pollDcnFlip(build34::dcn::ScanoutFlipPoll &poll) {
         surface->release();
         client->release();
     }
+    if (framebuffer) framebuffer->release();
     if (route) route->release();
     poll.result = result;
     return kIOReturnSuccess;

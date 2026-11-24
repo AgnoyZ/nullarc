@@ -25,7 +25,8 @@ FIELDS = '''    IOLock *fDcnFirmwareLock = nullptr;
         IOLockUnlock(fDcnFirmwareLock);
     }
 
-    IOReturn sampleDcnFirmware(const void *expectedPci, build34::dcn::FirmwareScanoutSample &out) {
+    IOReturn sampleDcnFirmware(const void *expectedPci, build34::dcn::FirmwareScanoutSample &out,
+                              const build34::dcn::FirmwareScanoutSample *expected = nullptr) {
         out = {};
         if (!fDcnFirmwareLock) return kIOReturnNotReady;
         if (!IOLockTryLock(fDcnFirmwareLock)) return kIOReturnBusy;
@@ -33,7 +34,7 @@ FIELDS = '''    IOLock *fDcnFirmwareLock = nullptr;
             if (!fDcnFirmwareReady || !fDcnFirmwarePower || fDcnFirmwareClosed || !fPCI || fPCI != expectedPci ||
                 fBeside || !fMmio || !fSurfMap) return false;
             const auto accessible = [&] {
-                if (isInactive() || fPCI->isInactive()) return false;
+                if (isInactive() || fPCI->isInactive() || getProvider() != fPCI) return false;
                 const auto command = fPCI->configRead16(kIOPCIConfigCommand);
                 return command != UINT16_MAX && (command & 2) && fPCI->configRead32(kIOPCIConfigVendorID) == 0x19001002;
             };
@@ -45,7 +46,7 @@ FIELDS = '''    IOLock *fDcnFirmwareLock = nullptr;
             const auto barBytes = bar->getLength();
             if (!build34::dcn::sampleFirmwareScanout(fBase, barBase, barBytes,
                 fSurfMap->getLength(), fWidth, fHeight, fRowBytes, fMmio->getLength(),
-                [&](uint32_t reg, uint32_t &value) { value = mmio[reg]; return true; }, out) || !accessible()) return false;
+                [&](uint32_t reg, uint32_t &value) { value = mmio[reg]; return true; }, out, expected) || !accessible()) return false;
             auto *currentBar = fPCI->getDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
             return currentBar == bar && currentBar->getPhysicalAddress() == barBase && currentBar->getLength() == barBytes;
         }();
@@ -70,6 +71,11 @@ LIFETIME = '''    bool init(OSDictionary *dictionary = nullptr) override {
 QUERY = '''        if (fn && fn->isEqualTo(BUILD34_DCN_SAMPLE_FIRMWARE)) {
             if (wait || !p1 || !p2 || p3 || p4) return kIOReturnBadArgument;
             return sampleDcnFirmware(p1, *static_cast<build34::dcn::FirmwareScanoutSample *>(p2));
+        }
+        if (fn && fn->isEqualTo(BUILD34_DCN_CHECK_FIRMWARE)) {
+            if (wait || !p1 || !p2 || p3 || p4) return kIOReturnBadArgument;
+            build34::dcn::FirmwareScanoutSample checked{};
+            return sampleDcnFirmware(p1, checked, static_cast<const build34::dcn::FirmwareScanoutSample *>(p2));
         }
 '''
 

@@ -207,7 +207,7 @@ enum class FirmwareFault { None, DisjointGart, WrongVmid, BadLength, BarOffset, 
 static void testFirmwareSample(FirmwareFault fault) {
     Fixture fixture;
     constexpr uint32_t fbBase = 0x9000, fbTop = fbBase + 1;
-    const uint32_t physicalBase = fault == FirmwareFault::PhysicalOverflow ? 0xffffff : 0x18;
+    uint32_t physicalBase = fault == FirmwareFault::PhysicalOverflow ? 0xffffff : 0x18;
     const auto offset = fault == FirmwareFault::CrossingAperture ? (2ull << 24) - kPageBytes :
         fault == FirmwareFault::PhysicalOverflow ? 1ull << 24 : 0x4000;
     const auto scanout = (uint64_t{fbBase} << 24) + offset;
@@ -216,7 +216,9 @@ static void testFirmwareSample(FirmwareFault fault) {
     if (fault == FirmwareFault::Stereo) fixture.flip = hubp0::kStereoFlip;
     const bool gart = fault == FirmwareFault::DisjointGart || fault == FirmwareFault::GartOverlap || fault == FirmwareFault::GartInvalid;
     const auto gartStart = !gart ? 0u : static_cast<uint32_t>(scanout / kPageBytes + (fault == FirmwareFault::GartOverlap ? 1 : 0x1000));
-    unsigned reads = 0, pitchReads = 0, frameReads = 0, offsetReads = 0;
+    unsigned reads = 0, pitchReads = 0, frameReads = 0, offsetReads = 0, addressReads = 0;
+    uint32_t pitch = 63;
+    bool updateLocked = false, crossCheckFrame = false;
     const auto read = [&](uint32_t reg, uint32_t &value) {
         ++reads;
         switch (reg) {
@@ -239,15 +241,22 @@ static void testFirmwareSample(FirmwareFault fault) {
         case 0x03aaa: value = (17u << 16) | 64; return true;
         case 0x03ac7:
             ++pitchReads;
-            value = fault == FirmwareFault::Geometry || (fault == FirmwareFault::ChangedGeometry && pitchReads == 2) ? 64 : 63;
+            value = pitch + (fault == FirmwareFault::Geometry || (fault == FirmwareFault::ChangedGeometry && pitchReads == 2));
             return true;
         case 0x03b2c: value = 0x00e00000; return true;
         case 0x04f8b: value = 0xfff00000; return true;
         case 0x05001: value = 0x00010001; return true;
-        case 0x0504a: value = fault == FirmwareFault::Lock ? 0x100 : 0; return true;
+        case 0x0504a: value = fault == FirmwareFault::Lock || updateLocked ? 0x100 : 0; return true;
         case 0x05051: value = fault == FirmwareFault::LockSelect ? 1u << 25 : 0; return true;
         default:
-            if (reg == 0x0500c && ++frameReads == 4 && fault == FirmwareFault::CrossedFrame) ++fixture.frame;
+            if (reg == 0x0500c) {
+                ++frameReads;
+                if ((frameReads == 4 && fault == FirmwareFault::CrossedFrame) || (crossCheckFrame && frameReads == 2))
+                    ++fixture.frame;
+            }
+            if (reg == hubp0::kVmid || reg == hubp0::kProgrammedLow || reg == hubp0::kProgrammedHigh ||
+                reg == hubp0::kInUseLow || reg == hubp0::kInUseHigh || reg == hubp0::kEarliestLow || reg == hubp0::kEarliestHigh)
+                ++addressReads;
             if (reg == 0x03ae5 && fault == FirmwareFault::TornAddress) fixture.earliest.address ^= kPageBytes;
             if (!Fixture::read(&fixture, reg, value)) return false;
             if (reg == 0x03ae2 && fault == FirmwareFault::AllOnes) value = UINT32_MAX;
@@ -272,6 +281,32 @@ static void testFirmwareSample(FirmwareFault fault) {
         if (fault == FirmwareFault::BarOffset || fault == FirmwareFault::ConsoleMap || fault == FirmwareFault::BadLength)
             assert(!reads);
     }
+    if (fault != FirmwareFault::None) return;
+    assert(sample.valid());
+    fixture.setNew();
+    ++fixture.frame;
+    FirmwareScanoutSample checked{};
+    const auto check = [&] {
+        addressReads = frameReads = 0;
+        return sampleFirmwareScanout(bar + offset, bar, barBytes, visible, 64, 17, 256, mmio, read, checked, &sample);
+    };
+    assert(!sampleFirmwareScanout(bar + offset, bar, barBytes, visible, 64, 17, 256, mmio, read, checked));
+    assert(check() && checked.valid() && !addressReads);
+    assert(checked.scanout == sample.scanout && !(checked.scanout == fixture.inUse) && checked.backing == sample.backing &&
+           checked.barOffset == sample.barOffset && checked.frame == fixture.frame && sameFlipGeometry(checked.surface, sample.surface));
+    ++physicalBase;
+    assert(!check() && !checked.backing);
+    --physicalBase;
+    ++pitch;
+    assert(!check() && !checked.backing);
+    --pitch;
+    updateLocked = true;
+    assert(!check() && !checked.backing);
+    updateLocked = false;
+    crossCheckFrame = true;
+    assert(!check() && !checked.backing);
+    crossCheckFrame = false;
+    assert(check() && checked.backing == sample.backing);
 }
 
 int main() {
