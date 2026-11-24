@@ -701,6 +701,29 @@ An issue failure can mean a posted write and is never retried or cancelled.
 `Issued` is not presentation, and ordinary CPU fallback cannot assume it is
 still updating the active framebuffer after that point.
 
+The [address programmer](../tools/build34_dcn_flip_program.h) now owns the
+write order inside that transaction. The route supplies scoped, ordered
+register access and a bounded microsecond delay, not an arbitrary issue
+callback. The existing live geometry, stride, linear BGRA mode and route
+must remain qualified; this is an address-only flip, not a modeset. It
+refuses an already-held update lock or a lock selected for another OTG,
+pending/immediate/stereo flips, triple-buffer/GSL modes, and compressed or
+protected primary surfaces. It requests OTG0's update lock without changing
+the lock selector, requires matching OTG and HUBP lock state, and rechecks
+the old programmed address under the lock. It updates the VMID field,
+writes primary address high then low, and releases only the lock it acquired.
+The register order follows the AMD [HUBP graphics flip](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubp/dcn20/dcn20_hubp.c#L712-L765)
+and [OTG update lock](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/optc/dcn30/dcn30_optc.c#L119-L131)
+references; no implementation was copied.
+
+Both lock transitions have a ten-sample bound. Loss of route, write
+uncertainty or a missing lock acknowledgement stops all further writes.
+The lock may remain asserted; a future recovery owner must resolve that
+condition without releasing either pin or guessing that a partial address
+is safe. CPU tests verify the register order in both directions and no
+low write or unlock after a partial or revoked issue. Register acceptance
+does not establish hardware latch, which still requires separate readback.
+
 Only fresh old-address absence plus the same route's independent fetch and
 old-translation retirement confirmation permits old DMA teardown. The client
 lock is try-only and no GPU lock is held across callbacks. The old command

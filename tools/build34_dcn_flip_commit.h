@@ -1,6 +1,6 @@
 #pragma once
 
-#include "build34_dcn_flip_readback.h"
+#include "build34_dcn_flip_program.h"
 #include "build34_dcn_scanout_dma.h"
 
 #define BUILD34_DCN_FLIP_BEGIN "phx34DcnFlipBeginV1"
@@ -33,8 +33,8 @@ struct HubpFlipRoute {
     uint64_t generation;
     OSObject *lifetime;
     HubpFlipReader reader;
+    HubpFlipWriter writer;
     bool (*qualify)(void *, const HubpFlipRequest &, const IODMACommand *, const IODMACommand *);
-    bool (*issue)(void *, const HubpFlipRequest &);
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
 };
 
@@ -48,7 +48,7 @@ public:
     ScanoutFlipResult begin(ScanoutFlipIntent intent, ScanoutPinToken operation, HubpFlipRoute route,
                            ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
         if (pending() || !live() || !operation.provider || !operation.serial ||
-            !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify || !route.issue ||
+            !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify ||
             !route.fetchesRetired || !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, true) ||
             !validBinding(next, intent.next, operation.provider, false) ||
@@ -64,7 +64,9 @@ public:
         if (!routeLifetime_) route.lifetime->retain();
         if (!route.qualify(route.reader.context, request, old.dma ? old.dma->command_ : nullptr,
                            next.dma ? next.dma->command_ : nullptr) ||
-            !live() || !readback_.begin(request, route.reader) || !live() ||
+            !live() || !readback_.begin(request, route.reader) ||
+            !HubpFlipProgram::preflight(request, route.reader, route.writer, [&] { return live() && readback_.stillInBudget(); }) ||
+            !live() ||
             (next.pin && !next.pin->beginDisplayUse())) {
             if (!routeLifetime_) route.lifetime->release();
             readback_.recycle();
@@ -76,7 +78,8 @@ public:
         request_ = request;
         route_ = route;
         old_ = old;
-        if (!live() || !route_.issue(route_.reader.context, request_) ||
+        if (!HubpFlipProgram::issue(request_, route_.reader, route_.writer,
+                                    [&] { return live() && readback_.stillInBudget(); }) ||
             !route_.reader.current(route_.reader.context, request_) || !live())
             return fail();
         return ScanoutFlipResult::Issued;

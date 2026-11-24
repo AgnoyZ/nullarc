@@ -861,7 +861,8 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
 #endif
 
 #ifdef TEST_SCANOUT_FLIP
-enum class FlipFault { None, Decline, Issue, Close, CloseDuringQualify, CloseDuringRetire, LateRetire, Unmap };
+enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, HighWrite, RouteLost, ClockRewind,
+                       Issue, UnlockTimeout, Close, CloseDuringQualify, CloseDuringRetire, LateRetire, Unmap };
 
 struct CommitFixture {
     ScanoutFixture scanout;
@@ -872,10 +873,13 @@ struct CommitFixture {
     HubpAddress programmed = home, active = home, earliest = home;
     uint32_t frame = 42;
     uint64_t now = 800;
-    unsigned issues = 0, reads = 0, retireChecks = 0;
-    bool qualify = true, live = true, pending = false, failIssue = false, retire = false, failUnmap = false;
+    unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0;
+    uint32_t lockSelect = 0, surfaceControl = 0;
+    bool lockRequested = false, lockHeld = false, lockTimeout = false, unlockTimeout = false;
+    bool qualify = true, live = true, pending = false, failHigh = false, failIssue = false, retire = false, failUnmap = false;
+    bool loseRouteAfterHigh = false, rewindAfterHigh = false;
     bool closeDuringQualify = false, closeDuringRetire = false, lateRetire = false;
-    HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, qualified, issue, retired};
+    HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay}, qualified, retired};
     ScanoutPinToken pin{};
 
     CommitFixture() {
@@ -934,14 +938,50 @@ struct CommitFixture {
         return self.qualify;
     }
 
-    static bool issue(void *context, const HubpFlipRequest &request) {
+    static bool write(void *context, uint32_t address, uint32_t value) {
         auto &self = *static_cast<CommitFixture *>(context);
         assert(self.scanout.cancelPin(self.pin) == kIOReturnBusy);
         assert(self.lifetime.references == 2 && !self.scanout.device.guard.held);
-        self.programmed = request.next;
-        self.pending = true;
-        ++self.issues;
-        return !self.failIssue;
+        const auto target = self.issues ? self.home : self.mapped;
+        const auto step = self.writes++ % 5;
+        switch (address) {
+        case hubp0::kOtgUpdateLock:
+            if (value) {
+                assert(step == 0 && !self.lockRequested && !self.lockHeld && value == hubp0::kOtgLockRequest);
+                self.lockRequested = true;
+                self.lockHeld = !self.lockTimeout;
+            } else {
+                assert(step == 4 && self.lockRequested && self.lockHeld && self.pending &&
+                       self.programmed == (self.issues == 1 ? self.mapped : self.home));
+                self.lockRequested = false;
+                self.lockHeld = self.unlockTimeout;
+            }
+            return true;
+        case hubp0::kVmid:
+            assert(step == 1 && self.lockHeld && value == (0x10 | target.vmid));
+            self.programmed.vmid = value & 0xf;
+            if (self.rewindAfterHigh) self.now += 10;
+            return true;
+        case hubp0::kProgrammedHigh:
+            assert(step == 2 && self.lockHeld && value == target.address >> 32);
+            self.programmed.address = (uint64_t{value} << 32) | (self.programmed.address & 0xffffffff);
+            if (self.loseRouteAfterHigh) self.live = false;
+            if (self.rewindAfterHigh) --self.now;
+            return !self.failHigh;
+        case hubp0::kProgrammedLow:
+            assert(step == 3 && self.lockHeld && value == static_cast<uint32_t>(target.address));
+            self.programmed.address = (self.programmed.address & ~uint64_t{0xffffffff}) | value;
+            self.pending = true;
+            ++self.issues;
+            return !self.failIssue;
+        default: assert(false); return false;
+        }
+    }
+
+    static void delay(void *context, uint32_t us) {
+        auto &self = *static_cast<CommitFixture *>(context);
+        assert(us == 1);
+        ++self.delays;
     }
 
     static bool retired(void *context, const HubpFlipRequest &request) {
@@ -961,8 +1001,15 @@ struct CommitFixture {
         ++self.reads;
         switch (address) {
         case hubp0::kControl: case hubp0::kFlip2: value = 0; break;
-        case hubp0::kFlip: value = self.pending ? hubp0::kPending : 0; break;
-        case hubp0::kVmid: value = self.programmed.vmid; break;
+        case hubp0::kFlip:
+            value = (self.pending ? hubp0::kPending : 0) | (self.lockHeld ? hubp0::kUpdateLocked : 0);
+            break;
+        case hubp0::kVmid: value = 0x10 | self.programmed.vmid; break;
+        case hubp0::kSurfaceControl: value = self.surfaceControl; break;
+        case hubp0::kOtgLockSelect: value = self.lockSelect; break;
+        case hubp0::kOtgUpdateLock:
+            value = (self.lockRequested ? hubp0::kOtgLockRequest : 0) | (self.lockHeld ? hubp0::kOtgLockStatus : 0);
+            break;
         case hubp0::kProgrammedLow: value = low(self.programmed); break;
         case hubp0::kProgrammedHigh: value = high(self.programmed); break;
         case hubp0::kInUseLow: value = low(self.active); break;
@@ -1012,23 +1059,40 @@ static void scanoutFlip(FlipFault fault) {
     request.next = fixture.mapped;
     fixture.qualify = fault != FlipFault::Decline;
     fixture.closeDuringQualify = fault == FlipFault::CloseDuringQualify;
+    fixture.lockSelect = fault == FlipFault::ForeignLock ? 1u << 25 : 0;
+    fixture.lockRequested = fixture.lockHeld = fault == FlipFault::HeldLock;
+    fixture.surfaceControl = fault == FlipFault::Dcc ? 1u << 1 : 0;
+    fixture.lockTimeout = fault == FlipFault::LockTimeout;
+    fixture.unlockTimeout = fault == FlipFault::UnlockTimeout;
+    fixture.failHigh = fault == FlipFault::HighWrite;
+    fixture.loseRouteAfterHigh = fault == FlipFault::RouteLost;
+    fixture.rewindAfterHigh = fault == FlipFault::ClockRewind;
     fixture.failIssue = fault == FlipFault::Issue;
     if (!fixture.qualify || fixture.closeDuringQualify) {
         assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.issues);
         assert(!request.operation.serial && fixture.lifetime.references == 1);
         return;
     }
-    assert(fixture.begin(request) == kIOReturnSuccess && request.operation.serial != fixture.pin.serial);
-    assert(fixture.issues == 1 && fixture.lifetime.references == 2 && !fixture.command.completes);
-    assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
-    ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
-    if (fault == FlipFault::Issue) {
-        assert(request.result == ScanoutFlipResult::Uncertain);
-        assert(fixture.poll(poll) == kIOReturnSuccess && poll.result == ScanoutFlipResult::Uncertain);
-        assert(fixture.issues == 1 && fixture.retireChecks == 0 && fixture.command.prepared);
+    if (fixture.lockSelect || fixture.lockHeld || fixture.surfaceControl) {
+        assert(fixture.begin(request) == kIOReturnNotReady && fixture.reads && !fixture.writes);
+        assert(!request.operation.serial && fixture.lifetime.references == 1);
         return;
     }
-    assert(request.result == ScanoutFlipResult::Issued);
+    assert(fixture.begin(request) == kIOReturnSuccess && request.operation.serial != fixture.pin.serial);
+    assert(fixture.writes && fixture.lifetime.references == 2 && !fixture.command.completes);
+    assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
+    ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
+    const bool afterHigh = fixture.failHigh || fixture.loseRouteAfterHigh || fixture.rewindAfterHigh;
+    if (fixture.lockTimeout || afterHigh || fixture.failIssue || fixture.unlockTimeout) {
+        const unsigned expectedWrites = fixture.lockTimeout ? 1 : afterHigh ? 3 : fixture.failIssue ? 4 : 5;
+        assert(fixture.writes == expectedWrites && fixture.issues == (expectedWrites >= 4));
+        assert(fixture.delays == (fixture.lockTimeout || fixture.unlockTimeout ? 9u : 0u));
+        assert(request.result == ScanoutFlipResult::Uncertain);
+        assert(fixture.poll(poll) == kIOReturnSuccess && poll.result == ScanoutFlipResult::Uncertain);
+        assert(fixture.writes == expectedWrites && fixture.retireChecks == 0 && fixture.command.prepared);
+        return;
+    }
+    assert(request.result == ScanoutFlipResult::Issued && fixture.writes == 5 && fixture.issues == 1);
     if (fault == FlipFault::Close) {
         scanout.device.exactCallbacks.close();
         const auto reads = fixture.reads;
@@ -1046,6 +1110,7 @@ static void scanoutFlip(FlipFault fault) {
 
     request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
     assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Issued);
+    assert(fixture.writes == 10 && fixture.issues == 2);
     poll.operation = request.operation;
     fixture.pending = fixture.retire = false;
     fixture.active = fixture.earliest = fixture.home;
@@ -1110,7 +1175,15 @@ int main() {
 #ifdef TEST_SCANOUT_FLIP
     scanoutFlip(FlipFault::None);
     scanoutFlip(FlipFault::Decline);
+    scanoutFlip(FlipFault::ForeignLock);
+    scanoutFlip(FlipFault::HeldLock);
+    scanoutFlip(FlipFault::Dcc);
+    scanoutFlip(FlipFault::LockTimeout);
+    scanoutFlip(FlipFault::HighWrite);
+    scanoutFlip(FlipFault::RouteLost);
+    scanoutFlip(FlipFault::ClockRewind);
     scanoutFlip(FlipFault::Issue);
+    scanoutFlip(FlipFault::UnlockTimeout);
     scanoutFlip(FlipFault::Close);
     scanoutFlip(FlipFault::CloseDuringQualify);
     scanoutFlip(FlipFault::CloseDuringRetire);

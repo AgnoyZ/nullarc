@@ -125,9 +125,11 @@ public:
 private:
     friend class ScanoutFlipCommit;
 
-    bool stillInBudget() const {
+    bool stillInBudget() {
         uint64_t now = 0;
-        return reader_.readClockNs(reader_.context, now) && inBudget(now, lastTime_);
+        if (!reader_.readClockNs(reader_.context, now) || !inBudget(now, lastTime_)) return false;
+        lastTime_ = now;
+        return true;
     }
 
     void recycle() {
