@@ -42,6 +42,7 @@ struct ScanoutFlipIntent {
     HubpAddress previous, next;
     ScanoutPinToken nextPin, operation;
     ScanoutFlipResult result;
+    IOService *framebuffer{nullptr};
 };
 
 struct ScanoutFlipPoll {
@@ -76,6 +77,8 @@ class ScanoutFlipCommit {
 public:
     bool pending() const { return operation_.serial != 0; }
     ScanoutPinToken front() const { return front_; }
+    HubpAddress frontAddress() const { return frontAddress_; }
+    HubpAddress firmwareAddress() const { return firmwareHome_.scanout; }
     bool matches(ScanoutPinToken token) const { return pending() && operation_ == token; }
 
     template<typename IsLive, typename WriterCurrent>

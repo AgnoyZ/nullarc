@@ -42,9 +42,19 @@ static bool IOLockTryLock(IOLock *lock) {
 }
 
 static bool vaCanonical(uint64_t va) { return va <= kVaMask || (va & ~kVaMask) == ~kVaMask; }
+#ifdef TEST_SCANOUT_TRANSACTION
+static uint64_t transactionNow = 1;
+static bool transactionSleeping = false;
+static uint64_t mach_absolute_time() { return transactionNow; }
+static void IOSleep(unsigned ms) {
+    assert(transactionSleeping && ms == 2);
+    transactionNow += uint64_t{ms} * 1000000;
+}
+#else
 static uint64_t mach_absolute_time() { return 1; }
-static void absolutetime_to_nanoseconds(uint64_t ticks, uint64_t *ns) { *ns = ticks; }
 static void IOSleep(unsigned) { assert(false); }
+#endif
+static void absolutetime_to_nanoseconds(uint64_t ticks, uint64_t *ns) { *ns = ticks; }
 static void IOLog(const char *, ...) { assert(false); }
 
 struct Descriptor final : IOMemoryDescriptor {
@@ -2730,6 +2740,161 @@ static void exerciseDcnBar5() {
 }
 #endif
 
+#ifdef TEST_SCANOUT_TRANSACTION
+#include "build34_dcn_transaction.h"
+
+struct TransactionFramebuffer : IOService {
+    unsigned samples = 0;
+    IOReturn callPlatformFunction(const OSSymbol *name, bool wait, void *device, void *out, void *third, void *fourth) override {
+        assert(name->isEqualTo(BUILD34_DCN_SAMPLE_FIRMWARE) && !wait && device == provider && out && !third && !fourth);
+        ++samples;
+        *static_cast<FirmwareScanoutSample *>(out) = {{0x80000000, 0}, {16, 32, 15, kDcnArgb8888, kPage}, 0, 0x80000000, 1};
+        return kIOReturnSuccess;
+    }
+};
+
+struct TransactionFixture {
+    IOPCIDevice device;
+    IOPCIDevice *pci = &device;
+    CallbackGate<> exactCallbacks;
+    // TRANSACTION_FIELDS
+    struct {
+        ScanoutPinToken token{};
+        HubpAddress address{}, home{0x80000000, 0};
+        bool waiting = false;
+        ScanoutPinToken front() const { return token; }
+        HubpAddress frontAddress() const { return address; }
+        HubpAddress firmwareAddress() const { return home; }
+        bool pending() const { return waiting; }
+    } dcnFlip;
+    const HubpFlipRoute *(*dcnQualifiedFlipRoute)(IOPCIDevice *) = [](IOPCIDevice *) -> const HubpFlipRoute * { return nullptr; };
+    DcnDirectDomain (*dcnQualifyDirect)(IOPCIDevice &) = [](IOPCIDevice &) { return DcnDirectDomain{}; };
+    ScanoutDmaMapper (*dcnQualifyMapper)(IOPCIDevice &, IOMapper &) = nullptr;
+    TransactionFramebuffer framebuffer;
+    ScanoutFlipIntent issued{};
+    const PresentCopyBacking *mapped = nullptr;
+    unsigned maps = 0, begins = 0, polls = 0, cancels = 0, waits = 0;
+    bool mapRefused = false, beginRefused = false, uncertainIssue = false, mismatch = false, timeout = false;
+
+    TransactionFixture() {
+        framebuffer.provider = pci;
+        framebuffer.isPhxFramebuffer = true;
+        dcnPlacePresent = [](IOService &, const ScanoutSurface &, HubpAddress before) {
+            return DcnPresentPlacement{{before.vmid == 7 ? 0xa0000000ull : 0x90000000ull, before.vmid == 7 ? 6u : 7u}, true};
+        };
+    }
+
+    IOReturn mapDcnPin(ScanoutDmaRequest &map, bool direct) {
+        assert(direct && map.present == mapped && validScanoutDmaStorage(map, kPage));
+        ++maps;
+        if (mapRefused) return kIOReturnNotReady;
+        map.token = {this, 2 * maps};
+        return kIOReturnSuccess;
+    }
+
+    IOReturn beginDcnFlip(ScanoutFlipIntent &intent) {
+        assert(!dcnFlip.pending() && intent.framebuffer == &framebuffer);
+        assert(intent.previous == (dcnFlip.front().serial ? dcnFlip.frontAddress() : dcnFlip.firmwareAddress()));
+        assert(intent.nextPin.serial ? intent.nextPin.provider == this : intent.next == dcnFlip.firmwareAddress());
+        ++begins;
+        if (beginRefused) return kIOReturnNotReady;
+        intent.operation = {this, 2 * begins + 1};
+        intent.result = uncertainIssue ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Issued;
+        issued = intent;
+        dcnFlip.waiting = true;
+        return kIOReturnSuccess;
+    }
+
+    IOReturn pollDcnFlip(ScanoutFlipPoll &poll) {
+        assert(dcnFlip.pending() && poll.operation == issued.operation);
+        ++polls;
+        if (timeout) return kIOReturnBusy;
+        if (mismatch) {
+            ++poll.operation.serial;
+            poll.result = ScanoutFlipResult::Presented;
+            return kIOReturnSuccess;
+        }
+        if (waits) {
+            --waits;
+            poll.result = ScanoutFlipResult::Waiting;
+            return kIOReturnSuccess;
+        }
+        poll.result = ScanoutFlipResult::Presented;
+        dcnFlip.waiting = false;
+        dcnFlip.token = issued.nextPin;
+        dcnFlip.address = issued.next;
+        return kIOReturnSuccess;
+    }
+
+    IOReturn cancelDcnPin(ScanoutPinToken pin) {
+        assert(!dcnFlip.pending() && !(pin == dcnFlip.front()));
+        ++cancels;
+        return kIOReturnSuccess;
+    }
+};
+
+// TRANSACTION_METHOD
+
+static void exerciseDcnTransaction() {
+    TransactionFixture fixture;
+    Descriptor descriptor;
+    OSObject pipe, otherPipe;
+    const int first = 0, next = 0;
+    auto backing = observePreparedCopyBacking(&first, &descriptor, &descriptor, kSurfaceBgra, 16, 32, 64, 16, 32);
+    fixture.mapped = &backing;
+    DcnPresentTransaction request{&pipe, &fixture.framebuffer, &next, &backing, DcnPresentResult::Copy};
+    assert(fixture.submitDcnPresent(request) == kIOReturnBadArgument && request.result == DcnPresentResult::Blocked && !fixture.maps);
+    request.transaction = &first;
+    fixture.mapRefused = true;
+    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && !fixture.begins);
+    fixture.mapRefused = false;
+    fixture.beginRefused = true;
+    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && fixture.cancels == 1);
+    fixture.beginRefused = false;
+    fixture.waits = 2;
+    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Direct && fixture.polls == 3);
+    assert(pipe.references == 2 && fixture.framebuffer.references == 2);
+    request.pipe = &otherPipe;
+    assert(fixture.submitDcnPresent(request) == kIOReturnNotReady && request.result == DcnPresentResult::Blocked && fixture.polls == 3);
+    request.pipe = &pipe;
+    request.transaction = &next;
+    request.backing = nullptr;
+    fixture.beginRefused = true;
+    assert(fixture.submitDcnPresent(request) == kIOReturnNotReady && request.result == DcnPresentResult::Blocked && fixture.polls == 3);
+    fixture.beginRefused = false;
+    assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && fixture.polls == 4);
+    assert(!fixture.dcnFlip.front().serial && pipe.references == 1 && fixture.framebuffer.references == 1 && fixture.cancels == 1);
+
+    for (unsigned fault = 0; fault < 3; ++fault) {
+        TransactionFixture faulted;
+        faulted.mapped = &backing;
+        faulted.uncertainIssue = fault == 0;
+        faulted.mismatch = fault == 1;
+        faulted.timeout = fault == 2;
+        request = {&pipe, &faulted.framebuffer, &first, &backing, DcnPresentResult::Copy};
+        assert(faulted.submitDcnPresent(request) == kIOReturnNotReady && request.result == DcnPresentResult::Blocked);
+        const auto polls = faulted.polls;
+        assert(polls == (fault == 0 ? 0u : fault == 1 ? 1u : 50u));
+        request.backing = nullptr;
+        assert(faulted.submitDcnPresent(request) == kIOReturnNotReady && request.result == DcnPresentResult::Blocked);
+        assert(faulted.begins == 1 && faulted.polls == polls && !faulted.cancels && faulted.framebuffer.references == 2);
+        assert(faulted.dcnPresentUncertain && faulted.dcnFlip.pending());
+        pipe.release();
+    }
+
+    DcnPresentCompletion completion;
+    bool done = true;
+    assert(!completion.check(&first, done) && !done);
+    completion.block();
+    assert(completion.check(&first, done) && !done);
+    completion.presented(&first);
+    assert(completion.check(&first, done) && done);
+    assert(completion.check(&next, done) && !done);
+    completion.legacy();
+    assert(!completion.check(&first, done) && !done);
+}
+#endif
+
 int main() {
     completionAndPages();
     newerAndRacingCompletions();
@@ -2902,6 +3067,10 @@ int main() {
 #endif
 #ifdef TEST_SCANOUT_BAR5
     exerciseDcnBar5();
+#endif
+#ifdef TEST_SCANOUT_TRANSACTION
+    transactionSleeping = true;
+    exerciseDcnTransaction();
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

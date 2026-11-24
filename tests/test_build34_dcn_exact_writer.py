@@ -19,6 +19,7 @@ import build34_dcn_flip_commit_stage as flip_commit
 import build34_dcn_present_handoff_stage as handoff
 import build34_dcn_scanout_dma_stage as scanout_dma
 import build34_dcn_scanout_pin_stage as scanout_pin
+import build34_dcn_transaction_stage as transaction
 from build34_dcn_present_backing_stage import ACCEL, stage as present_backing
 import build34_exact_submit_pressure as pressure
 from build34_exact_open import stage as exact_open, stage_header
@@ -83,6 +84,28 @@ class ExactWriterTests(unittest.TestCase):
 
     def test_extracted_scanout_flip_lifetime(self):
         self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True)
+
+    def test_scanout_transaction_caller(self):
+        source = transaction.stage_native(DRIVER, ABI)
+        accelerator = transaction.stage_accelerator((ROOT / ACCEL).read_bytes())
+        dispatch = method(source, handoff.DISPATCH)
+        self.assertIn('return submitDcnPresent(', dispatch)
+        for isolated in ('BUILD34_DCN_PRESENT_PROBE', 'BUILD34_DCN_PIN_MAP', 'BUILD34_DCN_FLIP_BEGIN', 'BUILD34_DCN_FLIP_POLL'):
+            self.assertNotIn(isolated, dispatch)
+        self.assertIn('route->framebuffer != intent.framebuffer', method(source, flip_commit.BEGIN))
+        self.assertEqual(method(source, 'bool PhxBringup::exactNativeOpenAdmitted('),
+                         method(self.source, 'bool PhxBringup::exactNativeOpenAdmitted('))
+        perform = method(accelerator, transaction.PERFORM)
+        self.assertNotIn('nvAccelObserveDcnCopyBacking', perform)
+        self.assertIn('!fromRes && !l10r', perform)
+        self.assertLess(perform.index('fDcnPresent.presented(txn)'), perform.index('nvAccelIopHome(fb, head)'))
+        self.assertLess(perform.index('if (result != DcnPresentResult::Copy)'), perform.index('movnti'))
+        self.assertLess(perform.index('if (result != DcnPresentResult::Copy)'), perform.rindex('nvAccelSurfCopyReady(s, head)'))
+        self.assertLess(perform.index('if (!dcnAttempt)'), perform.index('nvAccelSurfCopyReady(s, head)'))
+        self.assertIn('fDcnPresent.check(txn, complete)', method(accelerator, transaction.COMPLETE))
+        self.assertIn('nvAccelDcnSleepable)(NVDisplayPipe &, IOService &){nullptr}', accelerator)
+        self.assertIn('build34::dcn::HubpAddress){nullptr}', source)
+        self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True, present=source)
 
     def test_firmware_sample_keeps_existing_scanout_and_vbl(self):
         original = (ROOT / firmware_home.FRAMEBUFFER).read_bytes()
@@ -163,7 +186,7 @@ class ExactWriterTests(unittest.TestCase):
         power = method(bound, 'IOReturn PhxBringup::setPowerState(')
         self.assertLess(power.index('&dcnBar5Revoked'), power.index('invalidateExactQueues();'))
 
-    def check_native_methods(self, paired=False, pins=False, dma=False, flip=False, bar5_adapter=False):
+    def check_native_methods(self, paired=False, pins=False, dma=False, flip=False, bar5_adapter=False, present=None):
         fixture = Path(__file__).with_suffix('.cpp').read_text()
         source = scanout_pin.stage_native(DRIVER, ABI) if pins else handoff.stage_native(DRIVER, ABI) if paired else self.source
         if dma:
@@ -209,6 +232,10 @@ class ExactWriterTests(unittest.TestCase):
             bound = bar5.stage_native(DRIVER, ABI)
             fields += bar5.FIELDS
             extracted += '\n' + '\n'.join(method(bound, signature) for signature in bar5.SIGNATURES)
+        if present is not None:
+            fixture = fixture.replace('// TRANSACTION_FIELDS', transaction.FIELDS)
+            fixture = fixture.replace('// TRANSACTION_METHOD', method(present, transaction.NATIVE).replace(
+                'PhxBringup::submitDcnPresent(', 'TransactionFixture::submitDcnPresent(', 1))
         for marker, replacement in {
             '// WRITER_METHODS': ('static OwnerEpochs gDcnPinSerials;\n' if pins else '') +
             extracted,
@@ -228,6 +255,7 @@ class ExactWriterTests(unittest.TestCase):
                           *(['-DTEST_SCANOUT_DMA'] if dma else []),
                           *(['-DTEST_SCANOUT_FLIP'] if flip else []),
                           *(['-DTEST_SCANOUT_BAR5'] if bar5_adapter else []),
+                          *(['-DTEST_SCANOUT_TRANSACTION'] if present is not None else []),
                           '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable', '-O1', '-g',
                           '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I' + str(self.headers),
                           '-I' + str(ROOT / 'tests/build34_dcn'), '-I' + str(ROOT / 'tools'),
@@ -251,14 +279,20 @@ class ExactWriterTests(unittest.TestCase):
                  '-I' + os.environ['BUILD34_KERNEL_HEADERS'], '-I' + str(self.headers),
                  '-I' + str(ROOT / 'tools'), '-I' + str(src.parent)]
         for source in (self.source, handoff.stage_native(DRIVER, ABI), scanout_pin.stage_native(DRIVER, ABI),
-                       scanout_dma.stage_native(DRIVER, ABI), flip_commit.stage_native(DRIVER, ABI), bar5.stage_native(DRIVER, ABI)):
+                       scanout_dma.stage_native(DRIVER, ABI), flip_commit.stage_native(DRIVER, ABI), bar5.stage_native(DRIVER, ABI),
+                       transaction.stage_native(DRIVER, ABI)):
             src.write_text(source)
             self.run_checked([*flags, str(src)])
         accel = ROOT / ACCEL
         staged = self.directory / 'nvrm-accel.cpp'
         staged.write_text(handoff.stage_accelerator(accel.read_bytes()))
-        self.run_checked([*flags, '-DNMX_ACCEL', '-DNM_TAHOE', '-DPHX_FB', '-I' + str(accel.parent.parent), '-I' + str(accel.parent),
-                          '-I' + str(accel.parent / 'iofam'), '-I' + str(accel.parent / 're'), str(staged)])
+        accel_flags = [*flags, '-DNMX_ACCEL', '-DNM_TAHOE', '-DPHX_FB', '-I' + str(accel.parent.parent), '-I' + str(accel.parent),
+                       '-I' + str(accel.parent / 'iofam'), '-I' + str(accel.parent / 're'), str(staged)]
+        self.run_checked(accel_flags)
+        staged.write_text(transaction.stage_accelerator(accel.read_bytes()))
+        stubs = ROOT / transaction.STUBS
+        (self.directory / stubs.name).write_text(transaction.stage_stubs(stubs.read_text()))
+        self.run_checked(accel_flags)
         framebuffer = ROOT / firmware_home.FRAMEBUFFER
         staged_framebuffer = self.directory / framebuffer.name
         staged_framebuffer.write_text(firmware_home.stage(framebuffer.read_bytes()))

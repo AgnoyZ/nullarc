@@ -1194,6 +1194,46 @@ native invalidation, render completion and visibility, hardware latch
 confirmation before retiring old pages, and bounded fallback/recovery.
 Source-only rollback is a revert of this prerequisite.
 
+### Staged accelerator transaction caller
+
+The paired [transaction overlay](../tools/build34_dcn_transaction_stage.py)
+routes the prepared BGRA backing from `NVDisplayPipe::performTransaction`
+to the exact PhxBringup provider. It replaces the observation-only caller,
+so the observer cannot consume the one-shot offer before pinning. The
+paired provider no longer dispatches isolated probe, map, begin, poll or
+cancel requests. One serialized call binds the exact pipe, framebuffer,
+transaction and returned pin. The native placement hook nominates an incoming
+window and VMID; the existing route, translation and write-exclusion checks
+still decide whether any register write is allowed.
+
+The caller borrows the transaction only for this synchronous call and holds
+no client or GPUVM lock while waiting. Flip readback uses the exact provider
+and operation token, at most 64 polls, and a 100 ms monotonic budget starting
+before begin. This bounds polling, not scheduler latency or sleepable IOKit
+preparation. `Issued`, `Waiting` and `Busy` do not complete the transaction.
+Only the matching `Presented` result can increment the new present counter,
+complete that transaction without the legacy VBL delay and skip the final
+R2a CPU copy. The existing CPU source mapping can still be prepared before
+that decision; this stage does not copy its pixels into a new staging buffer.
+
+An unused refused pin may be cancelled. Once issued, loss of evidence,
+timeout or mismatched completion blocks the route and retains potentially
+reachable backing; the caller neither cancels nor reissues. A copy with a
+direct front already active requires a confirmed return to the same firmware
+front and a fresh match of the framebuffer's CPU destination. The legacy
+copy-readiness helper, which can page pixels out of VRAM into the IOSurface,
+runs only after that return on the opted-in path. Resource-only and `l10r`
+frames still take R2a, including existing conversion, after that check. The
+separate NVIDIA VRAM path is unchanged.
+
+Placement and the accelerator's sleepable-context qualification are null,
+as are the earlier native evidence hooks. The private family callback's
+actual execution context and native route ownership still need qualification;
+no live use, loaded candidate or GPU result is implied. Rollback is to omit
+this paired overlay; it does not replace production inputs or alter existing
+exact-open admission. CPU doubles can establish refusal, completion matching
+and retention, but not physical display of the GPU-rendered pages.
+
 ## Accepted baseline measurement, November 20
 
 [R1b's bounded pressure proof](BUILD34-RING-BACKPRESSURE.md) passed before
