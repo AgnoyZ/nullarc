@@ -646,8 +646,29 @@ same private ordered page list, but do not create a pixel `IODMACommand`.
 For a direct pin the driver requests a physically contiguous wired table
 buffer, checks its full extent and each page in that same domain, and does
 not create a table `IODMACommand` either. The route receives an explicit
-direct-domain identity in place of the pixel command; it still has to encode
-the root and leaves, verify visibility, and hold the route and domain current.
+direct-domain identity in place of the pixel command. In that mode the
+[native encoder](../tools/build34_dcn_flat_words.h) generates the root and
+read-only leaves; the route cannot substitute an encoder or decoder. The
+PCI qualifier must explicitly attest the only supported host-flat profile,
+`Gmc11SnoopedSystemUc`, for the current requester and domain generation.
+The root uses valid, system and snooped bits. The leaf adds read permission
+and the uncached memory type, with no write, execute or fragment bits. The
+whole root extent and every leaf must fit the conservative 44-bit host
+address limit. The table walk rejects any different flags on readback,
+even if the page address matches. The route still has to verify visibility
+and hold the route and domain current.
+
+This is a candidate based on Linux v6.12's [GMC root address and PTE layout](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/amdgpu/amdgpu_gmc.c#L104-L167),
+[system and snoop bits](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c#L1342-L1385),
+[GMC11 GART memory type](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c#L716-L729),
+and [GMC11 DMA limit](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c#L794-L806).
+Linux [passes the GART root to display setup](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c#L1387-L1415),
+but its GMC11 GART table is allocated in VRAM. This reference does not
+validate a host-memory root on a nonzero DCN VMID, the read-only leaf on
+this hardware, or coherency with the target GPU writer. No Linux code was
+imported. CPU fixtures verify the exact words, address limits and refusal
+before register writes when a stored leaf gains write permission.
+
 Mapped and direct pins, or direct pins of different domain generations,
 cannot form the same flip. A direct pin has no host DMA allocation to unmap,
 but stays wired until the same old-fetch drain, context detach and translation
@@ -768,7 +789,7 @@ This uses the SDK interfaces and does not copy XNU implementation code.
 The adapter rejects a substituted descriptor, an inexact prepared extent,
 nonlinear DMA segments, and any page the mapper cannot resolve to the
 descriptor's original CPU page. This establishes a contiguous DMA range,
-not contiguous physical memory. The route supplies root and leaf encoding
+not contiguous physical memory. The mapped route supplies root and leaf encoding
 for that exact mapping: it sees both commands, the mapper and the table's
 DMA extent, not the CPU buffer or caller-published page list. The provider
 fills leaves from its private DMA plan, zeroes padding, and requires the

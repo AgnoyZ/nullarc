@@ -25,7 +25,26 @@ struct DcnFlatFormat {
     bool (*encodeRoot)(void *, const DcnFlatMapping &, uint64_t &);
     bool (*visible)(void *, const DcnFlatMapping &, const DcnFlatContext &);
 
-    bool complete() const { return encodeLeaf && decodeLeaf && encodeRoot && visible; }
+    bool complete(DcnPixelMapping pixels) const {
+        return visible && (pixels.direct ? !pixels.command && pixels.direct->complete() :
+            pixels.command && encodeLeaf && decodeLeaf && encodeRoot);
+    }
+
+    bool rootWord(void *context, const DcnFlatMapping &mapping, uint64_t &word) const {
+        return mapping.pixels.direct ? mapping.directTable && !mapping.table && !mapping.mapper &&
+            DcnHostFlatWords::root(mapping.pixels.direct->encoding, mapping.address, mapping.bytes, word) :
+            encodeRoot(context, mapping, word);
+    }
+
+    bool leafWord(void *context, const DcnFlatMapping &mapping, uint64_t address, uint64_t &word) const {
+        return mapping.pixels.direct ? DcnHostFlatWords::leaf(mapping.pixels.direct->encoding, address, word) :
+            encodeLeaf(context, mapping, address, word);
+    }
+
+    bool leafAddress(void *context, const DcnFlatMapping &mapping, uint64_t word, uint64_t &address) const {
+        return mapping.pixels.direct ? DcnHostFlatWords::decode(mapping.pixels.direct->encoding, word, address) :
+            decodeLeaf(context, mapping, word, address);
+    }
 };
 
 class DcnFlatTable {
@@ -51,7 +70,7 @@ class DcnFlatTable {
             return !collided_ && matches(request, ownerLifetime, request.nextPin, request.next.vmid) &&
                 current(mapper, pixels) && live();
         }
-        if (!format.complete()) return false;
+        if (!format.complete(pixels)) return false;
         ownerLifetime.retain();
         ownerLifetime_ = &ownerLifetime;
         const bool ready = dma_.prepare(mapper, bytes, live);
@@ -63,14 +82,14 @@ class DcnFlatTable {
         if (!ready || collided_ || !live()) return false;
         const auto mapping = view(mapper, pixels);
         uint64_t root = 0;
-        const bool encoded = format.encodeRoot(ownerContext, mapping, root);
+        const bool encoded = format.rootWord(ownerContext, mapping, root);
         collided_ = overlaps(front, root);
         const DcnFlatContext vm{root, layout.firstLogicalPage, layout.lastLogicalPage, request.next.vmid};
         if (!encoded || collided_ || !vm.valid()) return false;
         for (size_t index = 0; index < bytes / sizeof(uint64_t); ++index) {
             uint64_t word = 0;
             if (!live() || (index < layout.entryCount &&
-                (!format.encodeLeaf(ownerContext, mapping, pages[index], word) || !word))) return false;
+                (!format.leafWord(ownerContext, mapping, pages[index], word) || !word))) return false;
             dma_.words_[index] = word;
         }
         if (!live() || !dma_.store() || !live()) return false;
@@ -110,7 +129,7 @@ class DcnFlatTable {
                 continue;
             }
             uint64_t observed = 0;
-            if (!word || !format_.decodeLeaf(context_, mapping, word, observed) || observed != pages[index]) return false;
+            if (!word || !format_.leafAddress(context_, mapping, word, observed) || observed != pages[index]) return false;
         }
         return live() && current(mapper, pixels) && live();
     }

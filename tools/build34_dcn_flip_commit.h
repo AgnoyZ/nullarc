@@ -57,11 +57,12 @@ public:
                            void *pci, ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
         if (pending() || !live() || !operation.provider || !operation.serial ||
             !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify ||
-            !route.flatFormat.complete() || !route.canInstallFlatVm || !route.fetchesRetired ||
+            !route.canInstallFlatVm || !route.fetchesRetired ||
             !route.canClearFlatVm || !route.translationsRetired || !route.framebuffer || !pci ||
             !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, pci, true) ||
             !validBinding(next, intent.next, operation.provider, pci, false) ||
+            (old.pin && !route.flatFormat.complete(mapping(old))) || (next.pin && !route.flatFormat.complete(mapping(next))) ||
             (old.dma && next.dma && !(old.dma->qualified_.direct == next.dma->qualified_.direct)) ||
             ((old.pin || next.pin) && intent.previous.vmid == intent.next.vmid) ||
             (old.pin && next.pin && (!sameFlipGeometry(old.surface, next.surface) ||

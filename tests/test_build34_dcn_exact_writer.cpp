@@ -855,7 +855,29 @@ static DcnDirectDomain directContract(IOPCIDevice &device) {
             auto &pci = static_cast<IOPCIDevice &>(selected);
             assert(pci.references >= 2 && pci.directEvidence);
             return pci.directEvidence(descriptor, offset, address, use);
-        }};
+        }, DcnHostFlatProfile::Gmc11SnoopedSystemUc};
+}
+
+static void hostFlatWords() {
+    using Words = DcnHostFlatWords;
+    constexpr auto profile = DcnHostFlatProfile::Gmc11SnoopedSystemUc;
+    constexpr auto unavailable = DcnHostFlatProfile::Unqualified;
+    constexpr uint64_t limit = 1ull << 44, leafFlags = 0x0003000000000027;
+    uint64_t word = UINT64_MAX;
+    assert(!Words::root(unavailable, kPage, kPage, word) && word == UINT64_MAX);
+    assert(!Words::leaf(unavailable, kPage, word) && word == UINT64_MAX);
+    assert(!Words::decode(unavailable, kPage | leafFlags, word) && word == UINT64_MAX);
+    assert(!Words::root(profile, limit - kPage, 2 * kPage, word) && word == UINT64_MAX);
+    assert(!Words::root(profile, kPage, kPage + 1, word) && word == UINT64_MAX);
+    assert(Words::root(profile, limit - kPage, kPage, word) && word == ((limit - kPage) | 7));
+    assert(Words::leaf(profile, limit - kPage, word) && word == ((limit - kPage) | leafFlags));
+    uint64_t decoded = UINT64_MAX;
+    for (const uint64_t flag : {1ull, 2ull, 4ull, 8ull, 16ull, 32ull, 64ull, 0xf80ull, 1ull << 44, 1ull << 48,
+                               1ull << 51, 1ull << 54, 1ull << 63})
+        assert(!Words::decode(profile, word ^ flag, decoded) && decoded == UINT64_MAX);
+    assert(!Words::decode(profile, leafFlags, decoded) && decoded == UINT64_MAX);
+    assert(Words::decode(profile, word, decoded) && decoded == limit - kPage);
+    assert(!Words::leaf(profile, 0, word) && !Words::leaf(profile, kPage + 1, word) && !Words::leaf(profile, limit, word));
 }
 
 static void scanoutDmaQualification() {
@@ -975,6 +997,13 @@ static void scanoutDirectQualification() {
     device.dcnQualifyDirect = directContract;
     assert(dispatch(direct) == kIOReturnNotReady && !pci.mapperLookups && !host.prepares);
     pci.directGeneration = 17;
+    device.dcnQualifyDirect = [](IOPCIDevice &selected) {
+        auto contract = directContract(selected);
+        contract.encoding = DcnHostFlatProfile::Unqualified;
+        return contract;
+    };
+    assert(dispatch(direct) == kIOReturnNotReady && !pci.mapperLookups && !host.prepares);
+    device.dcnQualifyDirect = directContract;
     device.dcnQualifyMapper = mapperContract;
     assert(dispatch(mapped) == kIOReturnNotReady && pci.mapperLookups == 1 && !host.prepares);
     unsigned pagesChecked = 0;
@@ -1150,7 +1179,7 @@ struct CommitFixture {
     uint32_t lockSelect = 0, surfaceControl = 0;
     uint32_t surfaceFormat = 8, returnControl = 0x00e00000, swizzle = 0, start = 0;
     uint32_t dimensions = (17u << 16) | 64u, pitch = 63, odm = 0xfff00000, otg = 0x00010001;
-    const uint64_t ownedRoot = 0x123400005001;
+    const uint64_t ownedRoot;
     uint64_t contextRoot = 0, firstPage = 0, lastPage = 0;
     const uint64_t alternateRoot = 0x123400006001;
     uint64_t alternateContextRoot = 0, alternateFirst = 0, alternateLast = 0;
@@ -1169,7 +1198,8 @@ struct CommitFixture {
                        canClearFlatVm, translationsRetired, &framebuffer};
     ScanoutPinToken pin{}, alternatePin{};
 
-    explicit CommitFixture(bool direct = false) : directMode(direct) {
+    explicit CommitFixture(bool direct = false)
+        : ownedRoot(direct ? 0xe3400005007 : 0x123400005001), directMode(direct) {
         framebuffer.fixture = this;
         framebuffer.provider = scanout.device.pci;
         framebuffer.isPhxFramebuffer = true;
@@ -1191,7 +1221,9 @@ struct CommitFixture {
                 return address == host.base + 2 * offset;
             };
             scanout.device.dcnQualifyDirect = directContract;
-            configureTable(homeTable, ownedRoot, (host.base + 2 * kPage) | 0x91, (host.base + 4 * kPage) | 0x91);
+            route.flatFormat = {nullptr, nullptr, nullptr, tableCurrent};
+            constexpr uint64_t flags = 0x0003000000000027;
+            configureTable(homeTable, ownedRoot, (host.base + 2 * kPage) | flags, (host.base + 4 * kPage) | flags);
         } else {
             configureTable(homeTable, ownedRoot, 0x500091, 0x601091);
         }
@@ -1426,7 +1458,7 @@ struct CommitFixture {
                 static_cast<uint32_t>(table.root >> 32), static_cast<uint32_t>(table.root)};
             const unsigned index = self.vmWrites++ % 7;
             assert(sequence[index] == address - base && values[index] == value && !self.lockRequested && table.stores == 1);
-            assert(self.pageReads == (alternate ? 6u : 2u));
+            assert(self.pageReads == (self.directMode ? 0u : alternate ? 6u : 2u));
             auto &root = alternate ? self.alternateContextRoot : self.contextRoot;
             auto &firstPage = alternate ? self.alternateFirst : self.firstPage;
             auto &lastPage = alternate ? self.alternateLast : self.lastPage;
@@ -1691,7 +1723,7 @@ static void revalidateScanoutPixels(PixelFault fault) {
     assert(fixture.command.completes == 1 && present.wires == 0 && present.references == 1 && host.wires == 1);
 }
 
-enum class DirectFlipFault { None, DeniedTable, ShortTable, DomainLost, ReplacedPci, DomainLostAfterIssue };
+enum class DirectFlipFault { None, DeniedTable, ShortTable, DomainLost, ReplacedPci, WriteableLeaf, DomainLostAfterIssue };
 
 static void scanoutDirectFlip(DirectFlipFault fault) {
     CommitFixture fixture(true);
@@ -1707,6 +1739,13 @@ static void scanoutDirectFlip(DirectFlipFault fault) {
     }
     if (fault == DirectFlipFault::ShortTable) fixture.homeTable.shortPhysical = true;
     if (fault == DirectFlipFault::DomainLost) ++pci.directGeneration;
+    if (fault == DirectFlipFault::WriteableLeaf) {
+        const auto verifyStored = fixture.homeTable.onStore;
+        fixture.homeTable.onStore = [&, verifyStored] {
+            verifyStored();
+            fixture.homeTable.words[1] |= 0x40;
+        };
+    }
     IOPCIDevice replacement;
     if (fault == DirectFlipFault::ReplacedPci) {
         replacement.route = &fixture.route;
@@ -1716,7 +1755,8 @@ static void scanoutDirectFlip(DirectFlipFault fault) {
     ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
     if (fault != DirectFlipFault::None && fault != DirectFlipFault::DomainLostAfterIssue) {
         assert(fixture.begin(intent) == kIOReturnNotReady && !intent.operation.serial && !fixture.writes && !fixture.vmWrites);
-        assert(!fixture.command.created && !fixture.homeTable.dma.created && !fixture.homeTable.stores && !pci.mapperLookups);
+        assert(!fixture.command.created && !fixture.homeTable.dma.created && !pci.mapperLookups);
+        assert(fixture.homeTable.stores == (fault == DirectFlipFault::WriteableLeaf));
         assert(scanout.cancelPin(fixture.pin) == kIOReturnSuccess && pci.references == 1 && !fixture.homeTable.references);
         return;
     }
@@ -2226,6 +2266,7 @@ int main() {
     scanoutPinFailedPrepareAndRollback();
 #endif
 #ifdef TEST_SCANOUT_DMA
+    hostFlatWords();
     scanoutDmaQualification();
     scanoutDirectQualification();
     scanoutDmaPresentPreparation(false);
@@ -2246,7 +2287,8 @@ int main() {
 #endif
 #ifdef TEST_SCANOUT_FLIP
     for (const auto fault : {DirectFlipFault::None, DirectFlipFault::DeniedTable, DirectFlipFault::ShortTable,
-         DirectFlipFault::DomainLost, DirectFlipFault::ReplacedPci, DirectFlipFault::DomainLostAfterIssue}) scanoutDirectFlip(fault);
+         DirectFlipFault::DomainLost, DirectFlipFault::ReplacedPci, DirectFlipFault::WriteableLeaf,
+         DirectFlipFault::DomainLostAfterIssue}) scanoutDirectFlip(fault);
     for (const auto fault : {PixelFault::MapperRemap, PixelFault::MapperUnavailable, PixelFault::RenderPage,
          PixelFault::PresentPage, PixelFault::RenderGeneration, PixelFault::PresentGeneration, PixelFault::LateGeneration,
          PixelFault::WrongCommandSlice, PixelFault::SubstitutedDescriptor, PixelFault::LateEvidence, PixelFault::FrontRemap,

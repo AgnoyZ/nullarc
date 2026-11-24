@@ -4,7 +4,7 @@
 #include <IOKit/IODMACommand.h>
 #include <IOKit/IOMapper.h>
 
-#include "build34_dcn_page_layout.h"
+#include "build34_dcn_flat_words.h"
 
 namespace build34::dcn {
 
@@ -15,16 +15,18 @@ struct DcnDirectDomain {
     uint64_t generation;
     bool (*live)(IOService &, uint64_t);
     bool (*canFetch)(IOService &, uint64_t, const IOMemoryDescriptor &, uint64_t, uint64_t, DcnDirectUse);
+    DcnHostFlatProfile encoding{DcnHostFlatProfile::Unqualified};
 
-    bool empty() const { return !device && !generation && !live && !canFetch; }
-    bool complete() const { return device && generation && live && canFetch; }
+    bool empty() const { return !device && !generation && !live && !canFetch && encoding == DcnHostFlatProfile::Unqualified; }
+    bool complete() const { return device && generation && live && canFetch && DcnHostFlatWords::supported(encoding); }
     bool current() const { return complete() && !device->isInactive() && live(*device, generation); }
     bool operator==(const DcnDirectDomain &other) const {
-        return device == other.device && generation == other.generation && live == other.live && canFetch == other.canFetch;
+        return device == other.device && generation == other.generation && live == other.live &&
+            canFetch == other.canFetch && encoding == other.encoding;
     }
 
     bool permits(const IOMemoryDescriptor &descriptor, uint64_t offset, uint64_t physical, DcnDirectUse use) const {
-        return validDmaSegment(physical, kPageBytes, kPageBytes) && current() &&
+        return DcnHostFlatWords::range(physical, kPageBytes) && current() &&
             canFetch(*device, generation, descriptor, offset, physical, use) && current();
     }
 };
@@ -65,7 +67,7 @@ class DcnFlatDma {
         if (direct_) {
             IOByteCount contiguous = 0;
             const auto base = buffer_->getPhysicalSegment(0, &contiguous, kIOMemoryMapperNone);
-            if (!validDmaSegment(base, bytes, bytes) || contiguous < bytes) return false;
+            if (!DcnHostFlatWords::range(base, bytes) || contiguous < bytes) return false;
             dmaAddress_ = base;
             return pagesCurrent(mapper, live);
         }
