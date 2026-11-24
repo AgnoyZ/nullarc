@@ -479,10 +479,47 @@ addresses are exposed, and matching pages do not authorize DMA or scanout.
 CPU tests exercise the extracted present probe and native method together,
 including a short rounded tail, wrong surface or BO, a substituted last
 page, a short physical segment and a translation change during the walk.
-The original copy and flip paths are unchanged. Native frame association
-still needs to connect the completed writer with this synchronous probe,
-establish writer exclusion, and retain backing through hardware retirement
-before any copy may be bypassed.
+The original copy and flip paths are unchanged.
+
+The separate [exact native writer stage](../tools/build34_dcn_exact_writer_stage.py)
+derives the receipt-capacity and exact-open overlays, without stacking the
+earlier render-map or TLB overlay onto their different VM implementation. It
+accepts an optional sized extension on the existing exact submit selector.
+The extension names one direct non-preamble GFX IB and a normalized host
+BO range. The handler copies the wire once, rejects ambiguous IB addresses
+for nomination, and checks that the same kernel map generation, prepared
+descriptor and BO offset cover the range before and after the unchanged
+typed submit. A missing or ineligible nomination does not change the normal
+submit result. Neither the nomination nor a matched IB address proves what
+memory the command stream actually wrote.
+
+Each exact client keeps one numeric record outside the receipt registry. A
+checked native WaitReceipt or ACK can mark it complete, and ACK can still
+forget its slot. A later authenticated submit attempt, even if it fails or
+encounters full receipts, invalidates the record. Mapping operations and
+context free also invalidate it; close gates it out before the close reaper
+clears it. The synchronous backing method refuses client or GPUVM lock
+contention and checks the current VM allocation, owner and queue history
+before and after comparing the borrowed, prepared descriptors. The page
+walk includes the tail page and does not hold the GPUVM lock. No address
+or descriptor leaves the method. Its result is historical, not a lease or
+proof of DMA visibility; a caller needs the exact retained client and the
+borrowed transaction backing throughout the call.
+
+CPU tests run the extracted handler, typed submit, WaitReceipt, ACK and
+backing method against doubles, including unaligned envelopes, forged and
+stale receipts, ACK slot reuse, pending and out-of-order completion,
+submission refusal, remapping, close, and generation loss during the page
+walk. `BUILD34_KERNEL_HEADERS` enables a syntax-only check of the complete
+staged kernel source against the pinned SDK headers. Discarding the overlay
+is the rollback; no installation or runtime change is involved.
+
+RADV does not yet send this extension, and no consumer is registered with
+`performTransaction`. Before any copy bypass, the paired transport and
+retained present handoff must establish earlier-writer drain, later writer
+exclusion, actual native translation and HUBP visibility, and keep the
+backing alive through flip latch and old-page retirement. The exact-open
+gate, the R2a copy, and the `l10r` fallback remain unchanged.
 
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and

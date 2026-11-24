@@ -36,11 +36,10 @@ inline PresentCopyBacking observePreparedCopyBacking(const void *transaction, co
         {width, height, pitch / 4 - 1, kDcnArgb8888, rounded}} : PresentCopyBacking{};
 }
 
-inline bool comparePreparedCopyBacking(const PresentCopyBacking &present, RenderDescriptorLease &render) {
+inline bool comparePreparedCopyBacking(const PresentCopyBacking &present, OriginalBacking backing, uint64_t bytes) {
     auto slice = present.slice;
-    const auto backing = render.backing();
     if (!present.transaction || !present.surface || !present.preparation || slice.offset ||
-        slice.bytes != present.scanout.mappedBytes || !backing.readPage || render.bytes() != slice.bytes ||
+        slice.bytes != present.scanout.mappedBytes || !backing.readPage || bytes != slice.bytes ||
         livePresentPreparation(slice) != present.preparation)
         return false;
 
@@ -51,6 +50,10 @@ inline bool comparePreparedCopyBacking(const PresentCopyBacking &present, Render
             return false;
     }
     return livePresentPreparation(slice) == present.preparation;
+}
+
+inline bool comparePreparedCopyBacking(const PresentCopyBacking &present, RenderDescriptorLease &render) {
+    return comparePreparedCopyBacking(present, render.backing(), render.bytes());
 }
 
 }
