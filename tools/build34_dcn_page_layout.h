@@ -114,14 +114,31 @@ struct DmaSegment {
 };
 
 using ReadDmaBatch = bool (*)(void *context, uint64_t *offset, DmaSegment *segments, uint32_t *count);
+using ResolveDmaPage = bool (*)(void *context, const void *mapper, uint64_t dmaAddress, uint64_t *physical);
+using ReadOriginalPage = bool (*)(void *context, uint64_t backingOffset, uint64_t *physical);
+
+struct PreparedDmaMapping {
+    uint64_t bytes;
+    const void *mapper;
+    void *context;
+    ReadDmaBatch readBatch;
+    ResolveDmaPage resolvePage;
+};
+
+struct OriginalBacking {
+    void *context;
+    ReadOriginalPage readPage;
+};
 
 inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSurface &surface,
-                                          uint64_t preparedBytes, ReadDmaBatch readBatch, void *context,
+                                          const PreparedDmaMapping &mapping, const void *deviceMapper,
+                                          const OriginalBacking &backing,
                                           DmaRun *scratch, size_t runCapacity,
                                           uint64_t *pageAddresses, size_t pageCapacity) {
     const uint64_t bytes = surface.mappedBytes;
-    if (!readBatch || !scratch || !runCapacity || !pageAddresses || !bytes || bytes > kMaxBackingBytes ||
-        bytes % kPageBytes || preparedBytes != bytes || pageCapacity < bytes / kPageBytes ||
+    if (!deviceMapper || mapping.mapper != deviceMapper || !mapping.readBatch || !mapping.resolvePage ||
+        !backing.readPage || !scratch || !runCapacity || !pageAddresses || !bytes || bytes > kMaxBackingBytes ||
+        bytes % kPageBytes || mapping.bytes != bytes || pageCapacity < bytes / kPageBytes ||
         windowStart % kPageBytes || windowStart >= kAddressLimit || bytes > kAddressLimit - windowStart)
         return {};
 
@@ -134,7 +151,7 @@ inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSur
         const uint32_t capacity = available < batchSize ? static_cast<uint32_t>(available) : batchSize;
         uint32_t count = capacity;
         uint64_t next = covered;
-        if (!capacity || !readBatch(context, &next, segments, &count) || !count || count > capacity)
+        if (!capacity || !mapping.readBatch(mapping.context, &next, segments, &count) || !count || count > capacity)
             return {};
 
         for (uint32_t index = 0; index < count; ++index) {
@@ -146,6 +163,19 @@ inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSur
         }
         if (next != covered)
             return {};
+    }
+
+    for (size_t index = 0; index < runCount; ++index) {
+        const auto &run = scratch[index];
+        for (uint64_t offset = 0; offset < run.bytes; offset += kPageBytes) {
+            uint64_t original = 0;
+            uint64_t resolved = 0;
+            if (!backing.readPage(backing.context, run.backingOffset + offset, &original) ||
+                !original || original % kPageBytes ||
+                !mapping.resolvePage(mapping.context, deviceMapper, run.dmaAddress + offset, &resolved) ||
+                resolved != original)
+                return {};
+        }
     }
 
     return buildFlatPageLayout(windowStart, bytes, scratch, runCount, pageAddresses, pageCapacity);

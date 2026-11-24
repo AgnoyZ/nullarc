@@ -57,22 +57,45 @@ publishing any page addresses. The caller owns disposable run scratch and
 disjoint page output. CPU fixtures exercise 4,000 fragmented pages, a short
 last batch and errors injected after successful reads.
 
+Before publishing the page list, the collector now compares the physical
+page at each logical offset of the original backing with the physical page
+resolved from that offset's DMA address. It requires a non-null mapper
+identity independently attributed to the device and matching the prepared
+mapping. The caller must hold stable leases on the original pages and the
+exact mapping. The original lookup must read the pinned backing independently
+of DMA preparation, and the reverse lookup must use that same mapper and
+mapping lease. Each callback must establish a whole, contiguous 4 KiB physical
+page in the same address domain, not just a first-byte address. The helper
+rejects failed lookups, zero or unaligned original pages, and any mismatch
+without writing the page list, even if the last page fails. Scratch can
+change. The output remains DMA addresses, not the compared physical addresses.
+
+CPU fixtures cover non-identity DMA, one substituted page with an unchanged
+mapping context and extent, reordered and repeated targets, missing/wrong
+mapper identity, lookup failure, and coalesced DMA backed by noncontiguous
+physical pages. The 4,000-page test checks every emitted address.
+
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or
-matching descriptor does not prove zero-copy: XNU may substitute pages,
-and the macOS GPU's actual mapper and DCN address domain remain unverified.
-See [device DMA backing](BUILD34-SYSTEM-WRITEBACK.md#device-dma-backing).
+matching descriptor cannot rule out per-page bounce buffering. A null mapper
+does not establish identity, and the presence of `mapToPhysicalAddress()`
+does not prove that the concrete implementation can resolve this live lease
+without a fallback. The equality check is conditional on trusted callbacks;
+it cannot independently attest a mapper or a DCN route. See
+[device DMA backing](BUILD34-SYSTEM-WRITEBACK.md#device-dma-backing).
 This stage does not encode PTE flags: the generic AMDGPU definitions alone
 do not establish which permissions and cache attributes work on the live
 DCN path.
 
 There is no native call site, MMIO or active page-table change. Keep the
-AMD flip guard and the accepted R2a copy fallback unchanged. Next correlate
-the plugin's actual direct import with that exact retained descriptor and
-prove a bounce-free, DCN-usable mapping. The plugin does not yet expose the
-qualification metadata to PhxAccel. Native invalidation, render completion
-and visibility, hardware latch confirmation before retiring old pages, and
-bounded fallback/recovery are still required. Do not treat a successful
-plan as a valid hardware mapping, R3 acceptance or
+AMD flip guard and the accepted R2a copy fallback unchanged. Next prove
+that the plugin's actual linear host import and the retained presentation
+descriptor refer to the same pinned pages, not just the same IOSurface ID.
+The plugin does not yet expose the qualification metadata to PhxAccel. The
+actual device mapper, lease/reverse-lookup semantics and HUBP fetch domain
+still need proof. Native invalidation, render completion and visibility,
+hardware latch confirmation before retiring old pages, and bounded
+fallback/recovery are also required. Do not treat a successful plan as a
+valid hardware mapping, R3 acceptance or
 permission to run any hardware trial. Source-only rollback is a revert of
 this prerequisite; no installed state needs restoration.
 
