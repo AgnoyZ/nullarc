@@ -1,6 +1,7 @@
 #pragma once
 
 #include <IOKit/IODMACommand.h>
+#include <IOKit/IOLib.h>
 #include <IOKit/IOMapper.h>
 
 #include "build34_dcn_present_backing.h"
@@ -108,6 +109,31 @@ public:
         return pin.cancellable() && releaseUnmapped();
     }
 
+    bool preparePlan(const ScanoutDmaRequest &request, uint64_t bytes, size_t runCount) {
+        if (!command_ || uncertain_ || pages_ || !validScanoutDmaStorage(request, bytes)) return false;
+        const size_t entryCount = static_cast<size_t>(bytes / kPageBytes);
+        const size_t tableBytes = entryCount * sizeof(uint64_t);
+        auto *pages = static_cast<uint64_t *>(IOMallocZero(tableBytes));
+        if (!pages) return false;
+        const auto layout = buildFlatPageLayout(request.windowStart, bytes, request.scratch, runCount, pages, entryCount);
+        if (layout.entryCount != entryCount) {
+            IOFree(pages, tableBytes);
+            return false;
+        }
+        pages_ = pages;
+        layout_ = layout;
+        return true;
+    }
+
+    bool publishPlan(ScanoutDmaRequest &request, uint64_t bytes) const {
+        if (!pages_ || uncertain_ || !validScanoutDmaStorage(request, bytes) ||
+            layout_.firstLogicalPage != request.windowStart / kPageBytes || layout_.entryCount != bytes / kPageBytes)
+            return false;
+        for (size_t index = 0; index < layout_.entryCount; ++index) request.pages[index] = pages_[index];
+        request.layout = layout_;
+        return true;
+    }
+
 private:
     friend class ScanoutFlipCommit;
 
@@ -127,8 +153,11 @@ private:
     void releaseObjects() {
         command_->release();
         qualified_.mapper->release();
+        if (pages_) IOFree(pages_, layout_.tableBytes);
         command_ = nullptr;
         qualified_ = {};
+        pages_ = nullptr;
+        layout_ = {};
     }
 
     static bool readBatch(void *context, uint64_t *offset, DmaSegment *segments, uint32_t *count) {
@@ -154,6 +183,8 @@ private:
 
     IODMACommand *command_{nullptr};
     ScanoutDmaMapper qualified_{};
+    uint64_t *pages_{nullptr};
+    FlatPageLayout layout_{};
     bool uncertain_{false};
 };
 

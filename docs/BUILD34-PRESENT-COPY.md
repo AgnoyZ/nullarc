@@ -633,12 +633,17 @@ This also detects a per-page substitute when descriptor identity alone
 would pass. Only after final preparation, writer and queue checks does it
 publish the ordered DMA page addresses and the pin token. Read the outputs
 only on success. CPU result storage must be disjoint from scratch and the
-request; scratch content is not published. The addresses are not PTEs and
-do not leave the kernel.
+request; scratch content is not published. The DMA lease records its own
+ordered address list before those final checks. Caller output is a copy of
+this metadata, not the record used at flip time. At most two leases can
+retain up to 128 KiB of page addresses each. No pixel data is copied by this
+step. The addresses are not PTEs and do not leave the kernel.
 
 Unused cancellation completes the DMA command, independently confirms
 synchronous unmap of that exact command, then clears the command before
-releasing the pin. Some [XNU descriptor unmap paths](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L3095-L3105)
+releasing the address list and pin. Any route preparation for an unissued
+pin must also be withdrawn before cancellation; the current DMA adapter
+does not program DCN tables. Some [XNU descriptor unmap paths](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L3095-L3105)
 discard the mapper's error; `complete()` alone cannot establish safe release.
 `prepare` and `complete` disable bounce-buffer data synchronization.
 Uncertain prepare, descriptor substitution or cleanup retains the command,
@@ -646,8 +651,8 @@ mapper, client, IOSurface and pin in the same bounded slot without retrying
 the uncertain command. Neither success nor failure proves hardware retirement.
 CPU tests exercise a nonzero BO offset, fragmented batches, substituted or
 unproven pages, generation changes during mapping, and failures in prepare,
-complete, unmap confirmation and clear. This stage is source-only; omit it
-for rollback.
+address-list allocation, complete, unmap confirmation and clear. This stage
+is source-only; omit it for rollback.
 
 The [HUBP0 readback](../tools/build34_dcn_flip_readback.h) separates latch
 observation from old-address absence for one serialized, non-immediate
@@ -697,8 +702,20 @@ the two DMA pin serials.
 The route qualification hook is null. A future route must keep its context,
 power, exclusive display-writer lease, exact HUBP translation and render
 write exclusion valid through scanout. Qualification is read-only and sees
-the exact prepared DMA commands; an arbitrary logical address or a page
-match is not enough. After qualification and baseline readback, the provider
+the exact prepared DMA commands. After baseline readback the provider
+requires the route to resolve each pinned side's logical 4 KiB pages in
+its requested VMID and compares them in order with the DMA lease's private
+list. The resolver must read the selected display translation under the
+current route lease, including verification of the accessible leaf and its
+address domain; it must not echo the published DMA plan. This check is
+within the flip deadline, before update locking, and holds neither the GPU
+nor the client lock. A missing resolver, read error, mismatched final page,
+revoked route or elapsed deadline refuses before any register write.
+
+A page match does not establish device visibility, total fetch coverage,
+or proof of retirement. The route still must hold translation stable from
+qualification through scanout, and firmware-backed sides still need
+independent address qualification. After these checks, the provider
 marks the new pin as potentially displayed before allowing the address write.
 An issue failure can mean a posted write and is never retried or cancelled.
 `Issued` is not presentation, and ordinary CPU fallback cannot assume it is

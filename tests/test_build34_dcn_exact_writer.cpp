@@ -681,7 +681,12 @@ struct ScanoutFixture {
             return kIOReturnSuccess;
         };
     }
-    ~ScanoutFixture() { IOService::accelerator = nullptr; }
+    ~ScanoutFixture() {
+        IOService::accelerator = nullptr;
+#ifdef TEST_SCANOUT_DMA
+        DcnAllocationStub::reset();
+#endif
+    }
 
     void offer() {
         const auto writer = frame.nominate();
@@ -771,7 +776,7 @@ static void scanoutPinFailedPrepareAndRollback() {
 #endif
 
 #ifdef TEST_SCANOUT_DMA
-enum class DmaFault { None, AlternateDescriptor, WrongOffset, WrongPage, NoMappedPage, FailedPrepare, ChangedEpoch };
+enum class DmaFault { None, AlternateDescriptor, WrongOffset, WrongPage, NoMappedPage, FailedPrepare, ChangedEpoch, NoPlanMemory };
 enum class DmaCleanupFault { None, Complete, ConfirmUnmap, Clear };
 
 static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault::None) {
@@ -838,10 +843,12 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
     assert(dispatch() == kIOReturnBadArgument && !command.created);
     request.pages = savedPages;
     const bool failedPlan = fault != DmaFault::None;
+    DcnAllocationStub::fail = fault == DmaFault::NoPlanMemory;
     assert(dispatch() == (failedPlan ? kIOReturnNotReady : kIOReturnSuccess) && command.created == 1);
     if (!failedPlan) {
         assert(request.layout.entryCount == 2 && request.token.provider == &fixture.device && request.token.serial);
         assert(pages[0] == 0x400000 && pages[1] == 0x600000);
+        assert(DcnAllocationStub::live() == 1);
         assert(mapper.references == 2 && host.references == 3 && host.wires == 2);
         assert(fixture.cancelPin(request.token) == (cleanup == DmaCleanupFault::None ? kIOReturnSuccess : kIOReturnNotReady));
         assert(fixture.cancelPin(request.token) == kIOReturnNotFound);
@@ -856,6 +863,7 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
     assert(command.clears == cleared && command.releases == !reserved);
     assert(mapper.references == (reserved ? 2u : 1u) && host.wires == (reserved ? 2u : 1u));
     assert(fixture.surface.references == (reserved ? 2u : 1u) && fixture.client.references == (reserved ? 2u : 1u));
+    assert(DcnAllocationStub::live() == (!failedPlan && reserved ? 1u : 0u));
     IODMACommand::next = nullptr;
 }
 #endif
@@ -865,6 +873,7 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        Issue, UnlockTimeout, Close, CloseDuringQualify, CloseDuringRetire, LateRetire, Unmap,
                        WrongFormat, SwappedChannels, AlphaPlane, Protected, Tiled, WrongPitch, Cropped, WrongViewport,
                        SplitInput, SplitOutput, WrongOdmSource, DisabledOtg,
+                       NoTranslationReader, TranslationError, WrongLastPage, LateTranslation, RevokedTranslation, WrongPreviousPage,
                        DifferentPinnedPitch, GeometryAtLock, GeometryAtRetire, GeometryBeforeRetire };
 
 struct CommitFixture {
@@ -876,7 +885,7 @@ struct CommitFixture {
     HubpAddress programmed = home, active = home, earliest = home;
     uint32_t frame = 42;
     uint64_t now = 800;
-    unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0;
+    unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0, pageReads = 0;
     uint32_t lockSelect = 0, surfaceControl = 0;
     uint32_t surfaceFormat = 8, returnControl = 0x00e00000, swizzle = 0, start = 0;
     uint32_t dimensions = (17u << 16) | 64u, pitch = 63, odm = 0xfff00000, otg = 0x00010001;
@@ -885,7 +894,10 @@ struct CommitFixture {
     bool loseRouteAfterHigh = false, rewindAfterHigh = false;
     bool closeDuringQualify = false, closeDuringRetire = false, lateRetire = false;
     bool changeGeometryAtLock = false, changeGeometryAtRetire = false;
-    HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay}, qualified, retired};
+    FlipFault translationFault = FlipFault::None;
+    uint64_t outputPages[2]{};
+    HubpFlipRoute route{this, 5, &lifetime, {this, 0x80000, routeCurrent, read, clock}, {write, delay},
+                       qualified, readTranslatedPage, retired};
     ScanoutPinToken pin{};
 
     CommitFixture() {
@@ -902,14 +914,14 @@ struct CommitFixture {
         };
         command.segments = [](UInt64 *cursor, IODMACommand::Segment64 *segments, UInt32 *count) {
             assert(!*cursor && *count == 2);
-            segments[0] = {0x500000, 2 * kPage};
-            *count = 1;
+            segments[0] = {0x500000, kPage};
+            segments[1] = {0x601000, kPage};
             *cursor = 2 * kPage;
             return kIOReturnSuccess;
         };
         nextCommand.segments = command.segments;
         mapper.resolve = [&](const IODMACommand &mapped, uint64_t address, uint64_t &physical) {
-            assert(&mapped == IODMACommand::next && (address == 0x500000 || address == 0x501000));
+            assert(&mapped == IODMACommand::next && (address == 0x500000 || address == 0x601000));
             physical = scanout.frame.host.base + (address == 0x500000 ? 2 : 4) * kPage;
             return true;
         };
@@ -920,8 +932,7 @@ struct CommitFixture {
         };
         scanout.offer();
         DmaRun scratch[2]{};
-        uint64_t addresses[2]{};
-        ScanoutDmaRequest request{&scanout.frame.copy, mapped.address, scratch, 2, addresses, 2, {}, {}};
+        ScanoutDmaRequest request{&scanout.frame.copy, mapped.address, scratch, 2, outputPages, 2, {}, {}};
         const OSSymbol symbol{BUILD34_DCN_PIN_MAP};
         const auto surface = scanout.frame.copy.scanout;
         scanout.frame.copy.scanout.pitchPixelsMinusOne = 1;
@@ -930,7 +941,8 @@ struct CommitFixture {
         assert(dispatch(symbol, &request) == kIOReturnBadArgument && !command.created);
         scanout.frame.copy.scanout = surface;
         assert(dispatch(symbol, &request) == kIOReturnSuccess && request.token.serial);
-        assert(addresses[0] == 0x500000 && addresses[1] == 0x501000);
+        assert(outputPages[0] == 0x500000 && outputPages[1] == 0x601000 && DcnAllocationStub::live() == 1);
+        outputPages[0] = outputPages[1] = 0x700000;
         pin = request.token;
         scanout.frame.copy.scanout = {};
     }
@@ -950,6 +962,25 @@ struct CommitFixture {
                (!old && next == &self.command && request.nextPin == self.pin));
         if (self.closeDuringQualify) self.scanout.device.exactCallbacks.close();
         return self.qualify;
+    }
+
+    static bool readTranslatedPage(void *context, const HubpFlipRequest &request, ScanoutPinToken token,
+                                   HubpAddress address, uint64_t &dmaPage) {
+        auto &self = *static_cast<CommitFixture *>(context);
+        const bool previous = request.previousPin == token;
+        assert(token == self.pin && (previous ? request.previous : request.next) == self.mapped);
+        assert(!self.scanout.device.guard.held && !self.scanout.client.guard.held && !self.lockRequested);
+        assert(self.command.prepared && self.lifetime.references == 2);
+        const bool last = (self.pageReads++ & 1) != 0;
+        assert(address.vmid == self.mapped.vmid && address.address == self.mapped.address + (last ? kPage : 0));
+        dmaPage = last ? 0x601000 : 0x500000;
+        if (last && (self.translationFault == FlipFault::WrongLastPage ||
+                     (previous && self.translationFault == FlipFault::WrongPreviousPage))) {
+            dmaPage = self.outputPages[1];
+        }
+        if (self.translationFault == FlipFault::LateTranslation) self.now += 100000000;
+        if (self.translationFault == FlipFault::RevokedTranslation) self.live = false;
+        return self.translationFault != FlipFault::TranslationError;
     }
 
     static bool write(void *context, uint32_t address, uint32_t value) {
@@ -1105,6 +1136,18 @@ static void scanoutFlip(FlipFault fault) {
     fixture.loseRouteAfterHigh = fault == FlipFault::RouteLost;
     fixture.rewindAfterHigh = fault == FlipFault::ClockRewind;
     fixture.failIssue = fault == FlipFault::Issue;
+    fixture.translationFault = fault;
+    if (fault == FlipFault::NoTranslationReader) {
+        fixture.route.readTranslatedPage = nullptr;
+        assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.writes && !fixture.pageReads);
+        return;
+    }
+    if (fault >= FlipFault::TranslationError && fault <= FlipFault::RevokedTranslation) {
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial && !fixture.writes);
+        assert(fixture.pageReads == (fault == FlipFault::WrongLastPage ? 2u : 1u));
+        assert(fixture.lifetime.references == 1 && fixture.command.prepared && DcnAllocationStub::live() == 1);
+        return;
+    }
     if (!fixture.qualify || fixture.closeDuringQualify) {
         assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.issues);
         assert(!request.operation.serial && fixture.lifetime.references == 1);
@@ -1117,7 +1160,7 @@ static void scanoutFlip(FlipFault fault) {
         return;
     }
     assert(fixture.begin(request) == kIOReturnSuccess && request.operation.serial != fixture.pin.serial);
-    assert(fixture.writes && fixture.lifetime.references == 2 && !fixture.command.completes);
+    assert(fixture.writes && fixture.lifetime.references == 2 && !fixture.command.completes && fixture.pageReads == 2);
     assert(scanout.cancelPin(fixture.pin) == kIOReturnNotFound && fixture.begin(request) == kIOReturnBusy);
     ScanoutFlipPoll poll{request.operation, ScanoutFlipResult::Refused};
     const bool afterHigh = fixture.failHigh || fixture.loseRouteAfterHigh || fixture.rewindAfterHigh;
@@ -1165,8 +1208,14 @@ static void scanoutFlip(FlipFault fault) {
     }
 
     request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
+    if (fault == FlipFault::WrongPreviousPage) {
+        assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+        assert(fixture.pageReads == 4 && fixture.writes == 5 && !fixture.command.completes);
+        assert(fixture.lifetime.references == 2 && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
+        return;
+    }
     assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Issued);
-    assert(fixture.writes == 10 && fixture.issues == 2);
+    assert(fixture.writes == 10 && fixture.issues == 2 && fixture.pageReads == 4);
     poll.operation = request.operation;
     fixture.pending = fixture.retire = false;
     fixture.active = fixture.earliest = fixture.home;
@@ -1192,6 +1241,7 @@ static void scanoutFlip(FlipFault fault) {
     fixture.failUnmap = fault == FlipFault::Unmap;
     fixture.step(poll, fixture.failUnmap ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
     assert(fixture.command.completes == 1 && fixture.command.clears == !fixture.failUnmap);
+    assert(DcnAllocationStub::live() == (fixture.failUnmap ? 1u : 0u));
     assert(scanout.frame.host.wires == (fixture.failUnmap ? 2u : 1u));
     assert(fixture.lifetime.references == (fixture.failUnmap ? 2u : 1u));
     assert(scanout.surface.references == (fixture.failUnmap ? 2u : 1u));
@@ -1227,6 +1277,7 @@ int main() {
     scanoutDma(DmaFault::NoMappedPage);
     scanoutDma(DmaFault::ChangedEpoch);
     scanoutDma(DmaFault::FailedPrepare);
+    scanoutDma(DmaFault::NoPlanMemory);
     scanoutDma(DmaFault::None, DmaCleanupFault::Complete);
     scanoutDma(DmaFault::None, DmaCleanupFault::Clear);
     scanoutDma(DmaFault::None, DmaCleanupFault::ConfirmUnmap);
@@ -1261,6 +1312,12 @@ int main() {
     scanoutFlip(FlipFault::SplitOutput);
     scanoutFlip(FlipFault::WrongOdmSource);
     scanoutFlip(FlipFault::DisabledOtg);
+    scanoutFlip(FlipFault::NoTranslationReader);
+    scanoutFlip(FlipFault::TranslationError);
+    scanoutFlip(FlipFault::WrongLastPage);
+    scanoutFlip(FlipFault::LateTranslation);
+    scanoutFlip(FlipFault::RevokedTranslation);
+    scanoutFlip(FlipFault::WrongPreviousPage);
     scanoutFlip(FlipFault::DifferentPinnedPitch);
     scanoutFlip(FlipFault::GeometryAtLock);
     scanoutFlip(FlipFault::GeometryAtRetire);

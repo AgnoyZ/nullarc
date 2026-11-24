@@ -36,6 +36,7 @@ struct HubpFlipRoute {
     HubpFlipReader reader;
     HubpFlipWriter writer;
     bool (*qualify)(void *, const HubpFlipRequest &, const IODMACommand *, const IODMACommand *);
+    bool (*readTranslatedPage)(void *, const HubpFlipRequest &, ScanoutPinToken, HubpAddress, uint64_t &);
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
 };
 
@@ -50,7 +51,8 @@ public:
                            ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
         if (pending() || !live() || !operation.provider || !operation.serial ||
             !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify ||
-            !route.fetchesRetired || !(old.token == front_) || !(next.token == intent.nextPin) ||
+            !route.readTranslatedPage || !route.fetchesRetired ||
+            !(old.token == front_) || !(next.token == intent.nextPin) ||
             !validBinding(old, intent.previous, operation.provider, true) ||
             !validBinding(next, intent.next, operation.provider, false) ||
             (old.pin && next.pin && (!sameFlipGeometry(old.surface, next.surface) ||
@@ -65,11 +67,16 @@ public:
         const auto surface = next.pin ? next.surface : old.surface;
         readback_.recycle();
         if (!routeLifetime_) route.lifetime->retain();
+        auto withinBudget = [&] { return live() && readback_.stillInBudget(); };
+        auto translationCurrent = [&] {
+            return withinBudget() && route.reader.current(route.reader.context, request) && withinBudget();
+        };
         if (!route.qualify(route.reader.context, request, old.dma ? old.dma->command_ : nullptr,
                            next.dma ? next.dma->command_ : nullptr) ||
             !live() || !readback_.begin(request, route.reader) ||
-            !HubpFlipProgram::preflight(request, route.reader, route.writer, surface,
-                                       [&] { return live() && readback_.stillInBudget(); }) ||
+            !matchesTranslation(old, intent.previous, route, request, translationCurrent) ||
+            !matchesTranslation(next, intent.next, route, request, translationCurrent) ||
+            !HubpFlipProgram::preflight(request, route.reader, route.writer, surface, withinBudget) ||
             !live() ||
             (next.pin && !next.pin->beginDisplayUse())) {
             if (!routeLifetime_) route.lifetime->release();
@@ -133,8 +140,23 @@ private:
         return binding.token.provider == provider && binding.pin && binding.dma && binding.window == address.address &&
             validFlipGeometry(binding.surface) && binding.surface.mappedBytes == binding.pin->lease_.bytes() &&
             binding.surface.mappedBytes <= kAddressLimit - binding.window &&
-            binding.dma->command_ && !binding.dma->uncertain() && binding.pin->held() &&
+            binding.dma->command_ && binding.dma->pages_ && !binding.dma->uncertain() &&
+            binding.dma->layout_.firstLogicalPage == binding.window / kPageBytes &&
+            binding.dma->layout_.entryCount == binding.surface.mappedBytes / kPageBytes && binding.pin->held() &&
             binding.pin->displayUse_ == displayed;
+    }
+
+    template<typename Current>
+    static bool matchesTranslation(const ScanoutFlipBinding &binding, HubpAddress address, const HubpFlipRoute &route,
+                                   const HubpFlipRequest &request, Current current) {
+        if (!binding.dma) return true;
+        const auto &dma = *binding.dma;
+        for (size_t index = 0; index < dma.layout_.entryCount; ++index, address.address += kPageBytes) {
+            uint64_t observed = 0;
+            if (!current() || !route.readTranslatedPage(route.reader.context, request, binding.token, address, observed) ||
+                observed != dma.pages_[index]) return false;
+        }
+        return current();
     }
 
     ScanoutFlipResult fail() {

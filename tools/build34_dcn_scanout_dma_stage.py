@@ -77,18 +77,13 @@ def stage_native(driver, abi):
     replace(probe, '            const auto current = exactWriterMapLocked(span);\n',
             '''            const size_t runs = pinned && dma && live() ? dma->lease.prepareRuns(*pin, dma->qualified, present,
                 dma->request.scratch, dma->request.runCapacity) : 0;
+            const bool planned = runs && dma->lease.preparePlan(dma->request, span.bytes, runs);
             const auto current = exactWriterMapLocked(span);
 ''')
-    replace(probe, '            same = pinned && live()', '            same = pinned && (!dma || runs) && live()')
+    replace(probe, '            same = pinned && live()', '            same = pinned && (!dma || planned) && live()')
     replace(probe, '                live() && livePresentPreparation(present.slice) == present.preparation;\n',
             '''                live() && livePresentPreparation(present.slice) == present.preparation;
-            if (same && dma) {
-                auto &request = dma->request;
-                const auto layout = build34::dcn::buildFlatPageLayout(request.windowStart, span.bytes,
-                    request.scratch, runs, request.pages, request.pageCapacity);
-                same = layout.entryCount != 0;
-                if (same) request.layout = layout;
-            }
+            if (same && dma) same = dma->lease.publishPlan(dma->request, span.bytes);
 ''')
     replace(probe, '    if (pin && pin->held() && !same) (void)pin->releaseUnused();\n',
             '''    if (pin && pin->held() && !same && (!dma || dma->lease.releaseUnused(*pin)))
