@@ -275,6 +275,54 @@ consumer for the binding record. An IOSurface ID or user property may locate
 a candidate, but cannot substitute for the retained object and the live
 mapping snapshot. Page comparison still requires live backing on both sides.
 
+The [isolated plugin attachment observation](../tools/build34_dcn_render_write_stage.py)
+derives from five pinned build34 plugin files without changing `src/`. It
+records the actual `VkImage`, view, imported `VkDeviceMemory`, buffer, and
+binding extent after successful bind and view creation. It checks reported
+linear pitch, zero offset, and extent using the color aspect for linear
+tiling or memory plane 0 for the explicit linear DRM modifier. Only a
+nonplanar `BGRA` IOSurface with matching dimensions and pitch and enough
+space for the page-rounded footprint can be associated with that record.
+Sampleable-only aliases, private images, family VRAM, `l10r`, and sRGB views
+do not qualify. None of these process-local handles identifies a kernel BO.
+
+The staged recorder only records an attachment selected by the successful
+Vulkan render-pass begin, with its exact view and memory, full-image area,
+single sample, and mip and layer zero. Metal must have requested Clear and
+Store, and the actual render pass must still clear rather than load. This
+demonstrates a written color attachment in the recording, not draw coverage
+or compositor frame intent. Open passes and conflicting candidates are
+refused. Under the queue submit lock, only a successful submission receives
+a serial and a copy of the recorded identity in its own in-flight object.
+Successful fence completion and the existing completion-witness check, if
+applicable, move that copy to the exact submission part. After successful
+legacy publication the part checks its retained surface and unchanged
+backing. Nothing publishes the observation beyond that part or modifies the
+existing pending/ready mark, wait, or R2a copy behavior.
+
+This is a historical write observation, not a latest-frame receipt. Split
+parts keep separate identities; an out-of-order completion cannot use a
+different part's attachment but can still describe an older write to those
+pages. Before producing a frame receipt, account for all writers, including
+ineligible/alternate backing, later split parts, overlapping command buffers,
+GPU copy/compute operations, and external/CPU writes. Do not infer that
+ordering from an IOSurface seed, ready mark, or observation serial. The
+current imported-image alias also lacks `VkExternalMemoryImageCreateInfo`
+and uses `PREINITIALIZED`. Before any native trial, qualify the exact image
+usage and tiling for host-pointer import, declare that handle type, and
+handle the required `UNDEFINED` initial layout without losing IOSurface
+contents on the legacy sampling path. See the Vulkan valid-usage entries
+[`vkBindImageMemory-memory-02989`](https://docs.vulkan.org/refpages/latest/refpages/source/vkBindImageMemory.html)
+and [`VkImageCreateInfo-pNext-01443`](https://docs.vulkan.org/refpages/latest/refpages/source/VkImageCreateInfo.html).
+
+CPU tests compile the actual staged alias, render begin/end, submit and
+completion blocks with doubles. They cover wrong backing/layout, unsupported
+attachments, conflicting passes, rejected submissions, serial saturation and
+out-of-order completion. The complete staged plugin passes x86_64 SDK syntax
+checking with the pinned Vulkan headers; no bundle was built, loaded or run.
+Rollback is to discard the temporary source stage. The accepted source and
+installed images are unchanged.
+
 Hardware acceptance requires proof of the actual device mapper,
 lease/reverse-lookup semantics and HUBP fetch domain. It also requires
 native invalidation, render completion and visibility, hardware latch
