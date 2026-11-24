@@ -8,7 +8,7 @@ from test_build34_exact_ownership import method
 MAP = 'IOReturn PhxBringup::mapDcnPin('
 DMA_FIELDS = '''        build34::dcn::ScanoutDmaLease dma;
 '''
-MAPPER_GATE = '''    build34::dcn::ScanoutDmaMapper (*dcnCopyQualifiedMapper)(IOPCIDevice *){nullptr};
+MAPPER_GATE = '''    build34::dcn::ScanoutDmaMapper (*dcnQualifyMapper)(IOPCIDevice &, IOMapper &){nullptr};
     IOReturn mapDcnPin(build34::dcn::ScanoutDmaRequest &);
 '''
 CONSUME_DECL = '    bool checkDcnPresent(const build34::dcn::PresentCopyBacking &, DcnPinSlot * = nullptr);\n'
@@ -21,13 +21,19 @@ DMA_OPERATIONS_DECL = pin.OPERATIONS_DECL.replace(' &);\n',
 
 MAP_METHOD = '''IOReturn PhxBringup::mapDcnPin(build34::dcn::ScanoutDmaRequest &request) {
     phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
-    if (!callback || !pci || !dcnCopyQualifiedMapper) return kIOReturnNotReady;
+    auto *device = pci;
+    if (!callback || !device || device->isInactive() || !dcnQualifyMapper) return kIOReturnNotReady;
     if (!request.present || !build34::dcn::validScanoutDmaStorage(request, request.present->slice.bytes))
         return kIOReturnBadArgument;
-    const auto qualified = dcnCopyQualifiedMapper(pci);
-    if (!qualified.mapper) return kIOReturnNotReady;
-    Phx34ScopedReference mapperLifetime(qualified.mapper, false);
-    if (!qualified.completeContract()) return kIOReturnNotReady;
+    auto *mapper = IOMapper::copyMapperForDevice(device);
+    if (!mapper) return kIOReturnNotReady;
+    Phx34ScopedReference mapperLifetime(mapper, false);
+    const auto current = [&] {
+        return !exactCallbacks.closed() && pci == device && !device->isInactive() && !mapper->isInactive();
+    };
+    if (!current()) return kIOReturnNotReady;
+    const auto qualified = dcnQualifyMapper(*device, *mapper);
+    if (qualified.mapper != mapper || !qualified.completeContract() || !current()) return kIOReturnNotReady;
     return prepareDcnPin(*request.present, request.token, &request, &qualified);
 }
 

@@ -611,17 +611,35 @@ or retirement, or that a hold excludes writes.
 
 The [DMA plan stage](../tools/build34_dcn_scanout_dma_stage.py) uses a
 kernel-only request to prepare the exact pinned BO slice with a retained
-`IODMACommand` and explicit mapper. Its mapper qualification callback is
-null. No system mapper lookup, identity fallback, framebuffer call, or
-MMIO programming is enabled. A future provider must certify the live PCI
-mapper's active translation and unused-unmap status for the exact command;
-a bare reverse lookup cannot qualify it. The framebuffer must establish
-that DCN consumes the returned address domain. The qualification hook must
-return an owned mapper reference and read-only evidence callbacks valid for
-the lifetime of the retained mapper. Call on a sleepable thread outside a
-workloop gate. DMA preparation, the page walk and cleanup hold the client
-lock, not `gpuLock`. The evidence callbacks must not reenter the driver or
-acquire those locks. The per-page bound is not a latency guarantee.
+`IODMACommand` and explicit mapper. When a qualification callback is present,
+PhxBringup obtains a retained mapper from `IOMapper::copyMapperForDevice`
+using its own PCI device. The [pinned XNU lookup](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMapper.cpp#L167-L207)
+uses that device's `iommu-parent` property and can wait for a matching
+service. Missing or inactive services and a callback that substitutes a
+different mapper fail before the writer offer is consumed. The callback
+borrows the selected mapper; the driver owns the lookup reference and a
+successful DMA lease retains its own reference.
+
+Device attribution is not mapping qualification. The callback must certify
+active translations and unused-unmap status for the exact commands, and its
+evidence callbacks must stay valid for the lifetime of the retained mapper.
+`mapToPhysicalAddress()` reports an address but does not take a command or
+report the success of its unmap. After `complete()` the [pinned command implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IODMACommand.cpp#L1087-L1110)
+has discarded its local allocation record. Do not issue a second unmap or
+infer retirement from the loss of that record. No concrete provider of
+this evidence is known for the target mapper; the qualification callback
+remains null, so no lookup or DMA command runs by default. There is no
+system mapper lookup, identity fallback, framebuffer call or MMIO change.
+This uses XNU interfaces without importing implementation code.
+
+The framebuffer must independently establish that DCN consumes the returned
+address domain. Call on a sleepable thread outside a workloop gate. DMA
+preparation, the page walk and cleanup hold the client lock, not `gpuLock`.
+The evidence callbacks must not reenter the driver or acquire those locks.
+The per-page bound is not a latency guarantee. CPU fixtures verify lookup
+and reference balance, rejection of an unrelated mapper or incomplete
+evidence, and preservation of the unconsumed offer on refusal. Pinned SDK
+syntax checking is not native link, load or hardware acceptance.
 
 The command prepares the original BO offset and full rounded extent, but
 the segment cursor is relative to that prepared range. The reference

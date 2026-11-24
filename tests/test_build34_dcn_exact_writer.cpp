@@ -169,6 +169,9 @@ static void IODelay(unsigned us) { assert(us == 1); ++bar5Delays; }
 #endif
 struct IOPCIDevice {
     IOMapper *mapper = nullptr;
+    unsigned mapperLookups = 0;
+    bool inactive = false;
+    bool isInactive() const { return inactive; }
 #ifdef TEST_SCANOUT_FLIP
     HubpFlipRoute *route = nullptr;
 #endif
@@ -176,13 +179,18 @@ struct IOPCIDevice {
     Bar5Resource *bar5 = nullptr;
     uint16_t command = 2;
     uint32_t identity = 0x19001002;
-    bool inactive = false;
-    bool isInactive() const { return inactive; }
     uint16_t configRead16(uint32_t reg) const { assert(reg == kIOPCIConfigCommand); return command; }
     uint32_t configRead32(uint32_t reg) const { assert(reg == kIOPCIConfigVendorID); return identity; }
     Bar5Resource *getDeviceMemoryWithRegister(uint32_t reg) const { assert(reg == kIOPCIConfigBaseAddress5); return bar5; }
 #endif
 };
+
+IOMapper *IOMapper::copyMapperForDevice(IOPCIDevice *device) {
+    assert(device && !device->inactive);
+    ++device->mapperLookups;
+    if (device->mapper) device->mapper->retain();
+    return device->mapper;
+}
 #endif
 
 struct PhxBringup
@@ -826,6 +834,82 @@ static void scanoutPinFailedPrepareAndRollback() {
 enum class DmaFault { None, AlternateDescriptor, WrongOffset, WrongPage, NoMappedPage, FailedPrepare, ChangedEpoch, NoPlanMemory };
 enum class DmaCleanupFault { None, Complete, ConfirmUnmap, Clear };
 
+static ScanoutDmaMapper mapperContract(IOPCIDevice &device, IOMapper &mapper) {
+    assert(device.mapper == &mapper && mapper.references >= 2);
+    return {&mapper,
+        [](IOMapper &selected, const IODMACommand &command, uint64_t address, uint64_t &physical) {
+            return selected.resolve(command, address, physical);
+        },
+        [](IOMapper &selected, const IODMACommand &command) { return selected.confirmUnmap(command); }};
+}
+
+static void scanoutDmaQualification() {
+    ScanoutFixture fixture;
+    auto &device = fixture.device;
+    auto &pci = *device.pci;
+    auto &host = fixture.frame.host;
+    IOMapper mapper;
+    static IOMapper foreign;
+    IODMACommand command;
+    IODMACommand::next = &command;
+    DmaRun scratch[2]{};
+    uint64_t pages[2]{UINT64_MAX, UINT64_MAX};
+    ScanoutDmaRequest request{&fixture.frame.copy, 0x100000, scratch, 2, pages, 2, {}, {}};
+    const OSSymbol map{BUILD34_DCN_PIN_MAP};
+    auto refuses = [&](IOReturn result, unsigned lookups) {
+        assert(device.callPlatformFunction(&map, false, &request, nullptr, nullptr, nullptr) == result);
+        assert(pci.mapperLookups == lookups && mapper.references == 1 && foreign.references == 1);
+        assert(!command.created && !host.prepares && host.wires == 1 && !DcnAllocationStub::live());
+        assert(!request.layout.entryCount && !request.token.serial && pages[0] == UINT64_MAX && pages[1] == UINT64_MAX);
+    };
+    fixture.offer();
+    refuses(kIOReturnNotReady, 0);
+    device.dcnQualifyMapper = mapperContract;
+    device.pci = nullptr;
+    refuses(kIOReturnNotReady, 0);
+    device.pci = &pci;
+    pci.inactive = true;
+    refuses(kIOReturnNotReady, 0);
+    pci.inactive = false;
+    request.pageCapacity = 1;
+    refuses(kIOReturnBadArgument, 0);
+    request.pageCapacity = 2;
+    refuses(kIOReturnNotReady, 1);
+    pci.mapper = &mapper;
+    mapper.inactive = true;
+    device.dcnQualifyMapper = [](IOPCIDevice &, IOMapper &) -> ScanoutDmaMapper { assert(false); return {}; };
+    refuses(kIOReturnNotReady, 2);
+    mapper.inactive = false;
+    device.dcnQualifyMapper = [](IOPCIDevice &selected, IOMapper &actual) {
+        auto contract = mapperContract(selected, actual);
+        contract.mapper = &foreign;
+        return contract;
+    };
+    refuses(kIOReturnNotReady, 3);
+    device.dcnQualifyMapper = [](IOPCIDevice &selected, IOMapper &actual) {
+        auto contract = mapperContract(selected, actual);
+        contract.resolveMappedPage = nullptr;
+        return contract;
+    };
+    refuses(kIOReturnNotReady, 4);
+    device.dcnQualifyMapper = [](IOPCIDevice &selected, IOMapper &actual) {
+        auto contract = mapperContract(selected, actual);
+        contract.confirmUnusedUnmap = nullptr;
+        return contract;
+    };
+    refuses(kIOReturnNotReady, 5);
+    device.dcnQualifyMapper = [](IOPCIDevice &selected, IOMapper &actual) {
+        auto contract = mapperContract(selected, actual);
+        actual.inactive = true;
+        return contract;
+    };
+    refuses(kIOReturnNotReady, 6);
+    mapper.inactive = false;
+    ScanoutPinToken token{};
+    assert(fixture.pin(token) == kIOReturnSuccess && fixture.cancelPin(token) == kIOReturnSuccess);
+    IODMACommand::next = nullptr;
+}
+
 static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault::None) {
     ScanoutFixture fixture;
     DmaRun scratch[2]{};
@@ -835,25 +919,12 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
     auto dispatch = [&] {
         return fixture.device.callPlatformFunction(&map, false, &request, nullptr, nullptr, nullptr);
     };
-    assert(dispatch() == kIOReturnNotReady);
     IOMapper mapper;
     IODMACommand command;
     IODMACommand::next = &command;
     fixture.device.pci->mapper = &mapper;
-    fixture.device.dcnCopyQualifiedMapper = [](IOPCIDevice *device) -> ScanoutDmaMapper {
-        device->mapper->retain();
-        return {device->mapper, nullptr, nullptr};
-    };
+    fixture.device.dcnQualifyMapper = mapperContract;
     fixture.offer();
-    assert(dispatch() == kIOReturnNotReady && !command.created && mapper.references == 1);
-    fixture.device.dcnCopyQualifiedMapper = [](IOPCIDevice *device) -> ScanoutDmaMapper {
-        device->mapper->retain();
-        return {device->mapper,
-            [](IOMapper &mapper, const IODMACommand &command, uint64_t address, uint64_t &physical) {
-                return mapper.resolve(command, address, physical);
-            },
-            [](IOMapper &mapper, const IODMACommand &command) { return mapper.confirmUnmap(command); }};
-    };
     command.failPrepare = fault == DmaFault::FailedPrepare;
     command.wrongOffset = fault == DmaFault::WrongOffset;
     command.failComplete = cleanup == DmaCleanupFault::Complete;
@@ -887,11 +958,12 @@ static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault
     };
     auto *savedPages = request.pages;
     request.pages = reinterpret_cast<uint64_t *>(scratch);
-    assert(dispatch() == kIOReturnBadArgument && !command.created);
+    assert(dispatch() == kIOReturnBadArgument && !command.created && !fixture.device.pci->mapperLookups);
     request.pages = savedPages;
     const bool failedPlan = fault != DmaFault::None;
     DcnAllocationStub::fail = fault == DmaFault::NoPlanMemory;
     assert(dispatch() == (failedPlan ? kIOReturnNotReady : kIOReturnSuccess) && command.created == 1);
+    assert(fixture.device.pci->mapperLookups == 1);
     if (!failedPlan) {
         assert(request.layout.entryCount == 2 && request.token.provider == &fixture.device && request.token.serial);
         assert(pages[0] == 0x400000 && pages[1] == 0x600000);
@@ -1020,14 +1092,7 @@ struct CommitFixture {
         IODMACommand::next = &command;
         scanout.device.pci->mapper = &mapper;
         scanout.device.pci->route = &route;
-        scanout.device.dcnCopyQualifiedMapper = [](IOPCIDevice *pci) -> ScanoutDmaMapper {
-            pci->mapper->retain();
-            return {pci->mapper,
-                [](IOMapper &mapper, const IODMACommand &command, uint64_t address, uint64_t &physical) {
-                    return mapper.resolve(command, address, physical);
-                },
-                [](IOMapper &mapper, const IODMACommand &command) { return mapper.confirmUnmap(command); }};
-        };
+        scanout.device.dcnQualifyMapper = mapperContract;
         command.segments = [](UInt64 *cursor, IODMACommand::Segment64 *segments, UInt32 *count) {
             assert(!*cursor && *count == 2);
             segments[0] = {0x500000, kPage};
@@ -1906,6 +1971,7 @@ int main() {
     scanoutPinFailedPrepareAndRollback();
 #endif
 #ifdef TEST_SCANOUT_DMA
+    scanoutDmaQualification();
     scanoutDma(DmaFault::None);
     scanoutDma(DmaFault::AlternateDescriptor);
     scanoutDma(DmaFault::WrongOffset);
