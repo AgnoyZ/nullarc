@@ -4,6 +4,9 @@
 #ifdef TEST_PRESENT_HANDOFF
 #include "build34_dcn_present_route.h"
 #endif
+#ifdef TEST_SCANOUT_PINS
+#include "build34_dcn_scanout_pin.h"
+#endif
 
 #include <cassert>
 #include <cstdio>
@@ -57,10 +60,31 @@ struct Descriptor final : IOMemoryDescriptor {
         if (afterRead) afterRead();
         return base + 2 * offset + (offset == wrongPage ? kPage : 0);
     }
+#ifdef TEST_SCANOUT_PINS
+    unsigned references = 1, wires = 1, prepares = 0, completes = 0;
+    IOReturn prepareResult = kIOReturnSuccess, completeResult = kIOReturnSuccess;
+    std::function<void()> afterPrepare;
+    IOReturn prepare() override {
+        ++prepares;
+        if (prepareResult != kIOReturnSuccess) return prepareResult;
+        ++wires;
+        if (afterPrepare) afterPrepare();
+        return kIOReturnSuccess;
+    }
+    IOReturn complete() override {
+        assert(wires);
+        ++completes;
+        if (completeResult == kIOReturnSuccess) --wires;
+        return completeResult;
+    }
+    void retain() override { assert(references); ++references; }
+    void release() override { assert(references); --references; }
+#else
     IOReturn prepare() override { assert(false); return kIOReturnNotReady; }
     IOReturn complete() override { assert(false); return kIOReturnNotReady; }
     void retain() override { assert(false); }
     void release() override { assert(false); }
+#endif
 };
 
 struct IOAccelPhxNativeClient;
@@ -620,6 +644,115 @@ static void closeDuringPresent(bool inLookup) {
 }
 #endif
 
+#ifdef TEST_SCANOUT_PINS
+struct ScanoutFixture {
+    Frame frame;
+    IOAccelPhxNativeClient &client = frame.client;
+    PhxBringup &device = client.device;
+    IOService accelerator;
+    OSObject surface;
+    const OSSymbol prepare{BUILD34_DCN_PIN_PREPARE}, cancel{BUILD34_DCN_PIN_CANCEL};
+
+    ScanoutFixture() {
+        taskNow = client.task;
+        IOService::accelerator = &accelerator;
+        frame.copy.surface = &surface;
+        accelerator.lookup = [&](task_t task, uint32_t id, OSObject **out) {
+            assert(task == client.task && id == 21);
+            surface.retain();
+            *out = &surface;
+            return kIOReturnSuccess;
+        };
+    }
+    ~ScanoutFixture() { IOService::accelerator = nullptr; }
+
+    void offer() {
+        const auto writer = frame.nominate();
+        device.done[1] = writer.sequence;
+        assert(frame.ack(writer) == Status::Ok);
+        build34_dcn_present_offer offer{BUILD34_DCN_PRESENT_VERSION, sizeof(offer), writer, frame.request.writer.range, 21, 0};
+        IOExternalMethodArguments args;
+        args.selector = BUILD34_DCN_SEL_OFFER;
+        args.structureInput = &offer;
+        args.structureInputSize = sizeof(offer);
+        assert(client.doDcnPresentOffer(&args) == kIOReturnSuccess);
+    }
+    IOReturn pin(ScanoutPinToken &out) {
+        return device.callPlatformFunction(&prepare, false, &frame.copy, &out, nullptr, nullptr);
+    }
+    IOReturn cancelPin(ScanoutPinToken token) {
+        return device.callPlatformFunction(&cancel, false, &token, nullptr, nullptr, nullptr);
+    }
+};
+
+static void scanoutPinLifetime() {
+    ScanoutFixture fixture;
+    auto &host = fixture.frame.host;
+    ScanoutPinToken first{}, second{}, third{};
+    fixture.offer();
+    assert(fixture.pin(first) == kIOReturnSuccess && first.provider == &fixture.device && first.serial);
+    assert(host.references == 2 && host.wires == 2 && fixture.surface.references == 2 && fixture.client.references == 2);
+    assert(fixture.pin(second) == kIOReturnNotReady && !second.serial);
+    fixture.offer();
+    assert(fixture.pin(second) == kIOReturnSuccess && second.serial > first.serial);
+    fixture.offer();
+    assert(fixture.pin(third) == kIOReturnNoResources && !third.serial);
+    assert(fixture.cancelPin({&fixture.surface, first.serial}) == kIOReturnBadArgument);
+    IOLockLock(fixture.client.lock);
+    assert(fixture.cancelPin(first) == kIOReturnBusy);
+    IOLockUnlock(fixture.client.lock);
+    assert(fixture.cancelPin(first) == kIOReturnSuccess && fixture.pin(third) == kIOReturnSuccess);
+    assert(third.serial > second.serial && fixture.cancelPin(first) == kIOReturnNotFound);
+    assert(fixture.cancelPin(second) == kIOReturnSuccess);
+
+    fixture.client.exactClientCallbacks.close();
+    assert(fixture.device.requestLegacyClose(&fixture.client));
+    assert(host.complete() == kIOReturnSuccess);
+    host.release();
+    fixture.device.sealStoppedQueues();
+    assert(host.references == 1 && host.wires == 1 && fixture.client.references == 2 && fixture.surface.references == 2);
+    assert(fixture.cancelPin(third) == kIOReturnSuccess);
+    assert(!host.references && !host.wires && fixture.client.references == 1 && fixture.surface.references == 1);
+}
+
+static void scanoutPinFailedPrepareAndRollback() {
+    ScanoutFixture fixture;
+    auto &host = fixture.frame.host;
+    ScanoutPinToken token{};
+    fixture.offer();
+    host.prepareResult = kIOReturnNotReady;
+    assert(fixture.pin(token) == kIOReturnNotReady && !token.serial);
+    assert(host.references == 1 && host.wires == 1 && !host.completes && fixture.surface.references == 1);
+    host.prepareResult = kIOReturnSuccess;
+    fixture.offer();
+    host.afterPrepare = [&] {
+        assert(fixture.client.guard.held && !fixture.device.guard.held);
+        ScanoutPinToken reentrant{};
+        assert(fixture.pin(reentrant) == kIOReturnBusy && !reentrant.serial);
+        ++fixture.device.exactInvalidationEpoch;
+    };
+    assert(fixture.pin(token) == kIOReturnNotReady && !token.serial);
+    assert(host.references == 1 && host.wires == 1 && host.completes == 1 && fixture.surface.references == 1);
+
+    host.completeResult = kIOReturnNotReady;
+    fixture.offer();
+    assert(fixture.pin(token) == kIOReturnNotReady && !token.serial);
+    assert(host.references == 2 && host.wires == 2 && host.completes == 2 && fixture.surface.references == 2);
+    host.completeResult = kIOReturnSuccess;
+    host.afterPrepare = nullptr;
+    fixture.offer();
+    assert(fixture.pin(token) == kIOReturnSuccess && token.serial);
+    ScanoutPinToken overflow{};
+    fixture.offer();
+    assert(fixture.pin(overflow) == kIOReturnNoResources && !overflow.serial);
+    assert(fixture.device.dcnPins[1].descriptor.beginDisplayUse());
+    assert(!fixture.device.dcnPins[1].descriptor.beginDisplayUse());
+    fixture.device.sealStoppedQueues();
+    assert(fixture.cancelPin(token) == kIOReturnNotFound && host.completes == 2);
+    assert(host.references == 3 && host.wires == 3 && fixture.surface.references == 3);
+}
+#endif
+
 int main() {
     completionAndPages();
     newerAndRacingCompletions();
@@ -630,6 +763,10 @@ int main() {
     exercisePresentHandoff();
     closeDuringPresent(true);
     closeDuringPresent(false);
+#endif
+#ifdef TEST_SCANOUT_PINS
+    scanoutPinLifetime();
+    scanoutPinFailedPrepareAndRollback();
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

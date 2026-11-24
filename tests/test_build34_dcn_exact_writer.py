@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 
 import build34_dcn_exact_writer_stage as writer
 import build34_dcn_present_handoff_stage as handoff
+import build34_dcn_scanout_pin_stage as scanout_pin
 from build34_dcn_present_backing_stage import ACCEL, stage as present_backing
 import build34_exact_submit_pressure as pressure
 from build34_exact_open import stage as exact_open, stage_header
@@ -70,6 +71,9 @@ class ExactWriterTests(unittest.TestCase):
     def test_extracted_present_handoff(self):
         self.check_native_methods(paired=True)
 
+    def test_extracted_scanout_pin_lifetime(self):
+        self.check_native_methods(paired=True, pins=True)
+
     def test_present_handoff_preserves_collecting_only_boundaries(self):
         source = handoff.stage_native(DRIVER, ABI)
         for signature in ('bool PhxBringup::exactNativeOpenAdmitted(', 'bool PhxBringup::captureExactOpenLocked(',
@@ -79,21 +83,32 @@ class ExactWriterTests(unittest.TestCase):
         signature = 'IOReturn NVDisplayPipe::performTransaction('
         self.assertEqual(method(handoff.stage_accelerator(accelerator), signature),
                          method(present_backing(accelerator), signature))
+        pinned = scanout_pin.stage_native(DRIVER, ABI)
+        for signature in ('bool PhxBringup::exactNativeOpenAdmitted(', 'IOReturn PhxBringup::gpuSubmit(',
+                          'IOReturn IOAccelPhxNativeClient::externalMethod(', handoff.CLOSE, handoff.SEAL):
+            self.assertEqual(method(pinned, signature), method(source, signature))
 
-    def check_native_methods(self, paired=False):
+    def check_native_methods(self, paired=False, pins=False):
         fixture = Path(__file__).with_suffix('.cpp').read_text()
-        source = handoff.stage_native(DRIVER, ABI) if paired else self.source
+        source = scanout_pin.stage_native(DRIVER, ABI) if pins else handoff.stage_native(DRIVER, ABI) if paired else self.source
         client = source[source.index('class IOAccelPhxNativeClient :'):]
         types = client[client.index('    struct Bo {'):client.index('    IOReturn doHello(')]
         signatures = SIGNATURES
         if paired:
             signatures += (handoff.GLOBAL, handoff.ATTACH, handoff.CONSUME, handoff.DISPATCH, handoff.CLIENT_MATCH, handoff.OFFER,
                            handoff.CLOSE, handoff.SEAL)
+        fields = handoff.PROVIDER_FIELDS
+        probe = writer.PROBE_DECL
+        if pins:
+            signatures += (scanout_pin.PREPARE, scanout_pin.CANCEL)
+            fields = fields[:fields.index('    bool checkDcnPresent(')] + scanout_pin.FIELDS + scanout_pin.OPERATIONS_DECL
+            probe = scanout_pin.PROBE_DECL
         for marker, replacement in {
-            '// WRITER_METHODS': '\n'.join(method(source, signature) for signature in signatures),
-            '// WRITER_SERVICE': handoff.DRAIN_DECL + handoff.PROVIDER_PUBLIC + handoff.PROVIDER_FIELDS
+            '// WRITER_METHODS': ('static OwnerEpochs gDcnPinSerials;\n' if pins else '') +
+            '\n'.join(method(source, signature) for signature in signatures),
+            '// WRITER_SERVICE': handoff.DRAIN_DECL + handoff.PROVIDER_PUBLIC + fields
             if paired else writer.SERVICE_DECL,
-            '// WRITER_CLIENT': writer.CLIENT_STATE + writer.PROBE_DECL + (handoff.CLIENT_FIELDS if paired else ''),
+            '// WRITER_CLIENT': writer.CLIENT_STATE + probe + (handoff.CLIENT_FIELDS if paired else ''),
             '// WRITER_TYPES': types,
         }.items():
             self.assertEqual(fixture.count(marker), 1)
@@ -103,6 +118,7 @@ class ExactWriterTests(unittest.TestCase):
         source.write_text(fixture)
         compiler = shlex.split(os.environ.get('CXX', 'clang++'))
         self.run_checked([*compiler, *(['-DTEST_PRESENT_HANDOFF'] if paired else []),
+                          *(['-DTEST_SCANOUT_PINS'] if pins else []),
                           '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable', '-O1', '-g',
                           '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I' + str(self.headers),
                           '-I' + str(ROOT / 'tests/build34_dcn'), '-I' + str(ROOT / 'tools'),
@@ -125,7 +141,7 @@ class ExactWriterTests(unittest.TestCase):
                  '-std=c++17', '-fapple-kext', '-fno-rtti', '-fno-exceptions', '-fsyntax-only',
                  '-I' + os.environ['BUILD34_KERNEL_HEADERS'], '-I' + str(self.headers),
                  '-I' + str(ROOT / 'tools'), '-I' + str(src.parent)]
-        for source in (self.source, handoff.stage_native(DRIVER, ABI)):
+        for source in (self.source, handoff.stage_native(DRIVER, ABI), scanout_pin.stage_native(DRIVER, ABI)):
             src.write_text(source)
             self.run_checked([*flags, str(src)])
         accel = ROOT / ACCEL

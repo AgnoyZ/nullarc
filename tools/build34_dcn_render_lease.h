@@ -56,7 +56,13 @@ public:
     bool uncertain() const { return state_ == State::Uncertain; }
 
 private:
+    friend class ScanoutDescriptorPin;
     enum class State { Empty, Transition, Held, Closed, Uncertain };
+
+    void recycleClosed() {
+        if (state_ == State::Closed)
+            state_ = State::Empty;
+    }
 
     static bool readPage(void *context, uint64_t offset, uint64_t *physical) {
         auto *lease = static_cast<RenderDescriptorLease *>(context);

@@ -581,6 +581,34 @@ CPU tests run the actual prefix and present methods with an older pending
 Compute submission, an unadopted queue, epoch or queue generation changes,
 and newer Compute work during comparison.
 
+The separate [scanout pin stage](../tools/build34_dcn_scanout_pin_stage.py)
+can consume that same offer into either of two provider-owned hold slots.
+After the page match, it retains and independently prepares the exact host
+BO descriptor under the client lock, without `gpuLock`, then repeats the
+map, preparation and queue-drain checks before returning a token. The
+token is kernel-only and has a module-lifetime non-reused serial. The slot
+also owns the IOSurface and client references. The client reference keeps
+the original BO/descriptor cleanup lock and its provider alive after client
+close. No naked descriptor or page reader escapes the slot.
+
+Only a pre-programming pin can be cancelled. A caller must hold a provider
+reference through prepare or cancel. Both use try-only admission; cancellation
+can be retried after lock contention, including after provider stop. A
+failed descriptor completion quarantines that slot and keeps its references
+without repeating the completion. A full pool refuses a new hold without
+consuming the pending offer. The pin type has a one-way display-use state
+that forbids cancellation once hardware might read the pages. This stage
+does not expose a display-use or hardware-retirement operation. Neither the
+framebuffer nor the accelerator calls the new prepare/cancel routes, and
+close, stop and timer ticks cannot retire a pin. The R2a and `l10r` copy paths
+are unchanged; rollback is to omit this overlay.
+
+CPU fixtures run the staged kernel dispatch and methods, testing the live
+BO pin through simulated original BO cleanup and client/provider closure,
+failed prepare and rollback, reentry, capacity, stale tokens and refusal to
+cancel a potentially displayed pin. They do not establish hardware mapping
+or retirement, or that a hold excludes writes.
+
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of
 writers outside that history or exclude later GPU, CPU or external writes
