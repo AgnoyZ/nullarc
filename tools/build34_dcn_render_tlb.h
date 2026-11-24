@@ -43,25 +43,25 @@ public:
     RenderTlbAck() = default;
 
     static RenderTlbAck observe(RenderVmTranslation request, void *context,
-                                bool (*sample)(void *, RenderTlbSample *)) {
+                                bool (*sample)(void *, RenderTlbSample *), uint32_t companionMask = 0) {
         if (!sample || !request.mapping.client || !request.provider || !request.context ||
             request.vmid < 8 || request.vmid > 15 || !validRenderGeneration(request.mapping.generation) ||
             !validRenderGeneration(request.contextGeneration) || !validRenderGeneration(request.bindingGeneration) ||
             !validRenderGeneration(request.tableGeneration) || !validRenderGeneration(request.invalidateGeneration))
             return {};
 
-        const uint32_t mask = 1u << request.vmid;
+        const uint32_t mask = (1u << request.vmid) | companionMask;
+        if ((mask & 0xffffu) != mask)
+            return {};
         uint64_t previousElapsed = 0;
-        bool observedClear = false;
+        uint32_t cleared = 0;
         for (unsigned attempt = 0; attempt < 1000; ++attempt) {
             RenderTlbSample reading{};
             if (!sample(context, &reading) || !sameRenderTranslation(request, reading.current) ||
                 reading.ackBits == UINT32_MAX || reading.elapsedNs < previousElapsed || reading.elapsedNs >= 1000000)
                 return {};
-
-            if (!(reading.ackBits & mask))
-                observedClear = true;
-            else if (observedClear) {
+            cleared |= ~reading.ackBits & mask;
+            if ((cleared & reading.ackBits) == mask) {
                 RenderTlbAck result;
                 result.translation_ = request;
                 return result;

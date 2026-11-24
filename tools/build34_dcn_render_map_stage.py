@@ -79,17 +79,29 @@ def stage(driver, abi):
             "    friend class IOAccelPhxNativeClient;\n"
             "    uint64_t renderVmSerial{0};\n"
             "    bool renderVmClosed{false};\n"
+            "    build34::dcn::RenderVmTranslation renderInvalidateRequest{};\n"
+            "    bool renderInvalidateUncertain{false};\n"
+            "    bool (*renderEngine17IdleAndExclusive)(const PhxBringup *){nullptr};\n"
             "    uint64_t nextRenderVmGenerationLocked();\n"
             "    build34::dcn::RenderVmTranslation renderVmIdentityLocked(\n"
+            "        uint32_t handle, build34::dcn::RenderMapIdentity mapping);\n"
+            "    build34::dcn::RenderTlbAck confirmRenderTlbLocked(\n"
             "        uint32_t handle, build34::dcn::RenderMapIdentity mapping);\n")
     replace("    uint64_t softwareMappedHostGenerationLocked(uint64_t va, uint64_t bytes) const;\n",
             "    uint64_t softwareMappedHostGenerationLocked(uint64_t va, uint64_t bytes) const;\n"
-            "    build34::dcn::RenderVmTranslation renderTranslationLocked(uint64_t va, uint64_t bytes) const;\n")
+            "    build34::dcn::RenderVmTranslation renderTranslationLocked(uint64_t va, uint64_t bytes) const;\n"
+            "    build34::dcn::RenderTlbAck confirmRenderTlbLocked(uint64_t va, uint64_t bytes) const;\n")
     replace(anchor, """build34::dcn::RenderVmTranslation IOAccelPhxNativeClient::renderTranslationLocked(
     uint64_t va, uint64_t bytes) const {
     const uint64_t generation = softwareMappedHostGenerationLocked(va, bytes);
     return generation && owner ? owner->renderVmIdentityLocked(vmid, {this, generation})
                                : build34::dcn::RenderVmTranslation{};
+}
+
+build34::dcn::RenderTlbAck IOAccelPhxNativeClient::confirmRenderTlbLocked(uint64_t va, uint64_t bytes) const {
+    const uint64_t generation = softwareMappedHostGenerationLocked(va, bytes);
+    return generation && owner ? owner->confirmRenderTlbLocked(vmid, {this, generation})
+                               : build34::dcn::RenderTlbAck{};
 }
 
 """ + anchor)
@@ -98,6 +110,10 @@ def stage(driver, abi):
             "    __atomic_store_n(&renderVmClosed, true, __ATOMIC_RELEASE);\n")
     replace("    if (ordinal == 0) {\n", "    if (ordinal == 0) {\n"
             "        __atomic_store_n(&renderVmClosed, true, __ATOMIC_RELEASE);\n")
+    replace("    void vmFlushTlb(uint32_t vmid) const;\n", "    void vmFlushTlb(uint32_t vmid);\n")
+    replace("void PhxBringup::vmFlushTlb(uint32_t vmid) const {\n",
+            "void PhxBringup::vmFlushTlb(uint32_t vmid) {\n"
+            "    renderInvalidateRequest = {};\n")
     replace("uint32_t PhxBringup::vmidAlloc() {", """uint64_t PhxBringup::nextRenderVmGenerationLocked() {
     return renderVmSerial < UINT64_MAX - 1 ? ++renderVmSerial : 0;
 }
@@ -113,8 +129,72 @@ build34::dcn::RenderVmTranslation PhxBringup::renderVmIdentityLocked(
         context->hw < kFirstUserVmid || context->hw >= kFirstUserVmid + kNumUserVmids ||
         hwv[context->hw - kFirstUserVmid].ctx != handle)
         return {};
-    return {mapping, this, context->renderContextGeneration, context->renderBindingGeneration,
-            context->renderTableGeneration, 0, handle, context->hw};
+    build34::dcn::RenderVmTranslation result{mapping, this, context->renderContextGeneration,
+        context->renderBindingGeneration, context->renderTableGeneration,
+        renderInvalidateRequest.invalidateGeneration, handle, context->hw};
+    if (!build34::dcn::sameRenderTranslation(result, renderInvalidateRequest))
+        result.invalidateGeneration = 0;
+    return result;
+}
+
+build34::dcn::RenderTlbAck PhxBringup::confirmRenderTlbLocked(
+    uint32_t handle, build34::dcn::RenderMapIdentity mapping) {
+    using namespace build34::dcn;
+    renderInvalidateRequest = {};
+    auto request = renderVmIdentityLocked(handle, mapping);
+    if (!request.provider || renderInvalidateUncertain || !renderEngine17IdleAndExclusive ||
+        !mmio || mmio->getLength() < 4u * (kRegInvEng17Ack + 1u) || !renderEngine17IdleAndExclusive(this) ||
+        !sameRenderTranslation(request, renderVmIdentityLocked(handle, mapping)))
+        return {};
+    const uint32_t mask = (1u << request.vmid) | 1u;
+    const uint32_t baseline = rreg(kRegInvEng17Ack);
+    if (baseline == UINT32_MAX || (baseline & mask) != mask ||
+        !sameRenderTranslation(request, renderVmIdentityLocked(handle, mapping)))
+        return {};
+    const uint64_t generation = nextRenderVmGenerationLocked();
+    if (!generation)
+        return {};
+
+    request.invalidateGeneration = generation;
+    renderInvalidateRequest = request;
+    struct Sampling {
+        PhxBringup *provider;
+        RenderVmTranslation request;
+        uint64_t start;
+        uint64_t previous;
+    } sampling{this, request, mach_absolute_time(), 0};
+    sampling.previous = sampling.start;
+    const auto sample = [](void *opaque, RenderTlbSample *value) -> bool {
+        auto &state = *static_cast<Sampling *>(opaque);
+        auto *device = state.provider;
+        const auto &expected = state.request;
+        if (!sameRenderTranslation(expected, device->renderVmIdentityLocked(expected.context, expected.mapping)))
+            return false;
+        const uint64_t before = mach_absolute_time();
+        uint64_t elapsed = 0;
+        if (before < state.previous)
+            return false;
+        absolutetime_to_nanoseconds(before - state.start, &elapsed);
+        if (elapsed >= 1000000)
+            return false;
+        value->ackBits = device->rreg(kRegInvEng17Ack);
+        const uint64_t after = mach_absolute_time();
+        if (after < before)
+            return false;
+        state.previous = after;
+        absolutetime_to_nanoseconds(after - state.start, &value->elapsedNs);
+        value->current = device->renderVmIdentityLocked(expected.context, expected.mapping);
+        return true;
+    };
+    __asm__ __volatile__("mfence" ::: "memory");
+    wreg(kRegInvEng17Req, 0x00F80000u | mask);
+    const auto ack = RenderTlbAck::observe(request, &sampling, sample, 1u);
+    if (!ack.matches(renderVmIdentityLocked(handle, mapping))) {
+        renderInvalidateRequest = {};
+        renderInvalidateUncertain = true;
+        return {};
+    }
+    return ack;
 }
 
 uint32_t PhxBringup::vmidAlloc(const void *client) {""")

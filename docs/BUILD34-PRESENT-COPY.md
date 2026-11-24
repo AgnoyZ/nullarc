@@ -168,9 +168,10 @@ context, evicting its VMID or changing its tables invalidates old identities.
 A partial map failure disables snapshots for that allocation. Stop and the
 first sleep close identity admission for the provider instance. The
 generator's counter can saturate without changing the legacy return values.
-The snapshot carries an invalidation generation of zero, so the legacy
-flush cannot satisfy the lease gate. Tests extract the build34 allocation,
-bind, free, map, unmap, flush and power callback for CPU-only execution.
+A snapshot without a confirmed request carries an invalidation generation
+of zero, so the legacy flush cannot satisfy the lease gate. Tests extract
+the build34 allocation, bind, free, map, unmap, flush and power callback
+for CPU-only execution.
 They cover reused context slots and VMIDs, partial page-table writes and
 counter saturation. A future caller must hold the provider lifetime through
 the lock acquisition and snapshot use. The admission bit alone cannot
@@ -188,17 +189,35 @@ the current mapping before retaining any pages. CPU fixtures verify stale
 and late ACKs, request replacement, context and VMID reuse, a stopped clock,
 and rejection at the lease boundary.
 
-Native integration needs a trusted sampler that reads ACK and the current
-identity together under the GPUVM lifetime and invalidation guards. The
-caller must exclude outstanding invalidations and other writers to the same
-engine. Provider stop and power loss must invalidate outstanding identities,
-and the live map must be resolved again under protection at lease acquisition.
-The clear-to-set requirement conservatively falls back when completion is so
-fast that sampling misses the clear. Linux v6.12 documents the corresponding
-[engine-17 request and ACK bit](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c#L208-L298),
-including its power-gating considerations. This stage checks the software
-contract with synthetic inputs. Native ACK freshness, the actual render
-binding and frame completion still require evidence from the device path.
+The isolated driver stage connects the sampler to the existing GFXHUB
+register accessors and monotonic clock. With the client and GPUVM locks held,
+it checks the live map and requires a trusted, lock-held engine-17
+idle/exclusive check **before** reading or writing MMIO. The proof hook is
+null in the staged driver; there is no runtime caller. The check must cover
+all prior invalidations and hold off competing MMIO, queue, and firmware
+writers across the transaction. Neither `gpuLock` alone nor a high ACK
+level establishes that guarantee. The caller must separately protect
+provider, power, and MMIO lifetimes through sampling and lease acquisition.
+
+The sampler preserves the original request word, which selects the render
+VMID **and VMID 0**. Both ACK bits must be set in the pre-write sample.
+After the write each selected bit must be observed clear, then both must
+be set in the same sample within 1 ms and 1,000 post-write reads. It
+rechecks the request identity before and after ACK reads. A failed issued
+request disables further checked requests for that provider; a timeout or
+a missed clear is not a drain proof and is never retried. A newer request
+or any legacy flush withdraws the previous request identity without
+changing the original flush's MMIO sequence or success behavior. The
+receipt must still match a freshly resolved live map at lease acquisition.
+
+CPU fixtures exercise the actual staged methods with scripted MMIO and
+clock reads, including denied ownership, a short register aperture,
+incomplete pre-write ACKs, separate bit transitions, a stale VMID 0 ACK,
+power/table changes and late or invalid reads. Linux v6.12 documents the
+[engine-17 request and ACK path](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c#L194-L277),
+including its power-gating considerations; no implementation was imported.
+Native engine handoff, ACK freshness, the actual render binding and frame
+completion still require device-path evidence.
 
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or
 matching descriptor cannot rule out per-page bounce buffering. A null mapper
@@ -211,7 +230,7 @@ This stage does not encode PTE flags: the generic AMDGPU definitions alone
 do not establish which permissions and cache attributes work on the live
 DCN path.
 
-There is no live binding caller, new MMIO or active page-table change. Keep
+There is no live binding caller, production MMIO or active page-table change. Keep
 the AMD flip guard and the accepted R2a copy fallback unchanged. The
 [plugin's linear alias](../src/nmplugin/NVMTLDevice.m#L915) uses a
 [task-backed wired descriptor](../src/phxbringup/PhxBringup.cpp#L1674)

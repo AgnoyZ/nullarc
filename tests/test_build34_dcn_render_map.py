@@ -25,6 +25,7 @@ def render_fixture(source):
                       "IOReturn IOAccelPhxNativeClient::doGemVa(",
                       "uint64_t IOAccelPhxNativeClient::softwareMappedHostGenerationLocked(",
                       "build34::dcn::RenderVmTranslation IOAccelPhxNativeClient::renderTranslationLocked(",
+                      "build34::dcn::RenderTlbAck IOAccelPhxNativeClient::confirmRenderTlbLocked(",
                       "IOReturn IOAccelPhxNativeClient::doBoFree(", "void IOAccelPhxNativeClient::boRelease(",
                       "void IOAccelPhxNativeClient::freeAll(", "IOReturn IOAccelPhxNativeClient::clientClose(")
     slots = {
@@ -49,6 +50,7 @@ def render_vm_fixture(source):
                        source.index("static inline void flushLine(")]
     signatures = ("uint64_t PhxBringup::nextRenderVmGenerationLocked(",
                   "build34::dcn::RenderVmTranslation PhxBringup::renderVmIdentityLocked(",
+                  "build34::dcn::RenderTlbAck PhxBringup::confirmRenderTlbLocked(",
                   "void PhxBringup::vmFlushTlb(",
                   "uint32_t PhxBringup::vmidAlloc(", "uint32_t PhxBringup::vmBind(", "void PhxBringup::vmidFree(",
                   "IOReturn PhxBringup::vmMap(", "IOReturn PhxBringup::vmUnmap(", "IOReturn PhxBringup::setPowerState(")

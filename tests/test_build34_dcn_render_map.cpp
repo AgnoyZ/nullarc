@@ -37,6 +37,7 @@ struct PhxBringup {
     uint32_t context = 1;
     IOReturn mapResult = kIOReturnSuccess;
     unsigned allocs = 0, mapCalls = 0, unmapCalls = 0, vmFrees = 0;
+    unsigned confirms = 0;
     bool sessionReleased = false;
     std::function<void()> onMap, onUnmap;
     bool gpuReady() const { return ready; }
@@ -46,6 +47,11 @@ struct PhxBringup {
                                                             build34::dcn::RenderMapIdentity mapping) {
         assert(handle == context && mapping.client == renderClient);
         return {mapping, this, 1, 2, 3, 0, handle, 8};
+    }
+    build34::dcn::RenderTlbAck confirmRenderTlbLocked(uint32_t handle, build34::dcn::RenderMapIdentity mapping) {
+        assert(handle == context && mapping.client == renderClient && mapping.generation);
+        ++confirms;
+        return {};
     }
     IOReturn vmMap(uint32_t vmid, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t) {
         assert(vmid == context);
@@ -115,6 +121,11 @@ struct IOAccelPhxNativeClient {
         IOLockUnlock(lock);
         return result;
     }
+    void confirm(uint64_t va, uint64_t bytes) {
+        IOLockLock(lock);
+        confirmRenderTlbLocked(va, bytes);
+        IOLockUnlock(lock);
+    }
 };
 
 // PHX34_RENDER_MAP_METHODS
@@ -141,6 +152,11 @@ static void testPublicationAndReuse() {
     assert(translation.mapping.client == &client && translation.mapping.generation == 1);
     assert(translation.provider == &client.device && !client.translation(start, page).provider);
     assert(!client.translation(start + 2 * page, 3 * page).provider);
+    client.confirm(start, page);
+    client.confirm(start + 2 * page, 3 * page);
+    assert(!client.device.confirms);
+    client.confirm(start + 2 * page, 2 * page);
+    assert(client.device.confirms == 1);
 
     assert(client.changeMap(unmapOp, start, 1, page, 2 * page) == kIOReturnSuccess);
     client.device.onMap = [&] {

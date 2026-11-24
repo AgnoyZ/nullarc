@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 
 using IOReturn = int;
 using IOByteCount = uint64_t;
@@ -31,6 +32,9 @@ static void IODelay(unsigned) { assert(false); }
 static void IOSleep(unsigned) { assert(false); }
 static void IOLog(const char *) {}
 static void flushLine(const volatile void *) {}
+static uint64_t testClock = 0, clockStep = 100;
+static uint64_t mach_absolute_time() { return testClock += clockStep; }
+static void absolutetime_to_nanoseconds(uint64_t time, uint64_t *ns) { *ns = time; }
 
 // PHX34_VM_REGISTERS
 
@@ -39,9 +43,19 @@ struct PhxBringup {
     IOLock lock;
     IOLock *gpuLock = &lock;
     bool isSleeping = false;
+    struct Mmio {
+        uint64_t length = (kRegInvEng17Ack + 1) * 4;
+        uint64_t getLength() const { return length; }
+    } aperture;
+    Mmio *mmio = &aperture;
     IOBufferMemoryDescriptor root;
     mutable unsigned invalidations = 0;
     mutable uint32_t request = 0;
+    mutable unsigned ackReads = 0;
+    mutable unsigned requestReads = 0;
+    mutable unsigned ownershipChecks = 0;
+    bool engineIdleAndExclusive = false;
+    std::function<uint32_t(unsigned)> ackRead;
     uint64_t ptes[2]{};
 
     bool gpuReady() const { return true; }
@@ -61,14 +75,17 @@ struct PhxBringup {
         if (reg == kRegInvEng17Req) {
             request = value;
             ++invalidations;
+            requestReads = 0;
         }
     }
     uint32_t rreg(uint32_t reg) const {
         assert(lock.held && reg == kRegInvEng17Ack && request);
-        return request & 0xff00;
+        ++ackReads;
+        const auto index = requestReads++;
+        return ackRead ? ackRead(index) : request & 0xff01u;
     }
 
-    void vmFlushTlb(uint32_t vmid) const;
+    void vmFlushTlb(uint32_t vmid);
     uint32_t vmidAlloc(const void *client);
     uint32_t vmBind(uint32_t handle);
     void vmidFree(uint32_t handle, uint64_t lastSeq);
@@ -88,6 +105,21 @@ struct PhxBringup {
         const auto snapshot = renderVmIdentityLocked(handle, mapping);
         IOLockUnlock(gpuLock);
         return snapshot;
+    }
+
+    build34::dcn::RenderTlbAck confirm(uint32_t handle, build34::dcn::RenderMapIdentity mapping) {
+        IOLockLock(gpuLock);
+        const auto ack = confirmRenderTlbLocked(handle, mapping);
+        IOLockUnlock(gpuLock);
+        return ack;
+    }
+
+    void useFixtureEngineProof() {
+        renderEngine17IdleAndExclusive = [](const PhxBringup *service) {
+            assert(service->lock.held);
+            ++service->ownershipChecks;
+            return service->engineIdleAndExclusive;
+        };
     }
 };
 
@@ -167,8 +199,105 @@ static void testPowerAndExhaustion() {
     assert(!exhausted.identity(last, mapping).provider && exhausted.renderVmSerial == UINT64_MAX - 1);
 }
 
+static constexpr uint32_t targetBit = 1u << kFirstUserVmid, requestMask = targetBit | 1u;
+
+static void testCheckedRequest() {
+    PhxBringup service;
+    const unsigned client = 1;
+    const build34::dcn::RenderMapIdentity mapping{&client, 1}, differentMap{&client, 2};
+    const auto handle = service.vmidAlloc(&client);
+    assert(!service.confirm(handle, mapping).matches(service.identity(handle, mapping)) && !service.ackReads);
+    assert(service.bind(handle) == kFirstUserVmid && service.invalidations == 1 && service.ackReads == 1);
+    const auto attempt = [&] { return service.confirm(handle, mapping); };
+    const auto current = [&] { return service.identity(handle, mapping); };
+    assert(!attempt().matches(current()) && service.ackReads == 1);
+    service.useFixtureEngineProof();
+    assert(!attempt().matches(current()) && service.ownershipChecks == 1 && service.ackReads == 1);
+    service.engineIdleAndExclusive = true;
+    --service.aperture.length;
+    assert(!attempt().matches(current()) && service.ownershipChecks == 1 && service.ackReads == 1);
+    ++service.aperture.length;
+    for (const uint32_t unusable : {targetBit, UINT32_MAX}) {
+        service.ackRead = [=](unsigned) { return unusable; };
+        assert(!attempt().matches(current()) && service.invalidations == 1 && !service.renderInvalidateUncertain);
+    }
+
+    const auto script = [&] {
+        service.ackRead = [&, nextRequest = service.invalidations + 1](unsigned read) {
+            if (service.invalidations < nextRequest)
+                return requestMask;
+            assert(service.request == (0x00F80000u | requestMask));
+            const uint32_t samples[] = {1u, targetBit, requestMask};
+            assert(read < 3);
+            return samples[read];
+        };
+    };
+    script();
+    const auto first = attempt();
+    const auto firstIdentity = current();
+    assert(first.matches(firstIdentity) && firstIdentity.invalidateGeneration && service.requestReads == 3);
+    assert(!service.identity(handle, differentMap).invalidateGeneration);
+    assert(!first.matches(service.identity(handle, differentMap)));
+    script();
+    const auto second = attempt();
+    assert(second.matches(current()) && current().invalidateGeneration > firstIdentity.invalidateGeneration);
+    assert(!first.matches(current()));
+
+    service.ackRead = {};
+    assert(service.vmUnmap(handle, 0x10000, page) == kIOReturnSuccess);
+    assert(!current().invalidateGeneration && !second.matches(current()));
+    script();
+    const auto third = attempt();
+    assert(third.matches(current()));
+    assert(service.setPowerState(0, nullptr) == IOPMAckImplied && !third.matches(current()));
+    assert(service.setPowerState(1, nullptr) == IOPMAckImplied && !attempt().matches(current()));
+}
+
+static void testUncertainRequest() {
+    enum class Fault { Stale, Companion, AllOnes, Deadline, Rewind, PowerLoss, TableChange };
+    for (const auto fault : {Fault::Stale, Fault::Companion, Fault::AllOnes, Fault::Deadline,
+                             Fault::Rewind, Fault::PowerLoss, Fault::TableChange}) {
+        testClock = 1000;
+        clockStep = fault == Fault::Stale ? 0 : 100;
+        PhxBringup service;
+        const unsigned client = 1;
+        const build34::dcn::RenderMapIdentity mapping{&client, 1};
+        const auto handle = service.vmidAlloc(&client);
+        assert(service.bind(handle) == kFirstUserVmid);
+        service.useFixtureEngineProof();
+        service.engineIdleAndExclusive = true;
+        service.ackRead = [&](unsigned read) {
+            if (service.invalidations == 1)
+                return requestMask;
+            switch (fault) {
+            case Fault::Stale: return requestMask;
+            case Fault::Companion: return read ? requestMask : 1u;
+            case Fault::AllOnes: return UINT32_MAX;
+            case Fault::Deadline:
+                if (read) testClock += 1000000;
+                break;
+            case Fault::Rewind: testClock -= 500; break;
+            case Fault::PowerLoss: service.setPowerState(0, nullptr); break;
+            case Fault::TableChange: ++service.vm[0].renderTableGeneration; break;
+            }
+            return read ? requestMask : 0u;
+        };
+        const auto ack = service.confirm(handle, mapping);
+        const auto current = service.identity(handle, mapping);
+        assert(!ack.matches(current) && !current.invalidateGeneration && service.renderInvalidateUncertain);
+        if (fault == Fault::Stale || fault == Fault::Companion)
+            assert(service.requestReads == 1000);
+        assert(service.invalidations == 2 && service.ownershipChecks == 1);
+        service.ackRead = {};
+        assert(!service.confirm(handle, mapping).matches(current));
+        assert(service.invalidations == 2 && service.ownershipChecks == 1);
+    }
+}
+
 int main() {
     testIdentityLifetime();
     testPowerAndExhaustion();
+    testCheckedRequest();
+    testUncertainRequest();
     std::puts("[PASS] staged build34 GPUVM identities (CPU only)");
 }
