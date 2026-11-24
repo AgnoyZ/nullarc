@@ -7,6 +7,39 @@ remains active with R1b/VBL/optimized AML/accepted plugin. The earlier
 offline/preparation statuses below describe their original checkpoints; the
 latest new-boot result is recorded at the end of this document.
 
+## Offline DCN zero-copy prerequisite, November 24
+
+The [DMA page layout](../tools/build34_dcn_page_layout.h) stages one step
+toward DCN scanout from the same pages that back a rendered IOSurface. The
+boundaries follow the reviewed Linux v6.12
+[`dcn20_vmid_setup`](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/display/dc/dcn20/dcn20_vmid.c)
+and [DCN 3.1.4 field definitions](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/asic_reg/dcn/dcn_3_1_4_sh_mask.h):
+4 KiB pages, 36-bit logical page numbers and an inclusive last page. The
+planner uses a conservative 48-bit DMA address limit and a 64 MiB work cap.
+This is new offline code, not a port of the Linux implementation.
+
+Pass immutable device DMA segments for the exact, page-rounded backing slice
+in logical offset order, with CPU-owned output storage disjoint from the
+input. The planner refuses short, excess, overlapping or gapped logical
+ranges, zero or misaligned DMA bases, and arithmetic or output-capacity
+overruns before writing any page address. It emits the ordered DMA page
+bases and the size of a flat table with 64-bit entries, **not** live PTEs:
+the caller must still establish mapping identity, permissions and validity.
+CPU physical addresses and the family VRAM pool are not substitutes for DMA
+segments of the exact rendered IOSurface. The tests include a synthetic
+2560x1600 frame with all 4,000 pages fragmented, the 48-bit boundary and
+malformed inputs that must leave output untouched.
+
+There is no native call site, MMIO or active page-table change. Keep the
+AMD flip guard and the accepted R2a copy fallback unchanged. Next prove
+that the retained IOSurface descriptor yields DCN-usable DMA segments and
+that the image layout matches the scanout format. Still required: native
+mapping and invalidation, render completion and visibility, hardware latch
+confirmation before retiring old pages, and bounded fallback/recovery. Do
+not treat a successful plan as a valid hardware mapping, R3 acceptance or
+permission to run any hardware trial. Source-only rollback is a revert of
+this prerequisite; no installed state needs restoration.
+
 ## Accepted baseline measurement, November 20
 
 [R1b's bounded pressure proof](BUILD34-RING-BACKPRESSURE.md) passed before
