@@ -12,6 +12,7 @@ LOOKUP = 'PhxBringup::DcnPinSlot *PhxBringup::findDcnFlipPin('
 BIND = 'build34::dcn::ScanoutFlipBinding PhxBringup::dcnFlipBinding('
 WRITER_CURRENT = 'bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent('
 SUBMIT = 'IOReturn PhxBringup::gpuSubmit('
+MAP = 'IOReturn PhxBringup::vmMap('
 SUBMIT_EPOCH = '        if (exact && !retried) admissionEpoch = exactInvalidationEpoch;\n'
 SUBMIT_GATE = '''        if (dcnSubmitGate.held()) {
             IOLockUnlock(gpuLock);
@@ -23,11 +24,14 @@ SUBMIT_GATE = '''        if (dcnSubmitGate.held()) {
         }
 '''
 DRAIN_DECL = once(dma.pin.handoff.DRAIN_DECL, 'DcnDrainStamp * = nullptr);', '''DcnDrainStamp * = nullptr,
-        build34::dcn::DcnSubmitGate::Lease * = nullptr, const DcnDrainStamp * = nullptr);''')
+        build34::dcn::DcnSubmitGate::Lease * = nullptr, const DcnDrainStamp * = nullptr,
+        const build34::dcn::ScanoutDmaLease * = nullptr);''')
 CLIENT = '''    bool dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescriptorPin &,
         const build34::dcn::ScanoutDmaLease &, build34::dcn::DcnSubmitGate::Lease *);
 '''
 FIELDS = '''    build34::dcn::DcnSubmitGate dcnSubmitGate;
+    build34::dcn::DcnManagedWriteHolds dcnManagedWrites;
+    bool (*dcnProveManagedWriteIsolation)(PhxBringup &, build34::dcn::PhysicalPageSet){nullptr};
     build34::dcn::ScanoutFlipCommit dcnFlip;
     const build34::dcn::HubpFlipRoute *(*dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr};
     DcnPinSlot *findDcnFlipPin(build34::dcn::ScanoutPinToken);
@@ -37,6 +41,22 @@ FIELDS = '''    build34::dcn::DcnSubmitGate dcnSubmitGate;
 '''
 SLOT = '''        uint64_t dmaWindow{0};
         build34::dcn::ScanoutSurface dmaSurface{};
+'''
+MAP_PREFLIGHT = '''    if (dcnManagedWrites.active()) {
+        for (uint64_t offset = 0; offset < size; offset += 4096) {
+            IOByteCount contiguous = 0;
+            const auto physical = md->getPhysicalSegment(off + offset, &contiguous, kIOMemoryMapperNone);
+            if (!physical || (physical & ~kPtAddrMask) || contiguous < 4096 || dcnManagedWrites.excludes(physical)) {
+                IOLockUnlock(gpuLock);
+                return kIOReturnBusy;
+            }
+        }
+    }
+'''
+MAP_PAGE_GATE = '''        if (validPage && dcnManagedWrites.excludes(pa)) {
+            r = kIOReturnVMError;
+            break;
+        }
 '''
 
 METHODS = '''bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescriptorPin &pin,
@@ -56,7 +76,7 @@ METHODS = '''bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent(const build34:
         PhxBringup::DcnDrainStamp drain{};
         return proof.writer.complete && exactWriter.matches(native, proof.writer.range, mapping.identity) &&
             proof.writer.map.matches(mapping.identity) && dma.matchesWriterBacking(pin, mapping) &&
-            owner->exactWriterVmCurrent(mapping.identity, native, this, &drain, reserve, &proof.drain) && live();
+            owner->exactWriterVmCurrent(mapping.identity, native, this, &drain, reserve, &proof.drain, &dma) && live();
     }();
     IOLockUnlock(lock);
     return current;
@@ -105,7 +125,14 @@ IOReturn PhxBringup::beginDcnFlip(build34::dcn::ScanoutFlipIntent &intent) {
                 exactWriterVmCurrent(proof.writer.map, proof.writer.native, next->client, &drain, nullptr, &proof.drain) &&
                 !next->client->exactClientCallbacks.closed();
         });
-    if (result == ScanoutFlipResult::Refused) return kIOReturnNotReady;
+    if (result == ScanoutFlipResult::Refused) {
+        if (programming.held()) {
+            IOLockLock(gpuLock);
+            dcnManagedWrites.release(next->dma.physicalPages());
+            IOLockUnlock(gpuLock);
+        }
+        return kIOReturnNotReady;
+    }
     intent.operation = token;
     intent.result = result;
     return kIOReturnSuccess;
@@ -124,7 +151,12 @@ IOReturn PhxBringup::pollDcnFlip(build34::dcn::ScanoutFlipPoll &poll) {
     if (old && !IOLockTryLock(old->client->lock)) return kIOReturnBusy;
     OSObject *route = nullptr;
     IOService *framebuffer = nullptr;
-    const auto result = dcnFlip.poll(poll.operation, [&] { return !exactCallbacks.closed(); }, route, framebuffer);
+    const auto result = dcnFlip.poll(poll.operation, [&] { return !exactCallbacks.closed(); }, route, framebuffer,
+        [&](PhysicalPageSet retired) {
+            IOLockLock(gpuLock);
+            dcnManagedWrites.release(retired);
+            IOLockUnlock(gpuLock);
+        });
     if (old) IOLockUnlock(old->client->lock);
     if (old && result == ScanoutFlipResult::Presented) {
         auto *surface = old->surface;
@@ -161,11 +193,20 @@ def stage_native(driver, abi):
     source = once(source, dma.pin.handoff.DRAIN_DECL, DRAIN_DECL)
     writer = dma.pin.handoff.writer.CURRENT
     replace(writer, 'DcnDrainStamp *drain) {', '''DcnDrainStamp *drain,
-    build34::dcn::DcnSubmitGate::Lease *reserve, const DcnDrainStamp *expected) {''')
+    build34::dcn::DcnSubmitGate::Lease *reserve, const DcnDrainStamp *expected, const build34::dcn::ScanoutDmaLease *dma) {''')
     replace(writer, '    IOLockUnlock(gpuLock);\n', '''    if (current && expected) current = drain && drain->matches(*expected);
-    if (current && reserve) current = expected && reserve->reserve(dcnSubmitGate);
+    if (current && reserve) {
+        const auto pages = dma ? dma->physicalPages() : build34::dcn::PhysicalPageSet{};
+        current = expected && pages.count && dcnProveManagedWriteIsolation &&
+            dcnProveManagedWriteIsolation(*this, pages) && !exactCallbacks.closed() &&
+            reserve->reserve(dcnSubmitGate) && dcnManagedWrites.acquire(pages);
+    }
     IOLockUnlock(gpuLock);
 ''')
+    replace(MAP, '    for (uint64_t p = 0; p < size; p += 4096) {\n',
+            MAP_PREFLIGHT + '    for (uint64_t p = 0; p < size; p += 4096) {\n')
+    replace(MAP, '        uint64_t *pte = validPage ? vmPte(c, va + p, true) : nullptr;\n',
+            MAP_PAGE_GATE + '        uint64_t *pte = validPage ? vmPte(c, va + p, true) : nullptr;\n')
     submit_anchor = '        // Re-select and validate under the lock after every sleep: adoption,\n'
     replace(SUBMIT, SUBMIT_EPOCH, '')
     replace(SUBMIT, submit_anchor, SUBMIT_EPOCH + SUBMIT_GATE + submit_anchor)

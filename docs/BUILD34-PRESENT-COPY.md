@@ -1096,6 +1096,35 @@ front-buffer residence. CPU tests exercise blocked Compute and GFX
 submissions, failure release and normal submission after issue. This does
 not freeze external engines, CPU writers or future writes to the front.
 
+The staged flip retains a host physical page snapshot separate from the DCN
+DMA plan. Each logical page is rechecked against the snapshot before issue.
+Two display pins with any shared physical page are refused even when their
+descriptors, DMA addresses, logical windows and VMIDs differ. The provider
+takes a per-pin write hold under `gpuLock` with the final writer drain
+comparison. The hold blocks new writable PTEs by original physical page
+across managed clients. `vmMap` checks the full range before allocating any
+PTE and rechecks each physical address at use. Drift into a protected page
+during the second walk faults the existing VM gate without installing that
+page. Disjoint mappings and submissions remain possible once the short
+programming barrier is released.
+
+The hold remains during latch polling and front residence. It is released
+only after old fetch/translation retirement and successful DMA and
+descriptor cleanup. A refused begin drops only its own temporary hold;
+uncertain issue or retirement keeps every potentially reachable hold.
+`dcnProveManagedWriteIsolation` remains null. Before taking a hold, that
+bounded, non-reentrant evidence callback must prove no existing runnable
+managed client or cached translation can write any protected page, even
+after VMID rebinding. It must not edit page tables under the check or accept
+the inherited TLB ACK as revocation. Blocking new PTEs alone cannot exclude
+the writer's retained mapping, aliases in another client or stale cached
+translations. Until a real proof exists, even an exact writer and a
+qualified flip route refuse. CPU and external writers still need separate
+exclusion. CPU fixtures cover proof refusal, aliasing through distinct
+mappings, mapping drift and release after successful retirement. Revert
+this overlay change to roll back; production source, exact-open admission
+and the R2a copy remain unchanged.
+
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and
 out-of-order completion. Set `BUILD34_RADV_COMPILE_COMMANDS` to the

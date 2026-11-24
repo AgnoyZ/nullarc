@@ -128,10 +128,10 @@ def stage_native(driver, abi):
             '    auto boundRoute = *route;\n'
             '    if (!bindDcnBar5(intent, boundRoute)) return kIOReturnNotReady;\n'
             '    const auto result = dcnFlip.begin(intent, token, boundRoute,')
-    replace(flip.POLL, '    const auto result = dcnFlip.poll(poll.operation, [&] { return !exactCallbacks.closed(); }, route, framebuffer);',
+    replace(flip.POLL, '    const auto result = dcnFlip.poll(poll.operation, [&] { return !exactCallbacks.closed(); }, route, framebuffer,\n',
             '    const bool barLive = dcnBar5Current();\n'
             '    if (!barLive) __atomic_store_n(&dcnBar5Revoked, true, __ATOMIC_RELEASE);\n'
-            '    const auto result = dcnFlip.poll(poll.operation, [&] { return barLive && dcnBar5Live(); }, route, framebuffer);')
+            '    const auto result = dcnFlip.poll(poll.operation, [&] { return barLive && dcnBar5Live(); }, route, framebuffer,\n')
     replace('IOReturn PhxBringup::setPowerState(', '    if (ordinal == 0) {\n',
             '    if (ordinal == 0) {\n'
             '        __atomic_store_n(&dcnBar5Revoked, true, __ATOMIC_RELEASE);\n')

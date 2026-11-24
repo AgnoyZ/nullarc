@@ -8,6 +8,7 @@
 #include "build34_dcn_present_backing.h"
 #include "build34_dcn_scanout_pin.h"
 #include "build34_dcn_flat_table.h"
+#include "build34_dcn_physical_pages.h"
 
 #define BUILD34_DCN_PIN_MAP "phx34DcnPinMapV1"
 #define BUILD34_DCN_PIN_MAP_DIRECT "phx34DcnPinMapDirectV1"
@@ -110,14 +111,27 @@ public:
         return pin.cancellable() && releaseUnmapped();
     }
 
-    bool preparePlan(const ScanoutDmaRequest &request, uint64_t bytes, size_t runCount) {
+    bool preparePlan(const ScanoutDmaRequest &request, ScanoutDescriptorPin &pin, uint64_t bytes, size_t runCount) {
         if (!hasBacking() || uncertain() || pages_ || !validScanoutDmaStorage(request, bytes)) return false;
         const size_t entryCount = static_cast<size_t>(bytes / kPageBytes);
-        const size_t tableBytes = entryCount * sizeof(uint64_t);
+        const size_t tableBytes = 3 * entryCount * sizeof(uint64_t);
         auto *pages = static_cast<uint64_t *>(IOMallocZero(tableBytes));
         if (!pages) return false;
         const auto layout = buildFlatPageLayout(request.windowStart, bytes, request.scratch, runCount, pages, entryCount);
-        if (layout.entryCount != entryCount) {
+        auto *physical = pages + entryCount;
+        auto *sorted = physical + entryCount;
+        const auto capture = [&] {
+            if (layout.entryCount != entryCount || !pin.cancellable()) return false;
+            for (size_t index = 0; index < entryCount; ++index) {
+                if (!readPinnedDescriptorPage(&pin.lease_.slice_, index * kPageBytes, &physical[index])) return false;
+                sorted[index] = physical[index];
+            }
+            sortPhysicalPages(sorted, entryCount);
+            for (size_t index = 1; index < entryCount; ++index)
+                if (sorted[index - 1] == sorted[index]) return false;
+            return livePresentPreparation(pin.lease_.slice_) == renderPreparation_;
+        };
+        if (!capture()) {
             IOFree(pages, tableBytes);
             return false;
         }
@@ -139,6 +153,10 @@ public:
     }
 
     const ScanoutWriterProof &writerProof() const { return writerProof_; }
+
+    PhysicalPageSet physicalPages() const {
+        return pages_ ? PhysicalPageSet{pages_ + 2 * layout_.entryCount, layout_.entryCount} : PhysicalPageSet{};
+    }
 
     bool matchesWriterBacking(const ScanoutDescriptorPin &pin, const WriterMapping &mapping) const {
         const auto &slice = pin.lease_.slice_;
@@ -192,7 +210,7 @@ private:
         for (size_t index = 0; index < layout_.entryCount; ++index) {
             const uint64_t offset = index * kPageBytes;
             uint64_t rendered = 0, presented = 0, resolved = 0;
-            if (!live() || !readPinnedDescriptorPage(&render, offset, &rendered) ||
+            if (!live() || !readPinnedDescriptorPage(&render, offset, &rendered) || rendered != pages_[layout_.entryCount + index] ||
                 !readPinnedDescriptorPage(&present, offset, &presented) || presented != rendered || (command_ ?
                 !qualified_.resolveMappedPage(*qualified_.mapper, *command_, pages_[index], resolved) || resolved != rendered :
                 pages_[index] != rendered || !qualified_.direct.permits(*render.descriptor, render.offset + offset,
@@ -201,7 +219,7 @@ private:
         return current();
     }
 
-    bool releaseUnmapped() {
+    bool releaseUnmapped(bool keepPlan = false) {
         if (uncertain()) return false;
         if (!table_.withdraw(qualified_) || (command_ && (command_->complete(false, false) != kIOReturnSuccess ||
             !qualified_.confirmUnusedUnmap(*qualified_.mapper, *command_) ||
@@ -211,22 +229,26 @@ private:
         }
         if (presentPin_.bytes() && !presentPin_.releaseAfterRetirement()) return false;
         presentPin_.recycleClosed();
-        if (hasBacking()) releaseObjects();
+        if (hasBacking()) releaseObjects(keepPlan);
         renderPreparation_ = presentPreparation_ = 0;
         return true;
     }
 
-    void releaseObjects() {
+    void releaseObjects(bool keepPlan = false) {
         table_.release();
         if (command_) command_->release();
         if (qualified_.mapper) qualified_.mapper->release();
         if (qualified_.direct.device) qualified_.direct.device->release();
-        if (pages_) IOFree(pages_, layout_.tableBytes);
         command_ = nullptr;
         qualified_ = {};
+        if (!keepPlan) releasePlan();
+        writerProof_ = {};
+    }
+
+    void releasePlan() {
+        if (pages_) IOFree(pages_, 3 * layout_.tableBytes);
         pages_ = nullptr;
         layout_ = {};
-        writerProof_ = {};
     }
 
     static bool readBatch(void *context, uint64_t *offset, DmaSegment *segments, uint32_t *count) {

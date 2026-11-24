@@ -119,7 +119,12 @@ class ExactWriterTests(unittest.TestCase):
                           handoff.CLOSE, handoff.SEAL, handoff.GLOBAL, pressure.SUBMIT):
             self.assertEqual(method(pinned, signature), method(source, signature))
             self.assertEqual(method(mapped, signature), method(pinned, signature))
-            self.assertEqual(method(flipped, signature), method(mapped, signature))
+            previous = method(mapped, signature)
+            if signature == flip_commit.MAP:
+                previous = previous.replace('    for (uint64_t p = 0; p < size; p += 4096) {\n',
+                    flip_commit.MAP_PREFLIGHT + '    for (uint64_t p = 0; p < size; p += 4096) {\n').replace(
+                    '        uint64_t *pte = validPage ?', flip_commit.MAP_PAGE_GATE + '        uint64_t *pte = validPage ?')
+            self.assertEqual(method(flipped, signature), previous)
             self.assertEqual(method(bound, signature), method(flipped, signature))
         mapped_submit = method(mapped, flip_commit.SUBMIT)
         self.assertEqual(mapped_submit, method(source, flip_commit.SUBMIT))
@@ -143,6 +148,8 @@ class ExactWriterTests(unittest.TestCase):
         self.assertEqual(flipped.count('dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr}'), 1)
         self.assertNotIn('dcnQualifiedFlipRoute =', flipped)
         self.assertNotIn('dcnQualifiedFlipRoute =', bound)
+        self.assertIn('dcnProveManagedWriteIsolation)(PhxBringup &, build34::dcn::PhysicalPageSet){nullptr}', bound)
+        self.assertNotIn('dcnProveManagedWriteIsolation =', bound)
         begin = method(bound, flip_commit.BEGIN)
         self.assertLess(begin.index('bindDcnBar5(intent, boundRoute)'), begin.index('dcnFlip.begin('))
         self.assertIn('return barLive && dcnBar5Live();', method(bound, flip_commit.POLL))
@@ -176,7 +183,8 @@ class ExactWriterTests(unittest.TestCase):
             fields = fields.replace(field, field + scanout_dma.DMA_FIELDS)
             probe = scanout_dma.DMA_PROBE_DECL
         if flip:
-            signatures += (flip_commit.WRITER_CURRENT, flip_commit.LOOKUP, flip_commit.BIND, flip_commit.BEGIN, flip_commit.POLL)
+            signatures += (flip_commit.WRITER_CURRENT, flip_commit.LOOKUP, flip_commit.BIND, flip_commit.BEGIN,
+                           flip_commit.POLL)
             fields = fields.replace(scanout_dma.DMA_FIELDS, scanout_dma.DMA_FIELDS + flip_commit.SLOT)
             fields = fields.replace(scanout_dma.MAPPER_GATE, scanout_dma.MAPPER_GATE + flip_commit.FIELDS)
             probe += flip_commit.CLIENT
@@ -186,6 +194,8 @@ class ExactWriterTests(unittest.TestCase):
             self.assertEqual(fixture.count(boundary), 1)
             fixture = fixture.replace(boundary, ''.join('    ' + line for line in flip_commit.SUBMIT_GATE.splitlines(True)))
         extracted = '\n'.join(method(source, signature) for signature in signatures)
+        if flip:
+            extracted += '\n' + method(source, flip_commit.MAP).replace('PhxBringup::vmMap(', 'PhxBringup::guardedVmMap(', 1)
         if bar5_adapter:
             bound = bar5.stage_native(DRIVER, ABI)
             fields += bar5.FIELDS

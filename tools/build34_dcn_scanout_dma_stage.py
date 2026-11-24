@@ -93,7 +93,7 @@ def stage_native(driver, abi):
     replace(probe, '            const auto current = exactWriterMapLocked(span);\n',
             '''            const size_t runs = pinned && dma && live() ? dma->lease.prepareRuns(*pin, dma->qualified, present,
                 dma->request.scratch, dma->request.runCapacity) : 0;
-            const bool planned = runs && dma->lease.preparePlan(dma->request, span.bytes, runs);
+            const bool planned = runs && dma->lease.preparePlan(dma->request, *pin, span.bytes, runs);
             const auto current = exactWriterMapLocked(span);
 ''')
     replace(probe, '            same = pinned && live()', '            same = pinned && (!dma || planned) && live()')

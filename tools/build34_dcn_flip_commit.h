@@ -92,6 +92,7 @@ public:
             (old.dma && next.dma && !(old.dma->qualified_.direct == next.dma->qualified_.direct)) ||
             ((old.pin || next.pin) && intent.previous.vmid == intent.next.vmid) ||
             (old.pin && next.pin && (!sameFlipGeometry(old.surface, next.surface) ||
+                old.dma->physicalPages().overlaps(next.dma->physicalPages()) ||
                 (old.window <= next.window ? next.window - old.window < old.surface.mappedBytes :
                                             old.window - next.window < next.surface.mappedBytes))) ||
             (old.token.serial && (!(frontAddress_ == intent.previous) || route.owner != routeOwner_ ||
@@ -174,8 +175,9 @@ public:
         return ScanoutFlipResult::Issued;
     }
 
-    template<typename IsLive>
-    ScanoutFlipResult poll(ScanoutPinToken operation, IsLive live, OSObject *&releaseRoute, IOService *&releaseFramebuffer) {
+    template<typename IsLive, typename RetireWrites>
+    ScanoutFlipResult poll(ScanoutPinToken operation, IsLive live, OSObject *&releaseRoute, IOService *&releaseFramebuffer,
+                           RetireWrites retireWrites) {
         if (!matches(operation)) return ScanoutFlipResult::Refused;
         if (uncertain_) return ScanoutFlipResult::Uncertain;
         auto withinBudget = [&] { return live() && readback_.stillInBudget(); };
@@ -219,7 +221,9 @@ public:
             if (!displayCurrent() || !oldCurrent()) return fail();
             if (translations == DcnRetirement::Pending) return ScanoutFlipResult::Waiting;
             if (translations != DcnRetirement::Complete || !old_.dma->table_.withdraw(old_.dma->qualified_) ||
-                !displayCurrent() || !detached() || !old_.dma->releaseUnmapped() || !old_.pin->retireDisplayUse()) return fail();
+                !displayCurrent() || !detached() || !old_.dma->releaseUnmapped(true) || !old_.pin->retireDisplayUse()) return fail();
+            retireWrites(old_.dma->physicalPages());
+            old_.dma->releasePlan();
         }
         front_ = request_.nextPin;
         frontAddress_ = request_.next;

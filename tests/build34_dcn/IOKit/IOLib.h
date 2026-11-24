@@ -7,7 +7,7 @@
 
 struct DcnAllocationStub {
     struct Slot {
-        uint64_t pages[16384];
+        uint64_t pages[3 * 16384];
         size_t bytes;
     };
     inline static Slot slots[2]{};

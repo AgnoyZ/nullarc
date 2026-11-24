@@ -147,6 +147,10 @@ struct Phx34ScopedReference {
 #include "build34_dcn_scanout_dma.h"
 #ifdef TEST_SCANOUT_FLIP
 #include "build34_dcn_flip_commit.h"
+using addr64_t = uint64_t;
+constexpr uint64_t kPtAddrMask = 0x0000FFFFFFFFF000ull, kPteSysFlags = 0x0004000000000077ull;
+constexpr IOReturn kIOReturnVMError = -10;
+static void flushLine(const volatile void *) {}
 #endif
 #ifdef TEST_SCANOUT_BAR5
 #include "build34_dcn_bar5.h"
@@ -213,6 +217,9 @@ struct PhxBringup
         uint64_t generation = 5, newest = 0, queueSequence[2]{}, queueGeneration[2]{};
         const void *client = nullptr;
         bool closing = false, busy = false;
+#ifdef TEST_SCANOUT_FLIP
+        uint32_t hw = 0;
+#endif
     } vm[kMaxCtx];
     struct GpuQueue {
         bool ready = true;
@@ -231,7 +238,7 @@ struct PhxBringup
     struct ExactOverlapSnapshot {
         struct Queue { uint64_t generation, submitted, completed; } queues[2];
     };
-    bool exactGlobalRetiredLocked(uint64_t &, ExactOverlapSnapshot *);
+    bool exactGlobalRetiredLocked(uint64_t &, ExactOverlapSnapshot * = nullptr);
     bool readExactFence32(uint32_t queue, uint64_t *out) const {
         assert(guard.held);
         if (!gq[queue].ready || !exactQueueLive[queue]) return false;
@@ -256,11 +263,28 @@ struct PhxBringup
     bool exactAdmissionClosed() const { return exactCallbacks.closed(); }
     bool gpuReady() const { return true; }
     bool debugEnabled() const { return false; }
-    VmCtx *vmCtx(uint32_t handle) { return handle == 1 ? &vm[0] : nullptr; }
+    VmCtx *vmCtx(uint32_t handle) { return handle && handle <= kMaxCtx && vm[handle - 1].busy ? &vm[handle - 1] : nullptr; }
     VmCtx *vmOwned(uint32_t, uint64_t, const void *, bool = false);
     bool vmWorkCurrent(const VmCtx &) const;
     // WRITER_SERVICE
 
+#ifdef TEST_SCANOUT_FLIP
+    unsigned pteLookups = 0;
+    uint64_t lastPte = 0;
+    bool isolationEvidence = true;
+    uint64_t existingWriteAlias = 0;
+    static bool proveIsolation(PhxBringup &device, PhysicalPageSet pages) {
+        assert(device.guard.held && pages.count == 2);
+        return device.isolationEvidence && !pages.contains(device.existingWriteAlias);
+    }
+    uint64_t *vmPte(VmCtx &, uint64_t, bool allocate) {
+        assert(guard.held && allocate);
+        ++pteLookups;
+        return &lastPte;
+    }
+    bool vmFlushTlbChecked(uint32_t) { assert(false); return false; }
+    IOReturn guardedVmMap(uint32_t, uint64_t, const void *, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t);
+#endif
     IOReturn vmMap(uint32_t, uint64_t, const void *, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t) {
         return mapResult;
     }
@@ -1145,7 +1169,7 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        WrongHomeBacking, HomeLostAfterInstall, HomeLostAtRetire, WrongReturnAddress, ReplacedFramebuffer,
                        PeerActive, PeerShortWindow, PeerDuringInstall, PeerAfterHigh, PeerDuringRetire, PeerAfterWithdraw,
                        NoRetirementProof, ClearDenied, ClearWriteUncertain, ReplacedDuringFetchDrain,
-                       TranslationPending, TranslationLost, FrontRevertedDuringTranslations };
+                       TranslationPending, TranslationLost, FrontRevertedDuringTranslations, PhysicalAlias };
 
 struct CommitFixture {
     struct Table : IOBufferMemoryDescriptor {
@@ -1191,6 +1215,7 @@ struct CommitFixture {
         }
     };
     ScanoutFixture scanout;
+    Descriptor nextHost, nextPresent;
     IOMapper mapper;
     IODMACommand command, nextCommand;
     OSObject lifetime;
@@ -1231,6 +1256,7 @@ struct CommitFixture {
 
     explicit CommitFixture(bool direct = false)
         : ownedRoot(direct ? 0xe3400005007 : 0x123400005001), directMode(direct) {
+        scanout.device.dcnProveManagedWriteIsolation = PhxBringup::proveIsolation;
         framebuffer.fixture = this;
         framebuffer.provider = scanout.device.pci;
         framebuffer.isPhxFramebuffer = true;
@@ -1286,10 +1312,11 @@ struct CommitFixture {
                 return true;
             }
             const bool alternate = &mapped == &nextCommand;
-            assert((alternate || &mapped == &command) && mapped.prepared && mapped.memory == &scanout.frame.host);
+            const auto &host = alternate ? nextHost : scanout.frame.host;
+            assert((alternate || &mapped == &command) && mapped.prepared && mapped.memory == &host);
             const bool first = address == (alternate ? 0x800000 : 0x500000);
             assert(first || address == (alternate ? 0x901000 : 0x601000));
-            physical = scanout.frame.host.base + (first ? 2 : 4) * kPage;
+            physical = host.base + (first ? 2 : 4) * kPage;
             ++pixelReads;
             return !pixelEvidence || pixelEvidence(first, physical);
         };
@@ -1303,15 +1330,15 @@ struct CommitFixture {
                 if (translationFault == FlipFault::RetireContextReappears) contextRoot = ownedRoot;
                 return translationFault != FlipFault::WithdrawError && translationFault != FlipFault::CancelWithdrawError;
             }
-            if (!issues) {
-                assert(&completed == &command && scanout.client.guard.held && !scanout.device.guard.held);
+            if (!issues || &completed == &nextCommand) {
+                assert(scanout.client.guard.held && !scanout.device.guard.held);
                 return true;
             }
             assert(&completed == &command && retire && retireChecks >= (alternatePin.serial ? 2u : 3u) &&
                    clearWrites == 7 && translationChecks &&
                    scanout.client.guard.held && !scanout.device.guard.held && lifetime.references == (alternatePin.serial ? 4u : 3u) &&
                    homeTable.withdrawals == 1 && !homeTable.dma.prepared && homeTable.references == 1 &&
-                   scanout.frame.host.wires == (alternatePin.serial ? 3u : 2u));
+                   scanout.frame.host.wires == 2);
             return !failUnmap;
         };
         scanout.offer();
@@ -1334,6 +1361,15 @@ struct CommitFixture {
     }
 
     ~CommitFixture() { IODMACommand::next = nullptr; IOBufferMemoryDescriptor::next = nullptr; }
+
+    void selectAlternate(bool alias = false) {
+        auto &frame = scanout.frame;
+        nextHost.base = frame.host.base + (alias ? 2 * kPage : 16 * kPage);
+        nextPresent.base = nextHost.base + 2 * kPage;
+        frame.client.boTable[1].md = &nextHost;
+        frame.copy.slice.descriptor = &nextPresent;
+        IODMACommand::next = &nextCommand;
+    }
 
     void configureTable(Table &table, uint64_t root, uint64_t first, uint64_t second) {
         table.root = root;
@@ -1767,6 +1803,60 @@ static void scanoutSubmitReservation(bool direct) {
     assert(sequence == original + 1 && sleeps == 2);
 }
 
+static void scanoutWriteIsolation(bool direct, bool physicalDrift) {
+    CommitFixture fixture(direct);
+    auto &device = fixture.scanout.device;
+    const auto first = fixture.scanout.frame.host.base + 2 * kPage;
+    const auto second = first + 2 * kPage;
+    device.dcnQualifiedFlipRoute = [](IOPCIDevice *pci) -> const HubpFlipRoute * { return pci->route; };
+    ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    device.dcnProveManagedWriteIsolation = nullptr;
+    assert(fixture.begin(intent) == kIOReturnNotReady && !device.dcnManagedWrites.active() && !fixture.vmWrites);
+    device.dcnProveManagedWriteIsolation = PhxBringup::proveIsolation;
+    device.existingWriteAlias = second;
+    assert(fixture.begin(intent) == kIOReturnNotReady && !device.dcnManagedWrites.active() && !fixture.vmWrites);
+    device.existingWriteAlias = 0;
+    fixture.pageReads = 0;
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    assert(!device.dcnSubmitGate.held() && device.dcnManagedWrites.excludes(first) && device.dcnManagedWrites.excludes(second));
+
+    Descriptor alias;
+    device.vm[1].busy = true;
+    device.vm[1].client = &alias;
+    const auto map = [&] { return device.guardedVmMap(2, device.vm[1].generation, &alias, 4 * kVa, &alias, 0, 2 * kPage); };
+    alias.base = first - 2 * kPage;
+    assert(map() == kIOReturnBusy && !device.pteLookups && !device.lastPte && !device.exactVMFault);
+    alias.base = second + 4 * kPage;
+    assert(map() == kIOReturnSuccess && device.pteLookups == 2);
+
+    if (physicalDrift) {
+        const auto count = alias.reads;
+        alias.afterRead = [&] { if (alias.reads == count + 4) alias.base = first; };
+        assert(map() == kIOReturnVMError && device.pteLookups == 3 && device.exactVMFault);
+        assert(device.dcnManagedWrites.excludes(second));
+        return;
+    }
+
+    ScanoutFlipPoll poll{intent.operation, ScanoutFlipResult::Refused};
+    fixture.pending = false;
+    fixture.active = fixture.earliest = fixture.mapped;
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    alias.base = first;
+    assert(map() == kIOReturnBusy && device.pteLookups == 2);
+    intent = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
+    assert(fixture.begin(intent) == kIOReturnSuccess && intent.result == ScanoutFlipResult::Issued);
+    poll.operation = intent.operation;
+    fixture.pending = fixture.retire = false;
+    fixture.active = fixture.earliest = fixture.home;
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.step(poll, ScanoutFlipResult::Waiting);
+    fixture.retire = true;
+    fixture.step(poll, ScanoutFlipResult::Presented);
+    assert(!device.dcnManagedWrites.active() && map() == kIOReturnSuccess && device.pteLookups == 4);
+}
+
 enum class PixelFault { MapperRemap, MapperUnavailable, RenderPage, PresentPage, RenderGeneration, PresentGeneration,
                         LateGeneration, WrongCommandSlice, SubstitutedDescriptor, LateEvidence, FrontRemap, None };
 
@@ -2114,7 +2204,7 @@ static void scanoutFlip(FlipFault fault) {
     assert(fixture.poll(poll) == kIOReturnNotFound && scanout.cancelPin(fixture.pin) == kIOReturnNotFound);
 
     if (fault == FlipFault::DifferentPinnedPitch) {
-        IODMACommand::next = &fixture.nextCommand;
+        fixture.selectAlternate();
         scanout.frame.copy.scanout = {64, 17, ++fixture.pitch, 8, 2 * kPage};
         scanout.offer();
         DmaRun scratch[2]{};
@@ -2130,9 +2220,9 @@ static void scanoutFlip(FlipFault fault) {
         return;
     }
 
-    if (fault == FlipFault::DualPins || fault == FlipFault::DualContextDuringRetire ||
+    if (fault == FlipFault::DualPins || fault == FlipFault::DualContextDuringRetire || fault == FlipFault::PhysicalAlias ||
         fault == FlipFault::SharedTable || fault == FlipFault::SharedRoot) {
-        IODMACommand::next = &fixture.nextCommand;
+        fixture.selectAlternate(fault == FlipFault::PhysicalAlias);
         scanout.frame.copy.scanout = {64, 17, fixture.pitch, 8, 2 * kPage};
         scanout.offer();
         DmaRun scratch[2]{};
@@ -2142,6 +2232,14 @@ static void scanoutFlip(FlipFault fault) {
         assert(fixture.dispatch(map, &mapped) == kIOReturnSuccess && mapped.token.serial);
         fixture.alternatePin = mapped.token;
         request = {fixture.mapped, fixture.alternate, fixture.alternatePin, {}, ScanoutFlipResult::Refused};
+        if (fault == FlipFault::PhysicalAlias) {
+            assert(pages[0] == 0x800000 && pages[1] == 0x901000);
+            assert(fixture.begin(request) == kIOReturnNotReady && !request.operation.serial);
+            assert(fixture.vmWrites == 7 && fixture.writes == 5 && !fixture.alternateTable.stores);
+            assert(scanout.cancelPin(fixture.alternatePin) == kIOReturnSuccess);
+            assert(scanout.device.dcnManagedWrites.excludes(scanout.frame.host.base + 4 * kPage));
+            return;
+        }
         if (fault == FlipFault::SharedTable || fault == FlipFault::SharedRoot) {
             assert(fixture.begin(request) == kIOReturnNotReady && fixture.vmWrites == 7 && fixture.writes == 5);
             assert(fixture.homeTable.references == 2 && fixture.homeTable.stores == 1 && fixture.homeTable.dma.prepared &&
@@ -2151,6 +2249,8 @@ static void scanoutFlip(FlipFault fault) {
             return;
         }
         assert(fixture.begin(request) == kIOReturnSuccess && request.result == ScanoutFlipResult::Issued);
+        const auto &holds = scanout.device.dcnManagedWrites;
+        assert(holds.excludes(scanout.frame.host.base + 2 * kPage) && holds.excludes(fixture.nextHost.base + 2 * kPage));
         assert(fixture.pageReads == 6 && fixture.writes == 10 && fixture.vmWrites == 14 && DcnAllocationStub::live() == 2);
         poll.operation = request.operation;
         fixture.pending = false;
@@ -2158,6 +2258,7 @@ static void scanoutFlip(FlipFault fault) {
         fixture.step(poll, ScanoutFlipResult::Waiting);
         const bool failed = fault == FlipFault::DualContextDuringRetire;
         fixture.step(poll, failed ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
+        assert(holds.excludes(scanout.frame.host.base + 2 * kPage) == failed && holds.excludes(fixture.nextHost.base + 2 * kPage));
         assert(fixture.retireChecks == 2 && fixture.command.completes == !failed && !fixture.nextCommand.completes);
         assert(DcnAllocationStub::live() == (failed ? 2u : 1u));
         assert(fixture.homeTable.references == (failed ? 2u : 0u) && fixture.alternateTable.references == 2);
@@ -2411,6 +2512,9 @@ int main() {
 #endif
 #ifdef TEST_SCANOUT_FLIP
     for (const bool direct : {false, true}) scanoutSubmitReservation(direct);
+    scanoutWriteIsolation(false, false);
+    scanoutWriteIsolation(true, false);
+    scanoutWriteIsolation(false, true);
     for (const bool direct : {false, true})
         for (const auto fault : {WriterFault::NewerCompletedWork, WriterFault::ChangedEpoch, WriterFault::ChangedQueueGeneration,
              WriterFault::ReplacedWriterMap, WriterFault::ClientBusy, WriterFault::GpuBusy, WriterFault::DuringPageWalk,
@@ -2470,6 +2574,7 @@ int main() {
     scanoutFlip(FlipFault::ContextDuringRetire);
     scanoutFlip(FlipFault::ReplacedFrontContext);
     scanoutFlip(FlipFault::DualPins);
+    scanoutFlip(FlipFault::PhysicalAlias);
     scanoutFlip(FlipFault::DualContextDuringRetire);
     scanoutFlip(FlipFault::DifferentPinnedPitch);
     scanoutFlip(FlipFault::GeometryAtLock);
