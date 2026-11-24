@@ -1185,6 +1185,7 @@ struct CommitFixture {
     unsigned issues = 0, reads = 0, writes = 0, delays = 0, retireChecks = 0, pageReads = 0;
     unsigned pixelReads = 0;
     std::function<bool(bool, uint64_t &)> pixelEvidence;
+    std::function<void()> afterVmInstall, afterOtgLock;
     unsigned vmWrites = 0, vmAckReads = 0, clearChecks = 0, clearWrites = 0, translationChecks = 0;
     uint32_t lockSelect = 0, surfaceControl = 0;
     uint32_t surfaceFormat = 8, returnControl = 0x00e00000, swizzle = 0, start = 0;
@@ -1481,6 +1482,7 @@ struct CommitFixture {
                 if (self.translationFault == FlipFault::Install || self.translationFault == FlipFault::InstallAckTimeout)
                     root &= ~uint64_t{1};
                 if (self.translationFault == FlipFault::InstallWrongAck) root ^= kPage;
+                if (self.afterVmInstall) self.afterVmInstall();
                 return self.translationFault != FlipFault::InstallWriteUncertain;
             case 3: firstPage = uint64_t{value} << 32; break;
             case 4: firstPage |= value; break;
@@ -1500,6 +1502,7 @@ struct CommitFixture {
                 self.lockHeld = !self.lockTimeout;
                 if (self.changeGeometryAtLock) ++self.pitch;
                 if (self.translationFault == FlipFault::ContextAtLock) self.contextRoot ^= kPage;
+                if (self.afterOtgLock) self.afterOtgLock();
             } else {
                 assert(step == 4 && self.lockRequested && self.lockHeld && self.pending &&
                        self.programmed == target);
@@ -1663,7 +1666,55 @@ struct CommitFixture {
         now += 8000000;
         assert(poll(request) == kIOReturnSuccess && request.result == expected);
     }
+
+    void completeNewComputeWork() {
+        auto &device = scanout.device;
+        IOLockLock(device.gpuLock);
+        device.done[0] = device.recordQueued(0);
+        IOLockUnlock(device.gpuLock);
+    }
 };
+
+enum class WriterFault { NewerCompletedWork, ChangedEpoch, ChangedQueueGeneration, ReplacedWriterMap, ClientBusy, GpuBusy,
+                         DuringPageWalk, AfterVmInstall, UnderOtgLock };
+
+static void revalidateScanoutWriter(WriterFault fault, bool direct) {
+    CommitFixture fixture(direct);
+    auto &client = fixture.scanout.client;
+    auto &device = fixture.scanout.device;
+    device.dcnQualifiedFlipRoute = [](IOPCIDevice *pci) -> const HubpFlipRoute * { return pci->route; };
+    std::function<void()> newWork = [&] { fixture.completeNewComputeWork(); };
+    switch (fault) {
+    case WriterFault::NewerCompletedWork: newWork(); break;
+    case WriterFault::ChangedEpoch: ++device.exactInvalidationEpoch; break;
+    case WriterFault::ChangedQueueGeneration: ++device.exactQueueGeneration[0]; break;
+    case WriterFault::ReplacedWriterMap: ++client.maps[0].writerGeneration; break;
+    case WriterFault::ClientBusy: IOLockLock(client.lock); break;
+    case WriterFault::GpuBusy: IOLockLock(device.gpuLock); break;
+    case WriterFault::DuringPageWalk:
+        fixture.scanout.frame.host.afterRead = newWork;
+        break;
+    case WriterFault::AfterVmInstall: fixture.afterVmInstall = newWork; break;
+    case WriterFault::UnderOtgLock: fixture.afterOtgLock = newWork; break;
+    }
+    ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    const bool issued = fault == WriterFault::AfterVmInstall || fault == WriterFault::UnderOtgLock;
+    assert(fixture.begin(intent) == (issued ? kIOReturnSuccess : kIOReturnNotReady));
+    if (fault == WriterFault::ClientBusy) IOLockUnlock(client.lock);
+    if (fault == WriterFault::GpuBusy) IOLockUnlock(device.gpuLock);
+    assert(bool(intent.operation.serial) == issued && !fixture.issues);
+    assert(fixture.writes == (fault == WriterFault::UnderOtgLock ? 1u : 0u));
+    assert(fixture.vmWrites == (issued ? 7u : 0u));
+    if (issued) {
+        assert(intent.result == ScanoutFlipResult::Uncertain && fixture.scanout.frame.host.wires == 2);
+        assert(fixture.scanout.cancelPin(fixture.pin) == kIOReturnNotFound && !fixture.command.completes);
+        ScanoutFlipPoll poll{intent.operation, ScanoutFlipResult::Refused};
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+    } else {
+        assert(bool(fixture.reads) == (fault == WriterFault::DuringPageWalk));
+        assert(fixture.scanout.cancelPin(fixture.pin) == kIOReturnSuccess && fixture.scanout.frame.host.wires == 1);
+    }
+}
 
 enum class PixelFault { MapperRemap, MapperUnavailable, RenderPage, PresentPage, RenderGeneration, PresentGeneration,
                         LateGeneration, WrongCommandSlice, SubstitutedDescriptor, LateEvidence, FrontRemap, None };
@@ -1710,6 +1761,7 @@ static void revalidateScanoutPixels(PixelFault fault) {
     fixture.active = fixture.earliest = fixture.mapped;
     fixture.step(poll, ScanoutFlipResult::Waiting);
     fixture.step(poll, ScanoutFlipResult::Presented);
+    fixture.completeNewComputeWork();
     request = {fixture.mapped, fixture.home, {}, {}, ScanoutFlipResult::Refused};
     if (fault == PixelFault::FrontRemap) {
         fixture.pixelEvidence = [](bool first, uint64_t &physical) {
@@ -2307,6 +2359,10 @@ int main() {
     scanoutDma(DmaFault::WrongPage, DmaCleanupFault::ConfirmUnmap);
 #endif
 #ifdef TEST_SCANOUT_FLIP
+    for (const bool direct : {false, true})
+        for (const auto fault : {WriterFault::NewerCompletedWork, WriterFault::ChangedEpoch, WriterFault::ChangedQueueGeneration,
+             WriterFault::ReplacedWriterMap, WriterFault::ClientBusy, WriterFault::GpuBusy, WriterFault::DuringPageWalk,
+             WriterFault::AfterVmInstall, WriterFault::UnderOtgLock}) revalidateScanoutWriter(fault, direct);
     for (const auto fault : {DirectFlipFault::None, DirectFlipFault::DeniedTable, DirectFlipFault::ShortTable,
          DirectFlipFault::DomainLost, DirectFlipFault::ReplacedPci, DirectFlipFault::WriteableLeaf,
          DirectFlipFault::WindowConflict, DirectFlipFault::DomainLostAfterIssue,

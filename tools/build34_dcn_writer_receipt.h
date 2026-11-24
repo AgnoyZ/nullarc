@@ -41,4 +41,18 @@ struct WriterReceipt {
     }
 };
 
+struct WriterDrainStamp {
+    uint64_t epoch, computeGeneration, gfxGeneration;
+
+    bool matches(const WriterDrainStamp &other) const {
+        return computeGeneration && gfxGeneration && epoch == other.epoch &&
+            computeGeneration == other.computeGeneration && gfxGeneration == other.gfxGeneration;
+    }
+};
+
+struct ScanoutWriterProof {
+    WriterReceipt writer;
+    WriterDrainStamp drain;
+};
+
 }

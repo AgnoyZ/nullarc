@@ -99,7 +99,7 @@ def stage_native(driver, abi):
     replace(probe, '            same = pinned && live()', '            same = pinned && (!dma || planned) && live()')
     replace(probe, '                live() && livePresentPreparation(present.slice) == present.preparation;\n',
             '''                live() && livePresentPreparation(present.slice) == present.preparation;
-            if (same && dma) same = dma->lease.publishPlan(dma->request, span.bytes);
+            if (same && dma) same = dma->lease.publishPlan(dma->request, span.bytes, exactWriter, after);
 ''')
     replace(probe, '    if (pin && pin->held() && !same) (void)pin->releaseUnused();\n',
             '''    if (pin && pin->held() && !same && (!dma || dma->lease.releaseUnused(*pin)))

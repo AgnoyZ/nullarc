@@ -1067,6 +1067,21 @@ after dropping the locks. Prove those properties, actual device translation
 and HUBP visibility, then retain the backing through flip latch and old-page
 retirement. The page-match counter is not proof of any of those properties.
 
+To close the gap between DMA preparation and flip admission, both DMA
+pin types now retain the exact completed writer receipt, BO mapping and
+queue-drain stamp. The staged native client revalidates the receipt, pinned
+slice, latest service sequence, retired prefix and both queue generations
+before route preflight, after the page walks, after installing the DCN
+context, and under the OTG update lock before writing the HUBP VMID/address.
+Both CPU locks are try-only and neither spans a display register write.
+A stale proof before programming leaves the pin cancellable. Once a write
+may have happened, the transaction becomes uncertain and keeps its backing.
+Returning to firmware does not require the receipt of an old front to still
+be newest. This is a freshness check, not write exclusion: the qualified
+route must still exclude later writes to the displayed pages. CPU fixtures
+cover intervening Compute work, generation or map changes, and lock
+contention in both DMA modes. Revert the paired overlay change to roll back.
+
 ASan/UBSan tests cover binding bounds, generation reuse and the clear and
 submission record lifecycles, plus the exact part's refusal paths and
 out-of-order completion. Set `BUILD34_RADV_COMPILE_COMMANDS` to the

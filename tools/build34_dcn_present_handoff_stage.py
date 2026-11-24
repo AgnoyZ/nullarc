@@ -20,13 +20,7 @@ CALL = 'static void nvAccelCheckDcnCopyBacking('
 
 PROVIDER_PUBLIC = '''    bool offerDcnPresent(IOAccelPhxNativeClient *, OSObject *&, const build34_dcn_present_offer &);
 '''
-DRAIN_DECL = '''    struct DcnDrainStamp {
-        uint64_t epoch, computeGeneration, gfxGeneration;
-        bool matches(const DcnDrainStamp &other) const {
-            return epoch == other.epoch && computeGeneration == other.computeGeneration &&
-                gfxGeneration == other.gfxGeneration;
-        }
-    };
+DRAIN_DECL = '''    using DcnDrainStamp = build34::dcn::WriterDrainStamp;
     bool exactWriterVmCurrent(const build34::dcn::WriterMapIdentity &,
         const build34_dcn_native_submit &, const IOAccelPhxNativeClient *, DcnDrainStamp * = nullptr);
 '''

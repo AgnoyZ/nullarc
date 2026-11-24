@@ -1,6 +1,7 @@
 """Stage scanout-pin transfer across a qualified build34 display flip."""
 
 import build34_dcn_scanout_dma_stage as dma
+from build34_exact_binding import CLIENT_VALID
 from build34_exact_submit import once
 from test_build34_exact_ownership import method
 
@@ -9,6 +10,10 @@ BEGIN = 'IOReturn PhxBringup::beginDcnFlip('
 POLL = 'IOReturn PhxBringup::pollDcnFlip('
 LOOKUP = 'PhxBringup::DcnPinSlot *PhxBringup::findDcnFlipPin('
 BIND = 'build34::dcn::ScanoutFlipBinding PhxBringup::dcnFlipBinding('
+WRITER_CURRENT = 'bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent('
+CLIENT = '''    bool dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescriptorPin &,
+        const build34::dcn::ScanoutDmaLease &);
+'''
 FIELDS = '''    build34::dcn::ScanoutFlipCommit dcnFlip;
     const build34::dcn::HubpFlipRoute *(*dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr};
     DcnPinSlot *findDcnFlipPin(build34::dcn::ScanoutPinToken);
@@ -20,7 +25,30 @@ SLOT = '''        uint64_t dmaWindow{0};
         build34::dcn::ScanoutSurface dmaSurface{};
 '''
 
-METHODS = '''PhxBringup::DcnPinSlot *PhxBringup::findDcnFlipPin(build34::dcn::ScanoutPinToken token) {
+METHODS = '''bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent(const build34::dcn::ScanoutDescriptorPin &pin,
+    const build34::dcn::ScanoutDmaLease &dma) {
+    using namespace build34::dcn;
+    phx34_exact::CallbackGate<>::Lease callback(exactClientCallbacks);
+    if (!callback || !lock || __atomic_load_n(&legacyState, __ATOMIC_ACQUIRE) != 2 || !IOLockTryLock(lock))
+        return false;
+    const auto &proof = dma.writerProof();
+    const auto &native = proof.writer.native;
+    const auto live = [&] {
+        return owner && (''' + CLIENT_VALID + ''') && !exactClientCallbacks.closed() && !owner->exactAdmissionClosed() &&
+            exactWriter.complete && native.context && native.context <= PHXN_MAX_CTX && ctx[native.context];
+    };
+    const bool current = live() && [&] {
+        const auto mapping = exactWriterMapLocked(proof.writer.range);
+        PhxBringup::DcnDrainStamp drain{};
+        return proof.writer.complete && exactWriter.matches(native, proof.writer.range, mapping.identity) &&
+            proof.writer.map.matches(mapping.identity) && dma.matchesWriterBacking(pin, mapping) &&
+            owner->exactWriterVmCurrent(mapping.identity, native, this, &drain) && proof.drain.matches(drain) && live();
+    }();
+    IOLockUnlock(lock);
+    return current;
+}
+
+PhxBringup::DcnPinSlot *PhxBringup::findDcnFlipPin(build34::dcn::ScanoutPinToken token) {
     if (token.provider == this && token.serial) {
         for (auto &slot : dcnPins)
             if (slot.serial == token.serial && slot.client && slot.dmaSurface.mappedBytes) return &slot;
@@ -51,7 +79,8 @@ IOReturn PhxBringup::beginDcnFlip(build34::dcn::ScanoutFlipIntent &intent) {
         !gDcnPinSerials.take(serial)) return kIOReturnNotReady;
     const ScanoutPinToken token{this, serial};
     const auto result = dcnFlip.begin(intent, token, *route, pci, dcnFlipBinding(old), dcnFlipBinding(next),
-        [&] { return !exactCallbacks.closed(); });
+        [&] { return !exactCallbacks.closed(); },
+        [&] { return next && next->client->dcnScanoutWriterCurrent(next->descriptor, next->dma); });
     if (result == ScanoutFlipResult::Refused) return kIOReturnNotReady;
     intent.operation = token;
     intent.result = result;
@@ -104,6 +133,7 @@ def stage_native(driver, abi):
     source = once(source, include, include + '#include "build34_dcn_flip_commit.h"\n')
     source = once(source, dma.DMA_FIELDS, dma.DMA_FIELDS + SLOT)
     source = once(source, dma.MAPPER_GATE, dma.MAPPER_GATE + FIELDS)
+    source = once(source, dma.DMA_PROBE_DECL, dma.DMA_PROBE_DECL + CLIENT)
     source = once(source, dma.MAP_METHOD, METHODS + dma.MAP_METHOD)
     replace(dma.pin.PREPARE, '    for (auto &slot : dcnPins) {\n', '''    const auto surface = request ? present.scanout : build34::dcn::ScanoutSurface{};
     if (request && (!build34::dcn::validFlipGeometry(surface) || surface.mappedBytes != present.slice.bytes))

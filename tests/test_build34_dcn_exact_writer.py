@@ -167,9 +167,10 @@ class ExactWriterTests(unittest.TestCase):
             fields = fields.replace(field, field + scanout_dma.DMA_FIELDS)
             probe = scanout_dma.DMA_PROBE_DECL
         if flip:
-            signatures += (flip_commit.LOOKUP, flip_commit.BIND, flip_commit.BEGIN, flip_commit.POLL)
+            signatures += (flip_commit.WRITER_CURRENT, flip_commit.LOOKUP, flip_commit.BIND, flip_commit.BEGIN, flip_commit.POLL)
             fields = fields.replace(scanout_dma.DMA_FIELDS, scanout_dma.DMA_FIELDS + flip_commit.SLOT)
             fields = fields.replace(scanout_dma.MAPPER_GATE, scanout_dma.MAPPER_GATE + flip_commit.FIELDS)
+            probe += flip_commit.CLIENT
         extracted = '\n'.join(method(source, signature) for signature in signatures)
         if bar5_adapter:
             bound = bar5.stage_native(DRIVER, ABI)

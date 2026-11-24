@@ -3,6 +3,7 @@
 #include <IOKit/IODMACommand.h>
 #include <IOKit/IOLib.h>
 #include <IOKit/IOMapper.h>
+#include <build34_dcn_writer_receipt.h>
 
 #include "build34_dcn_present_backing.h"
 #include "build34_dcn_scanout_pin.h"
@@ -125,13 +126,24 @@ public:
         return true;
     }
 
-    bool publishPlan(ScanoutDmaRequest &request, uint64_t bytes) const {
+    bool publishPlan(ScanoutDmaRequest &request, uint64_t bytes, const WriterReceipt &writer, WriterDrainStamp drain) {
         if (!pages_ || uncertain() || !validScanoutDmaStorage(request, bytes) ||
-            layout_.firstLogicalPage != request.windowStart / kPageBytes || layout_.entryCount != bytes / kPageBytes)
+            layout_.firstLogicalPage != request.windowStart / kPageBytes || layout_.entryCount != bytes / kPageBytes ||
+            !writer.complete || writer.range.bytes != bytes || writer.map.preparation != renderPreparation_ ||
+            !drain.computeGeneration || drain.gfxGeneration != writer.native.generation)
             return false;
+        writerProof_ = {writer, drain};
         for (size_t index = 0; index < layout_.entryCount; ++index) request.pages[index] = pages_[index];
         request.layout = layout_;
         return true;
+    }
+
+    const ScanoutWriterProof &writerProof() const { return writerProof_; }
+
+    bool matchesWriterBacking(const ScanoutDescriptorPin &pin, const WriterMapping &mapping) const {
+        const auto &slice = pin.lease_.slice_;
+        return pin.held() && pages_ && !uncertain() && mapping.slice.descriptor == slice.descriptor &&
+            mapping.slice.offset == slice.offset && mapping.slice.bytes == slice.bytes;
     }
 
 private:
@@ -214,6 +226,7 @@ private:
         qualified_ = {};
         pages_ = nullptr;
         layout_ = {};
+        writerProof_ = {};
     }
 
     static bool readBatch(void *context, uint64_t *offset, DmaSegment *segments, uint32_t *count) {
@@ -241,6 +254,7 @@ private:
     ScanoutDmaMapper qualified_{};
     uint64_t *pages_{nullptr};
     FlatPageLayout layout_{};
+    ScanoutWriterProof writerProof_{};
     DcnFlatTable table_;
     RenderDescriptorLease presentPin_;
     uint64_t renderPreparation_{0}, presentPreparation_{0};

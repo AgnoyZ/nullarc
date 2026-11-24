@@ -52,9 +52,9 @@ public:
     ScanoutPinToken front() const { return front_; }
     bool matches(ScanoutPinToken token) const { return pending() && operation_ == token; }
 
-    template<typename IsLive>
+    template<typename IsLive, typename WriterCurrent>
     ScanoutFlipResult begin(ScanoutFlipIntent intent, ScanoutPinToken operation, HubpFlipRoute route,
-                           void *pci, ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live) {
+                           void *pci, ScanoutFlipBinding old, ScanoutFlipBinding next, IsLive live, WriterCurrent writerCurrent) {
         if (pending() || !live() || !operation.provider || !operation.serial ||
             !intent.previous.valid() || !intent.next.valid() || !route.lifetime || !route.qualify ||
             !route.canInstallFlatVm || !route.fetchesRetired ||
@@ -70,7 +70,8 @@ public:
                                             old.window - next.window < next.surface.mappedBytes))) ||
             (old.token.serial && (!(frontAddress_ == intent.previous) || route.owner != routeOwner_ ||
                                   route.generation != routeGeneration_ || route.lifetime != routeLifetime_ ||
-                                  route.framebuffer != framebuffer_ || pci != pci_)))
+                                  route.framebuffer != framebuffer_ || pci != pci_)) ||
+            (next.pin && !writerCurrent()))
             return ScanoutFlipResult::Refused;
 
         const HubpFlipRequest request{route.owner, route.generation, operation.serial, intent.previous, intent.next,
@@ -97,7 +98,7 @@ public:
         auto oldInstalled = [&] { return oldCurrent() && contextCurrent(frontVm_, route.reader, translationCurrent); };
         auto contextsCurrent = [&] {
             return oldInstalled() && nextCurrent() &&
-                (!nextTable || contextCurrent(nextTable->vm_, route.reader, translationCurrent));
+                (!nextTable || (contextCurrent(nextTable->vm_, route.reader, translationCurrent) && writerCurrent() && withinBudget()));
         };
         FirmwareScanoutSample home = firmwareHome_;
         const auto captureHome = [&] {
@@ -117,7 +118,7 @@ public:
                 next.dma->qualified_, mapping(next), next.dma->layout_, next.dma->pages_, oldTable, translationCurrent)) ||
             !nextEmpty() || !matchesTranslation(old, translationCurrent) || !matchesTranslation(next, translationCurrent) ||
             !homeCurrent() || !oldInstalled() || !nextEmpty() || !peersIdle() ||
-            (next.pin && !next.pin->beginDisplayUse())) {
+            (next.pin && (!writerCurrent() || !withinBudget() || !next.pin->beginDisplayUse()))) {
             if (!routeLifetime_) {
                 route.framebuffer->release();
                 route.lifetime->release();
@@ -139,7 +140,7 @@ public:
         nextVm_ = nextTable ? nextTable->vm_ : DcnFlatContext{};
         surface_ = surface;
         if ((nextTable && (!DcnFlatProgram::install(nextVm_, route_.reader, route_.writer, inactive, peersIdle) ||
-                           !homeCurrent())) ||
+                           !homeCurrent() || !writerCurrent() || !withinBudget())) ||
             !HubpFlipProgram::issue(request_, route_.reader, route_.writer, surface_, withinBudget, contextsCurrent) ||
             !route_.reader.current(route_.reader.context, request_) || !live())
             return fail();
