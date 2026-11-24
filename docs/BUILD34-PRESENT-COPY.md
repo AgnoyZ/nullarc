@@ -57,23 +57,24 @@ publishing any page addresses. The caller owns disposable run scratch and
 disjoint page output. CPU fixtures exercise 4,000 fragmented pages, a short
 last batch and errors injected after successful reads.
 
-Before publishing the page list, the collector now compares the physical
-page at each logical offset of the original backing with the physical page
-resolved from that offset's DMA address. It requires a non-null mapper
-identity independently attributed to the device and matching the prepared
-mapping. The caller must hold stable leases on the original pages and the
-exact mapping. The original lookup must read the pinned backing independently
-of DMA preparation, and the reverse lookup must use that same mapper and
-mapping lease. Each callback must establish a whole, contiguous 4 KiB physical
-page in the same address domain, not just a first-byte address. The helper
-rejects failed lookups, zero or unaligned original pages, and any mismatch
-without writing the page list, even if the last page fails. Scratch can
-change. The output remains DMA addresses, not the compared physical addresses.
+Before publishing the page list, the collector requires three physical-page
+lookups to agree at every logical offset. The render lookup reads the backing
+of the successful, active linear-image import. The present lookup reads the
+original backing of the retained IOSurface descriptor. The DMA reverse
+lookup uses the prepared mapping and a non-null mapper independently
+attributed to the device. The caller must hold stable leases on both page
+sources and the exact mapping. Both backing reads must be independent of
+DMA preparation. Each callback must establish a whole, contiguous 4 KiB
+physical page in the same address domain. Failed lookups, zero or unaligned
+pages, and mismatches leave the page list untouched, even on the last page.
+Scratch can change. The page list contains the original DMA addresses.
 
 CPU fixtures cover non-identity DMA, one substituted page with an unchanged
 mapping context and extent, reordered and repeated targets, missing/wrong
 mapper identity, lookup failure, and coalesced DMA backed by noncontiguous
-physical pages. The 4,000-page test checks every emitted address.
+physical pages. A last-page render mismatch also refuses publication when
+the present descriptor and DMA mapping agree with each other. The 4,000-page
+test checks all three lookups and every emitted address.
 
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or
 matching descriptor cannot rule out per-page bounce buffering. A null mapper
@@ -87,17 +88,22 @@ do not establish which permissions and cache attributes work on the live
 DCN path.
 
 There is no native call site, MMIO or active page-table change. Keep the
-AMD flip guard and the accepted R2a copy fallback unchanged. Next prove
-that the plugin's actual linear host import and the retained presentation
-descriptor refer to the same pinned pages, not just the same IOSurface ID.
-The plugin does not yet expose the qualification metadata to PhxAccel. The
-actual device mapper, lease/reverse-lookup semantics and HUBP fetch domain
-still need proof. Native invalidation, render completion and visibility,
-hardware latch confirmation before retiring old pages, and bounded
-fallback/recovery are also required. Do not treat a successful plan as a
-valid hardware mapping, R3 acceptance or
-permission to run any hardware trial. Source-only rollback is a revert of
-this prerequisite; no installed state needs restoration.
+AMD flip guard and the accepted R2a copy fallback unchanged. The
+[plugin's linear alias](../src/nmplugin/NVMTLDevice.m#L915) uses a
+[task-backed wired descriptor](../src/phxbringup/PhxBringup.cpp#L1674)
+through the native host import. The
+[present path](../src/phxaccel/accel/nvrm-accel.cpp#L1150) retrieves its
+descriptor from the IOSurface. Native handoff needs kernel-owned evidence
+of the actual bound render BO and slice, tied to the same presentation
+transaction and retained descriptor. An IOSurface ID or user property can
+identify a candidate for lookup. Page comparison requires the live backing
+on both sides. PhxAccel currently has no such render binding handoff.
+
+Hardware acceptance requires proof of the actual device mapper,
+lease/reverse-lookup semantics and HUBP fetch domain. It also requires
+native invalidation, render completion and visibility, hardware latch
+confirmation before retiring old pages, and bounded fallback/recovery.
+Source-only rollback is a revert of this prerequisite.
 
 ## Accepted baseline measurement, November 20
 

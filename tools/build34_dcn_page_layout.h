@@ -132,12 +132,13 @@ struct OriginalBacking {
 
 inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSurface &surface,
                                           const PreparedDmaMapping &mapping, const void *deviceMapper,
-                                          const OriginalBacking &backing,
+                                          const OriginalBacking &renderBacking, const OriginalBacking &presentBacking,
                                           DmaRun *scratch, size_t runCapacity,
                                           uint64_t *pageAddresses, size_t pageCapacity) {
     const uint64_t bytes = surface.mappedBytes;
     if (!deviceMapper || mapping.mapper != deviceMapper || !mapping.readBatch || !mapping.resolvePage ||
-        !backing.readPage || !scratch || !runCapacity || !pageAddresses || !bytes || bytes > kMaxBackingBytes ||
+        !renderBacking.readPage || !presentBacking.readPage ||
+        !scratch || !runCapacity || !pageAddresses || !bytes || bytes > kMaxBackingBytes ||
         bytes % kPageBytes || mapping.bytes != bytes || pageCapacity < bytes / kPageBytes ||
         windowStart % kPageBytes || windowStart >= kAddressLimit || bytes > kAddressLimit - windowStart)
         return {};
@@ -168,12 +169,15 @@ inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSur
     for (size_t index = 0; index < runCount; ++index) {
         const auto &run = scratch[index];
         for (uint64_t offset = 0; offset < run.bytes; offset += kPageBytes) {
-            uint64_t original = 0;
+            const uint64_t backingOffset = run.backingOffset + offset;
+            uint64_t render = 0;
+            uint64_t present = 0;
             uint64_t resolved = 0;
-            if (!backing.readPage(backing.context, run.backingOffset + offset, &original) ||
-                !original || original % kPageBytes ||
+            if (!renderBacking.readPage(renderBacking.context, backingOffset, &render) ||
+                !render || render % kPageBytes ||
+                !presentBacking.readPage(presentBacking.context, backingOffset, &present) || present != render ||
                 !mapping.resolvePage(mapping.context, deviceMapper, run.dmaAddress + offset, &resolved) ||
-                resolved != original)
+                resolved != present)
                 return {};
         }
     }

@@ -171,14 +171,19 @@ static void testSegmentBatches() {
     std::vector<uint64_t> originals(4025);
     for (size_t index = 0; index < originals.size(); ++index)
         originals[index] = 0x10000000 + index * 5 * kPageBytes;
+    const auto presented = originals;
     const auto targets = originals;
     const auto collect = [&](BatchSource &source, uint64_t preparedBytes, size_t runCapacity, size_t pageCapacity) {
-        PhysicalPages originalPages{originals.data(), originals.size()};
-        const OriginalBacking backing{&originalPages, readOriginalPage};
+        PhysicalPages renderPages{originals.data(), originals.size()};
+        PhysicalPages presentPages{presented.data(), presented.size()};
+        const OriginalBacking renderBacking{&renderPages, readOriginalPage};
+        const OriginalBacking presentBacking{&presentPages, readOriginalPage};
         const PreparedDmaMapping mapping{preparedBytes, &kFixtureMapper, &source, readBatch, resolvePage};
-        const auto layout = collectScanoutPages(windowStart, surface, mapping, &kFixtureMapper, backing,
+        const auto layout = collectScanoutPages(windowStart, surface, mapping, &kFixtureMapper,
+                                                renderBacking, presentBacking,
                                                 runs.data(), runCapacity, pages.data(), pageCapacity);
-        assert(originalPages.calls == layout.entryCount && source.targets.calls == layout.entryCount);
+        assert(renderPages.calls == layout.entryCount && presentPages.calls == layout.entryCount);
+        assert(source.targets.calls == layout.entryCount);
         return layout;
     };
     BatchSource complete{surface.mappedBytes, BatchResult::Normal, {targets.data(), targets.size()}};
@@ -222,22 +227,26 @@ static void testSegmentBatches() {
 static void testPageIdentity() {
     const ScanoutSurface surface{1024, 3, 1023, kDcnArgb8888, 3 * kPageBytes};
     const std::array<uint64_t, 3> expected{0x10000, 0x50000, 0x20000};
-    auto originals = expected;
+    auto rendered = expected;
+    auto presented = expected;
     auto targets = expected;
-    PhysicalPages originalPages{originals.data(), originals.size()};
+    PhysicalPages renderPages{rendered.data(), rendered.size()};
+    PhysicalPages presentPages{presented.data(), presented.size()};
     BatchSource source{surface.mappedBytes, BatchResult::Normal, {targets.data(), targets.size()}, 0, true};
-    OriginalBacking backing{&originalPages, readOriginalPage};
+    OriginalBacking renderBacking{&renderPages, readOriginalPage};
+    OriginalBacking presentBacking{&presentPages, readOriginalPage};
     PreparedDmaMapping mapping{surface.mappedBytes, &kFixtureMapper, &source, readBatch, resolvePage};
     DmaRun scratch{};
     std::array<uint64_t, 4> pages;
 
-    const auto check = [&](const void *deviceMapper, size_t batches, size_t reads, size_t resolutions,
-                           bool accept = false) {
-        originalPages.calls = source.calls = source.targets.calls = 0;
+    const auto check = [&](const void *deviceMapper, size_t batches, size_t renderReads, size_t presentReads,
+                           size_t resolutions, bool accept = false) {
+        renderPages.calls = presentPages.calls = source.calls = source.targets.calls = 0;
         pages.fill(kUnwritten);
-        const auto layout = collectScanoutPages(0, surface, mapping, deviceMapper, backing,
+        const auto layout = collectScanoutPages(0, surface, mapping, deviceMapper, renderBacking, presentBacking,
                                                 &scratch, 1, pages.data(), pages.size());
-        assert(source.calls == batches && originalPages.calls == reads && source.targets.calls == resolutions);
+        assert(source.calls == batches && source.targets.calls == resolutions);
+        assert(renderPages.calls == renderReads && presentPages.calls == presentReads);
         if (accept) {
             assert(layout.entryCount == 3 && layout.tableBytes == 24);
             assert(pages[0] == kDmaBase && pages[1] == kDmaBase + kPageBytes);
@@ -249,36 +258,46 @@ static void testPageIdentity() {
         }
     };
 
-    check(&kFixtureMapper, 1, 3, 3, true);
+    check(&kFixtureMapper, 1, 3, 3, 3, true);
     targets[1] = 0x90000;
-    check(&kFixtureMapper, 1, 2, 2);
+    check(&kFixtureMapper, 1, 2, 2, 2);
     targets = {expected[1], expected[0], expected[2]};
-    check(&kFixtureMapper, 1, 1, 1);
+    check(&kFixtureMapper, 1, 1, 1, 1);
     targets = {expected[0], expected[1], expected[1]};
-    check(&kFixtureMapper, 1, 3, 3);
+    check(&kFixtureMapper, 1, 3, 3, 3);
     targets = expected;
     for (uint64_t invalid : {kUnwritten, uint64_t{0}, expected[2] + 1}) {
         targets[2] = invalid;
-        check(&kFixtureMapper, 1, 3, 3);
+        check(&kFixtureMapper, 1, 3, 3, 3);
     }
     targets = expected;
     for (uint64_t invalid : {kUnwritten, uint64_t{0}, expected[2] + 1}) {
-        originals[2] = invalid;
-        check(&kFixtureMapper, 1, 3, 2);
+        rendered[2] = invalid;
+        check(&kFixtureMapper, 1, 3, 2, 2);
+        rendered = expected;
+        presented[2] = invalid;
+        check(&kFixtureMapper, 1, 3, 3, 2);
     }
-    originals = expected;
+    presented[2] = 0xa0000;
+    check(&kFixtureMapper, 1, 3, 3, 2);
+    targets = presented;
+    check(&kFixtureMapper, 1, 3, 3, 2);
+    presented = targets = expected;
 
     const unsigned otherMapper = 2;
-    check(nullptr, 0, 0, 0);
-    check(&otherMapper, 0, 0, 0);
+    check(nullptr, 0, 0, 0, 0);
+    check(&otherMapper, 0, 0, 0, 0);
     mapping.mapper = nullptr;
-    check(&kFixtureMapper, 0, 0, 0);
+    check(&kFixtureMapper, 0, 0, 0, 0);
     mapping.mapper = &kFixtureMapper;
     mapping.resolvePage = nullptr;
-    check(&kFixtureMapper, 0, 0, 0);
+    check(&kFixtureMapper, 0, 0, 0, 0);
     mapping.resolvePage = resolvePage;
-    backing.readPage = nullptr;
-    check(&kFixtureMapper, 0, 0, 0);
+    renderBacking.readPage = nullptr;
+    check(&kFixtureMapper, 0, 0, 0, 0);
+    renderBacking.readPage = readOriginalPage;
+    presentBacking.readPage = nullptr;
+    check(&kFixtureMapper, 0, 0, 0, 0);
 }
 
 static void expectRefusal(uint64_t start, uint64_t bytes, const DmaRun *runs, size_t count,
