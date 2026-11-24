@@ -61,6 +61,7 @@ test: $(TESTS)
 	python3 -B tests/test_build34_present_copy.py
 	CXX="$(CXX)" python3 -B tests/test_build34_dcn_render_map.py
 	python3 -B tests/test_build34_dcn_render_write.py
+	python3 -B tests/test_build34_dcn_radv_binding.py
 	python3 -B tests/test_build34_present_copy_host.py
 	python3 -B tests/test_build34_map_observation.py
 	python3 -B tests/test_build34_pci_irq_observation.py

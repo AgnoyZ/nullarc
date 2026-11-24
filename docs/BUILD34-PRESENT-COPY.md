@@ -348,6 +348,33 @@ built, loaded or run.
 Rollback is to discard the temporary source stage. The accepted source and
 installed images are unchanged.
 
+The separate [RADV binding stage](../tools/build34_dcn_radv_binding_stage.py)
+derives four pinned MIT Mesa inputs from the reviewed build34 RADV source.
+After the actual host-import `GEM_VA` map succeeds, it compares the allocation
+size recorded from Darwin's import result with the mapped extent and assigns
+a process-local, non-reused generation. No generation is issued for local or
+fd-backed BO creation. The image bind reads back the actual BO pointer,
+memory address and range that RADV installed, not a plugin-supplied address.
+It requires the same winsys, host pointer, handle, VA and range, a declared
+host-allocation import, and an uncompressed single-plane linear BGRA color
+attachment with a zero-offset slice covering the whole page-rounded frame.
+The record preserves the original RADV VA for binding comparisons and keeps
+the normalized 48-bit PhxBringup VA separately, including sign-extended
+high addresses from RADV's VA allocator. A mismatched extent, layout or VA
+leaves the record empty without changing the Vulkan bind result.
+
+The RADV record is not exported or accepted by PhxBringup. Its generation
+does not replace the kernel map/table generations, and a successful map
+return does not prove native TLB completion. Retain the image, memory and
+winsys during any future use and revalidate the matching live kernel map.
+The next consumer must associate the actual recorded RADV attachment and
+its accepted native submission with this binding, then account for later
+writes before the display can take a lease. Tests exercise the bounds and
+reuse rules with ASan/UBSan. Set `BUILD34_RADV_COMPILE_COMMANDS` to the
+reviewed Darwin Meson recipe to additionally syntax-check the two edited
+Mesa translation units with a temporary overlay. No Mesa source copy or
+binary is published; rollback is to discard the overlay.
+
 Hardware acceptance requires proof of the actual device mapper,
 lease/reverse-lookup semantics and HUBP fetch domain. It also requires
 native invalidation, render completion and visibility, hardware latch
