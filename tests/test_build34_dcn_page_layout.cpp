@@ -277,6 +277,81 @@ static void testSegmentBatches() {
     assert(pages[4024] == kDmaBase + 4024 * 3 * kPageBytes && pages.back() == kUnwritten);
 }
 
+struct TlbSamples {
+    const RenderTlbSample *samples;
+    size_t size;
+    size_t calls = 0;
+
+    static bool read(void *context, RenderTlbSample *sample) {
+        auto &source = *static_cast<TlbSamples *>(context);
+        const size_t index = source.calls++;
+        if (index >= source.size)
+            return false;
+        *sample = source.samples[index];
+        return true;
+    }
+};
+
+static constexpr uint32_t kFixtureAck = 1u << 8;
+
+static RenderTlbAck confirmedTlb(const RenderVmTranslation &translation) {
+    const RenderTlbSample samples[] = {{translation, 0, 0}, {translation, 1000, kFixtureAck}};
+    TlbSamples source{samples, 2};
+    const auto ack = RenderTlbAck::observe(translation, &source, TlbSamples::read);
+    assert(ack.matches(translation) && source.calls == 2);
+    return ack;
+}
+
+static void testRenderTlbAck() {
+    const unsigned client = 1, provider = 2, other = 3;
+    const RenderVmTranslation translation{{&client, 17}, &provider, 2, 3, 4, 5, 1, 8};
+    const RenderVmTranslation changes[] = {
+        {{&other, 17}, &provider, 2, 3, 4, 5, 1, 8}, {{&client, 18}, &provider, 2, 3, 4, 5, 1, 8},
+        {{&client, 17}, &other, 2, 3, 4, 5, 1, 8}, {{&client, 17}, &provider, 3, 3, 4, 5, 1, 8},
+        {{&client, 17}, &provider, 2, 4, 4, 5, 1, 8}, {{&client, 17}, &provider, 2, 3, 5, 5, 1, 8},
+        {{&client, 17}, &provider, 2, 3, 4, 6, 1, 8}, {{&client, 17}, &provider, 2, 3, 4, 5, 2, 8},
+        {{&client, 17}, &provider, 2, 3, 4, 5, 1, 9},
+    };
+    const auto observe = [&](const RenderTlbSample *samples, size_t size, size_t expectedCalls) {
+        TlbSamples source{samples, size};
+        const auto ack = RenderTlbAck::observe(translation, &source, TlbSamples::read);
+        assert(source.calls == expectedCalls);
+        return ack;
+    };
+    const RenderTlbSample ordered[] = {{translation, 0, kFixtureAck}, {translation, 1000, 0},
+                                      {translation, 2000, 1u << 9}, {translation, 999999, kFixtureAck}};
+    const auto valid = observe(ordered, 4, 4);
+    assert(valid.matches(translation));
+    assert(!observe(ordered, 1, 2).matches(translation));
+    assert(!observe(ordered, 3, 4).matches(translation));
+    for (const auto &changed : changes) {
+        const RenderTlbSample rebound[] = {{translation, 1000, 0}, {changed, 2000, kFixtureAck}};
+        assert(!observe(rebound, 2, 2).matches(translation));
+        assert(!valid.matches(changed));
+    }
+
+    const RenderTlbSample late[] = {{translation, 999999, 0}, {translation, 1000000, kFixtureAck}};
+    assert(!observe(late, 2, 2).matches(translation));
+    const RenderTlbSample rewound[] = {{translation, 1000, 0}, {translation, 999, kFixtureAck}};
+    assert(!observe(rewound, 2, 2).matches(translation));
+    const RenderTlbSample failedRead[] = {{translation, 0, 0}, {translation, 1000, UINT32_MAX}};
+    assert(!observe(failedRead, 2, 2).matches(translation));
+    const std::vector<RenderTlbSample> stuck(1001, {translation, 0, kFixtureAck});
+    assert(!observe(stuck.data(), stuck.size(), 1000).matches(translation));
+
+    TlbSamples unused{ordered, 4};
+    auto invalid = translation;
+    invalid.vmid = 32;
+    assert(!RenderTlbAck::observe(invalid, &unused, TlbSamples::read).matches(invalid));
+    invalid = translation;
+    invalid.invalidateGeneration = 0;
+    assert(!RenderTlbAck::observe(invalid, &unused, TlbSamples::read).matches(invalid));
+    invalid = translation;
+    invalid.bindingGeneration = UINT64_MAX;
+    assert(!RenderTlbAck::observe(invalid, &unused, TlbSamples::read).matches(invalid));
+    assert(!unused.calls);
+}
+
 static void testPageIdentity() {
     const ScanoutSurface surface{1024, 3, 1023, kDcnArgb8888, 3 * kPageBytes};
     const std::array<uint64_t, 3> expected{0x10000, 0x50000, 0x20000};
@@ -288,11 +363,11 @@ static void testPageIdentity() {
     PinnedDescriptorSlice presentSlice{&presentPages, 0, surface.mappedBytes};
     BatchSource source{surface.mappedBytes, BatchResult::Normal, {targets.data(), targets.size()}, 0, true};
     RenderDescriptorLease renderLease;
-    const RenderMapIdentity identity{&renderPages, 17};
-    const BoundRenderImage image{identity, &presentPages, 0x80000, 0, kSurfaceBgra, 1024, 3, 4096};
-    const LiveHostRenderMap mappingSnapshot{identity, &renderPages, renderPages.preparation, surface.mappedBytes,
+    const RenderVmTranslation translation{{&renderPages, 17}, &kFixtureMapper, 2, 3, 4, 5, 1, 8};
+    const BoundRenderImage image{translation, &presentPages, 0x80000, 0, kSurfaceBgra, 1024, 3, 4096};
+    const LiveHostRenderMap mappingSnapshot{translation, &renderPages, renderPages.preparation, surface.mappedBytes,
                                           image.gpuAddress, 0, surface.mappedBytes};
-    assert(acquireBoundRenderBacking(image, mappingSnapshot, &presentPages, surface, renderLease));
+    assert(acquireBoundRenderBacking(image, mappingSnapshot, confirmedTlb(translation), &presentPages, surface, renderLease));
     assert(renderPages.complete() == kIOReturnSuccess);
     renderPages.release();
     OriginalBacking renderBacking = renderLease.backing();
@@ -498,15 +573,16 @@ static void testBoundRenderBacking() {
     const uint64_t addresses[] = {0x10000, 0x30000, 0x90000, 0x50000, 0x70000};
     DescriptorFixture descriptor{addresses, 5 * page};
     const unsigned client = 1, otherClient = 2, surfaceObject = 3, otherSurfaceObject = 4;
-    const RenderMapIdentity identity{&client, 17};
-    const BoundRenderImage image{identity, &surfaceObject, va + page, 2 * page, kSurfaceBgra, 1023, 2, 4092};
-    const LiveHostRenderMap mapping{identity, &descriptor, descriptor.preparation, 5 * page, va, page, 3 * page};
+    const RenderVmTranslation translation{{&client, 17}, &kFixtureMapper, 2, 3, 4, 5, 1, 8};
+    const BoundRenderImage image{translation, &surfaceObject, va + page, 2 * page, kSurfaceBgra, 1023, 2, 4092};
+    const LiveHostRenderMap mapping{translation, &descriptor, descriptor.preparation, 5 * page, va, page, 3 * page};
+    const auto ack = confirmedTlb(translation);
     const ScanoutSurface scanout{image.width, image.height, 1022, kDcnArgb8888, 2 * page};
 
     const auto refuse = [&](const BoundRenderImage &candidate, const LiveHostRenderMap &snapshot,
                             const void *surface, const ScanoutSurface &target) {
         RenderDescriptorLease lease;
-        assert(!acquireBoundRenderBacking(candidate, snapshot, surface, target, lease));
+        assert(!acquireBoundRenderBacking(candidate, snapshot, ack, surface, target, lease));
         assert(!lease.backing().readPage && !lease.uncertain());
         assert(!descriptor.prepares && !descriptor.completes && descriptor.references == 1 && descriptor.wires == 1);
     };
@@ -515,16 +591,19 @@ static void testBoundRenderBacking() {
     for (const uint64_t stale : {uint64_t{0}, uint64_t{18}, UINT64_MAX}) {
         auto candidate = image;
         auto snapshot = mapping;
-        candidate.mapping.generation = stale;
+        candidate.translation.mapping.generation = stale;
         refuse(candidate, snapshot, &surfaceObject, scanout);
-        if (stale != 18) {
-            snapshot.identity.generation = stale;
-            refuse(candidate, snapshot, &surfaceObject, scanout);
-        }
+        snapshot.translation.mapping.generation = stale;
+        refuse(candidate, snapshot, &surfaceObject, scanout);
     }
     auto snapshot = mapping;
-    snapshot.identity.client = &otherClient;
+    snapshot.translation.mapping.client = &otherClient;
     refuse(image, snapshot, &surfaceObject, scanout);
+    auto reboundImage = image;
+    snapshot = mapping;
+    ++snapshot.translation.bindingGeneration;
+    reboundImage.translation = snapshot.translation;
+    refuse(reboundImage, snapshot, &surfaceObject, scanout);
     snapshot = mapping;
     snapshot.descriptor = nullptr;
     refuse(image, snapshot, &surfaceObject, scanout);
@@ -566,7 +645,9 @@ static void testBoundRenderBacking() {
     refuse(image, mapping, &surfaceObject, target);
 
     RenderDescriptorLease lease;
-    assert(acquireBoundRenderBacking(image, mapping, &surfaceObject, scanout, lease));
+    assert(!acquireBoundRenderBacking(image, mapping, {}, &surfaceObject, scanout, lease));
+    assert(!descriptor.prepares && !lease.backing().readPage);
+    assert(acquireBoundRenderBacking(image, mapping, ack, &surfaceObject, scanout, lease));
     const auto backing = lease.backing();
     uint64_t physical = kUnwritten;
     assert(backing.readPage(backing.context, 0, &physical) && physical == addresses[2]);
@@ -684,6 +765,7 @@ int main() {
     testDescriptorSlice();
     testRenderLease();
     testRenderLeaseFailures();
+    testRenderTlbAck();
     testBoundRenderBacking();
     testFragmentedBacking();
     testAddressAndCapacityEdges();

@@ -156,13 +156,33 @@ without changing legacy map results. Tests extract the actual staged
 methods and use CPU doubles. No selector, exported ABI, map call sequence,
 or page-table programming implementation is added or replaced.
 
-This generation identifies only a completed software page-table update.
-The legacy `vmMap` can return before the context has a hardware VMID and its
-TLB invalidation helper does not propagate timeout. A generation is not a
-`LiveHostRenderMap`: provider stop, power changes, checked invalidation,
-actual render binding and frame completion still need native evidence before
-any lease can be taken. No test treats an IOSurface property or other user
-claim as any of that evidence.
+The software map generation identifies a completed software page-table
+update. The legacy `vmMap` can return before the context has a hardware
+VMID, and its TLB invalidation helper does not propagate timeout.
+
+The offline render lease gate now requires a
+[TLB observation](../tools/build34_dcn_render_tlb.h) for the exact client map,
+provider, context allocation, VMID binding, page-table generation and
+invalidation request. For a serialized GFXHUB invalidation, the sampler
+starts after the request write and must observe the target VMID's ACK bit
+clear and then set within 1 ms and 1,000 reads. A stale level, a different
+VMID's bit, an all-ones read, a timeout or a changed identity fails closed.
+The binding gate compares the observation with both the render binding and
+the current mapping before retaining any pages. CPU fixtures verify stale
+and late ACKs, request replacement, context and VMID reuse, a stopped clock,
+and rejection at the lease boundary.
+
+Native integration needs a trusted sampler that reads ACK and the current
+identity together under the GPUVM lifetime and invalidation guards. The
+caller must exclude outstanding invalidations and other writers to the same
+engine. Provider stop and power loss must invalidate outstanding identities,
+and the live map must be resolved again under protection at lease acquisition.
+The clear-to-set requirement conservatively falls back when completion is so
+fast that sampling misses the clear. Linux v6.12 documents the corresponding
+[engine-17 request and ACK bit](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/amdgpu/gmc_v11_0.c#L208-L298),
+including its power-gating considerations. This stage checks the software
+contract with synthetic inputs. Native ACK freshness, the actual render
+binding and frame completion still require evidence from the device path.
 
 This XNU reference is APSL 2.0 and no code was imported. A segment walk or
 matching descriptor cannot rule out per-page bounce buffering. A null mapper

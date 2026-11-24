@@ -1,16 +1,12 @@
 #pragma once
 
 #include "build34_dcn_render_lease.h"
+#include "build34_dcn_render_tlb.h"
 
 namespace build34::dcn {
 
-struct RenderMapIdentity {
-    const void *client;
-    uint64_t generation;
-};
-
 struct BoundRenderImage {
-    RenderMapIdentity mapping;
+    RenderVmTranslation translation;
     const void *surface;
     uint64_t gpuAddress;
     uint64_t boOffset;
@@ -21,7 +17,7 @@ struct BoundRenderImage {
 };
 
 struct LiveHostRenderMap {
-    RenderMapIdentity identity;
+    RenderVmTranslation translation;
     IOMemoryDescriptor *descriptor;
     uint64_t preparation;
     uint64_t boBytes;
@@ -31,11 +27,10 @@ struct LiveHostRenderMap {
 };
 
 inline bool acquireBoundRenderBacking(const BoundRenderImage &image, const LiveHostRenderMap &mapping,
-                                      const void *presentSurface, const ScanoutSurface &scanout,
+                                      const RenderTlbAck &ack, const void *presentSurface, const ScanoutSurface &scanout,
                                       RenderDescriptorLease &lease) {
-    if (!presentSurface || image.surface != presentSurface || !image.mapping.client ||
-        image.mapping.client != mapping.identity.client || !image.mapping.generation ||
-        image.mapping.generation == UINT64_MAX || image.mapping.generation != mapping.identity.generation ||
+    if (!presentSurface || image.surface != presentSurface || !ack.matches(mapping.translation) ||
+        !sameRenderTranslation(image.translation, mapping.translation) ||
         !mapping.descriptor || image.pixelFormat != kSurfaceBgra || scanout.dcnPixelFormat != kDcnArgb8888 ||
         !image.width || image.width != scanout.width || !image.height || image.height != scanout.height ||
         image.bytesPerRow % 4 || image.bytesPerRow / 4 != uint64_t{scanout.pitchPixelsMinusOne} + 1 ||
