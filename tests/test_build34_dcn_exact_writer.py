@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 
 import build34_dcn_exact_writer_stage as writer
+import build34_dcn_firmware_home_stage as firmware_home
 import build34_dcn_flip_commit_stage as flip_commit
 import build34_dcn_present_handoff_stage as handoff
 import build34_dcn_scanout_dma_stage as scanout_dma
@@ -81,6 +82,23 @@ class ExactWriterTests(unittest.TestCase):
 
     def test_extracted_scanout_flip_lifetime(self):
         self.check_native_methods(paired=True, pins=True, dma=True, flip=True)
+
+    def test_firmware_sample_keeps_existing_scanout_and_vbl(self):
+        original = (ROOT / firmware_home.FRAMEBUFFER).read_bytes()
+        with self.assertRaisesRegex(ValueError, 'firmware sample source drift'):
+            firmware_home.stage(original + b'\n')
+        staged = firmware_home.stage(original)
+        before = original.decode()
+        def inline_method(source, signature):
+            self.assertEqual(source.count(signature), 1)
+            start = source.index(signature)
+            return source[start:source.index('\n    }\n', start) + len('\n    }\n')]
+        for signature in ('    static void vblFire(', '    void measureRefresh(', '    IOMemoryMap *aliasMap('):
+            self.assertEqual(inline_method(before, signature), inline_method(staged, signature))
+        signature = '    IOReturn callPlatformFunction('
+        self.assertEqual(inline_method(staged, signature).replace(firmware_home.QUERY, ''), inline_method(before, signature))
+        stop = method(staged, 'void PhxAMDFB::stop(')
+        self.assertLess(stop.index('closeDcnFirmwareSample();'), stop.index('OSSafeReleaseNULL(fMmio)'))
 
     def test_present_handoff_preserves_collecting_only_boundaries(self):
         source = handoff.stage_native(DRIVER, ABI)
@@ -184,6 +202,11 @@ class ExactWriterTests(unittest.TestCase):
         staged.write_text(handoff.stage_accelerator(accel.read_bytes()))
         self.run_checked([*flags, '-DNMX_ACCEL', '-DNM_TAHOE', '-DPHX_FB', '-I' + str(accel.parent.parent), '-I' + str(accel.parent),
                           '-I' + str(accel.parent / 'iofam'), '-I' + str(accel.parent / 're'), str(staged)])
+        framebuffer = ROOT / firmware_home.FRAMEBUFFER
+        staged_framebuffer = self.directory / framebuffer.name
+        staged_framebuffer.write_text(firmware_home.stage(framebuffer.read_bytes()))
+        self.run_checked([*flags, '-DNMX_ACCEL', '-DNM_TAHOE', '-DPHX_FB', '-I' + str(framebuffer.parent),
+                          '-I' + str(framebuffer.parent.parent), str(staged_framebuffer)])
 
 
 if __name__ == '__main__':

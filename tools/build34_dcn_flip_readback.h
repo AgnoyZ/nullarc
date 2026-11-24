@@ -54,6 +54,16 @@ public:
     HubpFlipReadback(const HubpFlipReadback &) = delete;
     HubpFlipReadback &operator=(const HubpFlipReadback &) = delete;
 
+    template<typename ReadDword>
+    static bool observeQuiescent(const ReadDword &read, HubpAddress &address, uint32_t &frame) {
+        Sample sample{};
+        if (sampleRegisters(read, sample) != Read::Stable || sample.pending || !sample.programmed.valid() ||
+            !(sample.programmed == sample.inUse) || !(sample.programmed == sample.earliest)) return false;
+        address = sample.programmed;
+        frame = sample.frame;
+        return true;
+    }
+
     bool begin(HubpFlipRequest request, HubpFlipReader reader) {
         if (progress_ != HubpFlipProgress::Idle || !validRequest(request) ||
             !reader.current || !reader.readDword || !reader.readClockNs ||
@@ -180,22 +190,28 @@ private:
         return reader.readDword(reader.context, address, value) && value != UINT32_MAX;
     }
 
-    static bool readRegisters(const HubpFlipReader &reader, Registers &regs) {
+    template<typename ReadDword>
+    static bool readRegisters(const ReadDword &read, Registers &regs) {
         using namespace hubp0;
-        return read(reader, kControl, regs.control) && read(reader, kVmid, regs.vmid) &&
-            read(reader, kProgrammedLow, regs.programmedLow) && read(reader, kProgrammedHigh, regs.programmedHigh) &&
-            read(reader, kFlip, regs.flip) && read(reader, kFlip2, regs.flip2) &&
-            read(reader, kInUseLow, regs.inUseLow) && read(reader, kInUseHigh, regs.inUseHigh) &&
-            read(reader, kEarliestLow, regs.earliestLow) && read(reader, kEarliestHigh, regs.earliestHigh);
+        return read(kControl, regs.control) && read(kVmid, regs.vmid) &&
+            read(kProgrammedLow, regs.programmedLow) && read(kProgrammedHigh, regs.programmedHigh) &&
+            read(kFlip, regs.flip) && read(kFlip2, regs.flip2) &&
+            read(kInUseLow, regs.inUseLow) && read(kInUseHigh, regs.inUseHigh) &&
+            read(kEarliestLow, regs.earliestLow) && read(kEarliestHigh, regs.earliestHigh);
     }
 
     static Read snapshot(const HubpFlipRequest &request, const HubpFlipReader &reader, Sample &sample) {
+        if (!reader.current(reader.context, request)) return Read::Invalid;
+        const auto result = sampleRegisters([&](uint32_t reg, uint32_t &value) { return read(reader, reg, value); }, sample);
+        return result != Read::Invalid && reader.current(reader.context, request) ? result : Read::Invalid;
+    }
+
+    template<typename ReadDword>
+    static Read sampleRegisters(const ReadDword &read, Sample &sample) {
         using namespace hubp0;
         uint32_t firstFrame = 0, lastFrame = 0;
         Registers first{}, last{};
-        if (!reader.current(reader.context, request) || !read(reader, kFrame, firstFrame) ||
-            !readRegisters(reader, first) || !readRegisters(reader, last) || !read(reader, kFrame, lastFrame) ||
-            !reader.current(reader.context, request))
+        if (!read(kFrame, firstFrame) || !readRegisters(read, first) || !readRegisters(read, last) || !read(kFrame, lastFrame))
             return Read::Invalid;
         if ((firstFrame & kFrameMask) != (lastFrame & kFrameMask) || !(first == last) || (last.flip & kUpdateLocked))
             return Read::Changing;

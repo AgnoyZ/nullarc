@@ -859,9 +859,31 @@ or `l10r` path. Omit the overlay to roll back this source-only step.
 PhxFB owns a BAR5 mapping for backlight PWM and releases it during `stop`.
 Retaining that mapping would keep a CPU view, not a live display power or
 route lease. PhxFB's backlight power handler does not supply such a lease.
-Before binding the callback to PhxFB, the owner must account for stop and
-power transitions, prove the firmware surface's actual HUBP address and
-fetch domain, and provide a recovery path for an uncertain flip.
+The hash-pinned [firmware scanout overlay](../tools/build34_dcn_firmware_home_stage.py)
+adds a synchronous kernel-only query to that actual framebuffer. It takes
+the expected PCI provider and a caller-owned output record, not a BAR or
+register supplied by the caller. It uses the existing BAR5 mapping only
+after successful PhxFB startup, an observed power-on, exact PCI match,
+memory-space enablement, and no known second framebuffer. Its try-lock
+serializes the bounded sample with local power and stop notifications.
+Power/connection off or stop prevents future samples before releasing any
+mapping; a later power-on does not rearm a revoked sample path. It does not
+claim to serialize other PCI, firmware, or platform power transitions.
+
+The [sample](../tools/build34_dcn_firmware_home.h) validates the console's
+CPU-visible BAR0 range and checks the live HUBP0 geometry twice around
+matching programmed, in-use and earliest VMID 0 addresses. All reads must
+fall within a single observed physical frame counter value, with no pending
+flip, update lock or unsupported layout. It returns the observed HUBP
+address, geometry, frame and console BAR0 offset separately. No register is
+written and no address or sample is logged or published to userspace. A
+readback is not proof the two address domains refer to the same backing.
+The next route must bind that relationship, provide actual display-writer
+exclusion, and address power, translation visibility and uncertain-flip
+recovery. No route provider or production caller is enabled. Tests cover
+the bounded register sample and its rejection cases, source preservation,
+and full PhxFB syntax against the pinned kernel SDK. Roll back by omitting
+the overlay; copy, VBL and accepted runtime inputs stay unchanged.
 
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of
