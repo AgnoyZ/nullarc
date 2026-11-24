@@ -649,6 +649,39 @@ unproven pages, generation changes during mapping, and failures in prepare,
 complete, unmap confirmation and clear. This stage is source-only; omit it
 for rollback.
 
+The [HUBP0 readback](../tools/build34_dcn_flip_readback.h) separates latch
+observation from old-address absence for one serialized, non-immediate
+BGRA flip on a qualified single HUBP0/OTG0 route. It starts before the
+address update, with no pending flip and the programmed, current and
+earliest-in-use addresses and VMIDs all matching the old surface. Each
+poll reads all fields twice between samples of the physical 24-bit OTG
+frame counter. Torn reads or a held update lock cannot advance the result.
+An advanced counter, the exact new programmed and current address/VMID,
+and a clear pending bit establish the latch observation. The earliest
+in-use address/VMID must also reach the new surface and remain there on a
+later physical frame before reporting the old address absent. There is no
+synthetic VBL or software wait-sequence input. The decoder uses the pinned
+[DCN 3.1.4 offsets](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/asic_reg/dcn/dcn_3_1_4_offset.h)
+and [fields](https://github.com/torvalds/linux/blob/adc218676eef25575469234709c2d87185ca223a/drivers/gpu/drm/amd/include/asic_reg/dcn/dcn_3_1_4_sh_mask.h).
+Linux's [pending check](https://github.com/torvalds/linux/blob/v6.12/drivers/gpu/drm/amd/display/dc/hubp/dcn20/dcn20_hubp.c#L909-L935)
+also checks the earliest-in-use address; no Linux implementation was copied.
+
+The future owner must keep routing, power, MMIO, page tables and both
+backings stable, and serialize every display writer. Its identity callback
+must tie that lease to the route generation, exact flip and pin tokens;
+loss of continuity makes any observation unusable. Blank, reset, disabled
+requests, underflow, unexpected VTG, immediate/triple/GSL configurations,
+unexpected address or VMID, a counter discontinuity or read error are
+refused. Polling is driven by the caller, with at most 22 register reads
+per sample, 64 polls and a 100 ms monotonic deadline. Unexpected outcomes
+require retaining any backing that may still be fetched. A result is valid
+only within the caller's current serialized operation and is not cached as
+a later success. Old-address absence is **not** a descriptor release API:
+the native path still needs to confirm outstanding fetch/translation
+retirement and synchronous DMA unmap before relinquishing either lease.
+The observer has no hardware caller, writes no registers and does not
+change the framebuffer or copy path. Rollback is to omit the observer.
+
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of
 writers outside that history or exclude later GPU, CPU or external writes

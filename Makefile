@@ -10,7 +10,8 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_rdna3_ucode \
         $(TEST_BIN_DIR)/test_r3n_abi \
         $(TEST_BIN_DIR)/test_phx_topology \
-        $(TEST_BIN_DIR)/test_build34_dcn_page_layout
+        $(TEST_BIN_DIR)/test_build34_dcn_page_layout \
+        $(TEST_BIN_DIR)/test_build34_dcn_flip_readback
 
 .PHONY: all test clean kext fixtures
 
@@ -32,6 +33,12 @@ $(TEST_BIN_DIR)/test_build34_dcn_page_layout: tests/test_build34_dcn_page_layout
         tools/build34_dcn_descriptor_backing.h tools/build34_dcn_render_lease.h tools/build34_dcn_render_binding.h \
         tools/build34_dcn_render_tlb.h \
         tests/build34_dcn/IOKit/IOMemoryDescriptor.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) -Itests/build34_dcn $< -o $@
+
+$(TEST_BIN_DIR)/test_build34_dcn_flip_readback: tests/test_build34_dcn_flip_readback.cpp \
+        tools/build34_dcn_flip_readback.h tools/build34_dcn_scanout_pin.h tools/build34_dcn_page_layout.h \
+        tools/build34_dcn_render_lease.h tools/build34_dcn_descriptor_backing.h \
+        tests/build34_dcn/IOKit/IOMemoryDescriptor.h src/amd/phx_dcn314_prog_regs.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) -Itests/build34_dcn $< -o $@
 
 $(TEST_BIN_DIR)/test_rdna3_ucode: src/amd/rdna3_ucode_extract.cpp tests/test_rdna3_ucode.cpp | $(TEST_BIN_DIR)
