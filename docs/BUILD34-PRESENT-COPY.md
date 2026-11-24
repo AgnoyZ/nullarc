@@ -609,6 +609,46 @@ failed prepare and rollback, reentry, capacity, stale tokens and refusal to
 cancel a potentially displayed pin. They do not establish hardware mapping
 or retirement, or that a hold excludes writes.
 
+The [DMA plan stage](../tools/build34_dcn_scanout_dma_stage.py) uses a
+kernel-only request to prepare the exact pinned BO slice with a retained
+`IODMACommand` and explicit mapper. Its mapper qualification callback is
+null. No system mapper lookup, identity fallback, framebuffer call, or
+MMIO programming is enabled. A future provider must certify the live PCI
+mapper's active translation and unused-unmap status for the exact command;
+a bare reverse lookup cannot qualify it. The framebuffer must establish
+that DCN consumes the returned address domain. The qualification hook must
+return an owned mapper reference and read-only evidence callbacks valid for
+the lifetime of the retained mapper. Call on a sleepable thread outside a
+workloop gate. DMA preparation, the page walk and cleanup hold the client
+lock, not `gpuLock`. The evidence callbacks must not reenter the driver or
+acquire those locks. The per-page bound is not a latency guarantee.
+
+The command prepares the original BO offset and full rounded extent, but
+the segment cursor is relative to that prepared range. The reference
+[pinned XNU implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IODMACommand.cpp#L836-L853)
+checks the requested transfer length against the maximum, not the full BO
+descriptor size. The adapter refuses an alternate DMA descriptor and
+checks each 4 KiB DMA page against both the known render and present pages.
+This also detects a per-page substitute when descriptor identity alone
+would pass. Only after final preparation, writer and queue checks does it
+publish the ordered DMA page addresses and the pin token. Read the outputs
+only on success. CPU result storage must be disjoint from scratch and the
+request; scratch content is not published. The addresses are not PTEs and
+do not leave the kernel.
+
+Unused cancellation completes the DMA command, independently confirms
+synchronous unmap of that exact command, then clears the command before
+releasing the pin. Some [XNU descriptor unmap paths](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMemoryDescriptor.cpp#L3095-L3105)
+discard the mapper's error; `complete()` alone cannot establish safe release.
+`prepare` and `complete` disable bounce-buffer data synchronization.
+Uncertain prepare, descriptor substitution or cleanup retains the command,
+mapper, client, IOSurface and pin in the same bounded slot without retrying
+the uncertain command. Neither success nor failure proves hardware retirement.
+CPU tests exercise a nonzero BO offset, fragmented batches, substituted or
+unproven pages, generation changes during mapping, and failures in prepare,
+complete, unmap confirmation and clear. This stage is source-only; omit it
+for rollback.
+
 Before any copy bypass, qualify the render-only alias on the actual
 compositor path. The adopted-queue snapshot cannot establish drain of
 writers outside that history or exclude later GPU, CPU or external writes

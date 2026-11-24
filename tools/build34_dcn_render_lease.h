@@ -57,6 +57,7 @@ public:
 
 private:
     friend class ScanoutDescriptorPin;
+    friend class ScanoutDmaLease;
     enum class State { Empty, Transition, Held, Closed, Uncertain };
 
     void recycleClosed() {

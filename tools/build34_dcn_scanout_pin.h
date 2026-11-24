@@ -38,6 +38,7 @@ public:
     bool uncertain() const { return lease_.uncertain(); }
 
 private:
+    friend class ScanoutDmaLease;
     RenderDescriptorLease lease_;
     bool displayUse_{false};
 };

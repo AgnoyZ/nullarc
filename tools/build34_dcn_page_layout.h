@@ -130,18 +130,13 @@ struct OriginalBacking {
     ReadOriginalPage readPage;
 };
 
-inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSurface &surface,
-                                          const PreparedDmaMapping &mapping, const void *deviceMapper,
-                                          const OriginalBacking &renderBacking, const OriginalBacking &presentBacking,
-                                          DmaRun *scratch, size_t runCapacity,
-                                          uint64_t *pageAddresses, size_t pageCapacity) {
-    const uint64_t bytes = surface.mappedBytes;
+inline size_t collectScanoutRuns(uint64_t bytes, const PreparedDmaMapping &mapping, const void *deviceMapper,
+                                 const OriginalBacking &renderBacking, const OriginalBacking &presentBacking,
+                                 DmaRun *scratch, size_t runCapacity) {
     if (!deviceMapper || mapping.mapper != deviceMapper || !mapping.readBatch || !mapping.resolvePage ||
         !renderBacking.readPage || !presentBacking.readPage ||
-        !scratch || !runCapacity || !pageAddresses || !bytes || bytes > kMaxBackingBytes ||
-        bytes % kPageBytes || mapping.bytes != bytes || pageCapacity < bytes / kPageBytes ||
-        windowStart % kPageBytes || windowStart >= kAddressLimit || bytes > kAddressLimit - windowStart)
-        return {};
+        !scratch || !runCapacity || !bytes || bytes > kMaxBackingBytes || bytes % kPageBytes || mapping.bytes != bytes)
+        return 0;
 
     uint64_t covered = 0;
     size_t runCount = 0;
@@ -153,17 +148,17 @@ inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSur
         uint32_t count = capacity;
         uint64_t next = covered;
         if (!capacity || !mapping.readBatch(mapping.context, &next, segments, &count) || !count || count > capacity)
-            return {};
+            return 0;
 
         for (uint32_t index = 0; index < count; ++index) {
             const auto &segment = segments[index];
             if (!validDmaSegment(segment.address, segment.bytes, bytes - covered))
-                return {};
+                return 0;
             scratch[runCount++] = {covered, segment.address, segment.bytes};
             covered += segment.bytes;
         }
         if (next != covered)
-            return {};
+            return 0;
     }
 
     for (size_t index = 0; index < runCount; ++index) {
@@ -178,11 +173,24 @@ inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSur
                 !presentBacking.readPage(presentBacking.context, backingOffset, &present) || present != render ||
                 !mapping.resolvePage(mapping.context, deviceMapper, run.dmaAddress + offset, &resolved) ||
                 resolved != present)
-                return {};
+                return 0;
         }
     }
 
-    return buildFlatPageLayout(windowStart, bytes, scratch, runCount, pageAddresses, pageCapacity);
+    return runCount;
+}
+
+inline FlatPageLayout collectScanoutPages(uint64_t windowStart, const ScanoutSurface &surface,
+                                          const PreparedDmaMapping &mapping, const void *deviceMapper,
+                                          const OriginalBacking &renderBacking, const OriginalBacking &presentBacking,
+                                          DmaRun *scratch, size_t runCapacity,
+                                          uint64_t *pageAddresses, size_t pageCapacity) {
+    const uint64_t bytes = surface.mappedBytes;
+    if (!pageAddresses || pageCapacity < bytes / kPageBytes || windowStart % kPageBytes ||
+        windowStart >= kAddressLimit || bytes > kAddressLimit - windowStart)
+        return {};
+    const size_t count = collectScanoutRuns(bytes, mapping, deviceMapper, renderBacking, presentBacking, scratch, runCapacity);
+    return buildFlatPageLayout(windowStart, bytes, scratch, count, pageAddresses, pageCapacity);
 }
 
 }  // namespace build34::dcn

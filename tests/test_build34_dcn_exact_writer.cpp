@@ -129,11 +129,20 @@ struct Phx34ScopedReference {
 };
 #endif
 
+#ifdef TEST_SCANOUT_DMA
+#include "build34_dcn_scanout_dma.h"
+struct IOPCIDevice { IOMapper *mapper = nullptr; };
+#endif
+
 struct PhxBringup
 #ifdef TEST_PRESENT_HANDOFF
     : IOService
 #endif
 {
+#ifdef TEST_SCANOUT_DMA
+    IOPCIDevice pciObject;
+    IOPCIDevice *pci = &pciObject;
+#endif
     static constexpr uint32_t kMaxCtx = 2;
     struct VmCtx {
         uint64_t generation = 5, newest = 0, queueSequence[2]{}, queueGeneration[2]{};
@@ -753,6 +762,96 @@ static void scanoutPinFailedPrepareAndRollback() {
 }
 #endif
 
+#ifdef TEST_SCANOUT_DMA
+enum class DmaFault { None, AlternateDescriptor, WrongOffset, WrongPage, NoMappedPage, FailedPrepare, ChangedEpoch };
+enum class DmaCleanupFault { None, Complete, ConfirmUnmap, Clear };
+
+static void scanoutDma(DmaFault fault, DmaCleanupFault cleanup = DmaCleanupFault::None) {
+    ScanoutFixture fixture;
+    DmaRun scratch[2]{};
+    uint64_t pages[2]{UINT64_MAX, UINT64_MAX};
+    ScanoutDmaRequest request{&fixture.frame.copy, 0x100000, scratch, 2, pages, 2, {}, {}};
+    const OSSymbol map{BUILD34_DCN_PIN_MAP};
+    auto dispatch = [&] {
+        return fixture.device.callPlatformFunction(&map, false, &request, nullptr, nullptr, nullptr);
+    };
+    assert(dispatch() == kIOReturnNotReady);
+    IOMapper mapper;
+    IODMACommand command;
+    IODMACommand::next = &command;
+    fixture.device.pci->mapper = &mapper;
+    fixture.device.dcnCopyQualifiedMapper = [](IOPCIDevice *device) -> ScanoutDmaMapper {
+        device->mapper->retain();
+        return {device->mapper, nullptr, nullptr};
+    };
+    fixture.offer();
+    assert(dispatch() == kIOReturnNotReady && !command.created && mapper.references == 1);
+    fixture.device.dcnCopyQualifiedMapper = [](IOPCIDevice *device) -> ScanoutDmaMapper {
+        device->mapper->retain();
+        return {device->mapper,
+            [](IOMapper &mapper, const IODMACommand &command, uint64_t address, uint64_t &physical) {
+                return mapper.resolve(command, address, physical);
+            },
+            [](IOMapper &mapper, const IODMACommand &command) { return mapper.confirmUnmap(command); }};
+    };
+    command.failPrepare = fault == DmaFault::FailedPrepare;
+    command.wrongOffset = fault == DmaFault::WrongOffset;
+    command.failComplete = cleanup == DmaCleanupFault::Complete;
+    command.failClear = cleanup == DmaCleanupFault::Clear;
+    if (fault == DmaFault::AlternateDescriptor) command.substitute = &fixture.frame.present;
+    command.segments = [&](UInt64 *cursor, IODMACommand::Segment64 *segments, UInt32 *count) {
+        assert(!command.substitute && !command.wrongOffset);
+        assert(fixture.client.guard.held && !fixture.device.guard.held && command.offset == kPage);
+        assert((*cursor == 0 && *count == 2) || (*cursor == kPage && *count == 1));
+        segments[0] = {*cursor ? 0x600000ull : 0x400000ull, kPage};
+        *cursor += kPage;
+        *count = 1;
+        if (*cursor == 2 * kPage && fault == DmaFault::ChangedEpoch) ++fixture.device.exactInvalidationEpoch;
+        return kIOReturnSuccess;
+    };
+    auto &host = fixture.frame.host;
+    mapper.resolve = [&](const IODMACommand &mapped, uint64_t address, uint64_t &physical) {
+        assert(&mapped == &command && command.prepared && command.memory == &host);
+        assert(address == 0x400000 || address == 0x600000);
+        const bool first = address == 0x400000;
+        physical = host.base + (first ? 2 : fault == DmaFault::WrongPage ? 5 : 4) * kPage;
+        return first || fault != DmaFault::NoMappedPage;
+    };
+    command.onComplete = [&] { assert(host.wires == 2 && fixture.client.guard.held && !fixture.device.guard.held); };
+    unsigned confirmations = 0;
+    mapper.confirmUnmap = [&](const IODMACommand &completed) {
+        ++confirmations;
+        assert(&completed == &command && command.completes == 1 && !command.prepared && command.memory == &host);
+        assert(!command.clears && host.wires == 2 && fixture.client.guard.held && !fixture.device.guard.held);
+        return cleanup != DmaCleanupFault::ConfirmUnmap;
+    };
+    auto *savedPages = request.pages;
+    request.pages = reinterpret_cast<uint64_t *>(scratch);
+    assert(dispatch() == kIOReturnBadArgument && !command.created);
+    request.pages = savedPages;
+    const bool failedPlan = fault != DmaFault::None;
+    assert(dispatch() == (failedPlan ? kIOReturnNotReady : kIOReturnSuccess) && command.created == 1);
+    if (!failedPlan) {
+        assert(request.layout.entryCount == 2 && request.token.provider == &fixture.device && request.token.serial);
+        assert(pages[0] == 0x400000 && pages[1] == 0x600000);
+        assert(mapper.references == 2 && host.references == 3 && host.wires == 2);
+        assert(fixture.cancelPin(request.token) == (cleanup == DmaCleanupFault::None ? kIOReturnSuccess : kIOReturnNotReady));
+        assert(fixture.cancelPin(request.token) == kIOReturnNotFound);
+    } else {
+        assert(!request.layout.entryCount && !request.token.serial && pages[0] == UINT64_MAX && pages[1] == UINT64_MAX);
+    }
+    const bool completed = !command.failPrepare && !command.substitute;
+    const bool confirmed = completed && !command.failComplete;
+    const bool cleared = confirmed && cleanup != DmaCleanupFault::ConfirmUnmap;
+    const bool reserved = !cleared || command.failClear;
+    assert(command.completes == completed && confirmations == confirmed);
+    assert(command.clears == cleared && command.releases == !reserved);
+    assert(mapper.references == (reserved ? 2u : 1u) && host.wires == (reserved ? 2u : 1u));
+    assert(fixture.surface.references == (reserved ? 2u : 1u) && fixture.client.references == (reserved ? 2u : 1u));
+    IODMACommand::next = nullptr;
+}
+#endif
+
 int main() {
     completionAndPages();
     newerAndRacingCompletions();
@@ -767,6 +866,19 @@ int main() {
 #ifdef TEST_SCANOUT_PINS
     scanoutPinLifetime();
     scanoutPinFailedPrepareAndRollback();
+#endif
+#ifdef TEST_SCANOUT_DMA
+    scanoutDma(DmaFault::None);
+    scanoutDma(DmaFault::AlternateDescriptor);
+    scanoutDma(DmaFault::WrongOffset);
+    scanoutDma(DmaFault::WrongPage);
+    scanoutDma(DmaFault::NoMappedPage);
+    scanoutDma(DmaFault::ChangedEpoch);
+    scanoutDma(DmaFault::FailedPrepare);
+    scanoutDma(DmaFault::None, DmaCleanupFault::Complete);
+    scanoutDma(DmaFault::None, DmaCleanupFault::Clear);
+    scanoutDma(DmaFault::None, DmaCleanupFault::ConfirmUnmap);
+    scanoutDma(DmaFault::WrongPage, DmaCleanupFault::ConfirmUnmap);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }
