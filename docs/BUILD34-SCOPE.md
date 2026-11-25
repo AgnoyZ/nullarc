@@ -425,3 +425,23 @@ KDK reports build `25G332`; neither produced an admitted candidate cache.
 The standard-path input swap requires a fresh bounded guard and exact R2a
 restoration before the complete 416-record/29-codeless comparison. It has not
 been run for the dedicated-key candidate. No live inputs were changed.
+
+### Dedicated-key private cache verified, November 25, 2026
+
+The owner authorized only a guarded standard-path link, not installation or
+restart. An initial guard rejected staging before any executable replacement
+because Python 3.9's monotonic epoch differed between the two processes. A
+fresh sealed scope used the verified shared system clock with the same
+deadline. It linked the dedicated-key candidate using the matching KDK and
+the retained explicit bundle list. The worker restored the R2a executable
+byte for byte and the independent guard verified its signature.
+
+Fresh readback of the private AuxKC and the installed collections passed all
+416 records and 29 codeless entries. Only the exact candidate PhxAccel image
+changed; bundle paths, personalities, dependencies, load policy, and boot and
+system links remain intact. The running R1b/R2a baseline, installed AuxKC,
+complete EFI, and startup jobs passed separate readback. The HiDPI key is
+absent, existing panel arming was left in place, and no NVRAM write, cache
+installation, candidate load or power request was made. The private cache
+is ready for review; the actual 2x mode still requires a separately
+authorized single-boot trial and the current-mode checks above.
