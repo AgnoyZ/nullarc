@@ -92,6 +92,10 @@ class ExactWriterTests(unittest.TestCase):
         native = bar5.stage_native(DRIVER, ABI)
         adopt = method(native, raw_tail.ADOPT)
         self.assertLess(adopt.index('if (!exactRawWriters.drained())'), adopt.index('if (!dcnRawTailMatchesLocked('))
+        # The coherent-pair sampler stays an unbound hook: declared, null-initialized, never assigned.
+        self.assertEqual(native.count('dcnCoherentFence'), 4)
+        self.assertIn('const DcnCoherentFenceAccess *dcnCoherentFence{nullptr};', native)
+        self.assertEqual(native.count('dcnCoherentFence ='), native.count('dcnCoherentFence{nullptr}') - 1)
         for mutation in ('exactQueueAdopted[qi] = true;', 'exactFenceWindow[qi].invalidate();', 'fence[0] ='):
             self.assertLess(adopt.index('if (!dcnRawTailMatchesLocked('), adopt.index(mutation))
         self.assertEqual(method(native, 'bool PhxBringup::exactNativeOpenAdmitted('),

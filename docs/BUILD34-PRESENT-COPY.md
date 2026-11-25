@@ -1208,18 +1208,32 @@ unchanged production bootstrap.
 The staged BAR5 driver's adopter now checks the nonwrapping terminal packet,
 its destination, published tail and both fence dwords after closing and
 draining the raw CPU writer gate, but before changing managed queue state or
-overwriting the fence seed. It uses at most 16 checked dword reads and repeats
-the cookie read around a second tail check. Without the existing (still null)
-qualified reader the check refuses. CPU tests drive the real bootstrap and
-extracted matcher with absent, torn, dirty, mismatched and revoked reads.
+overwriting the fence seed. It uses at most 12 checked dword reads plus two
+paired fence samples. Without the existing (still null) qualified reader the
+check refuses. CPU tests drive the real bootstrap and extracted matcher with
+absent, torn, dirty, mismatched and revoked reads.
+
+The two adoption-cookie dwords must now come from one device snapshot, not
+two independent raw reads: the matcher delegates both loads to a new
+`DcnCoherentFenceAccess::samplePair` hook that stays null in staged source
+(declared, `{nullptr}`-initialized, never assigned), so every adoption still
+refuses. A second independent read of the cookie between two tail checks
+cannot prove the pair was ever consistent — the [fence-reader
+study](BUILD34-FENCE-READER.md) already rejects single and repeated raw
+loads as coherence evidence — so the pair read is now a single typed
+contract the future reader must satisfy. The fence offset must also be
+dword-aligned with eight readable bytes in both the aperture length and the
+mapped length. CPU tests cover the torn-snapshot case two raw reads could
+never catch, plus sampler failure, dirty cookie, misalignment and refusal
+while the hook is unbound.
 
 This is a boundary for the paired bootstrap's own queue prefix only. A
 cookie is not a producer authentication token. Native use still requires a
 coherent reader, exclusive boot/queue control, a qualified release boundary,
 and independent evidence for inherited queues, firmware, stale GPUVM
-translations and writers outside these two queues. The ownership and route
-hooks remain null. Omit both sides of this overlay to roll back; no installed
-inputs, exact-open admission or fallback copy change.
+translations and writers outside these two queues. The ownership, route and
+pair-sampler hooks remain null. Omit both sides of this overlay to roll
+back; no installed inputs, exact-open admission or fallback copy change.
 
 An optional staged permission path now lets the original writer submit
 against a different buffer in the same GPUVM. With the global writer

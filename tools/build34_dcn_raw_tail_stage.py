@@ -7,19 +7,28 @@ from build34_exact_submit import once
 
 ADOPT = 'IOReturn PhxBringup::adoptQueue('
 VERIFY = 'bool PhxBringup::dcnRawTailMatchesLocked('
-DECLARATION = '    bool dcnRawTailMatchesLocked(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t) const;\n'
+DECLARATION = '''    struct DcnCoherentFenceAccess {
+        // One sample of both adoption-cookie dwords. The two loads must observe the same
+        // device snapshot; two independent raw reads cannot prove that.
+        bool (*samplePair)(const PhxBringup &, uint64_t, uint32_t (&)[2]);
+    };
+    const DcnCoherentFenceAccess *dcnCoherentFence{nullptr}; // unbound; never exposed to user clients
+    bool dcnRawTailMatchesLocked(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t) const;
+'''
 PACKET_PREFIX = '0xc0064900u, 0x06603514u, 0x40000000u'
 METHOD = '''bool PhxBringup::dcnRawTailMatchesLocked(uint64_t ringOff, uint64_t ringDw, uint64_t wbOff,
     uint64_t wptr, uint64_t fenceOff) const {
     const auto live = [&] {
         return !exactCallbacks.closed() && exactRawWriters.drained() && !exactStopped && !isSleeping && !exactVMFault;
     };
-    if (!live() || !fbAper || !exactDwordReader || wptr < 8 || wptr >= ringDw || ringDw > 65536 ||
+    if (!live() || !fbAper || !exactDwordReader || !dcnCoherentFence || !dcnCoherentFence->samplePair ||
+        wptr < 8 || wptr >= ringDw || ringDw > 65536 ||
         ringOff > UINT32_MAX || wbOff > UINT32_MAX || fenceOff > UINT32_MAX ||
         fbMcBase > UINT64_MAX - fenceOff) return false;
     const uint64_t bytes = fbAper->getLength();
     const uintptr_t base = fbAper->getVirtualAddress();
-    if (!base || (base & 3)) return false;
+    if (!base || (base & 3) || (fenceOff & 3) ||
+        fenceOff > fbAperLen || 8 > fbAperLen - fenceOff || fenceOff > bytes || 8 > bytes - fenceOff) return false;
     const auto read = [&](uint64_t offset, uint32_t &word) {
         return !(offset & 3) && offset <= UINTPTR_MAX - base && offset <= fbAperLen && fbAperLen - offset >= 4 &&
             offset <= bytes && bytes - offset >= 4 && live() &&
@@ -40,8 +49,8 @@ METHOD = '''bool PhxBringup::dcnRawTailMatchesLocked(uint64_t ringOff, uint64_t 
     if (!read(tail + 20, low) || !read(tail + 24, high) || !read(tail + 28, context) ||
         !(low & 1) || !(high & 0x80000000u) || context || (uint64_t(high) << 32 | low) == gSeq) return false;
     const auto fenceMatches = [&] {
-        uint32_t first = 0, second = 0;
-        return read(fenceOff, first) && read(fenceOff + 4, second) && first == low && second == high;
+        uint32_t pair[2] = {0, 0};
+        return dcnCoherentFence->samplePair(*this, fenceOff, pair) && pair[0] == low && pair[1] == high;
     };
     return fenceMatches() && atTail() && fenceMatches() && live();
 }
