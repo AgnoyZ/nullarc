@@ -73,6 +73,24 @@ runtime mapper unresolved; it does not rule out a mapper or establish
 identity addressing. Only classifications are retained in the
 [sanitized record](validation/build34-r3-iommu-scope-20261122.json).
 
+A bounded passive follow-up on November 26, 2026, again matched exactly one
+`1002:1900` provider with one build34 child and classified its PCI
+`iommu-parent` property as absent. The collector does not retain the registry
+snapshot or emit property values. This confirms the currently exposed property
+state only; it neither proves that no mapper exists nor qualifies identity
+DMA. The reusable [filtered mapper observer](../tools/build34_dcn_mapper_observation.py)
+and its [sanitized result](validation/build34-dcn-mapper-observation-20261126.json)
+keep runtime mapper resolution and DMA-domain proof explicitly false.
+Reproduce the parser and bounded live query with:
+
+```sh
+python3 -B tests/test_build34_dcn_mapper_observation.py
+python3 -B tools/build34_dcn_mapper_observation.py
+```
+
+No mapper lookup API, DMA mapping, device register access, driver operation,
+GPU submission, installation, or restart was performed.
+
 - In [XNU's device mapper lookup](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMapper.cpp#L167-L207),
   `copyMapperForDevice()` resolves `iommu-parent`; the implementation can
   wait for a matching service. Do not call it under a GPU lock or infer

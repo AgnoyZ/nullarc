@@ -1,0 +1,21 @@
+{
+  "status": "target-device-iommu-parent-absent-runtime-mapper-unresolved",
+  "date": "2026-11-26",
+  "branch": "upstream34/vram-layout-fix",
+  "commit": "c1910b350afd52e4ad672c465e3377667cb035e6",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "pci": "1002:1900",
+  "phxbringup_build": 34,
+  "method": "bounded-filtered-IORegistry-provider-and-exact-build34-child",
+  "iommu_parent_property": "absent",
+  "runtime_mapper_resolved": false,
+  "identity_dma_proven": false,
+  "dma_mapping_changed": false,
+  "old_writer_drain_proven": false,
+  "gpu_work_submitted": false,
+  "driver_installed_or_reloaded": false,
+  "restart_requested": false,
+  "raw_registry_saved": false,
+  "property_value_emitted": false
+}
