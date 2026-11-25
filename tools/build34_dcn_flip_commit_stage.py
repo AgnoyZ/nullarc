@@ -204,14 +204,14 @@ METHODS = '''bool IOAccelPhxNativeClient::dcnScanoutWriterCurrent(const build34:
 PhxBringup::DcnPinSlot *PhxBringup::findDcnFlipPin(build34::dcn::ScanoutPinToken token) {
     if (token.provider == this && token.serial) {
         for (auto &slot : dcnPins)
-            if (slot.serial == token.serial && slot.client && slot.dmaSurface.mappedBytes) return &slot;
+            if (__atomic_load_n(&slot.serial, __ATOMIC_ACQUIRE) == token.serial && slot.client && slot.dmaSurface.mappedBytes) return &slot;
     }
     return nullptr;
 }
 
 build34::dcn::ScanoutFlipBinding PhxBringup::dcnFlipBinding(DcnPinSlot *slot) {
     if (!slot) return {};
-    return {{this, slot->serial}, &slot->descriptor, &slot->dma, slot->dmaWindow, slot->dmaSurface};
+    return {{this, __atomic_load_n(&slot->serial, __ATOMIC_ACQUIRE)}, &slot->descriptor, &slot->dma, slot->dmaWindow, slot->dmaSurface};
 }
 
 IOReturn PhxBringup::beginDcnFlip(build34::dcn::ScanoutFlipIntent &intent) {
@@ -288,7 +288,9 @@ IOReturn PhxBringup::pollDcnFlip(build34::dcn::ScanoutFlipPoll &poll) {
     if (old && result == ScanoutFlipResult::Presented) {
         auto *surface = old->surface;
         auto *client = old->client;
-        old->serial = old->dmaWindow = 0;
+        __atomic_store_n(&old->serial, uint64_t{0}, __ATOMIC_RELEASE);
+        __atomic_store_n(&old->cancelPending, uint64_t{0}, __ATOMIC_RELEASE);
+        old->dmaWindow = 0;
         old->dmaSurface = {};
         old->surface = nullptr;
         old->client = nullptr;
@@ -317,6 +319,8 @@ def stage_native(driver, abi):
                   '#include "build34_dcn_gpu_write_history.h"\n#include "build34_dcn_gpu_permissions.h"\n')
     source = once(source, dma.DMA_FIELDS, dma.DMA_FIELDS + SLOT)
     source = once(source, dma.MAPPER_GATE, dma.MAPPER_GATE + FIELDS)
+    source = once(source, dma.pin.RELEASE_PIN_RESET,
+                  dma.pin.RELEASE_PIN_RESET + '        slot.dmaWindow = 0;\n        slot.dmaSurface = {};\n')
     source = once(source, dma.DMA_PROBE_DECL, dma.DMA_PROBE_DECL + CLIENT)
     source = once(source, dma.pin.handoff.DRAIN_DECL, DRAIN_DECL)
     writer = dma.pin.handoff.writer.CURRENT
@@ -363,18 +367,16 @@ def stage_native(driver, abi):
     replace(SUBMIT, SUBMIT_EPOCH, '')
     replace(SUBMIT, submit_anchor, SUBMIT_EPOCH + SUBMIT_GATE + submit_anchor)
     source = once(source, dma.MAP_METHOD, PERMISSION_METHODS + METHODS + dma.MAP_METHOD)
-    replace(dma.pin.PREPARE, '    for (auto &slot : dcnPins) {\n', '''    const auto surface = request ? present.scanout : build34::dcn::ScanoutSurface{};
+    replace(dma.pin.PREPARE, '    for (auto &slot : dcnPins) {\n        if (slot.client || slot.descriptor.held() || slot.descriptor.uncertain()) continue;\n', '''    const auto surface = request ? present.scanout : build34::dcn::ScanoutSurface{};
     if (request && (!build34::dcn::validFlipGeometry(surface) || surface.mappedBytes != present.slice.bytes))
         return kIOReturnBadArgument;
     for (auto &slot : dcnPins) {
+        if (slot.client || slot.descriptor.held() || slot.descriptor.uncertain()) continue;
 ''')
-    replace(dma.pin.PREPARE, '        slot.serial = serial;\n', '''        slot.serial = serial;
-        slot.dmaWindow = request ? request->windowStart : 0;
-        slot.dmaSurface = surface;
-''')
-    replace(dma.pin.CANCEL, '        slot.serial = 0;\n', '''        slot.serial = slot.dmaWindow = 0;
-        slot.dmaSurface = {};
-''')
+    replace(dma.pin.PREPARE, '        __atomic_store_n(&slot.serial, serial, __ATOMIC_RELEASE);\n',
+            '        __atomic_store_n(&slot.serial, serial, __ATOMIC_RELEASE);\n'
+            '        slot.dmaWindow = request ? request->windowStart : 0;\n'
+            '        slot.dmaSurface = surface;\n')
     anchor = '    if (name && name->isEqualTo(BUILD34_DCN_PIN_MAP)) {\n'
     replace(dma.pin.handoff.DISPATCH, anchor, '''    if (name && name->isEqualTo(BUILD34_DCN_FLIP_BEGIN)) {
         if (wait || !device || p2 || p3 || p4) return kIOReturnBadArgument;

@@ -71,8 +71,8 @@ def stage_native(driver, abi):
     const build34::dcn::ScanoutDmaMapper *qualified) {''')
     replace(pin.PREPARE, '        if (!checkDcnPresent(present, &slot))',
             '        if (!checkDcnPresent(present, &slot, request, qualified))')
-    replace(pin.CANCEL, '        const bool released = slot.descriptor.releaseUnused();',
-            '        const bool released = slot.dma.releaseUnused(slot.descriptor) && slot.descriptor.releaseUnused();')
+    source = once(source, pin.RELEASE_PIN_CLEANUP,
+                  '        const bool released = slot.dma.releaseUnused(slot.descriptor) && slot.descriptor.releaseUnused();\n')
     consume = pin.handoff.CONSUME
     replace(consume, 'DcnPinSlot *slot) {', '''DcnPinSlot *slot,
     build34::dcn::ScanoutDmaRequest *request, const build34::dcn::ScanoutDmaMapper *qualified) {''')

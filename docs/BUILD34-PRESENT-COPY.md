@@ -1686,3 +1686,21 @@ remove readiness/completion protection to make timings appear faster.
 R3 source/measurement work can now proceed with the safe global reclamation
 watermark retained. R3–R6 have no hardware acceptance. See
 [sanitized loaded-trial evidence](validation/build34-r2-packed-copy-boot-20261120.json).
+
+## Source-only scanout pin cancellation retry, November 26
+
+The isolated build34 pin candidate now remembers a cancellation request when
+the pin-operation gate or client lock is busy. A later pin admission retries
+only the matching, still-cancellable pin before consuming a free slot. A pin
+that has entered display use is not cancelled by this retry. If descriptor or
+DMA cleanup fails, the serial is withdrawn while its client/surface ownership
+and uncertain resource state remain quarantined; later admission skips that
+slot rather than repeating cleanup or reusing it.
+
+CPU-only extracted-method coverage exercises both busy paths, reclaim on the
+next admission, and a failed descriptor completion that must not be repeated.
+This is a candidate lifecycle correction only: it does not enable zero-copy,
+bind the mapper/direct-domain, coherent-fence, GPUVM-ownership or display-route
+proof hooks, or establish real GPU execution. It has not been hardware tested.
+Keep the verified native 2x mode unchanged and retain the current build34
+execution boundaries.

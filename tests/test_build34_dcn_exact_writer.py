@@ -292,7 +292,8 @@ class ExactWriterTests(unittest.TestCase):
         fields = handoff.PROVIDER_FIELDS
         probe = writer.PROBE_DECL
         if pins:
-            signatures += (scanout_pin.PREPARE, scanout_pin.CANCEL)
+            signatures += (scanout_pin.CANCEL_SLOT, scanout_pin.REMEMBER_PIN_CANCELLATION,
+                           scanout_pin.PREPARE, scanout_pin.CANCEL)
             fields = fields[:fields.index('    bool checkDcnPresent(')] + scanout_pin.FIELDS + scanout_pin.OPERATIONS_DECL
             probe = scanout_pin.PROBE_DECL
         if dma:

@@ -877,9 +877,19 @@ static void scanoutPinLifetime() {
     IOLockLock(fixture.client.lock);
     assert(fixture.cancelPin(first) == kIOReturnBusy);
     IOLockUnlock(fixture.client.lock);
-    assert(fixture.cancelPin(first) == kIOReturnSuccess && fixture.pin(third) == kIOReturnSuccess);
-    assert(third.serial > second.serial && fixture.cancelPin(first) == kIOReturnNotFound);
+    fixture.offer();
+    assert(fixture.pin(third) == kIOReturnSuccess && third.serial > second.serial);
+    assert(fixture.cancelPin(first) == kIOReturnNotFound);
     assert(fixture.cancelPin(second) == kIOReturnSuccess);
+
+    ScanoutPinToken fourth{};
+    {
+        CallbackGate<1>::Lease operation(fixture.device.dcnPinOperation);
+        assert(operation && fixture.cancelPin(third) == kIOReturnBusy);
+    }
+    fixture.offer();
+    assert(fixture.pin(fourth) == kIOReturnSuccess && fourth.serial > third.serial);
+    assert(fixture.cancelPin(third) == kIOReturnNotFound);
 
     fixture.client.exactClientCallbacks.close();
     assert(fixture.device.requestLegacyClose(&fixture.client));
@@ -887,8 +897,27 @@ static void scanoutPinLifetime() {
     host.release();
     fixture.device.sealStoppedQueues();
     assert(host.references == 1 && host.wires == 1 && fixture.client.references == 2 && fixture.surface.references == 2);
-    assert(fixture.cancelPin(third) == kIOReturnSuccess);
+    assert(fixture.cancelPin(fourth) == kIOReturnSuccess);
     assert(!host.references && !host.wires && fixture.client.references == 1 && fixture.surface.references == 1);
+}
+
+static void scanoutPinCancelCleanupFailureIsQuarantined() {
+    ScanoutFixture fixture;
+    auto &host = fixture.frame.host;
+    ScanoutPinToken token{}, next{};
+    fixture.offer();
+    assert(fixture.pin(token) == kIOReturnSuccess && token.serial);
+    auto &slot = fixture.device.dcnPins[0];
+    host.completeResult = kIOReturnNotReady;
+    assert(fixture.cancelPin(token) == kIOReturnNotReady);
+    assert(!__atomic_load_n(&slot.serial, __ATOMIC_ACQUIRE) && slot.client == &fixture.client &&
+           slot.surface == &fixture.surface && slot.descriptor.uncertain());
+    const auto completes = host.completes;
+    host.completeResult = kIOReturnSuccess;
+    assert(fixture.cancelPin(token) == kIOReturnNotFound && host.completes == completes);
+    fixture.offer();
+    assert(fixture.pin(next) == kIOReturnSuccess && next.serial > token.serial && host.completes == completes);
+    assert(fixture.cancelPin(next) == kIOReturnSuccess);
 }
 
 static void scanoutPinFailedPrepareAndRollback() {
@@ -3433,6 +3462,7 @@ int main() {
 #endif
 #ifdef TEST_SCANOUT_PINS
     scanoutPinLifetime();
+    scanoutPinCancelCleanupFailureIsQuarantined();
     scanoutPinFailedPrepareAndRollback();
 #endif
 #ifdef TEST_SCANOUT_DMA

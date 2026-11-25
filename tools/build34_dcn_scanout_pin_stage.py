@@ -7,21 +7,62 @@ from test_build34_exact_ownership import method
 
 PREPARE = 'IOReturn PhxBringup::prepareDcnPin('
 CANCEL = 'IOReturn PhxBringup::cancelDcnPin('
+CANCEL_SLOT = 'IOReturn PhxBringup::cancelDcnPinSlot('
+REMEMBER_PIN_CANCELLATION = 'void PhxBringup::rememberDcnPinCancellation('
 OPERATIONS_DECL = '''    IOReturn prepareDcnPin(const build34::dcn::PresentCopyBacking &, build34::dcn::ScanoutPinToken &);
     IOReturn cancelDcnPin(build34::dcn::ScanoutPinToken);
+'''
+RELEASE_PIN_CLEANUP = '    const bool released = slot.descriptor.releaseUnused();\n'
+RELEASE_PIN_RESET = '''    __atomic_store_n(&slot.serial, uint64_t{0}, __ATOMIC_RELEASE);
+    __atomic_store_n(&slot.cancelPending, uint64_t{0}, __ATOMIC_RELEASE);
 '''
 FIELDS = '''    struct DcnPinSlot {
         build34::dcn::ScanoutDescriptorPin descriptor;
         IOAccelPhxNativeClient *client{nullptr};
         OSObject *surface{nullptr};
         uint64_t serial{0};
+        uint64_t cancelPending{0};
     } dcnPins[2];
     phx34_exact::CallbackGate<1> dcnPinOperation;
     bool checkDcnPresent(const build34::dcn::PresentCopyBacking &, DcnPinSlot * = nullptr);
+    IOReturn cancelDcnPinSlot(DcnPinSlot &slot);
+    void rememberDcnPinCancellation(uint64_t serial);
 '''
 PROBE_DECL = '''    bool probeExactWriterBacking(build34_dcn_native_submit, build34_dcn_writer_range,
         const build34::dcn::PresentCopyBacking &, build34::dcn::ScanoutDescriptorPin * = nullptr);
 '''
+PIN_CANCELLATION_HELPERS = '''IOReturn PhxBringup::cancelDcnPinSlot(DcnPinSlot &slot) {
+    const auto serial = __atomic_load_n(&slot.serial, __ATOMIC_ACQUIRE);
+    if (!serial || !slot.client || !slot.descriptor.cancellable()) return kIOReturnNotFound;
+    auto *client = slot.client;
+    if (!IOLockTryLock(client->lock)) {
+        __atomic_store_n(&slot.cancelPending, serial, __ATOMIC_RELEASE);
+        return kIOReturnBusy;
+    }
+    const bool released = slot.descriptor.releaseUnused();
+    IOLockUnlock(client->lock);
+    __atomic_store_n(&slot.serial, uint64_t{0}, __ATOMIC_RELEASE);
+    __atomic_store_n(&slot.cancelPending, uint64_t{0}, __ATOMIC_RELEASE);
+    if (!released) return kIOReturnNotReady;
+    auto *surface = slot.surface;
+    slot.surface = nullptr;
+    slot.client = nullptr;
+    surface->release();
+    client->release();
+    return kIOReturnSuccess;
+}
+
+void PhxBringup::rememberDcnPinCancellation(uint64_t serial) {
+    if (!serial) return;
+    for (auto &slot : dcnPins) {
+        if (__atomic_load_n(&slot.serial, __ATOMIC_ACQUIRE) != serial) continue;
+        __atomic_store_n(&slot.cancelPending, serial, __ATOMIC_RELEASE);
+        return;
+    }
+}
+
+'''
+
 OPERATIONS = '''static phx34_exact::OwnerEpochs gDcnPinSerials;
 
 IOReturn PhxBringup::prepareDcnPin(const build34::dcn::PresentCopyBacking &present,
@@ -29,12 +70,18 @@ IOReturn PhxBringup::prepareDcnPin(const build34::dcn::PresentCopyBacking &prese
     phx34_exact::CallbackGate<1>::Lease operation(dcnPinOperation);
     if (!operation) return kIOReturnBusy;
     for (auto &slot : dcnPins) {
+        const auto pending = __atomic_load_n(&slot.cancelPending, __ATOMIC_ACQUIRE);
+        if (pending && pending == __atomic_load_n(&slot.serial, __ATOMIC_ACQUIRE))
+            (void)cancelDcnPinSlot(slot);
+    }
+    for (auto &slot : dcnPins) {
         if (slot.client || slot.descriptor.held() || slot.descriptor.uncertain()) continue;
         uint64_t serial = 0;
         if (!gDcnPinSerials.take(serial)) return kIOReturnNoResources;
         if (!checkDcnPresent(present, &slot)) return kIOReturnNotReady;
-        slot.serial = serial;
-        out = {this, slot.serial};
+        __atomic_store_n(&slot.cancelPending, uint64_t{0}, __ATOMIC_RELEASE);
+        __atomic_store_n(&slot.serial, serial, __ATOMIC_RELEASE);
+        out = {this, serial};
         return kIOReturnSuccess;
     }
     return kIOReturnNoResources;
@@ -43,26 +90,19 @@ IOReturn PhxBringup::prepareDcnPin(const build34::dcn::PresentCopyBacking &prese
 IOReturn PhxBringup::cancelDcnPin(build34::dcn::ScanoutPinToken token) {
     if (token.provider != this || !token.serial) return kIOReturnBadArgument;
     phx34_exact::CallbackGate<1>::Lease operation(dcnPinOperation);
-    if (!operation) return kIOReturnBusy;
+    if (!operation) {
+        rememberDcnPinCancellation(token.serial);
+        return kIOReturnBusy;
+    }
     for (auto &slot : dcnPins) {
-        if (slot.serial != token.serial || !slot.client || !slot.descriptor.cancellable()) continue;
-        auto *client = slot.client;
-        if (!IOLockTryLock(client->lock)) return kIOReturnBusy;
-        const bool released = slot.descriptor.releaseUnused();
-        IOLockUnlock(client->lock);
-        slot.serial = 0;
-        if (!released) return kIOReturnNotReady;
-        auto *surface = slot.surface;
-        slot.surface = nullptr;
-        slot.client = nullptr;
-        surface->release();
-        client->release();
-        return kIOReturnSuccess;
+        if (__atomic_load_n(&slot.serial, __ATOMIC_ACQUIRE) != token.serial) continue;
+        return cancelDcnPinSlot(slot);
     }
     return kIOReturnNotFound;
 }
 
 '''
+OPERATIONS = PIN_CANCELLATION_HELPERS + OPERATIONS
 
 
 def stage_native(driver, abi):
