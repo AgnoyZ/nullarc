@@ -1196,6 +1196,31 @@ exclusion of CPU or external writers. The ownership callback remains null;
 no native deployment or physical scanout is inferred. Revert this BAR5
 overlay delta to remove the audit without changing the R2a path.
 
+The [paired bootstrap-tail overlay](../tools/build34_dcn_raw_tail_stage.py)
+adds a final `RELEASE_MEM` to each new Compute and GFX setup queue before
+publishing its write pointer. It uses build34's existing eight-dword fence
+encoding, the queue's reserved fence slot and a fresh two-dword cookie.
+Checked bootstrap refuses nonzero initial fence words, requires both the
+original sentinels and the exact tail cookie, and defers both adoptions
+until setup has finished. This derivation must not be paired with the
+unchanged production bootstrap.
+
+The staged BAR5 driver's adopter now checks the nonwrapping terminal packet,
+its destination, published tail and both fence dwords after closing and
+draining the raw CPU writer gate, but before changing managed queue state or
+overwriting the fence seed. It uses at most 16 checked dword reads and repeats
+the cookie read around a second tail check. Without the existing (still null)
+qualified reader the check refuses. CPU tests drive the real bootstrap and
+extracted matcher with absent, torn, dirty, mismatched and revoked reads.
+
+This is a boundary for the paired bootstrap's own queue prefix only. A
+cookie is not a producer authentication token. Native use still requires a
+coherent reader, exclusive boot/queue control, a qualified release boundary,
+and independent evidence for inherited queues, firmware, stale GPUVM
+translations and writers outside these two queues. The ownership and route
+hooks remain null. Omit both sides of this overlay to roll back; no installed
+inputs, exact-open admission or fallback copy change.
+
 An optional staged permission path now lets the original writer submit
 against a different buffer in the same GPUVM. With the global writer
 prefix drained, it validates that writer's four-level owned tables before

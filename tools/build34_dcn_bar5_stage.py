@@ -1,6 +1,7 @@
 """Bind staged flip register operations to the exact native provider's BAR5."""
 
 import build34_dcn_flip_commit_stage as flip
+import build34_dcn_raw_tail_stage as raw_tail
 from build34_exact_submit import once
 from test_build34_exact_ownership import method
 
@@ -188,4 +189,4 @@ def stage_native(driver, abi):
     replace('IOReturn PhxBringup::setPowerState(', '    if (ordinal == 0) {\n',
             '    if (ordinal == 0) {\n'
             '        __atomic_store_n(&dcnBar5Revoked, true, __ATOMIC_RELEASE);\n')
-    return source
+    return raw_tail.stage_native(source)

@@ -21,9 +21,11 @@ import build34_dcn_present_handoff_stage as handoff
 import build34_dcn_scanout_dma_stage as scanout_dma
 import build34_dcn_scanout_pin_stage as scanout_pin
 import build34_dcn_transaction_stage as transaction
+import build34_dcn_raw_tail_stage as raw_tail
 from build34_dcn_present_backing_stage import ACCEL, stage as present_backing
 import build34_exact_submit_pressure as pressure
 from build34_exact_open import stage as exact_open, stage_header
+from build34_exact_submit import once
 from test_build34_exact_ownership import method
 
 
@@ -85,6 +87,55 @@ class ExactWriterTests(unittest.TestCase):
 
     def test_extracted_scanout_flip_lifetime(self):
         self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True)
+
+    def test_raw_tail_adoption(self):
+        native = bar5.stage_native(DRIVER, ABI)
+        adopt = method(native, raw_tail.ADOPT)
+        self.assertLess(adopt.index('if (!exactRawWriters.drained())'), adopt.index('if (!dcnRawTailMatchesLocked('))
+        for mutation in ('exactQueueAdopted[qi] = true;', 'exactFenceWindow[qi].invalidate();', 'fence[0] ='):
+            self.assertLess(adopt.index('if (!dcnRawTailMatchesLocked('), adopt.index(mutation))
+        self.assertEqual(method(native, 'bool PhxBringup::exactNativeOpenAdmitted('),
+                         method(self.source, 'bool PhxBringup::exactNativeOpenAdmitted('))
+        (self.directory / 'raw-tail-decl.inc').write_text(raw_tail.DECLARATION)
+        (self.directory / 'raw-tail-method.inc').write_text(method(native, raw_tail.VERIFY))
+        binary = self.directory / 'raw-tail-CPU-only'
+        compiler = shlex.split(os.environ.get('CXX', 'clang++'))
+        self.run_checked([*compiler, '-std=c++17', '-Wall', '-Wextra', '-Werror', '-O1', '-g',
+                          '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-I' + str(self.directory),
+                          '-I' + str(ROOT / 'tools'), str(ROOT / 'tests/test_build34_dcn_raw_tail.cpp'), '-o', str(binary)])
+        self.run_checked([str(binary)])
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'bootstrap uses Darwin SDK headers')
+    def test_raw_tail_bootstrap(self):
+        bootstrap = raw_tail.stage_bootstrap((ROOT / 'tools/phxctl/mesboot.c').read_text())
+        full = self.directory / 'staged-mesboot.c'
+        full.write_text(bootstrap)
+        compiler = ['xcrun', 'clang', '-std=gnu11', '-I' + str(ROOT / 'tools/phxctl')]
+        self.run_checked([*compiler, '-fsyntax-only', str(full)])
+        mock = once(bootstrap, method(bootstrap, 'static int open_kext('), 'static int open_kext(void) { return mockOpen(); }\n')
+        (self.directory / 'cpu-mesboot.inc').write_text(mock)
+        base = (ROOT / 'tests/test_build34_exact_bootstrap_progress.c').read_text()
+        base = once(base, '/* Resolve the fake transport',
+                    'static void completeMes(uint64_t);\nstatic void injectDuringPacket(uint64_t);\n'
+                    'static void completeTail(uint64_t, uint64_t, uint64_t, unsigned);\n/* Resolve the fake transport')
+        base = once(base, '        *word(in[0]) = (uint32_t)in[1];',
+                    '        *word(in[0]) = (uint32_t)in[1];\n        injectDuringPacket(in[0]);')
+        base = once(base, '            *word(SCH_WB + 64) = mesBells == badMesStatus ? 0 : 1;', '            completeMes(in[1]);')
+        for bell, wptr, call in [('cmp', 'in[4] != 8', 'CMP_RING, in[1], PHX34_CMP_TAIL_FENCE, 1'),
+                                 ('gfx', 'in[4] != sizeof(kCsbGfx11) / 4 + 8', 'GFX_RING, in[1], PHX34_GFX_TAIL_FENCE, 2')]:
+            base = once(base, wptr, wptr + ' + 8')
+            launch = f'            if ({bell}Published != {bell}Bells) abort();'
+            base = once(base, launch, launch + f'\n            completeTail({call});')
+        entry = 'int main(int argc, char **argv)'
+        (self.directory / 'base-fixture.inc').write_text(once(base, entry, 'static int progress_main(int argc, char **argv)'))
+        mes = (ROOT / 'tests/test_build34_exact_mes_status.c').read_text()
+        (self.directory / 'mes-status-fixture.inc').write_text(once(mes, entry, 'int mes_status_main(int argc, char **argv)'))
+        binary = self.directory / 'raw-tail-bootstrap-CPU-only'
+        self.run_checked([*compiler, '-I' + str(self.directory), '-DCHECKED_STAGE', '-DISOLATED', '-O1', '-g',
+                          '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
+                          str(ROOT / 'tests/test_build34_dcn_raw_tail.c'), '-o', str(binary)])
+        self.assertNotRegex(self.run_checked(['otool', '-L', str(binary)]), r'IOKit\.framework|Metal\.framework|vulkan')
+        self.run_checked([str(binary)])
 
     def test_scanout_transaction_caller(self):
         source = transaction.stage_native(DRIVER, ABI)
