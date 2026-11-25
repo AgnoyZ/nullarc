@@ -19,7 +19,7 @@ inline uint64_t livePresentPreparation(const PinnedDescriptorSlice &slice) {
     return preparation > kIOPreparationIDAlwaysPrepared && preparation != UINT64_MAX ? preparation : 0;
 }
 
-inline PresentCopyBacking observePreparedCopyBacking(const void *transaction, const void *surface,
+inline PresentCopyBacking describePresentBacking(const void *transaction, const void *surface,
     IOMemoryDescriptor *descriptor, uint32_t format, uint32_t width, uint32_t height, uint32_t pitch,
     uint32_t panelWidth, uint32_t panelHeight) {
     if (!transaction || !surface || !descriptor || format != kSurfaceBgra || !width || !height ||
@@ -31,9 +31,16 @@ inline PresentCopyBacking observePreparedCopyBacking(const void *transaction, co
         return {};
     const uint64_t rounded = (footprint + kPageBytes - 1) & ~(kPageBytes - 1);
     const PinnedDescriptorSlice slice{descriptor, 0, rounded};
-    const uint64_t preparation = livePresentPreparation(slice);
-    return preparation ? PresentCopyBacking{transaction, surface, slice, preparation,
+    return validDescriptorSlice(slice) ? PresentCopyBacking{transaction, surface, slice, 0,
         {width, height, pitch / 4 - 1, kDcnArgb8888, rounded}} : PresentCopyBacking{};
+}
+
+inline PresentCopyBacking observePreparedCopyBacking(const void *transaction, const void *surface,
+    IOMemoryDescriptor *descriptor, uint32_t format, uint32_t width, uint32_t height, uint32_t pitch,
+    uint32_t panelWidth, uint32_t panelHeight) {
+    auto backing = describePresentBacking(transaction, surface, descriptor, format, width, height, pitch, panelWidth, panelHeight);
+    backing.preparation = livePresentPreparation(backing.slice);
+    return backing.preparation ? backing : PresentCopyBacking{};
 }
 
 inline bool comparePreparedCopyBacking(const PresentCopyBacking &present, OriginalBacking backing, uint64_t bytes) {

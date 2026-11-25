@@ -1220,7 +1220,7 @@ Source-only rollback is a revert of this prerequisite.
 ### Staged accelerator transaction caller
 
 The paired [transaction overlay](../tools/build34_dcn_transaction_stage.py)
-routes the prepared BGRA backing from `NVDisplayPipe::performTransaction`
+routes the BGRA descriptor from `NVDisplayPipe::performTransaction`
 to the exact PhxBringup provider. It replaces the observation-only caller,
 so the observer cannot consume the one-shot offer before pinning. The
 paired provider no longer dispatches isolated probe, map, begin, poll or
@@ -1251,8 +1251,18 @@ before begin. This bounds polling, not scheduler latency or sleepable IOKit
 preparation. `Issued`, `Waiting` and `Busy` do not complete the transaction.
 Only the matching `Presented` result can increment the new present counter,
 complete that transaction without the legacy VBL delay and skip the final
-R2a CPU copy. The existing CPU source mapping can still be prepared before
-that decision; this stage does not copy its pixels into a new staging buffer.
+R2a CPU copy. The qualified path no longer requires the accelerator's CPU
+source mapping. After route and firmware checks, the native provider takes a
+temporary prepare hold on the exact IOSurface descriptor and reads its live
+preparation ID. It takes this hold before consuming the writer offer and
+releases it after the DMA pin takes its own independent preparations, before
+issuing any flip. An unprepared descriptor can qualify, but stale or invalid
+preparation IDs cannot. The provider requires `kIOMemoryThreadSafe` on the
+IOSurface descriptor; the transaction gate does not serialize unrelated
+kernel clients. Failed completion quarantines the hold and blocks the route
+without trying a flip. CPU fixtures cover fresh preparation, missing or stale
+IDs, descriptors without the flag, prepare refusal and uncertain completion. Revert this change to
+restore the earlier CPU mapping prerequisite for the staged caller.
 
 An unused refused pin may be cancelled. Once issued, loss of evidence,
 timeout or mismatched completion blocks the route and retains potentially
@@ -1260,7 +1270,8 @@ reachable backing; the caller neither cancels nor reissues. A copy with a
 direct front already active requires a confirmed return to the same firmware
 front and a fresh match of the framebuffer's CPU destination. The legacy
 copy-readiness helper, which can page pixels out of VRAM into the IOSurface,
-runs only after that return on the opted-in path. Resource-only and `l10r`
+and the CPU source mapping run only after that return on the opted-in path.
+Resource-only and `l10r`
 frames still take R2a, including existing conversion, after that check. The
 separate NVIDIA VRAM path is unchanged.
 

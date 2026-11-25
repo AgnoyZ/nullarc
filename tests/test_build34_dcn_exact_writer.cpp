@@ -59,9 +59,11 @@ static void IOLog(const char *, ...) { assert(false); }
 
 struct Descriptor final : IOMemoryDescriptor {
     uint64_t preparation = 9, base = 0x80000, wrongPage = UINT64_MAX;
+    uint64_t flags = kIOMemoryThreadSafe;
     unsigned reads = 0;
     std::function<void()> afterRead;
     IOByteCount getLength() const override { return 4 * kPage; }
+    uint64_t getFlags() override { return flags; }
     uint64_t getPreparationID() override { return preparation; }
     uint64_t getPhysicalSegment(IOByteCount offset, IOByteCount *length, unsigned options) override {
         assert(offset < getLength() && offset % kPage == 0 && options == kIOMemoryMapperNone);
@@ -3019,7 +3021,11 @@ struct TransactionFixture {
     }
 
     IOReturn mapDcnPin(ScanoutDmaRequest &map, bool direct) {
-        assert(direct && map.present == mapped && validScanoutDmaStorage(map, kPage) && lifetime.references == 2);
+        assert(direct && mapped && map.present != mapped && validScanoutDmaStorage(map, kPage) && lifetime.references == 2);
+        assert(map.present->surface == mapped->surface && map.present->transaction == mapped->transaction &&
+               map.present->slice.descriptor == mapped->slice.descriptor && !map.present->slice.offset &&
+               map.present->preparation && livePresentPreparation(map.present->slice) == map.present->preparation &&
+               dcnPresentBacking.cancellable());
         const auto current = dcnFlip.front().serial ? dcnFlip.frontAddress() : dcnFlip.firmwareAddress();
         assert(map.windowStart == route.presentWindows.select(current, kPage).address);
         ++maps;
@@ -3030,7 +3036,7 @@ struct TransactionFixture {
     }
 
     IOReturn beginDcnFlip(ScanoutFlipIntent &intent) {
-        assert(!dcnFlip.pending() && intent.framebuffer == &framebuffer);
+        assert(!dcnPresentBacking.held() && !dcnFlip.pending() && intent.framebuffer == &framebuffer);
         assert(intent.previous == (dcnFlip.front().serial ? dcnFlip.frontAddress() : dcnFlip.firmwareAddress()));
         assert(intent.nextPin.serial ? intent.nextPin.provider == this : intent.next == dcnFlip.firmwareAddress());
         ++begins;
@@ -3107,6 +3113,7 @@ static void exerciseDcnTransaction() {
     fixture.route.presentWindows = pair;
     fixture.framebuffer.conflict = true;
     assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && !fixture.maps);
+    assert(!descriptor.prepares && !descriptor.completes);
     fixture.framebuffer.conflict = false;
     fixture.mapRefused = true;
     assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && !fixture.begins);
@@ -3139,6 +3146,7 @@ static void exerciseDcnTransaction() {
     fixture.beginRefused = false;
     assert(fixture.submitDcnPresent(request) == kIOReturnSuccess && request.result == DcnPresentResult::Copy && fixture.polls == 5);
     assert(!fixture.dcnFlip.front().serial && pipe.references == 1 && fixture.framebuffer.references == 1 && fixture.cancels == 2);
+    assert(descriptor.prepares == fixture.maps && descriptor.completes == fixture.maps && descriptor.wires == 1);
 
     for (unsigned fault = 0; fault < 3; ++fault) {
         TransactionFixture faulted;
@@ -3167,6 +3175,41 @@ static void exerciseDcnTransaction() {
     assert(completion.check(&next, done) && !done);
     completion.legacy();
     assert(!completion.check(&first, done) && !done);
+}
+
+enum class PresentPreparation { New, Failed, MissingId, StaleId, NotThreadSafe, CompleteFailed };
+
+static void exerciseDcnPresentPreparation(PresentPreparation scenario) {
+    TransactionFixture fixture;
+    Descriptor descriptor;
+    descriptor.preparation = 0;
+    descriptor.wires = 0;
+    OSObject pipe;
+    const int transaction = 0;
+    auto backing = describePresentBacking(&transaction, &descriptor, &descriptor, kSurfaceBgra, 16, 32, 64, 16, 32);
+    assert(backing.surface == &descriptor && !backing.preparation && !descriptor.prepares);
+    fixture.mapped = &backing;
+    if (scenario == PresentPreparation::StaleId) backing.preparation = 8;
+    if (scenario == PresentPreparation::NotThreadSafe) descriptor.flags = 0;
+    descriptor.prepareResult = scenario == PresentPreparation::Failed ? kIOReturnNotReady : kIOReturnSuccess;
+    descriptor.completeResult = scenario == PresentPreparation::CompleteFailed ? kIOReturnNotReady : kIOReturnSuccess;
+    descriptor.afterPrepare = [&] {
+        if (scenario != PresentPreparation::MissingId) descriptor.preparation = 9;
+    };
+    DcnPresentTransaction request{&pipe, &fixture.framebuffer, &transaction, &backing, DcnPresentResult::Blocked};
+    const bool stuck = scenario == PresentPreparation::CompleteFailed;
+    const bool direct = scenario == PresentPreparation::New;
+    assert(fixture.submitDcnPresent(request) == (stuck ? kIOReturnNotReady : kIOReturnSuccess));
+    assert(request.result == (direct ? DcnPresentResult::Direct : stuck ? DcnPresentResult::Blocked : DcnPresentResult::Copy));
+    assert(fixture.maps == unsigned(direct || stuck) && fixture.begins == unsigned(direct) && fixture.cancels == unsigned(stuck));
+    assert(descriptor.prepares == unsigned(scenario != PresentPreparation::StaleId && scenario != PresentPreparation::NotThreadSafe) &&
+           descriptor.completes == unsigned(direct || stuck || scenario == PresentPreparation::MissingId));
+    assert(descriptor.references == 1 + unsigned(stuck) && descriptor.wires == unsigned(stuck));
+    if (stuck) {
+        assert(fixture.dcnPresentUncertain && fixture.dcnPresentBacking.uncertain());
+        assert(fixture.submitDcnPresent(request) == kIOReturnNotReady && descriptor.completes == 1);
+    }
+    if (direct) pipe.release();
 }
 #endif
 
@@ -3357,6 +3400,9 @@ int main() {
 #ifdef TEST_SCANOUT_TRANSACTION
     transactionSleeping = true;
     exerciseDcnTransaction();
+    for (const auto scenario : {PresentPreparation::New, PresentPreparation::Failed, PresentPreparation::MissingId,
+                                PresentPreparation::StaleId, PresentPreparation::NotThreadSafe, PresentPreparation::CompleteFailed})
+        exerciseDcnPresentPreparation(scenario);
 #endif
     std::puts("[PASS] exact writer backing (CPU only)");
 }

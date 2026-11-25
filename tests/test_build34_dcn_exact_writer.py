@@ -103,11 +103,18 @@ class ExactWriterTests(unittest.TestCase):
         self.assertLess(perform.index('if (result != DcnPresentResult::Copy)'), perform.index('movnti'))
         self.assertLess(perform.index('if (result != DcnPresentResult::Copy)'), perform.rindex('nvAccelSurfCopyReady(s, head)'))
         self.assertLess(perform.index('if (!dcnAttempt)'), perform.index('nvAccelSurfCopyReady(s, head)'))
+        self.assertIn('if (!dcnAttempt)\n#endif\n        {\n            src = (const volatile unsigned int *)iopMapSurface(', perform)
+        self.assertEqual(perform.count('iopMapSurface('), 2)
+        self.assertLess(perform.index('if (result != DcnPresentResult::Copy)'), perform.rindex('iopMapSurface('))
+        self.assertLess(perform.rindex('a->askFramebufferForScanout('), perform.rindex('iopMapSurface('))
+        self.assertIn('observed = describePresentBacking(', perform)
         self.assertIn('fDcnPresent.check(txn, complete)', method(accelerator, transaction.COMPLETE))
         self.assertIn('nvAccelDcnSleepable)(NVDisplayPipe &, IOService &){nullptr}', accelerator)
         self.assertNotIn('dcnPlacePresent', source)
         submit = method(source, transaction.NATIVE)
         self.assertLess(submit.index('BUILD34_DCN_CHECK_FIRMWARE'), submit.index('mapDcnPin('))
+        self.assertLess(submit.index('dcnPresentBacking.acquirePresent('), submit.index('mapDcnPin('))
+        self.assertLess(submit.index('dcnPresentBacking.releaseUnused()'), submit.index('const auto result = submit(intent)'))
         self.assertIn('request.framebuffer, &route}', submit)
         self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True, present=source)
 
@@ -119,7 +126,7 @@ class ExactWriterTests(unittest.TestCase):
         self.assertLess(method(framebuffer, 'void PhxAMDFB::stop(').index('closeDcnFirmwareSample();'),
                         method(framebuffer, 'void PhxAMDFB::stop(').index('OSSafeReleaseNULL(fMmio)'))
         submit = method(native, transaction.NATIVE)
-        self.assertLess(submit.index('acquireDcnFbRoute(route, home)'), submit.index('mapDcnPin('))
+        self.assertLess(submit.index('acquireDcnFbRoute(route, home)'), submit.index('dcnPresentBacking.acquirePresent('))
         self.assertLess(submit.index('submit(home) != ScanoutFlipResult::Presented'), submit.index('releaseDcnFbRoute()'))
         self.assertIn('dcnQualifiedFlipRoute)(IOPCIDevice *){nullptr}', native)
         self.assertEqual(method(native, 'bool PhxBringup::exactNativeOpenAdmitted('),

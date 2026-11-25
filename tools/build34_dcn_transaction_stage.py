@@ -11,6 +11,7 @@ NATIVE = 'IOReturn PhxBringup::submitDcnPresent('
 PERFORM = 'IOReturn NVDisplayPipe::performTransaction('
 COMPLETE = 'bool NVDisplayPipe::isTransactionComplete('
 FIELDS = '''    build34::dcn::DcnSubmitGate dcnPresentGate;
+    build34::dcn::ScanoutDescriptorPin dcnPresentBacking;
     OSObject *dcnPresentPipe{nullptr};
     IOService *dcnPresentFramebuffer{nullptr};
     bool dcnPresentUncertain{false};
@@ -61,9 +62,8 @@ METHOD = '''IOReturn PhxBringup::submitDcnPresent(build34::dcn::DcnPresentTransa
 
     const auto *present = request.backing;
     if (present && present->transaction != request.transaction) return kIOReturnBadArgument;
-    if (present && dcnQualifiedFlipRoute &&
-        validFlipGeometry(present->scanout) && present->scanout.mappedBytes == present->slice.bytes &&
-        livePresentPreparation(present->slice) == present->preparation && present->preparation) {
+    if (present && present->surface && !present->slice.offset && dcnQualifiedFlipRoute &&
+        validFlipGeometry(present->scanout) && present->scanout.mappedBytes == present->slice.bytes) {
         const auto *qualified = dcnQualifiedFlipRoute(pci);
         const auto route = qualified ? *qualified : HubpFlipRoute{};
         const bool direct = route.presentWindows.domain == DcnPresentDomain::Direct;
@@ -81,15 +81,24 @@ METHOD = '''IOReturn PhxBringup::submitDcnPresent(build34::dcn::DcnPresentTransa
             if (next.valid() && home.valid() && sameFlipGeometry(home.surface, present->scanout) &&
                 request.framebuffer->callPlatformFunction(BUILD34_DCN_CHECK_FIRMWARE, false,
                     pci, &home, &windows, nullptr) == kIOReturnSuccess) {
-                const size_t entries = present->slice.bytes / kPageBytes;
-                auto *runs = static_cast<DmaRun *>(IOMallocZero(entries * sizeof(DmaRun)));
-                auto *pages = static_cast<uint64_t *>(IOMallocZero(entries * sizeof(uint64_t)));
-                if (runs && pages) {
-                    ScanoutDmaRequest map{present, next.address, runs, entries, pages, entries, {}, {}};
-                    if (mapDcnPin(map, direct) == kIOReturnSuccess) pin = map.token;
+                auto prepared = *present;
+                if (dcnPresentBacking.acquirePresent(prepared.slice, prepared.preparation)) {
+                    const size_t entries = prepared.slice.bytes / kPageBytes;
+                    auto *runs = static_cast<DmaRun *>(IOMallocZero(entries * sizeof(DmaRun)));
+                    auto *pages = static_cast<uint64_t *>(IOMallocZero(entries * sizeof(uint64_t)));
+                    if (runs && pages) {
+                        ScanoutDmaRequest map{&prepared, next.address, runs, entries, pages, entries, {}, {}};
+                        if (mapDcnPin(map, direct) == kIOReturnSuccess) pin = map.token;
+                    }
+                    if (pages) IOFree(pages, entries * sizeof(uint64_t));
+                    if (runs) IOFree(runs, entries * sizeof(DmaRun));
+                    (void)dcnPresentBacking.releaseUnused();
                 }
-                if (pages) IOFree(pages, entries * sizeof(uint64_t));
-                if (runs) IOFree(runs, entries * sizeof(DmaRun));
+                if (dcnPresentBacking.uncertain()) {
+                    if (pin.serial) (void)cancelDcnPin(pin);
+                    dcnPresentUncertain = true;
+                    return kIOReturnNotReady;
+                }
             }
             if (pin.serial) {
                 ScanoutFlipIntent intent{previous, next, pin, {}, ScanoutFlipResult::Refused, request.framebuffer, &route};
@@ -225,6 +234,15 @@ def stage_accelerator(accelerator):
         {
 ''' + ''.join('    ' + line for line in readiness.splitlines(True)) + '''        }
 ''')
+    cpu_map = '''        src = (const volatile unsigned int *)iopMapSurface(s->getSurfaceID(), md, H * P);
+        if (!src) NVIOP_FAIL(kIOReturnVMError, "surface 0x%x would not prepare/map %llu bytes", s->getSurfaceID(), H * P);
+'''
+    after = once(after, cpu_map, '''#if defined(NMX_ACCEL) && defined(PHX_FB)
+        if (!dcnAttempt)
+#endif
+        {
+''' + ''.join('    ' + line for line in cpu_map.splitlines(True)) + '''        }
+''')
     start = after.index('    if (nvAccelObserveDcnCopyBacking && ')
     end = after.index('    nvAccelIopHome(fb, head);\n', start)
     after = once(after, after[start:end], '''#if defined(NMX_ACCEL) && defined(PHX_FB)
@@ -236,9 +254,9 @@ def stage_accelerator(accelerator):
         };
         PresentCopyBacking observed{};
         if (!fromRes && !l10r && sameSource())
-            observed = observePreparedCopyBacking(txn, s, copyDescriptor, s->getPixelFormat(), w, h, pitch, q.width, q.height);
+            observed = describePresentBacking(txn, s, copyDescriptor, s->getPixelFormat(), w, h, pitch, q.width, q.height);
         const bool mayRehome = nvAccelDcnProvider != nullptr;
-        DcnPresentTransaction request{this, fb, txn, observed.preparation ? &observed : nullptr, DcnPresentResult::Blocked};
+        DcnPresentTransaction request{this, fb, txn, observed.surface ? &observed : nullptr, DcnPresentResult::Blocked};
         fDcnPresent.block();
         const auto result = nvAccelSubmitDcnPresent(*a, request);
         if (result == DcnPresentResult::Direct) {
@@ -265,6 +283,14 @@ def stage_accelerator(accelerator):
                 a->askFramebufferForScanout(&home, fb) != kIOReturnSuccess || home.kva != q.kva ||
                 home.width != q.width || home.height != q.height || home.pitch != q.pitch)
                 return kIOReturnNotReady;
+        }
+        if (s) {
+            if (!sameSource()) return kIOReturnNotReady;
+            const auto bytes = uint64_t{h} * pitch;
+            src = (const volatile unsigned int *)iopMapSurface(s->getSurfaceID(), copyDescriptor, bytes);
+            if (!src) NVIOP_FAIL(kIOReturnVMError, "surface 0x%x would not prepare/map %llu bytes", s->getSurfaceID(),
+                                 (unsigned long long)bytes);
+            if (!sameSource()) return kIOReturnNotReady;
         }
         fDcnPresent.legacy();
     }

@@ -22,6 +22,13 @@ public:
         return acquired;
     }
 
+    bool acquirePresent(const PinnedDescriptorSlice &slice, uint64_t &preparation) {
+        if (!slice.descriptor || !(slice.descriptor->getFlags() & kIOMemoryThreadSafe)) return false;
+        const bool acquired = lease_.hold(slice, preparation);
+        lease_.recycleClosed();
+        return acquired;
+    }
+
     bool releaseUnused() {
         if (displayUse_) return false;
         const bool released = lease_.releaseAfterRetirement();
