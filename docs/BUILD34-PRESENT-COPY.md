@@ -1144,6 +1144,15 @@ during the second walk faults the existing VM gate without installing that
 page. Disjoint mappings and submissions remain possible once the short
 programming barrier is released.
 
+The write-hold helper now validates its page-set contract at admission:
+nonempty, bounded, nonzero, page-aligned, strictly increasing and duplicate-
+free physical pages are required before overlap checks or publication. This
+prevents a malformed or unsorted internal set from bypassing the helper's
+merge and binary-search comparisons. CPU fixtures cover unsorted, duplicate,
+unaligned, zero and over-capacity sets, plus valid overlap and release. This
+only hardens the isolated source stage; it does not connect the GPUVM
+ownership or permission-evidence hooks.
+
 The hold remains during latch polling and front residence. It is released
 only after old fetch/translation retirement and successful DMA and
 descriptor cleanup. A refused begin drops only its own temporary hold;

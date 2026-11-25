@@ -1,4 +1,5 @@
 #include "../tools/build34_dcn_render_binding.h"
+#include "../tools/build34_dcn_physical_pages.h"
 
 #include <array>
 #include <cassert>
@@ -89,6 +90,37 @@ static void testSurfaceQualifications() {
     assert(validateScanoutSurface(candidate, 2560, 1600, &padded));
     assert(padded.pitchPixelsMinusOne == 2575);
     assert(padded.mappedBytes == ((candidate.allocationBytes + kPageBytes - 1) & ~(kPageBytes - 1)));
+}
+
+static void testManagedWriteHoldsRequireCanonicalPages() {
+    DcnManagedWriteHolds holds;
+    DcnManagedWriteExclusion blocked{};
+    const std::array<uint64_t, 3> valid{0x10000, 0x20000, 0x30000};
+    const std::array<std::array<uint64_t, 3>, 4> malformed{{
+        {{0x10000, 0x30000, 0x20000}},
+        {{0x10000, 0x20000, 0x20000}},
+        {{0x10000, 0x20001, 0x30000}},
+        {{0, 0x20000, 0x30000}},
+    }};
+
+    assert(!holds.acquire({}, blocked));
+    for (const auto &pages : malformed) {
+        assert(!holds.acquire({pages.data(), pages.size()}, blocked));
+        assert(!holds.active());
+        for (uint64_t page : valid)
+            assert(!holds.excludes(page));
+    }
+    assert(!holds.acquire({valid.data(), kMaxBackingBytes / kPageBytes + 1}, blocked));
+    assert(holds.acquire({valid.data(), valid.size()}, blocked));
+    assert(holds.active());
+    for (uint64_t page : valid)
+        assert(holds.excludes(page));
+
+    const std::array<uint64_t, 2> overlapping{0x20000, 0x40000};
+    assert(!holds.acquire({overlapping.data(), overlapping.size()}, blocked));
+    assert(holds.active() && holds.excludes(0x20000));
+    holds.release({valid.data(), valid.size()});
+    assert(!holds.active() && !holds.excludes(0x20000));
 }
 
 enum class BatchResult { Normal, Error, Empty, Excess, WrongOffset, TooLong, Unaligned, Short };
@@ -760,6 +792,7 @@ static void testPanelAndBoundedWork() {
 
 int main() {
     testSurfaceQualifications();
+    testManagedWriteHoldsRequireCanonicalPages();
     testSegmentBatches();
     testPageIdentity();
     testDescriptorSlice();

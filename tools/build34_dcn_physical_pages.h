@@ -141,7 +141,7 @@ public:
     }
 
     bool acquire(PhysicalPageSet next, DcnManagedWriteExclusion blocked) {
-        if (!next.pages || !next.count || holds_[0].pages.overlaps(next) || holds_[1].pages.overlaps(next)) return false;
+        if (!canonicalPages(next) || holds_[0].pages.overlaps(next) || holds_[1].pages.overlaps(next)) return false;
         for (auto &held : holds_) {
             if (held.pages.count) continue;
             held = {next, blocked, {}};
@@ -156,6 +156,15 @@ public:
     }
 
 private:
+    static bool canonicalPages(PhysicalPageSet pages) {
+        if (!pages.pages || !pages.count || pages.count > kMaxBackingBytes / kPageBytes) return false;
+        for (size_t index = 0; index < pages.count; ++index) {
+            const uint64_t page = pages.pages[index];
+            if (!page || page % kPageBytes || (index && pages.pages[index - 1] >= page)) return false;
+        }
+        return true;
+    }
+
     static bool samePages(PhysicalPageSet first, PhysicalPageSet second) {
         return first.count && first.count == second.count && first.pages == second.pages;
     }
