@@ -12,6 +12,7 @@ def main():
     source = (ROOT / "src/phxaccel/accel/phxfb.cpp").read_text()
     template = (ROOT / "tests/upstream34_panel_callbacks.cpp").read_text()
     for marker, signature in {
+        "// ACTUAL_HIRES_REQUEST": "static bool hiResRequested()",
         "// ACTUAL_REFRESH_METHOD": "void measureRefresh()",
         "// ACTUAL_TIMING_METHOD": "IOReturn getTimingInfoForDisplayMode(",
         "// ACTUAL_MODE_INFO_METHOD": "IOReturn getInformationForDisplayMode(",

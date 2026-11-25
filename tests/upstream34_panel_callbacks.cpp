@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <vector>
 #include "accel/phx_panel_timing.h"
 using IOReturn = int;
@@ -33,6 +34,42 @@ struct IOTimingInformation {
 };
 #define PFBLOG(...) ((void)0)
 #define OSSafeReleaseNULL(object) do { if (object) (object)->release(); (object) = nullptr; } while (0)
+#define OSDynamicCast(type, object) dynamic_cast<type *>(object)
+struct OSObject {
+    virtual ~OSObject() = default;
+    unsigned copies = 0, releases = 0;
+    void release() { assert(releases < copies); ++releases; }
+};
+struct OSData : OSObject {
+    OSData(std::initializer_list<uint8_t> value) : bytes(value) {}
+    std::vector<uint8_t> bytes;
+    unsigned getLength() const { return bytes.size(); }
+    const void *getBytesNoCopy() const { assert(!bytes.empty()); return bytes.data(); }
+};
+static constexpr auto gIODTPlane = "IODeviceTree";
+struct IORegistryEntry : OSObject {
+    static IORegistryEntry *options;
+    OSObject *property = nullptr;
+    static IORegistryEntry *fromPath(const char *path, const char *plane) {
+        assert(std::strcmp(path, "/options") == 0 && plane == gIODTPlane);
+        if (options) ++options->copies;
+        return options;
+    }
+    OSObject *copyProperty(const char *key) {
+        assert(std::strcmp(key, "phxfb-hidpi") == 0);
+        if (property) ++property->copies;
+        return property;
+    }
+};
+IORegistryEntry *IORegistryEntry::options = nullptr;
+static int bootArg = -1;
+static bool PE_parse_boot_argn(const char *name, void *out, int length) {
+    assert(std::strcmp(name, "phxfbhires") == 0 && length == sizeof(uint32_t));
+    if (bootArg < 0) return false;
+    *static_cast<uint32_t *>(out) = bootArg;
+    return true;
+}
+// ACTUAL_HIRES_REQUEST
 struct IOMemoryMap {
     std::vector<uint32_t> regs = std::vector<uint32_t>(0x5100);
     uint64_t length = 0x5100 * 4;
@@ -94,7 +131,33 @@ static void fallback(Fixture &f) {
     IOTimingInformation expected{}; expected.appleTimingID = kIOTimingIDInvalid;
     check(std::memcmp(&info, &expected, sizeof info) == 0);
 }
+static void testHiResRequest() {
+    check(!hiResRequested());
+    IORegistryEntry options;
+    IORegistryEntry::options = &options;
+    check(!hiResRequested());
+    OSObject wrongType;
+    OSData empty{}, off{'0'}, binary{1}, trailingNul{'1', 0}, longer{'1', '1'}, enabled{'1'};
+    OSObject *properties[] = {&wrongType, &empty, &off, &binary, &trailingNul, &longer, &enabled};
+    for (OSObject *property : properties) {
+        options.property = property;
+        check(hiResRequested() == (property == &enabled));
+        check(property->copies == 1 && property->releases == 1);
+    }
+    bootArg = 0;
+    check(hiResRequested());
+    options.property = nullptr;
+    check(!hiResRequested());
+    bootArg = 2;
+    check(!hiResRequested());
+    bootArg = 1;
+    check(hiResRequested());
+    check(options.copies == 11 && options.releases == 11);
+    IORegistryEntry::options = nullptr;
+    bootArg = -1;
+}
 int main() {
+    testHiResRequest();
     // Replay the logged 25-frame / 200,965-us input with a one-frame endpoint
     // phase. At 2 s the corresponding synthetic input is 241 / 2,000,965 us.
     // The assumed 120-Hz clock here is a CPU model, not a panel-rate finding.

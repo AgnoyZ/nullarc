@@ -19,6 +19,7 @@
 #include <IOKit/IORangeAllocator.h>
 #include <IOKit/IOSubMemoryDescriptor.h>
 #include <libkern/OSAtomic.h>
+#include <libkern/c++/OSData.h>
 #include <sys/sysctl.h>
 #include "nvrm_vram_abi.h"
 #include "nvrm_gpuva_abi.h"
@@ -672,6 +673,21 @@ static bool takeBootArming()
     return armed && !stuck;
 }
 
+static bool hiResRequested()
+{
+    uint32_t bootArg = 0;
+    if (PE_parse_boot_argn("phxfbhires", &bootArg, sizeof bootArg) && bootArg == 1) return true;
+    IORegistryEntry *opts = IORegistryEntry::fromPath("/options", gIODTPlane);
+    if (!opts) return false;
+    OSObject *property = opts->copyProperty("phxfb-hidpi");
+    opts->release();
+    const auto *data = OSDynamicCast(OSData, property);
+    const bool enabled = data && data->getLength() == 1 &&
+        *static_cast<const uint8_t *>(data->getBytesNoCopy()) == '1';
+    OSSafeReleaseNULL(property);
+    return enabled;
+}
+
 bool PhxAMDFB::start(IOService *provider)
 {
     char arg[8];
@@ -743,9 +759,8 @@ bool PhxAMDFB::start(IOService *provider)
     else if (!backlightRead(&bl)) PFBLOG("backlight: the PWM is not running (no MMIO view, or off), no brightness control");
     else if (!(fBacklight = phxBacklightCreate(this))) PFBLOG("backlight: the handler would not attach");
     else PFBLOG("backlight: PWM at %u of %u", bl, kBlMax);
-    uint32_t hiRes = 0;
-    fHiRes = PE_parse_boot_argn("phxfbhires", &hiRes, sizeof hiRes) && hiRes == 1
-        && !((fWidth | fHeight) & 1) && !(fRowBytes & 3) && fRowBytes == v.v_rowBytes;
+    fHiRes = !((fWidth | fHeight) & 1) && !(fRowBytes & 3) && fRowBytes == v.v_rowBytes
+        && hiResRequested();
     setProperty("PhxFBHiResModeFlag", fHiRes);
     if (!IOFramebuffer::start(provider)) {
         if (fBacklight) { fBacklight->detach(this); OSSafeReleaseNULL(fBacklight); }

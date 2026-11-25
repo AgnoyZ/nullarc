@@ -331,18 +331,23 @@ See the [failure and rollback result](validation/build34-acpi-s5-failure-rollbac
 Build34 adapts QiRanChenk's native panel capability hint from
 [commit `5f6a231`](https://github.com/QiRanChenk/nullarc/commit/5f6a231d05bc8c502a2a23294d2469bdceae0f75).
 The change belongs to the existing PolyForm Noncommercial PhxAccel component.
-This adaptation defaults to off. With `phxfbhires=1` and an eligible 32-bit GOP
-raster, mode 1 adds `kDisplayModeValidForHiResFlag` to its existing flags.
+This adaptation defaults to off. With either the dedicated `phxfb-hidpi`
+NVRAM variable set to the single ASCII byte `1` or the legacy boot argument
+`phxfbhires=1`, mode 1 adds `kDisplayModeValidForHiResFlag` to its existing
+flags for an eligible 32-bit GOP raster. The driver reads the dedicated key
+without modifying it or changing the separate one-use `phxfb-boot` gate.
 `PhxFBHiResModeFlag` reports the hint and CoreDisplay chooses the logical mode.
 An eligible 2560×1600 scan-out can back a 1280×800 logical desktop on the same
 physical raster, pitch and timing. The single-mode scan-out contract also
 applies to future direct present work.
 
-`make test-upstream34-panel-timing` checks that mode information differs only in
-the HiRes bit. The offline DCN firmware sample stage pins the updated framebuffer
-source by exact SHA-256. Target acceptance requires checking the current logical
-and backing dimensions and refresh in CoreGraphics on a separately authorized
-boot. To roll back the hint, remove `phxfbhires=1`.
+`make test-upstream34-panel-timing` checks that absent or malformed NVRAM data
+does not opt in, the legacy boot argument still works, and mode information
+differs only in the HiRes bit. The offline DCN firmware sample stage pins the
+updated framebuffer source by exact SHA-256. Target acceptance requires checking
+the current logical and backing dimensions and refresh in CoreGraphics on a
+separately authorized boot. To disable the hint on the next start, remove both
+opt-ins if present.
 
 The [ThinkBook branch at `fe3ea7d`](https://github.com/dandingdjianjiao/nullarc/commit/fe3ea7de558803181d4983869aac60765b6eabc2)
 applies the hint to the existing GOP output, while QiRanChenk limits it to
@@ -369,7 +374,7 @@ this is the firmware baseline, not a HiDPI candidate result. No candidate
 was installed or loaded, no boot argument was changed, and no restart was
 requested.
 
-### Baseline restored; candidate boot remains blocked
+### Baseline restored; prior candidate not booted
 
 The separate, owner-authorized baseline recovery boot completed on November
 25, 2026 at 20:10:25 Asia/Shanghai. A fresh scope replaced only the two startup
@@ -392,8 +397,21 @@ again. The HiDPI candidate remains uninstalled and unloaded.
 Read-only inspection of the active OpenCore configuration found `boot-args`
 in both NVRAM `Delete` and `Add`. A macOS-only write to `boot-args` would lose
 the HiDPI opt-in at the next OpenCore boot. No EFI or boot-argument change was
-made and the distinct HiDPI restart remains unused. Establish a separately
-approved boot-persistent opt-in before installing the candidate. Acceptance
+made and the distinct HiDPI restart remains unused. Those preflight results
+apply to the earlier boot-argument-only candidate, not to the dedicated-key
+change. A fresh candidate and cache must pass full validation before any
+separately authorized installation. Verify that OpenCore does not rewrite the
+dedicated key and confirm its exact value before and after boot. Acceptance
 then requires the exact loaded image, the HiRes property, and the **current**
 1280x800 logical / 2560x1600 backing mode at the unchanged 120 Hz and physical
 timing. Enumeration or the registry property alone is not a pass.
+
+The dedicated-key candidate builds and passes x86_64 architecture and strict
+signature checks using the same frozen R2a sources and SDK, with only the
+framebuffer source replaced. The rebuilt control matches the accepted R2a
+executable byte for byte; the candidate has the same undefined imports.
+Offline checks passed 43 timing cases, 542 panel callback assertions, 3,646
+framebuffer assertions and 25 cache metadata fixture tests. These checks do not
+link a new AuxKC or exercise the physical panel. The dedicated key was absent
+on readback; no NVRAM, EFI, installed driver or startup job change was made
+and no restart was requested for this candidate.
