@@ -9,6 +9,14 @@ latest new-boot result is recorded at the end of this document.
 
 ## Offline DCN zero-copy prerequisite, November 24
 
+For subsequent local hardware comparisons, hold the [verified internal 2x
+mode](BUILD34-SCOPE.md#saved-local-2x-preference) fixed on the copy baseline
+and the direct-present candidate: 1280x800 logical, 2560x1600 backing,
+120 Hz. Check the active mode before and after each run; a saved preference
+or an enumerated mode alone does not qualify a comparison. Use the physical
+backing dimensions and the verified surface pitch for scanout, not the
+logical dimensions. The saved mode does not enable direct present.
+
 The [DMA page layout](../tools/build34_dcn_page_layout.h) stages one step
 toward DCN scanout from the same pages that back a rendered IOSurface. The
 boundaries follow the reviewed Linux v6.12

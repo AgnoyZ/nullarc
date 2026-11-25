@@ -488,3 +488,15 @@ logins, other displays, performance, or long-term stability. The session
 can return to 1x by selecting 2560x1600 logical at 120 Hz; removing the opt-ins
 disables the hint at the next boot. No scaling mode was added to the driver,
 and the existing CPU present copy remains; direct scan-out is separate work.
+
+### Saved local 2x preference
+
+On the same boot, a permanent-scope CoreGraphics transaction saved the
+already-selected internal mode without switching through 1x. Readback of both
+the per-host user and system display preferences found the 1280x800 mode at
+120 Hz. Independent live queries still reported 1280x800 logical, 2560x1600
+backing at 120 Hz and AppKit scale 2.0, with unchanged framebuffer timing
+metadata and HiRes still enabled. No driver, EFI or NVRAM change or restart
+was needed. The saved preference was verified on disk; its restoration on a
+new login or boot has not been tested. Select 2560x1600 at 120 Hz in Displays
+to return to 1x without disabling the driver's HiRes capability.
