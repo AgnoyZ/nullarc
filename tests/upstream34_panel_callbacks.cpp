@@ -7,7 +7,15 @@
 #include "accel/phx_panel_timing.h"
 using IOReturn = int;
 using IODisplayModeID = uint32_t;
-constexpr int kIOReturnSuccess = 0, kIOReturnUnsupportedMode = -3;
+using IOFixed1616 = uint32_t;
+constexpr int kIOReturnSuccess = 0, kIOReturnBadArgument = -2, kIOReturnUnsupportedMode = -3;
+constexpr uint32_t kDisplayModeValidFlag = 1, kDisplayModeSafeFlag = 2, kDisplayModeDefaultFlag = 4;
+constexpr uint32_t kFramebufferSupportsGammaCorrection = 0x00040000, kDisplayModeValidForHiResFlag = 0x00800000;
+struct IODisplayModeInformation {
+    uint32_t nominalWidth, nominalHeight, refreshRate, maxDepthIndex, flags;
+    uint16_t imageWidth, imageHeight;
+    uint32_t reserved[3];
+};
 // The native SDK build separately verifies actual Apple structures and constants.
 constexpr uint32_t kIOTimingIDInvalid = 0xffffffffu, kIODetailedTimingValid = 1;
 constexpr uint32_t kIODigitalSignal = 1, kIOSyncPositivePolarity = 1;
@@ -63,6 +71,7 @@ struct Fixture {
     uint64_t fFrameNs = 16666667;
     phx::PanelTiming fPanelTiming = {};
     bool fPanelTimingValid = false;
+    bool fHiRes = false;
     Fixture() {
         // Reviewed upstream fixture; these are not new target observations.
         const unsigned offsets[] = {0x1b2a,0x1b2b,0x1b2c,0x1b2d,0x1b2f,0x1b36,0x1b37,0x1b38,0x1b41,0x1b44,0x1b33};
@@ -74,6 +83,7 @@ struct Fixture {
     }
     // ACTUAL_REFRESH_METHOD
     // ACTUAL_TIMING_METHOD
+    // ACTUAL_MODE_INFO_METHOD
 };
 static unsigned checks = 0;
 static void check(bool value) { assert(value); ++checks; }
@@ -96,6 +106,23 @@ int main() {
     expectedRegisters[counter] = 240;
     good.measureRefresh();
     check(good.fPanelTimingValid && good.fRefreshMilliHz == 120000 && good.fFrameNs == 8333333);
+    constexpr uint32_t baseFlags = kDisplayModeValidFlag | kDisplayModeSafeFlag
+        | kDisplayModeDefaultFlag | kFramebufferSupportsGammaCorrection;
+    for (bool hiRes : {false, true}) {
+        good.fHiRes = hiRes;
+        IODisplayModeInformation mode;
+        std::memset(&mode, 0xa5, sizeof mode);
+        check(good.getInformationForDisplayMode(1, &mode) == kIOReturnSuccess);
+        IODisplayModeInformation expected{};
+        expected.nominalWidth = 2560;
+        expected.nominalHeight = 1600;
+        expected.refreshRate = 120u << 16;
+        expected.flags = baseFlags | (hiRes ? kDisplayModeValidForHiResFlag : 0);
+        check(std::memcmp(&mode, &expected, sizeof mode) == 0);
+        check(good.getInformationForDisplayMode(2, &mode) == kIOReturnBadArgument);
+        check(good.getInformationForDisplayMode(1, nullptr) == kIOReturnBadArgument);
+        check(std::memcmp(&mode, &expected, sizeof mode) == 0);
+    }
     check(good.fHTotal == 2720 && good.fVTotal == 1694 && sleeps == 1 && sleptMilliseconds == 2000 && good.memory.releases == 1);
     check(good.memory.regs == expectedRegisters); // Only the CPU fake's frame counter update is permitted.
     IOTimingInformation info; std::memset(&info, 0xa5, sizeof info);
@@ -153,5 +180,5 @@ int main() {
     }
     Fixture nonstandard; rateMilliHz = 130000; nonstandard.measureRefresh();
     check(nonstandard.fPanelTimingValid && nonstandard.fRefreshMilliHz == 130000);
-    std::printf("actual refresh/timing callbacks: %u CPU assertions passed\n", checks);
+    std::printf("actual refresh/timing/mode callbacks: %u CPU assertions passed\n", checks);
 }

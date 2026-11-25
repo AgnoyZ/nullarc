@@ -325,3 +325,21 @@ action was executed or scheduled. Physical shutdown is not repaired and its
 precise physical failure mode still requires confirmation. This supersedes
 the candidate's pending-acceptance status, not its historical loading evidence.
 See the [failure and rollback result](validation/build34-acpi-s5-failure-rollback-20261118.json).
+
+## Native 2× HiDPI
+
+Build34 adapts QiRanChenk's native panel capability hint from
+[commit `5f6a231`](https://github.com/QiRanChenk/nullarc/commit/5f6a231d05bc8c502a2a23294d2469bdceae0f75).
+The change belongs to the existing PolyForm Noncommercial PhxAccel component.
+This adaptation defaults to off. With `phxfbhires=1` and an eligible 32-bit GOP
+raster, mode 1 adds `kDisplayModeValidForHiResFlag` to its existing flags.
+`PhxFBHiResModeFlag` reports the hint and CoreDisplay chooses the logical mode.
+An eligible 2560×1600 scan-out can back a 1280×800 logical desktop on the same
+physical raster, pitch and timing. The single-mode scan-out contract also
+applies to future direct present work.
+
+`make test-upstream34-panel-timing` checks that mode information differs only in
+the HiRes bit. The offline DCN firmware sample stage pins the updated framebuffer
+source by exact SHA-256. Target acceptance requires checking the current logical
+and backing dimensions and refresh in CoreGraphics on a separately authorized
+boot. To roll back the hint, remove `phxfbhires=1`.

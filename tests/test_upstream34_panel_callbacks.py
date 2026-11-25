@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise actual A3 callbacks with CPU mapping/clock doubles and sanitizers."""
+"""Exercise actual panel timing and mode callbacks with CPU doubles."""
 import hashlib
 from pathlib import Path
 import subprocess
@@ -14,6 +14,7 @@ def main():
     for marker, signature in {
         "// ACTUAL_REFRESH_METHOD": "void measureRefresh()",
         "// ACTUAL_TIMING_METHOD": "IOReturn getTimingInfoForDisplayMode(",
+        "// ACTUAL_MODE_INFO_METHOD": "IOReturn getInformationForDisplayMode(",
     }.items():
         template = template.replace(marker, method(source, signature).replace(" override", ""))
     build = ROOT / "build/tests/upstream34-panel-callbacks"
