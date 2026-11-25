@@ -445,3 +445,22 @@ absent, existing panel arming was left in place, and no NVRAM write, cache
 installation, candidate load or power request was made. The private cache
 is ready for review; the actual 2x mode still requires a separately
 authorized single-boot trial and the current-mode checks above.
+
+### Single-boot trial staged, November 25, 2026
+
+The owner then authorized this exact candidate and private AuxKC, the
+dedicated opt-in, and one ordinary restart. The first two separate scopes
+refused on a mutable-log seal and a runtime contract binding error. The
+first stopped before installation; the second restored the accepted images
+and jobs and passed independent disk readback. Neither armed the key or
+requested power.
+
+The corrected scope exercised the actual read-only contract derivation
+before installation. Its independent staged readback passed the exact
+candidate and full cache metadata, unchanged EFI/AML/plugin, unloaded
+next-boot jobs, and the still-running R2a image. It retains the 45/150/300
+second startup gates, daily PR28 policy, and disabled resident monitoring.
+Failure recovery restores the R2a images and jobs and removes only the trial
+opt-in, with no automatic restart. Before the restart request, CoreGraphics
+still reported 2560x1600 logical and backing dimensions at 120 Hz. This is
+installation evidence only, not native 2x hardware acceptance.
