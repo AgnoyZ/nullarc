@@ -343,3 +343,37 @@ the HiRes bit. The offline DCN firmware sample stage pins the updated framebuffe
 source by exact SHA-256. Target acceptance requires checking the current logical
 and backing dimensions and refresh in CoreGraphics on a separately authorized
 boot. To roll back the hint, remove `phxfbhires=1`.
+
+The [ThinkBook branch at `fe3ea7d`](https://github.com/dandingdjianjiao/nullarc/commit/fe3ea7de558803181d4983869aac60765b6eabc2)
+applies the hint to the existing GOP output, while QiRanChenk limits it to
+the panel head. Both advertise HiRes by default and provide `-phxhidpioff`.
+Build34 keeps its existing mode flags, including the gamma flag, and makes
+HiRes an explicit opt-in for a controlled test. No extra mode, scaler or
+scan-out buffer is introduced, and the existing present copy remains.
+
+### Local preflight, November 25, 2026
+
+On macOS 26.7.2 (`25G332`), the signed x86_64 PhxAccel candidate changes only
+the framebuffer source from the R2a recipe. The control build reproduces the
+installed R2a executable byte for byte. An offline link from a private bundle
+path returned success but dropped the sole PhxAccel record: boot/system/aux
+record counts were `232/180/3` rather than `232/180/4`, with 29 codeless records
+unchanged. The full [cache metadata check](../tools/check_build34_cache_metadata.py)
+refused the candidate; neither the installed executable nor the AuxKC changed.
+
+The two installed startup jobs still refer to the retained R2a scope, whose
+daily journal records `daily-startup-failure` and a rollback decision. The
+current boot loads the exact R1b PhxBringup but not PhxAccel. CoreGraphics
+reports 2560x1600 logical and backing dimensions with no 2x mode exposed;
+this is the firmware baseline, not a HiDPI candidate result. No candidate
+was installed or loaded, no boot argument was changed, and no restart was
+requested.
+
+Before using the HiDPI restart, restore and independently admit the unchanged
+R1b/R2a desktop under a fresh recovery scope. Do not clear or replay the old
+journals. Use the [approved-path offline cache recipe](BUILD34-PRESENT-COPY.md)
+only after its retained-runtime preflight passes. Check all 416 records and
+29 codeless entries, permitting only the PhxAccel image change. After the
+trial boot, verify the exact loaded candidate, the HiRes property, and the
+current 1280x800 logical / 2560x1600 backing mode with unchanged physical
+scan-out and timing. Enumeration or the registry property alone is not a pass.
