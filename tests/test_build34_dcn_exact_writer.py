@@ -209,6 +209,12 @@ class ExactWriterTests(unittest.TestCase):
         self.assertIn(flip_commit.BOUND_SLOT_GATE, bind)
         self.assertIn(flip_commit.FREE_SLOT_GATE, bind)
         self.assertLess(bind.index('dcnGpuWrites.bound('), bind.index('wreg('))
+        self.assertLess(bind.index('if (!vmFlushTlbChecked(vmid))'), bind.index('dcnGcvm[pick] ='))
+        self.assertNotIn('dcnGcvm', method(bound, flip_commit.VM_FREE))
+        current = method(bound, writer.CURRENT)
+        self.assertLess(current.index('drain->matches(*expected)'), current.index('dcnGcvmCurrent()'))
+        self.assertLess(current.index('dcnProveGpuVmOwnership(*this, pages) && dcnGcvmCurrent()'),
+                        current.index('reserve->reserve(dcnSubmitGate)'))
         begin = method(bound, flip_commit.BEGIN)
         self.assertLess(begin.index('bindDcnBar5(intent, boundRoute)'), begin.index('dcnFlip.begin('))
         self.assertIn('return barLive && dcnBar5Live();', method(bound, flip_commit.POLL))
@@ -256,11 +262,16 @@ class ExactWriterTests(unittest.TestCase):
         extracted = '\n'.join(method(source, signature) for signature in signatures)
         if flip:
             extracted += '\n' + method(source, flip_commit.MAP).replace('PhxBringup::vmMap(', 'PhxBringup::guardedVmMap(', 1)
-            extracted += '\n' + method(source, flip_commit.VM_BIND)
         if bar5_adapter:
             bound = lease if lease is not None else bar5.stage_native(DRIVER, ABI)
             fields += bar5.FIELDS
             extracted += '\n' + '\n'.join(method(bound, signature) for signature in bar5.SIGNATURES)
+            extracted += '\n' + method(bound, writer.CURRENT).replace('::exactWriterVmCurrent(', '::checkBar5WriterCurrent(', 1)
+            fixture = fixture.replace('// GCVM_FIELDS', bar5.GCVM_FIELDS)
+            declaration = flip_commit.DRAIN_DECL.split('\n', 1)[1]
+            fixture = fixture.replace('// GCVM_WRITER', declaration.replace('exactWriterVmCurrent(', 'checkBar5WriterCurrent('))
+        if flip:
+            extracted += '\n' + method(bound if bar5_adapter else source, flip_commit.VM_BIND)
         if lease is not None:
             fields += fb_lease.NATIVE_FIELDS
             extracted += '\n' + '\n'.join(method(lease, signature) for signature in (fb_lease.ACQUIRE, fb_lease.RELEASE))

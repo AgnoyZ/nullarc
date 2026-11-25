@@ -302,6 +302,7 @@ struct PhxBringup
     VmCtx *vmOwned(uint32_t, uint64_t, const void *, bool = false);
     bool vmWorkCurrent(const VmCtx &) const;
     // WRITER_SERVICE
+    // GCVM_WRITER
 
 #ifdef TEST_SCANOUT_FLIP
     static constexpr uint32_t kPtChunks = VmCtx::kPtChunks, kPtChunkPages = 2, kPtChunkBytes = kPtChunkPages * kPage;
@@ -310,6 +311,7 @@ struct PhxBringup
     uint64_t *testGpuLeaf = nullptr;
     std::function<DcnGpuPermissionAck(const DcnGpuPermissionUse &, DcnGpuPermissionPhase)> permission;
     struct HwVmid { uint32_t ctx; uint64_t generation, lastSeq, lastUse; } hwv[kNumUserVmids]{};
+    // GCVM_FIELDS
     uint64_t hwTick = 0;
     bool isolationEvidence = true;
     static bool proveIsolation(const PhxBringup &device, PhysicalPageSet pages) {
@@ -322,7 +324,16 @@ struct PhxBringup
         return testGpuLeaf ? testGpuLeaf + ((va / kPage) % 512) : &lastPte;
     }
     bool vmFlushTlbChecked(uint32_t slot) { assert(guard.held && slot >= kFirstUserVmid); return true; }
-    void wreg(uint32_t, uint32_t) { assert(guard.held); ++gpuVmWrites; }
+    void wreg(uint32_t reg, uint32_t word) {
+        assert(guard.held);
+        ++gpuVmWrites;
+#ifdef TEST_SCANOUT_BAR5
+        if (mmio) reinterpret_cast<uint32_t *>(mmio->address)[reg] = word;
+#else
+        (void)reg;
+        (void)word;
+#endif
+    }
     uint32_t vmBind(uint32_t, uint64_t, const void *, uint64_t);
     bool vmidFree(uint32_t, uint64_t, const void *, uint64_t);
     IOReturn guardedVmMap(uint32_t, uint64_t, const void *, uint64_t, IOMemoryDescriptor *, uint64_t, uint64_t);
@@ -2787,6 +2798,111 @@ static void scanoutFlip(FlipFault fault) {
 #endif
 
 #if defined(TEST_SCANOUT_BAR5) && !defined(TEST_SCANOUT_FB_LEASE)
+static void checkDcnGcvmReadback(CommitFixture &fixture, uint32_t *registers) {
+    auto &device = fixture.scanout.device;
+    auto &client = fixture.scanout.client;
+    CallbackGate<>::Lease life(device.exactCallbacks);
+    CallbackGate<1>::Lease operation(device.dcnPinOperation);
+    assert(life && operation && device.exactRawWriters.close());
+    const ScanoutFlipIntent intent{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
+    assert(device.bindDcnBar5(intent, fixture.route));
+
+    auto *pin = device.findDcnFlipPin(fixture.pin);
+    assert(pin);
+    const auto &proof = pin->dma.writerProof();
+    const auto verify = [&](DcnSubmitGate::Lease *reserve = nullptr) {
+        PhxBringup::DcnDrainStamp drain{};
+        return device.checkBar5WriterCurrent(proof.writer.map, proof.writer.native, &client, &drain,
+                                             reserve, &proof.drain, &pin->dma);
+    };
+    assert(!verify());
+    IOBufferMemoryDescriptor roots[2];
+    roots[0].physical = 0x12345676000;
+    roots[1].physical = roots[0].physical + 2 * kPage;
+    auto &writer = device.vm[0];
+    auto &other = device.vm[1];
+    other.busy = true;
+    other.client = &roots[1];
+    for (uint32_t slot = 0; slot < 2; ++slot) {
+        auto &context = device.vm[slot];
+        context.chunk[0] = &roots[slot];
+        context.phys = context.chunkPhys[0] = roots[slot].physical;
+        context.pages = context.used = 1;
+        IOLockLock(device.gpuLock);
+        assert(device.vmBind(slot + 1, context.generation, context.client, device.gSeq) == kFirstUserVmid + slot);
+        IOLockUnlock(device.gpuLock);
+    }
+    assert(verify());
+    const auto writes = device.gpuVmWrites;
+    for (const auto reg : {kRegCtx0Cntl + kFirstUserVmid, kRegCtx0BaseLo + 2 * kFirstUserVmid,
+                            kRegCtx0BaseLo + 2 * kFirstUserVmid + 1, kRegCtx0StartLo + 2 * kFirstUserVmid,
+                            kRegCtx0StartLo + 2 * kFirstUserVmid + 1, kRegCtx0EndLo + 2 * kFirstUserVmid,
+                            kRegCtx0EndLo + 2 * kFirstUserVmid + 1}) {
+        registers[reg] ^= 1;
+        assert(!verify());
+        registers[reg] ^= 1;
+    }
+    ++device.hwv[0].generation;
+    assert(!verify());
+    --device.hwv[0].generation;
+    device.vm[2].hw = writer.hw;
+    assert(!verify());
+    device.vm[2].hw = 0;
+    const uint32_t unused = kFirstUserVmid + 2;
+    registers[kRegCtx0Cntl + unused] = 1;
+    assert(!verify());
+    registers[kRegCtx0Cntl + unused] = 0;
+    registers[kRegCtx0BaseLo + 2 * unused] = 0x1234003;
+    assert(!verify());
+    registers[kRegCtx0BaseLo + 2 * unused] = 0;
+
+    assert(device.vmidFree(2, other.generation, other.client, 0) && !device.hwv[1].ctx && !other.hw);
+    assert(verify());
+    ++other.generation;
+    assert(verify());
+    registers[kRegCtx0BaseLo + 2 * (kFirstUserVmid + 1)] ^= 1;
+    assert(!verify());
+    registers[kRegCtx0BaseLo + 2 * (kFirstUserVmid + 1)] ^= 1;
+    other.chunkPhys[0] += kPage;
+    assert(!verify());
+    other.chunkPhys[0] -= kPage;
+
+    DcnSubmitGate::Lease reservation;
+    device.dcnProveGpuVmOwnership = nullptr;
+    assert(!verify(&reservation) && !reservation.held());
+    device.dcnProveGpuVmOwnership = [](const PhxBringup &provider, PhysicalPageSet pages) {
+        reinterpret_cast<uint32_t *>(provider.mmio->address)[kRegCtx0Cntl + kFirstUserVmid] ^= 1;
+        return PhxBringup::proveIsolation(provider, pages);
+    };
+    assert(!verify(&reservation) && !reservation.held() && !device.dcnManagedWrites.active());
+    registers[kRegCtx0Cntl + kFirstUserVmid] ^= 1;
+    device.dcnProveGpuVmOwnership = PhxBringup::proveIsolation;
+    assert(verify(&reservation) && reservation.held() && device.dcnManagedWrites.active());
+    registers[kRegCtx0Cntl + kFirstUserVmid] ^= 1;
+    assert(!verify() && device.dcnManagedWrites.active());
+    registers[kRegCtx0Cntl + kFirstUserVmid] ^= 1;
+    device.pci->command = 0;
+    assert(!verify());
+    device.pci->command = 2;
+    assert(device.gpuVmWrites == writes);
+    IOLockLock(device.gpuLock);
+    device.dcnManagedWrites.release(pin->dma.physicalPages());
+    IOLockUnlock(device.gpuLock);
+}
+
+static void exerciseDcnGcvmReadback(bool direct) {
+    CommitFixture fixture(direct);
+    auto &device = fixture.scanout.device;
+    Bar5Resource resource;
+    uint32_t registers[dcnPeers::kMmioBytes / sizeof(uint32_t)]{};
+    IOMemoryMap mapping{&resource, reinterpret_cast<uintptr_t>(registers), sizeof(registers), resource.physical};
+    device.mmio = &mapping;
+    device.pci->bar5 = &resource;
+    device.provider = device.pci;
+    checkDcnGcvmReadback(fixture, registers);
+    assert(fixture.scanout.cancelPin(fixture.pin) == kIOReturnSuccess);
+}
+
 static void exerciseDcnBar5() {
     PhxBringup device;
     Bar5Resource resource;
@@ -3487,6 +3603,8 @@ int main() {
     exerciseDcnFramebufferRoute();
 #elif defined(TEST_SCANOUT_BAR5)
     exerciseDcnBar5();
+    exerciseDcnGcvmReadback(false);
+    exerciseDcnGcvmReadback(true);
 #endif
 #ifdef TEST_SCANOUT_TRANSACTION
     transactionSleeping = true;

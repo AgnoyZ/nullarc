@@ -8,11 +8,16 @@ from test_build34_exact_ownership import method
 BIND = 'bool PhxBringup::bindDcnBar5('
 LIVE = 'bool PhxBringup::dcnBar5Live('
 CURRENT = 'bool PhxBringup::dcnBar5Current('
+GCVM_CURRENT = 'bool PhxBringup::dcnGcvmCurrent('
 READ = 'bool PhxBringup::readDcnBar5('
 WRITE = 'bool PhxBringup::writeDcnBar5('
 CLOCK = 'bool PhxBringup::clockDcnBar5('
 DELAY = 'void PhxBringup::delayDcnBar5('
-SIGNATURES = (BIND, LIVE, CURRENT, READ, WRITE, CLOCK, DELAY)
+SIGNATURES = (BIND, LIVE, CURRENT, GCVM_CURRENT, READ, WRITE, CLOCK, DELAY)
+
+GCVM_FIELDS = '''    struct DcnGcvmBinding { uint64_t root, generation; uint32_t context; };
+    DcnGcvmBinding dcnGcvm[sizeof(hwv) / sizeof(hwv[0])]{};
+'''
 
 FIELDS = '''    build34::dcn::DcnBar5Window dcnBar5Window;
     struct {
@@ -26,6 +31,7 @@ FIELDS = '''    build34::dcn::DcnBar5Window dcnBar5Window;
     bool bindDcnBar5(const build34::dcn::ScanoutFlipIntent &, build34::dcn::HubpFlipRoute &);
     bool dcnBar5Live() const;
     bool dcnBar5Current() const;
+    bool dcnGcvmCurrent() const;
     static bool readDcnBar5(void *, uint32_t, uint32_t &);
     static bool writeDcnBar5(void *, uint32_t, uint32_t);
     static bool clockDcnBar5(void *, uint64_t &);
@@ -47,6 +53,44 @@ bool PhxBringup::dcnBar5Current() const {
         resource->getPhysicalAddress() == dcnBar5.physical && resource->getLength() == dcnBar5.bytes &&
         mmio->getPhysicalAddress() == dcnBar5.physical && mmio->getLength() == dcnBar5.bytes &&
         reinterpret_cast<volatile uint32_t *>(mmio->getVirtualAddress()) == dcnBar5.registers && dcnBar5Live();
+}
+
+bool PhxBringup::dcnGcvmCurrent() const {
+    static_assert(sizeof(dcnGcvm) / sizeof(dcnGcvm[0]) == kNumUserVmids);
+    if (exactVMFault || exactStopped || isSleeping || !dcnBar5Current()) return false;
+    for (uint32_t index = 0; index < kMaxCtx; ++index) {
+        const auto &context = vm[index];
+        if (!context.hw) continue;
+        if (!context.busy || context.hw < kFirstUserVmid || context.hw >= kFirstUserVmid + kNumUserVmids ||
+            hwv[context.hw - kFirstUserVmid].ctx != index + 1) return false;
+    }
+    const auto matches = [&](uint32_t reg, uint32_t word, uint32_t mask = UINT32_MAX) {
+        return (uint64_t(reg) + 1) * sizeof(uint32_t) <= dcnBar5.bytes && dcnBar5Live() &&
+            (dcnBar5.registers[reg] & mask) == word;
+    };
+    for (uint32_t slot = 0; slot < kNumUserVmids; ++slot) {
+        const auto &bound = dcnGcvm[slot];
+        const auto &live = hwv[slot];
+        const uint32_t vmid = kFirstUserVmid + slot;
+        const uint32_t base = kRegCtx0BaseLo + 2 * vmid, control = kRegCtx0Cntl + vmid;
+        if (!live.ctx && (live.generation || live.lastSeq)) return false;
+        if (!bound.context) {
+            if (bound.root || bound.generation || live.ctx || !matches(control, 0, 1) ||
+                !matches(base, 0) || !matches(base + 1, 0)) return false;
+            continue;
+        }
+        if (bound.context > kMaxCtx || !bound.root || (bound.root & ~kPtAddrMask) || !bound.generation) return false;
+        const auto &context = vm[bound.context - 1];
+        if (!context.chunk[0] || context.chunkPhys[0] != bound.root || context.phys != bound.root ||
+            context.generation < bound.generation || (live.ctx && (live.ctx != bound.context || !context.client ||
+                context.hw != vmid || context.generation != bound.generation || live.generation != bound.generation)))
+            return false;
+        const uint32_t start = kRegCtx0StartLo + 2 * vmid, end = kRegCtx0EndLo + 2 * vmid;
+        if (!matches(control, 0x01fffe07) || !matches(base, static_cast<uint32_t>(bound.root | 3)) ||
+            !matches(base + 1, static_cast<uint32_t>(bound.root >> 32)) || !matches(start, 0) ||
+            !matches(start + 1, 0) || !matches(end, UINT32_MAX) || !matches(end + 1, 0xf)) return false;
+    }
+    return dcnBar5Current();
 }
 
 bool PhxBringup::bindDcnBar5(const build34::dcn::ScanoutFlipIntent &intent, build34::dcn::HubpFlipRoute &route) {
@@ -118,12 +162,21 @@ def stage_native(driver, abi):
     source = once(source, include, include + '#include "build34_dcn_bar5.h"\n')
     source = once(source, flip.FIELDS, flip.FIELDS + FIELDS)
     source = once(source, flip.METHODS, METHODS + flip.METHODS)
+    slots = '    HwVmid hwv[8]{};\n'
+    source = once(source, slots, slots + GCVM_FIELDS)
 
     def replace(signature, old, new):
         nonlocal source
         before = method(source, signature)
         source = once(source, before, once(before, old, new))
 
+    replace(flip.VM_BIND, '    c.hw = vmid;\n',
+            '    c.hw = vmid;\n    dcnGcvm[pick] = {c.phys, generation, handle};\n')
+    writer = flip.dma.pin.handoff.writer.CURRENT
+    replace(writer, 'current = drain && drain->matches(*expected);',
+            'current = drain && drain->matches(*expected) && context->hw && dcnProveGpuVmOwnership && dcnGcvmCurrent();')
+    replace(writer, 'dcnProveGpuVmOwnership(*this, pages) && !exactCallbacks.closed()',
+            'dcnProveGpuVmOwnership(*this, pages) && dcnGcvmCurrent() && !exactCallbacks.closed()')
     replace(flip.BEGIN, '    const auto result = dcnFlip.begin(intent, token, *route,',
             '    auto boundRoute = *route;\n'
             '    if (!bindDcnBar5(intent, boundRoute)) return kIOReturnNotReady;\n'

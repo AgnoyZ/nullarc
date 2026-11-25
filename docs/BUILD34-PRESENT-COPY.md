@@ -1169,6 +1169,33 @@ failure, history exhaustion and retirement. Revert this isolated overlay
 change to roll back. Production source, exact-open admission and the R2a
 copy remain unchanged.
 
+The BAR5 overlay now cross-checks the eight managed GCVM slots under
+`gpuLock` before accepting a pinned writer. It records the last successful
+managed bind's root, handle and allocation generation, separately from the
+live software owner. Freeing a context clears its software reservation, not
+the register image; the audit still requires its expected root and retained
+root backing. A never-managed slot must be disabled and have a zero root.
+Every managed image must match the programmed control, root and window, and
+live software bindings must agree in both directions.
+
+Each sample reads at most 56 GCVM dwords from the already bound BAR5, with
+the resource checked before and after. The sample is repeated around the
+separate ownership callback before taking the submission barrier or page
+hold, and at subsequent writer checks during issue. A mismatch before issue
+refuses; a mismatch after a write may have posted keeps the flip uncertain
+and its backing held. The check makes no GCVM writes, does not expose the
+registers through the display route, and does not change the present readiness
+query or the return-to-firmware path.
+
+CPU fixtures exercise the native checks with mapper and direct pins, all
+seven programmed words, never-managed foreign roots, reused allocations,
+software-free residual roots, and drift during and after ownership evidence.
+Matching GCVM registers do not establish pre-handoff queue drain, absence of
+cached translations from replaced roots, MMHUB/other engine ownership, or
+exclusion of CPU or external writers. The ownership callback remains null;
+no native deployment or physical scanout is inferred. Revert this BAR5
+overlay delta to remove the audit without changing the R2a path.
+
 An optional staged permission path now lets the original writer submit
 against a different buffer in the same GPUVM. With the global writer
 prefix drained, it validates that writer's four-level owned tables before
