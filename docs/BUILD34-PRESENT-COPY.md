@@ -938,8 +938,8 @@ stays busy, polling times out without clearing or unwiring the old mapping.
 CPU tests cover torn and stale idle samples, wait/resume and timeout with the
 old mapping and write hold retained. Revert this overlay change to roll it back.
 
-The old root remains bound to its
-pin and a replacement root refuses. For an old pinned surface only, the
+The old root remains bound to its pin and a replacement root refuses. For
+an old pinned surface only, the
 provider clears its nonzero VMID through the normal checked MMIO writer. It
 compares all seven words before each write, checks the exact new front and
 idle peers, and requires the route to authorize clearing that VMID. It clears
@@ -952,8 +952,18 @@ example does not document a zero-root invalidate operation. The route must
 separately qualify the empty-image operation for this display engine and
 confirm that the exact old pin/VMID/root can no longer be reached by a
 translation or outstanding walk. An empty register image alone cannot
-confirm this. A pending translation proof leaves both mappings pinned and
-polls again without clearing the context twice. The provider rechecks the
+confirm this. In the paired PhxFB stage, the exact lease serial is stamped
+when BAR5 is bound and must not change while a pinned front is live. Clear
+authorization and the post-clear callback receive the full flip identity,
+old context image and lease identity. A retirement acknowledgement for a
+different transaction, pin, VMID, root, range or lease leaves the flip
+uncertain, with DMA and the write hold retained. These identity checks do
+not supply a native DCN invalidation mechanism.
+
+A pending translation proof leaves both mappings pinned and polls again
+without clearing the context twice. A matching complete acknowledgement is
+consumed once; waiting for GPU write restoration does not re-initiate DCN
+retirement. The provider rechecks the
 exact new front, peer state, firmware backing and empty old context after
 that confirmation and again after withdrawing the table before completing
 pixel DMA. The table and pixel commands each must complete, independently
@@ -962,6 +972,7 @@ Withdrawal is also required before unused cancellation. The client lock is
 try-only, no GPU lock is held, and callbacks must be bounded and must not
 reenter the provider or acquire its client or GPU locks. The staged kernel
 selectors are flip begin V3 and poll V2.
+Reverting this acknowledgement change rolls back the source-only protocol.
 The new front stays pinned. On timeout, observed close,
 an ambiguous write, or cleanup failure, the provider retains the reachable
 backing and route and admits no replacement commit. On success, a return to

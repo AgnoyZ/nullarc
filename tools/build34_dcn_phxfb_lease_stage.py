@@ -137,7 +137,8 @@ def stage_native(driver, abi):
             '    if (!releaseDcnFbRoute()) return kIOReturnNotReady;\n    request.result = DcnPresentResult::Copy;\n')
     replace(bar5.BIND, '    dcnBar5Window = window;\n', '''    const DcnFramebufferRouteClaim claim{this, route.owner, route.generation, route.presentWindows, nullptr, 0};
     if (dcnFbRouteService != route.framebuffer || !dcnFbRoute.sameOwner(claim) || !dcnFbRoute.gate ||
-        !dcnFbRoute.gate->access(dcnFbRoute, [] { return true; })) return false;
+        !dcnFbRoute.serial || !dcnFbRoute.gate->access(dcnFbRoute, [] { return true; })) return false;
+    route.framebufferLeaseSerial = dcnFbRoute.serial;
     dcnBar5Window = window;
 ''')
     replace(bar5.READ, '''    const auto sampled = self->dcnBar5.registers[reg];

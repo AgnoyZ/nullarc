@@ -1202,7 +1202,8 @@ enum class FlipFault { None, Decline, ForeignLock, HeldLock, Dcc, LockTimeout, H
                        PeerActive, PeerShortWindow, PeerDuringInstall, PeerAfterHigh, PeerDuringRetire, PeerAfterWithdraw,
                        NoRetirementProof, ClearDenied, ClearWriteUncertain, ReplacedDuringFetchDrain,
                        TranslationPending, TranslationLost, FrontRevertedDuringTranslations, PhysicalAlias,
-                       FetchBusy, FetchNeverDrained };
+                       FetchBusy, FetchNeverDrained, WrongRetirementLease, WrongRetirementOperation, WrongRetirementRoute,
+                       WrongRetirementPin, WrongRetirementVmid, WrongRetirementRoot, WrongRetirementRange };
 
 struct CommitFixture {
     struct Table : IOBufferMemoryDescriptor {
@@ -1650,9 +1651,13 @@ struct CommitFixture {
         return self.retire;
     }
 
-    static bool canClearFlatVm(void *context, const HubpFlipRequest &request, const DcnFlatContext &old) {
+    static bool canClearFlatVm(void *context, const DcnTranslationRetirementUse &use) {
         auto &self = *static_cast<CommitFixture *>(context);
+        const auto &request = use.flip;
+        const auto &old = use.oldContext;
         assert(self.scanout.client.guard.held && !self.scanout.device.guard.held && self.retire &&
+               use.operation.provider == &self.scanout.device && use.operation.serial == request.flipSerial &&
+               use.framebuffer == &self.framebuffer && use.framebufferLeaseSerial == self.route.framebufferLeaseSerial &&
                request.previous == self.mapped && request.previousPin == self.pin && request.next == self.active &&
                old.vmid == self.mapped.vmid && old.rootEntry == self.ownedRoot && old.firstPage == self.mapped.address / kPage &&
                old.lastPage == old.firstPage + 1 && !self.translationChecks);
@@ -1660,18 +1665,32 @@ struct CommitFixture {
         return self.translationFault != FlipFault::ClearDenied;
     }
 
-    static DcnRetirement translationsRetired(void *context, const HubpFlipRequest &request, const DcnFlatContext &old) {
+    static DcnTranslationRetirementAck translationsRetired(void *context, const DcnTranslationRetirementUse &use) {
         auto &self = *static_cast<CommitFixture *>(context);
+        const auto &request = use.flip;
+        const auto &old = use.oldContext;
         assert(self.scanout.client.guard.held && !self.scanout.device.guard.held && self.retire &&
                request.previousPin == self.pin && request.next == self.active && old.vmid == self.mapped.vmid &&
                old.rootEntry == self.ownedRoot && self.clearWrites == 7 && !self.contextRoot && !self.firstPage &&
                !self.lastPage && !self.contextControl && self.homeTable.dma.prepared == !self.directMode &&
                self.command.prepared == !self.directMode);
         ++self.translationChecks;
-        if (self.translationFault == FlipFault::TranslationLost) return DcnRetirement::Lost;
-        if (self.translationFault == FlipFault::TranslationPending && self.translationChecks == 1) return DcnRetirement::Pending;
+        if (self.translationFault == FlipFault::TranslationLost) return {use, DcnRetirement::Lost};
+        if (self.translationFault == FlipFault::TranslationPending && self.translationChecks == 1)
+            return {use, DcnRetirement::Pending};
         if (self.translationFault == FlipFault::FrontRevertedDuringTranslations) self.earliest = request.previous;
-        return DcnRetirement::Complete;
+        auto observed = use;
+        switch (self.translationFault) {
+        case FlipFault::WrongRetirementLease: --observed.framebufferLeaseSerial; break;
+        case FlipFault::WrongRetirementOperation: --observed.operation.serial; break;
+        case FlipFault::WrongRetirementRoute: --observed.flip.routeGeneration; break;
+        case FlipFault::WrongRetirementPin: --observed.flip.previousPin.serial; break;
+        case FlipFault::WrongRetirementVmid: ++observed.oldContext.vmid; break;
+        case FlipFault::WrongRetirementRoot: observed.oldContext.rootEntry ^= kPage; break;
+        case FlipFault::WrongRetirementRange: ++observed.oldContext.lastPage; break;
+        default: break;
+        }
+        return {observed, DcnRetirement::Complete};
     }
 
     static bool read(void *context, uint32_t address, uint32_t &value) {
@@ -2121,13 +2140,14 @@ static void scanoutReadOnlyDoubleBuffer(bool loseRestore) {
     fixture.active = fixture.earliest = fixture.alternate;
     fixture.step(poll, ScanoutFlipResult::Waiting);
     fixture.step(poll, ScanoutFlipResult::Waiting);
-    assert(!fixture.writable(kVa) && !fixture.command.completes);
+    assert(!fixture.writable(kVa) && !fixture.command.completes && fixture.translationChecks == 1);
     fixture.submit(true, kIOReturnBusy);
     device.done[0] = compute;
     device.permission = [&](const DcnGpuPermissionUse &use, DcnGpuPermissionPhase phase) {
         return DcnGpuPermissionAck{use.serial - (loseRestore && phase == DcnGpuPermissionPhase::Restored), use.owner, phase};
     };
     fixture.step(poll, loseRestore ? ScanoutFlipResult::Uncertain : ScanoutFlipResult::Presented);
+    assert(fixture.translationChecks == 1 && fixture.clearWrites == 7);
     assert(fixture.writable(kVa) && fixture.writable(3 * kVa) && !fixture.writable(2 * kVa));
     assert(device.dcnManagedWrites.excludes(frame.host.base + 2 * kPage) == loseRestore);
     assert(device.dcnManagedWrites.excludes(fixture.nextHost.base + 2 * kPage) && device.exactVMFault == loseRestore);
@@ -2310,6 +2330,7 @@ static void presentWindowRetirement(bool conflict) {
     auto &device = fixture.scanout.device;
     device.dcnQualifiedFlipRoute = [](IOPCIDevice *device) -> const HubpFlipRoute * { return device->route; };
     fixture.route.presentWindows = {{fixture.mapped, 2 * kPage}, {fixture.alternate, 2 * kPage}, DcnPresentDomain::Mapped};
+    fixture.route.framebufferLeaseSerial = 11;
     const auto planned = fixture.route;
     ScanoutFlipIntent incoming{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused, &fixture.framebuffer, &planned};
     assert(fixture.begin(incoming) == kIOReturnSuccess && incoming.result == ScanoutFlipResult::Issued);
@@ -2328,6 +2349,9 @@ static void presentWindowRetirement(bool conflict) {
     fixture.route.presentWindows.second.bytes -= kPage;
     assert(fixture.begin(home) == kIOReturnNotReady && fixture.issues == 1 && !fixture.clearWrites);
     fixture.route.presentWindows = planned.presentWindows;
+    ++fixture.route.framebufferLeaseSerial;
+    assert(fixture.begin(home) == kIOReturnNotReady && fixture.issues == 1 && !fixture.clearWrites);
+    fixture.route.framebufferLeaseSerial = planned.framebufferLeaseSerial;
     assert(fixture.begin(home) == kIOReturnSuccess && home.result == ScanoutFlipResult::Issued);
     poll.operation = home.operation;
     fixture.target = fixture.active = fixture.earliest = fixture.home;
@@ -2342,6 +2366,7 @@ static void presentWindowRetirement(bool conflict) {
 
 static void scanoutFlip(FlipFault fault) {
     CommitFixture fixture;
+    fixture.route.framebufferLeaseSerial = 11;
     auto &scanout = fixture.scanout;
     ScanoutFlipIntent request{fixture.home, fixture.mapped, fixture.pin, {}, ScanoutFlipResult::Refused};
     assert(fixture.begin(request) == kIOReturnNotReady && !fixture.reads && !fixture.issues);
@@ -2694,6 +2719,14 @@ static void scanoutFlip(FlipFault fault) {
         assert(fixture.homeTable.withdrawals == withdrew && !fixture.command.completes);
         return;
     }
+    if (fault >= FlipFault::WrongRetirementLease && fault <= FlipFault::WrongRetirementRange) {
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        fixture.step(poll, ScanoutFlipResult::Uncertain);
+        assert(fixture.clearWrites == 7 && fixture.translationChecks == 1 && !fixture.homeTable.withdrawals &&
+               fixture.homeTable.dma.prepared && fixture.command.prepared && !fixture.command.completes &&
+               scanout.device.dcnManagedWrites.excludes(scanout.frame.host.base + 2 * kPage));
+        return;
+    }
     if (fault == FlipFault::ClearDenied || fault == FlipFault::ClearWriteUncertain || fault == FlipFault::ReplacedDuringFetchDrain ||
         fault == FlipFault::TranslationLost || fault == FlipFault::FrontRevertedDuringTranslations) {
         const bool afterClear = fault == FlipFault::TranslationLost || fault == FlipFault::FrontRevertedDuringTranslations;
@@ -2903,6 +2936,7 @@ static void exerciseDcnFramebufferRoute() {
     CallbackGate<>::Lease life(device.exactCallbacks);
     CallbackGate<1>::Lease operation(device.dcnPinOperation);
     assert(life && operation && device.bindDcnBar5(intent, route));
+    assert(route.framebufferLeaseSerial == device.dcnFbRoute.serial && route.framebufferLeaseSerial > old.serial);
     const auto read = [&](uint32_t &value) { return route.reader.readDword(route.reader.ioContext, hubp0::kProgrammedHigh, value); };
     const auto write = [&](uint32_t value) { return route.writer.writeDword(route.reader.ioContext, hubp0::kProgrammedHigh, value); };
     uint32_t value = 0;
@@ -3310,6 +3344,10 @@ int main() {
     scanoutFlip(FlipFault::FetchNeverDrained);
     scanoutFlip(FlipFault::TranslationLost);
     scanoutFlip(FlipFault::FrontRevertedDuringTranslations);
+    for (const auto fault : {FlipFault::WrongRetirementLease, FlipFault::WrongRetirementOperation, FlipFault::WrongRetirementRoute,
+                            FlipFault::WrongRetirementPin, FlipFault::WrongRetirementVmid, FlipFault::WrongRetirementRoot,
+                            FlipFault::WrongRetirementRange})
+        scanoutFlip(fault);
 #endif
 #if defined(TEST_SCANOUT_FB_LEASE)
     exerciseDcnFramebufferRoute();

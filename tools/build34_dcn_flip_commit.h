@@ -61,6 +61,27 @@ struct ScanoutFlipBinding {
     ScanoutSurface surface;
 };
 
+struct DcnTranslationRetirementUse {
+    HubpFlipRequest flip;
+    ScanoutPinToken operation;
+    DcnFlatContext oldContext;
+    IOService *framebuffer;
+    uint64_t framebufferLeaseSerial;
+
+    bool operator==(const DcnTranslationRetirementUse &other) const {
+        return operation == other.operation && framebuffer == other.framebuffer &&
+            framebufferLeaseSerial == other.framebufferLeaseSerial && oldContext == other.oldContext &&
+            flip.routeOwner == other.flip.routeOwner && flip.routeGeneration == other.flip.routeGeneration &&
+            flip.flipSerial == other.flip.flipSerial && flip.previous == other.flip.previous && flip.next == other.flip.next &&
+            flip.previousPin == other.flip.previousPin && flip.nextPin == other.flip.nextPin;
+    }
+};
+
+struct DcnTranslationRetirementAck {
+    DcnTranslationRetirementUse use{};
+    DcnRetirement state{DcnRetirement::Lost};
+};
+
 struct HubpFlipRoute {
     const void *owner;
     uint64_t generation;
@@ -71,10 +92,11 @@ struct HubpFlipRoute {
     DcnFlatFormat flatFormat;
     bool (*fetchesRetired)(void *, const HubpFlipRequest &);
     bool (*canInstallFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
-    bool (*canClearFlatVm)(void *, const HubpFlipRequest &, const DcnFlatContext &);
-    DcnRetirement (*translationsRetired)(void *, const HubpFlipRequest &, const DcnFlatContext &);
+    bool (*canClearFlatVm)(void *, const DcnTranslationRetirementUse &);
+    DcnTranslationRetirementAck (*translationsRetired)(void *, const DcnTranslationRetirementUse &);
     IOService *framebuffer;
     DcnPresentWindowPair presentWindows{};
+    uint64_t framebufferLeaseSerial{0};
 };
 
 inline bool sameDcnPresentRoute(const HubpFlipRoute &first, const HubpFlipRoute &second) {
@@ -116,7 +138,8 @@ public:
                                             old.window - next.window < next.surface.mappedBytes))) ||
             (old.token.serial && (!(frontAddress_ == intent.previous) || route.owner != routeOwner_ ||
                                   route.generation != routeGeneration_ || route.lifetime != routeLifetime_ ||
-                                  route.framebuffer != framebuffer_ || pci != pci_ || !matchesPresentWindows(route.presentWindows))) ||
+                                  route.framebuffer != framebuffer_ || route.framebufferLeaseSerial != frontLeaseSerial_ ||
+                                  pci != pci_ || !matchesPresentWindows(route.presentWindows))) ||
             (next.pin && !writerCurrent(false)))
             return ScanoutFlipResult::Refused;
 
@@ -210,7 +233,7 @@ public:
         const auto detached = [&] { return DcnFlatProgram::empty(frontVm_.vmid, route_.reader, translationCurrent); };
         const auto oldCurrent = [&] {
             return tableCurrent(old_.dma, frontVm_, translationCurrent) &&
-                (contextCleared_ ? detached() : contextCurrent(frontVm_, route_.reader, translationCurrent));
+                (retirement_ == VmRetirement::Installed ? contextCurrent(frontVm_, route_.reader, translationCurrent) : detached());
         };
         const auto peersIdle = [&] { return HubpFlipProgram::peersIdle(request_, route_.reader, withinBudget); };
         if (!peersIdle() || !nextCurrent() || !oldCurrent()) return fail();
@@ -223,26 +246,30 @@ public:
                 HubpFlipProgram::frontCurrent(request_, route_.reader, surface_, withinBudget);
         };
         if (!displayCurrent() || !oldCurrent()) return fail();
-        if (!contextCleared_) {
+        const DcnTranslationRetirementUse retirementUse{request_, operation_, frontVm_, framebuffer_, route_.framebufferLeaseSerial};
+        if (retirement_ == VmRetirement::Installed) {
             if (old_.pin && !noOutstanding) return ScanoutFlipResult::Waiting;
             const bool retired = route_.fetchesRetired(route_.reader.context, request_);
             if (!displayCurrent() || !oldCurrent()) return fail();
             if (!retired) return ScanoutFlipResult::Waiting;
             if (old_.pin) {
                 const auto writeAllowed = [&] {
-                    return translationCurrent() && route_.canClearFlatVm(route_.reader.context, request_, frontVm_) &&
+                    return translationCurrent() && route_.canClearFlatVm(route_.reader.context, retirementUse) &&
                         HubpFlipProgram::frontCurrent(request_, route_.reader, surface_, withinBudget);
                 };
                 if (!DcnFlatProgram::clear(frontVm_, route_.reader, route_.writer, translationCurrent, writeAllowed)) return fail();
-                contextCleared_ = true;
+                retirement_ = VmRetirement::Cleared;
             }
         }
         if (old_.pin) {
             if (!displayCurrent() || !oldCurrent()) return fail();
-            const auto translations = route_.translationsRetired(route_.reader.context, request_, frontVm_);
-            if (!displayCurrent() || !oldCurrent()) return fail();
-            if (translations == DcnRetirement::Pending) return ScanoutFlipResult::Waiting;
-            if (translations != DcnRetirement::Complete) return fail();
+            if (retirement_ == VmRetirement::Cleared) {
+                const auto ack = route_.translationsRetired(route_.reader.context, retirementUse);
+                if (!(ack.use == retirementUse) || !displayCurrent() || !oldCurrent()) return fail();
+                if (ack.state == DcnRetirement::Pending) return ScanoutFlipResult::Waiting;
+                if (ack.state != DcnRetirement::Complete) return fail();
+                retirement_ = VmRetirement::Confirmed;
+            }
             const auto writes = restoreWrites(old_.dma->physicalPages());
             if (writes == DcnRetirement::Pending) return ScanoutFlipResult::Waiting;
             if (writes != DcnRetirement::Complete || !displayCurrent() || !oldCurrent() ||
@@ -255,6 +282,7 @@ public:
         frontAddress_ = request_.next;
         frontVm_ = nextVm_;
         frontWindows_ = front_.serial ? route_.presentWindows : DcnPresentWindowPair{};
+        frontLeaseSerial_ = front_.serial ? route_.framebufferLeaseSerial : 0;
         routeOwner_ = request_.routeOwner;
         routeGeneration_ = request_.routeGeneration;
         operation_ = {};
@@ -265,7 +293,7 @@ public:
         nextVm_ = {};
         surface_ = {};
         windows_ = {};
-        contextCleared_ = false;
+        retirement_ = VmRetirement::Installed;
         readback_.recycle();
         if (!front_.serial) {
             releaseRoute = routeLifetime_;
@@ -281,6 +309,8 @@ public:
     }
 
 private:
+    enum class VmRetirement { Installed, Cleared, Confirmed };
+
     template<typename Current>
     static bool checkFirmware(IOService &framebuffer, void *pci, const FirmwareScanoutSample &home,
                               FirmwareFlatWindows windows, const Current &current) {
@@ -346,13 +376,13 @@ private:
     FirmwareScanoutSample firmwareHome_{};
     FirmwareFlatWindows windows_{};
     DcnPresentWindowPair frontWindows_{};
-    uint64_t routeGeneration_{0};
+    uint64_t routeGeneration_{0}, frontLeaseSerial_{0};
     HubpFlipRequest request_{};
     HubpFlipRoute route_{};
     ScanoutFlipBinding old_{};
     ScanoutDmaLease *nextDma_{nullptr};
     ScanoutSurface surface_{};
-    bool contextCleared_{false};
+    VmRetirement retirement_{VmRetirement::Installed};
     bool uncertain_{false};
 };
 
