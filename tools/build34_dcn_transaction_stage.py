@@ -8,6 +8,7 @@ from test_build34_exact_ownership import method
 
 STUBS = 'src/phxaccel/accel/nvaccel_stubs.h'
 NATIVE = 'IOReturn PhxBringup::submitDcnPresent('
+READY = 'bool PhxBringup::dcnPresentReady('
 PERFORM = 'IOReturn NVDisplayPipe::performTransaction('
 COMPLETE = 'bool NVDisplayPipe::isTransactionComplete('
 FIELDS = '''    build34::dcn::DcnSubmitGate dcnPresentGate;
@@ -15,7 +16,23 @@ FIELDS = '''    build34::dcn::DcnSubmitGate dcnPresentGate;
     OSObject *dcnPresentPipe{nullptr};
     IOService *dcnPresentFramebuffer{nullptr};
     bool dcnPresentUncertain{false};
+    bool dcnPresentReady(IOService *);
     IOReturn submitDcnPresent(build34::dcn::DcnPresentTransaction &);
+'''
+READY_METHOD = '''bool PhxBringup::dcnPresentReady(IOService *framebuffer) {
+    using namespace build34::dcn;
+    DcnSubmitGate::Lease gate;
+    phx34_exact::CallbackGate<>::Lease callback(exactCallbacks);
+    if (!gate.reserve(dcnPresentGate) || !callback || !pci || !framebuffer || !dcnQualifiedFlipRoute ||
+        dcnPresentUncertain || dcnFlip.pending() || !exactRawWriters.drained() || !dcnProveGpuVmOwnership ||
+        framebuffer->isInactive() || framebuffer->getProvider() != pci || !framebuffer->metaCast("PhxAMDFB")) return false;
+    const auto *route = dcnQualifiedFlipRoute(pci);
+    return route && route->framebuffer == framebuffer && route->owner && route->generation && route->lifetime &&
+        route->reader.current && route->qualify && route->fetchesRetired && route->canInstallFlatVm &&
+        route->canClearFlatVm && route->translationsRetired && route->presentWindows.valid(kPageBytes) &&
+        (route->presentWindows.domain == DcnPresentDomain::Direct ? dcnQualifyDirect != nullptr : dcnQualifyMapper != nullptr);
+}
+
 '''
 METHOD = '''IOReturn PhxBringup::submitDcnPresent(build34::dcn::DcnPresentTransaction &request) {
     using namespace build34::dcn;
@@ -135,45 +152,61 @@ def stage_native(driver, abi):
     include = '#include "build34_dcn_bar5.h"\n'
     source = once(source, include, include + '#include "build34_dcn_transaction.h"\n')
     source = once(source, bar5.FIELDS, bar5.FIELDS + FIELDS)
-    source = once(source, bar5.METHODS, METHOD + bar5.METHODS)
+    source = once(source, bar5.METHODS, READY_METHOD + METHOD + bar5.METHODS)
     begin = method(source, bar5.flip.BEGIN)
     source = once(source, begin, once(begin, '    if (!route || !route->framebuffer ||',
         '    if (!route || !route->framebuffer || (intent.framebuffer && route->framebuffer != intent.framebuffer) ||'))
     dispatch = method(source, handoff.DISPATCH)
     start = dispatch.index('    if (name && name->isEqualTo(BUILD34_DCN_FLIP_BEGIN)) {\n')
     end = dispatch.index('    if (!name || !name->isEqualTo("phxBuild34CheckAccelClaimV1"))\n')
-    return once(source, dispatch, once(dispatch, dispatch[start:end], '''    if (name && name->isEqualTo(BUILD34_DCN_PRESENT_TRANSACTION)) {
+    return once(source, dispatch, once(dispatch, dispatch[start:end], '''    if (name && name->isEqualTo(build34::dcn::kDcnPresentReady)) {
+        if (wait || !device || p2 || p3 || p4) return kIOReturnBadArgument;
+        return dcnPresentReady(static_cast<IOService *>(device)) ? kIOReturnSuccess : kIOReturnNotReady;
+    }
+    if (name && name->isEqualTo(BUILD34_DCN_PRESENT_TRANSACTION)) {
         if (wait || !device || p2 || p3 || p4) return kIOReturnBadArgument;
         return submitDcnPresent(*static_cast<build34::dcn::DcnPresentTransaction *>(device));
     }
 '''))
 
 
+ACCEL_CONTEXT = 'static bool nvAccelDcnCallerCurrent('
 ACCEL_STATE = '''static bool nvAccelDcnLookupSeen{false};
-static bool (*nvAccelDcnSleepable)(NVDisplayPipe &, IOService &){nullptr};
 static build34::dcn::DcnSubmitGate nvAccelDcnPresentGate;
 static IOService *nvAccelDcnProvider;
 static SInt64 gCntIopDcnPresented;
+extern "C" boolean_t preemption_enabled(void);
+static IOLock *nvAccelFamilyMutex(NVAccel &);
 
-static build34::dcn::DcnPresentResult nvAccelSubmitDcnPresent(NVAccel &accel,
+static bool nvAccelDcnCallerCurrent(NVAccel &accel, IOService &framebuffer, IOService &provider) {
+    if (!preemption_enabled()) return false;
+    auto *platform = accel.getPlatform();
+    if (!platform || platform->atInterruptLevel() || !accel.fPCI || accel.isInactive() || framebuffer.isInactive() ||
+        provider.isInactive() || framebuffer.getProvider() != accel.fPCI || provider.getProvider() != accel.fPCI ||
+        !provider.metaCast("PhxBringup")) return false;
+    const auto outside = [](IOWorkLoop *loop) { return !loop || (!loop->onThread() && !loop->inGate()); };
+    auto *accelLoop = accel.getWorkLoop();
+    if (!accelLoop || !outside(accelLoop) || !outside(framebuffer.getWorkLoop()) || !outside(provider.getWorkLoop())) return false;
+    auto *mutex = nvAccelFamilyMutex(accel);
+    if (!mutex || !IOLockTryLock(mutex)) return false;
+    IOLockUnlock(mutex);
+    return preemption_enabled();
+}
+
+static build34::dcn::DcnPresentResult nvAccelSubmitDcnPresent(IOService &provider,
     build34::dcn::DcnPresentTransaction &request) {
     using namespace build34::dcn;
-    auto *provider = nvAccelDcnProvider ? nvAccelDcnProvider : accel.fNative;
-    if (!provider || !provider->metaCast("PhxBringup") || provider->getProvider() != request.framebuffer->getProvider() ||
-        provider->getProvider() != accel.fPCI || provider->isInactive())
-        return nvAccelDcnProvider ? DcnPresentResult::Blocked : DcnPresentResult::Copy;
-
-    provider->retain();
-    const auto status = provider->callPlatformFunction(BUILD34_DCN_PRESENT_TRANSACTION, false, &request, nullptr, nullptr, nullptr);
+    provider.retain();
+    const auto status = provider.callPlatformFunction(BUILD34_DCN_PRESENT_TRANSACTION, false, &request, nullptr, nullptr, nullptr);
     auto result = status == kIOReturnSuccess ? request.result : DcnPresentResult::Blocked;
     if (result == DcnPresentResult::Copy && nvAccelDcnProvider) {
         nvAccelDcnProvider->release();
         nvAccelDcnProvider = nullptr;
     } else if (result != DcnPresentResult::Copy && !nvAccelDcnProvider) {
-        provider->retain();
-        nvAccelDcnProvider = provider;
+        provider.retain();
+        nvAccelDcnProvider = &provider;
     }
-    provider->release();
+    provider.release();
     return result;
 }
 '''
@@ -194,6 +227,19 @@ def stage_stubs(stubs):
 
 def stage_accelerator(accelerator):
     source = handoff.stage_accelerator(accelerator)
+    anchor = '#include <IOKit/IOService.h>\n'
+    source = once(source, anchor, anchor + '''#if defined(NMX_ACCEL) && defined(PHX_FB)
+#include <IOKit/IOPlatformExpert.h>
+#include <IOKit/IOWorkLoop.h>
+#endif
+''')
+    anchor = 'static bool nvFamLock(NVAccel *a, bool tryOnly)\n{\n'
+    source = once(source, anchor + '    unsigned char *b = (unsigned char *)a;\n    IOLock *lk = *(IOLock *volatile *)(b + 0x88);\n',
+        '''static IOLock *nvAccelFamilyMutex(NVAccel &accel)
+{
+    return *(IOLock *volatile *)((unsigned char *)&accel + 0x88);
+}
+''' + anchor + '    unsigned char *b = (unsigned char *)a;\n    IOLock *lk = nvAccelFamilyMutex(*a);\n')
     observer = 'static void (*nvAccelObserveDcnCopyBacking)(const build34::dcn::PresentCopyBacking &){nullptr};\n'
     source = once(source, '#if defined(NMX_ACCEL) && defined(PHX_FB)\n' + handoff.ACCEL_CALL +
         observer.replace('{nullptr}', '{nvAccelCheckDcnCopyBacking}') + '#else\n' + observer + '#endif\n',
@@ -213,11 +259,12 @@ def stage_accelerator(accelerator):
     after = once(before, '    IOSurface *s  = txn->getPlaneIOSurface(0, 0);\n', '''#if defined(NMX_ACCEL) && defined(PHX_FB)
     using namespace build34::dcn;
     DcnSubmitGate::Lease dcnPresentGate;
-    if (nvAccelDcnSleepable && !dcnPresentGate.reserve(nvAccelDcnPresentGate)) return kIOReturnBusy;
-    const bool dcnRoute = nvAccelDcnSleepable && fb->metaCast("PhxAMDFB");
-    const bool dcnAttempt = dcnRoute && (nvAccelDcnProvider || __atomic_load_n(&nvAccelDcnLookupSeen, __ATOMIC_ACQUIRE)) &&
-        nvAccelDcnSleepable(*this, *fb);
-    if (nvAccelDcnSleepable && nvAccelDcnProvider && !dcnAttempt) {
+    const bool dcnRoute = __atomic_load_n(&nvAccelDcnLookupSeen, __ATOMIC_ACQUIRE) && fb->metaCast("PhxAMDFB");
+    if (dcnRoute && !dcnPresentGate.reserve(nvAccelDcnPresentGate)) return kIOReturnBusy;
+    auto *dcnProvider = dcnRoute ? (nvAccelDcnProvider ? nvAccelDcnProvider : a->fNative) : nullptr;
+    const bool dcnAttempt = dcnProvider && nvAccelDcnCallerCurrent(*a, *fb, *dcnProvider) &&
+        (nvAccelDcnProvider || dcnProvider->callPlatformFunction(kDcnPresentReady, false, fb, nullptr, nullptr, nullptr) == kIOReturnSuccess);
+    if (dcnRoute && nvAccelDcnProvider && !dcnAttempt) {
         fDcnPresent.block();
         return kIOReturnNotReady;
     }
@@ -258,7 +305,8 @@ def stage_accelerator(accelerator):
         const bool mayRehome = nvAccelDcnProvider != nullptr;
         DcnPresentTransaction request{this, fb, txn, observed.surface ? &observed : nullptr, DcnPresentResult::Blocked};
         fDcnPresent.block();
-        const auto result = nvAccelSubmitDcnPresent(*a, request);
+        const auto result = nvAccelDcnCallerCurrent(*a, *fb, *dcnProvider) ?
+            nvAccelSubmitDcnPresent(*dcnProvider, request) : (mayRehome ? DcnPresentResult::Blocked : DcnPresentResult::Copy);
         if (result == DcnPresentResult::Direct) {
             fIopVblSeq = 0;
             fDcnPresent.presented(txn);

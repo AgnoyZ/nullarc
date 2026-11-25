@@ -1275,14 +1275,33 @@ Resource-only and `l10r`
 frames still take R2a, including existing conversion, after that check. The
 separate NVIDIA VRAM path is unchanged.
 
-The native route provider and the accelerator's sleepable-context
-qualification are null, as are the earlier native evidence hooks. The private
-family callback's actual context and native route ownership still need qualification;
-no live use, loaded candidate or GPU result is implied. Rollback is to omit
-this paired overlay; it does not replace production inputs or alter existing
-exact-open admission. CPU doubles cover alternating windows, extent conflict
-before mapping, changed routes before any MMIO write, completion matching
-and retention, but not physical display of the GPU-rendered pages.
+The staged accelerator now checks the native caller context before asking
+PhxBringup for readiness, and again before submitting the transaction. It
+rejects disabled preemption, interrupt context, the thread or gate of any
+known participating workloop, and an unavailable accelerator family mutex.
+It uses the existing family mutex identity and immediately drops the probe
+lock. [XNU exports `preemption_enabled`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/config/Mach.exports);
+the target 25G332 x86_64 KDK checks both the preemption level and interrupt
+enable flag. The [workloop checks](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOWorkLoop.cpp)
+exclude the known loops, not a private gate elsewhere in the actual family
+call chain. This still needs verification on the deployed family's callback.
+
+The readiness request holds the provider's try-only transaction gate and
+requires the same framebuffer, drained raw writers and a qualified route
+with the required DMA and GPUVM evidence hooks. It does not consume an
+offer, prepare a descriptor, take a framebuffer route lease or touch MMIO.
+Without readiness the caller keeps the legacy path; a tracked direct front
+still requires an admitted return to firmware before copying. CPU doubles
+cover the context refusals and the readiness boundary. Revert this caller
+qualification change to restore the earlier staged null hook.
+
+The native route provider and the earlier hardware evidence hooks are still
+null; the staged check does not enable scanout on its own. No live use,
+loaded candidate or GPU result is implied. Omit this paired overlay to roll
+the experiment back; it does not replace production inputs or alter exact-open
+admission. CPU doubles cover alternating windows, extent conflict before
+mapping, changed routes before any MMIO write, completion matching and
+retention, but not physical display of the GPU-rendered pages.
 
 ### Paired PhxFB route lease
 

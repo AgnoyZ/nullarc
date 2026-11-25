@@ -6,6 +6,8 @@
 
 namespace build34::dcn {
 
+inline constexpr char kDcnPresentReady[] = "phx34DcnPresentReadyV1";
+
 enum class DcnPresentResult { Blocked, Copy, Direct };
 
 struct DcnPresentTransaction {

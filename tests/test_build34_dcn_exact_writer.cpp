@@ -43,6 +43,11 @@ static bool IOLockTryLock(IOLock *lock) {
 
 static bool vaCanonical(uint64_t va) { return va <= kVaMask || (va & ~kVaMask) == ~kVaMask; }
 #ifdef TEST_SCANOUT_TRANSACTION
+struct IOWorkLoop {
+    bool worker = false, gated = false;
+    bool onThread() const { return worker; }
+    bool inGate() const { return gated; }
+};
 static uint64_t transactionNow = 1;
 static bool transactionSleeping = false;
 static uint64_t mach_absolute_time() { return transactionNow; }
@@ -120,6 +125,10 @@ struct IOService : OSObject {
     std::function<IOReturn(task_t, uint32_t, OSObject **)> lookup;
     bool inactive = false;
     bool isInactive() const { return inactive; }
+#ifdef TEST_SCANOUT_TRANSACTION
+    IOWorkLoop *loop = nullptr;
+    IOWorkLoop *getWorkLoop() { return loop; }
+#endif
 #ifdef TEST_SCANOUT_FLIP
     const void *provider = nullptr;
     bool isPhxFramebuffer = false, isPhxBringup = false;
@@ -2983,6 +2992,7 @@ struct TransactionFixture {
     IOPCIDevice device;
     IOPCIDevice *pci = &device;
     CallbackGate<> exactCallbacks;
+    CallbackGate<1> exactRawWriters;
     // TRANSACTION_FIELDS
     struct {
         ScanoutPinToken token{};
@@ -3000,6 +3010,8 @@ struct TransactionFixture {
     const HubpFlipRoute *(*dcnQualifiedFlipRoute)(IOPCIDevice *) = [](IOPCIDevice *device) -> const HubpFlipRoute * { return device->route; };
     DcnDirectDomain (*dcnQualifyDirect)(IOPCIDevice &) = [](IOPCIDevice &) { return DcnDirectDomain{}; };
     ScanoutDmaMapper (*dcnQualifyMapper)(IOPCIDevice &, IOMapper &) = nullptr;
+    bool (*dcnProveGpuVmOwnership)(const TransactionFixture &, PhysicalPageSet) =
+        [](const TransactionFixture &, PhysicalPageSet) { assert(false); return false; };
     TransactionFramebuffer framebuffer;
     OSObject lifetime;
     HubpFlipRoute route{};
@@ -3086,6 +3098,85 @@ struct TransactionFixture {
 };
 
 // TRANSACTION_METHOD
+
+struct NVAccel : IOService {
+    struct Platform {
+        bool interrupt = false;
+        bool atInterruptLevel() const { return interrupt; }
+    } platform;
+    IOPCIDevice *fPCI = nullptr;
+    IOLock family{};
+    IOLock *mutex = &family;
+    Platform *getPlatform() { return &platform; }
+};
+
+static bool preemptionAllowed = true;
+static bool preemption_enabled() { return preemptionAllowed; }
+static IOLock *nvAccelFamilyMutex(NVAccel &accel) { return accel.mutex; }
+
+// ACCEL_CONTEXT
+
+static void exerciseDcnCallerContext() {
+    NVAccel accel;
+    IOPCIDevice pci, other;
+    IOService framebuffer, provider;
+    IOWorkLoop accelLoop, fbLoop, providerLoop;
+    accel.fPCI = &pci;
+    framebuffer.provider = provider.provider = &pci;
+    provider.isPhxBringup = true;
+    const auto current = [&] { return nvAccelDcnCallerCurrent(accel, framebuffer, provider); };
+    assert(!current());
+    accel.loop = &accelLoop;
+    framebuffer.loop = &fbLoop;
+    provider.loop = &providerLoop;
+    for (auto *loop : {&accelLoop, &fbLoop, &providerLoop}) {
+        loop->worker = true;
+        assert(!current());
+        loop->worker = false;
+        loop->gated = true;
+        assert(!current());
+        loop->gated = false;
+    }
+    preemptionAllowed = false;
+    assert(!current());
+    preemptionAllowed = true;
+    accel.platform.interrupt = true;
+    assert(!current());
+    accel.platform.interrupt = false;
+    accel.family.held = true;
+    assert(!current() && accel.family.held);
+    accel.family.held = false;
+    provider.provider = &other;
+    assert(!current());
+    provider.provider = &pci;
+    framebuffer.inactive = true;
+    assert(!current());
+    framebuffer.inactive = false;
+    assert(current() && !accel.family.held);
+}
+
+static void exerciseDcnReadiness() {
+    TransactionFixture fixture;
+    auto &route = fixture.route;
+    route.reader.current = [](void *, const HubpFlipRequest &) { assert(false); return false; };
+    route.qualify = [](void *, const HubpFlipRequest &, DcnPixelMapping, DcnPixelMapping) { assert(false); return false; };
+    route.fetchesRetired = [](void *, const HubpFlipRequest &) { assert(false); return false; };
+    route.canInstallFlatVm = [](void *, const HubpFlipRequest &, const DcnFlatContext &) { assert(false); return false; };
+    route.canClearFlatVm = [](void *, const DcnTranslationRetirementUse &) { assert(false); return false; };
+    const auto retired = [](void *, const DcnTranslationRetirementUse &) { assert(false); return DcnTranslationRetirementAck{}; };
+    route.translationsRetired = retired;
+    const auto ready = [&] { return fixture.dcnPresentReady(&fixture.framebuffer); };
+    assert(!ready() && fixture.exactRawWriters.close() && ready());
+    route.translationsRetired = nullptr;
+    assert(!ready());
+    route.translationsRetired = retired;
+    fixture.dcnFlip.waiting = true;
+    assert(!ready());
+    fixture.dcnFlip.waiting = false;
+    DcnSubmitGate::Lease busy;
+    assert(busy.reserve(fixture.dcnPresentGate) && !ready());
+    assert(!fixture.maps && !fixture.begins && !fixture.framebuffer.samples);
+}
 
 static void exerciseDcnTransaction() {
     TransactionFixture fixture;
@@ -3399,6 +3490,8 @@ int main() {
 #endif
 #ifdef TEST_SCANOUT_TRANSACTION
     transactionSleeping = true;
+    exerciseDcnCallerContext();
+    exerciseDcnReadiness();
     exerciseDcnTransaction();
     for (const auto scenario : {PresentPreparation::New, PresentPreparation::Failed, PresentPreparation::MissingId,
                                 PresentPreparation::StaleId, PresentPreparation::NotThreadSafe, PresentPreparation::CompleteFailed})

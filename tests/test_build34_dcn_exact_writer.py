@@ -109,14 +109,17 @@ class ExactWriterTests(unittest.TestCase):
         self.assertLess(perform.rindex('a->askFramebufferForScanout('), perform.rindex('iopMapSurface('))
         self.assertIn('observed = describePresentBacking(', perform)
         self.assertIn('fDcnPresent.check(txn, complete)', method(accelerator, transaction.COMPLETE))
-        self.assertIn('nvAccelDcnSleepable)(NVDisplayPipe &, IOService &){nullptr}', accelerator)
+        self.assertNotIn('nvAccelDcnSleepable', accelerator)
+        self.assertIn('kDcnPresentReady', dispatch)
+        self.assertLess(perform.index('nvAccelDcnCallerCurrent('), perform.index('callPlatformFunction(kDcnPresentReady,'))
+        self.assertLess(perform.rindex('nvAccelDcnCallerCurrent('), perform.index('nvAccelSubmitDcnPresent('))
         self.assertNotIn('dcnPlacePresent', source)
         submit = method(source, transaction.NATIVE)
         self.assertLess(submit.index('BUILD34_DCN_CHECK_FIRMWARE'), submit.index('mapDcnPin('))
         self.assertLess(submit.index('dcnPresentBacking.acquirePresent('), submit.index('mapDcnPin('))
         self.assertLess(submit.index('dcnPresentBacking.releaseUnused()'), submit.index('const auto result = submit(intent)'))
         self.assertIn('request.framebuffer, &route}', submit)
-        self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True, present=source)
+        self.check_native_methods(paired=True, pins=True, dma=True, flip=True, bar5_adapter=True, present=source, accel=accelerator)
 
     def test_paired_framebuffer_route(self):
         native = fb_lease.stage_native(DRIVER, ABI)
@@ -212,7 +215,7 @@ class ExactWriterTests(unittest.TestCase):
         power = method(bound, 'IOReturn PhxBringup::setPowerState(')
         self.assertLess(power.index('&dcnBar5Revoked'), power.index('invalidateExactQueues();'))
 
-    def check_native_methods(self, paired=False, pins=False, dma=False, flip=False, bar5_adapter=False, present=None, lease=None):
+    def check_native_methods(self, paired=False, pins=False, dma=False, flip=False, bar5_adapter=False, present=None, lease=None, accel=None):
         fixture = Path(__file__).with_suffix('.cpp').read_text()
         source = scanout_pin.stage_native(DRIVER, ABI) if pins else handoff.stage_native(DRIVER, ABI) if paired else self.source
         if dma:
@@ -267,8 +270,10 @@ class ExactWriterTests(unittest.TestCase):
             fixture = fixture.replace('// FRAMEBUFFER_ROUTE_QUERY', fb_lease.FB_QUERY)
         if present is not None:
             fixture = fixture.replace('// TRANSACTION_FIELDS', transaction.FIELDS)
-            fixture = fixture.replace('// TRANSACTION_METHOD', method(present, transaction.NATIVE).replace(
-                'PhxBringup::submitDcnPresent(', 'TransactionFixture::submitDcnPresent(', 1))
+            fixture = fixture.replace('// TRANSACTION_METHOD', '\n'.join(
+                method(present, signature).replace('PhxBringup::', 'TransactionFixture::', 1)
+                for signature in (transaction.READY, transaction.NATIVE)))
+            fixture = fixture.replace('// ACCEL_CONTEXT', method(accel, transaction.ACCEL_CONTEXT))
         for marker, replacement in {
             '// WRITER_METHODS': ('static OwnerEpochs gDcnPinSerials;\n' if pins else '') +
             extracted,
