@@ -415,3 +415,13 @@ framebuffer assertions and 25 cache metadata fixture tests. These checks do not
 link a new AuxKC or exercise the physical panel. The dedicated key was absent
 on readback; no NVRAM, EFI, installed driver or startup job change was made
 and no restart was requested for this candidate.
+
+Independent readback still accepts the running R1b/R2a baseline. The exact
+active OpenCore configuration does not list `phxfb-hidpi` in `Add`, `Delete`
+or `LegacySchema`, and does not enable `OpenVariableRuntimeDxe`. This static
+check does not prove that a newly written variable survives a boot.
+Two isolated-volume AuxKC attempts rejected the KDK even though the installed
+KDK reports build `25G332`; neither produced an admitted candidate cache.
+The standard-path input swap requires a fresh bounded guard and exact R2a
+restoration before the complete 416-record/29-codeless comparison. It has not
+been run for the dedicated-key candidate. No live inputs were changed.
