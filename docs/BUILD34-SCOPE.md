@@ -369,11 +369,31 @@ this is the firmware baseline, not a HiDPI candidate result. No candidate
 was installed or loaded, no boot argument was changed, and no restart was
 requested.
 
-Before using the HiDPI restart, restore and independently admit the unchanged
-R1b/R2a desktop under a fresh recovery scope. Do not clear or replay the old
-journals. Use the [approved-path offline cache recipe](BUILD34-PRESENT-COPY.md)
-only after its retained-runtime preflight passes. Check all 416 records and
-29 codeless entries, permitting only the PhxAccel image change. After the
-trial boot, verify the exact loaded candidate, the HiRes property, and the
-current 1280x800 logical / 2560x1600 backing mode with unchanged physical
-scan-out and timing. Enumeration or the registry property alone is not a pass.
+### Baseline restored; candidate boot remains blocked
+
+The separate, owner-authorized baseline recovery boot completed on November
+25, 2026 at 20:10:25 Asia/Shanghai. A fresh scope replaced only the two startup
+job definitions and added a finite startup watcher. It retained the existing
+45/150/300-second gates and permitted no automatic power recovery. The old
+journals remain intact. Independent readback passed the exact loaded R1b/R2a
+images, mapped WindowServer plugin, complete EFI and cache, loaded AML,
+same-WindowServer progress and all four zero error counters. The watcher
+retired. CoreGraphics reports the baseline's current 2560x1600 logical and
+backing dimensions at 120 Hz, with no native 2x mode exposed.
+
+After baseline admission, the [approved-path offline cache recipe](BUILD34-PRESENT-COPY.md)
+produced a private HiDPI AuxKC with all 416 records and 29 codeless entries.
+Only the PhxAccel image changed; the full metadata gate preserves bundle paths,
+matching policies, dependencies and boot/system links. The independent guard
+verified restoration of the signed R2a executable. The installed AuxKC and
+startup jobs are unchanged from the recovered baseline, which passed readback
+again. The HiDPI candidate remains uninstalled and unloaded.
+
+Read-only inspection of the active OpenCore configuration found `boot-args`
+in both NVRAM `Delete` and `Add`. A macOS-only write to `boot-args` would lose
+the HiDPI opt-in at the next OpenCore boot. No EFI or boot-argument change was
+made and the distinct HiDPI restart remains unused. Establish a separately
+approved boot-persistent opt-in before installing the candidate. Acceptance
+then requires the exact loaded image, the HiRes property, and the **current**
+1280x800 logical / 2560x1600 backing mode at the unchanged 120 Hz and physical
+timing. Enumeration or the registry property alone is not a pass.
