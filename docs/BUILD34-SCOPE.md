@@ -464,3 +464,27 @@ Failure recovery restores the R2a images and jobs and removes only the trial
 opt-in, with no automatic restart. Before the restart request, CoreGraphics
 still reported 2560x1600 logical and backing dimensions at 120 Hz. This is
 installation evidence only, not native 2x hardware acceptance.
+
+### Native 2x accepted on the local panel, November 25, 2026
+
+On the one authorized boot of macOS 26.7.2 (`25G332`), the exact HiDPI
+PhxAccel image from source commit `33ec7c6` passed bounded desktop admission.
+Independent readback verified the loaded driver, mapped WindowServer plugin,
+unchanged EFI and loaded AML, complete cache (416 records, 29 codeless entries),
+and same-WindowServer progress with all four checked error counters at zero.
+The finite startup watcher retired, with no recovery restart or resident
+monitoring. The single ordinary restart authorization is consumed.
+
+The dedicated NVRAM value survived as one ASCII `1` byte, and
+`PhxFBHiResModeFlag` was true. CoreGraphics exposed both 1x and 2x at 120 Hz,
+but initially kept 1x selected. After one session-only mode change, a separate
+CoreGraphics read confirmed the **current** mode was 1280x800 logical with
+2560x1600 backing pixels at 120 Hz. AppKit independently reported a backing
+scale factor of 2.0. Framebuffer geometry and timing metadata matched the
+sealed pre-restart baseline, and the independent desktop checks still passed.
+
+This validates native 2x on this panel, not automatic mode selection on future
+logins, other displays, performance, or long-term stability. The session
+can return to 1x by selecting 2560x1600 logical at 120 Hz; removing the opt-ins
+disables the hint at the next boot. No scaling mode was added to the driver,
+and the existing CPU present copy remains; direct scan-out is separate work.
