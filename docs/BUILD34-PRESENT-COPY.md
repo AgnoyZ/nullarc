@@ -17,6 +17,11 @@ or an enumerated mode alone does not qualify a comparison. Use the physical
 backing dimensions and the verified surface pitch for scanout, not the
 logical dimensions. The saved mode does not enable direct present.
 
+Run `make check-build34-scanout-mode` before and after each local comparison.
+This read-only gate requires one active, unmirrored built-in display, the
+current CoreGraphics mode and AppKit 2x backing scale; it does not change the
+display configuration or attest scanout correctness.
+
 The [DMA page layout](../tools/build34_dcn_page_layout.h) stages one step
 toward DCN scanout from the same pages that back a rendered IOSurface. The
 boundaries follow the reviewed Linux v6.12

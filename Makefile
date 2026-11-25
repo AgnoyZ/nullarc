@@ -344,6 +344,10 @@ test-upstream34-panel-timing: $(TEST_BIN_DIR)/test_upstream34_panel_timing
 	./$(TEST_BIN_DIR)/test_upstream34_panel_timing
 	python3 tests/test_upstream34_panel_callbacks.py
 
+.PHONY: check-build34-scanout-mode
+check-build34-scanout-mode:
+	xcrun swift tools/build34_scanout_mode_gate.swift
+
 # CPU clock/scheduler doubles only; never initializes or submits to a GPU.
 .PHONY: test-build34-vbl-scheduling
 test-build34-vbl-scheduling:
