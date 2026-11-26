@@ -60,6 +60,7 @@ test: $(TESTS)
 	python3 -B tests/test_nmplugin_release_logging.py
 	python3 -B tests/test_nmplugin_ws_mark_once.py
 	python3 -B tests/test_nmplugin_multisample_copy_guard.py
+	python3 -B tests/test_nmplugin_upload_ring.py
 	python3 -B tests/test_build34_wait_deadline.py
 	python3 -B tests/test_build34_ring_backpressure.py
 	python3 -B tests/test_build34_startup_recovery.py

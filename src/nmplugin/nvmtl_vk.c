@@ -15,10 +15,12 @@
 #include <stdint.h>
 #include <stdatomic.h>
 #include <math.h>
+#include <sched.h>
 #define VK_NO_PROTOTYPES 1
 #include <vulkan/vulkan.h>
 #include "nvmtl_vk.h"
 #include "nvmtl_tex_upload.h"
+#include "nvmtl_upload_ring.h"
 #include "nvmtl_cmd_refusal.h"
 #include "nvmtl_sampler_state.h"
 static int g_sampler_anisotropy, g_sampler_mirror_clamp;
@@ -6498,8 +6500,143 @@ static int nvmtl_async_tex_upload(void)
     }
     return on;
 }
-typedef struct { nvmtl_inflight infl; nvk_buffer stage; nvk_cmdbuf cb; } nvmtl_asyncup;
+
+#define NVMTL_UPRING_BYTES (16u << 20)
+#define NVMTL_UPRING_MAX1  (8u << 20)
+typedef struct {
+    nvmtl_inflight infl;
+    nvk_buffer     stage;
+    nvk_cmdbuf     cb;
+    nvk_image     *img;
+    size_t         ring_off;
+    uint32_t       ring_slot;
+    uint64_t       ring_seq;
+    int            from_ring;
+    int            finished;
+    int            refs;
+} nvmtl_asyncup;
 static pthread_mutex_t g_asyncup_mutex = PTHREAD_MUTEX_INITIALIZER;
+static nvk_buffer g_upring_buf;
+static nvmtl_upring g_upring;
+static int g_upring_ready;
+
+static int nvmtl_upring_ensure_locked(void)
+{
+    if (g_upring_ready > 0) return 0;
+    if (g_upring_ready < 0) return -1;
+    nvk_buffer b = {0};
+    if (nvmtl_vk_buffer_create(NVMTL_UPRING_BYTES, 1, &b) || !b.buf || !b.map) {
+        g_upring_ready = -1;
+        nvlog("vk: async upload staging ring (%u MiB) creation FAILED - falling back to sync", NVMTL_UPRING_BYTES >> 20);
+        return -1;
+    }
+    g_upring_buf = b;
+    nvmtl_upring_init(&g_upring, b.size);
+    g_upring_ready = 1;
+    nvlog("vk: async upload staging ring ready (%u MiB, %u slots)", NVMTL_UPRING_BYTES >> 20, NVMTL_UPRING_MAX_SLOTS);
+    return 0;
+}
+
+static void nvmtl_asyncup_release(nvmtl_asyncup *au)
+{
+    if (!au) return;
+    int free_now = 0;
+    pthread_mutex_lock(&g_asyncup_mutex);
+    if (--au->refs <= 0) free_now = 1;
+    pthread_mutex_unlock(&g_asyncup_mutex);
+    if (free_now) free(au);
+}
+
+static void nvmtl_asyncup_complete_locked_or_free(nvmtl_asyncup *au)
+{
+    if (!au) return;
+    int should_finish = 0;
+    pthread_mutex_lock(&g_asyncup_mutex);
+    if (!au->finished) {
+        au->finished = 1;
+        should_finish = 1;
+        if (au->img && au->img->up_token == (uint64_t)(uintptr_t)au) {
+            au->img->up_token = 0;
+            au->refs--;
+        }
+        au->img = NULL;
+    }
+    pthread_mutex_unlock(&g_asyncup_mutex);
+    if (should_finish) {
+        if (au->infl.fence) nvmtl_vk_submit_finish(&au->infl);
+        if (au->from_ring) {
+            pthread_mutex_lock(&g_asyncup_mutex);
+            nvmtl_upring_mark_done(&g_upring, au->ring_slot, au->ring_seq);
+            au->refs--;
+            pthread_mutex_unlock(&g_asyncup_mutex);
+        } else if (au->stage.buf) {
+            nvmtl_vk_buffer_destroy(&au->stage);
+        }
+    }
+    nvmtl_asyncup_release(au);
+}
+
+static void nvmtl_upring_reap_done(void)
+{
+    for (;;) {
+        nvmtl_asyncup *oldest = NULL;
+        pthread_mutex_lock(&g_asyncup_mutex);
+        uint32_t slot = 0; uint64_t seq = 0, tag = 0;
+        if (g_upring_ready > 0 && nvmtl_upring_oldest_active(&g_upring, &slot, &seq, &tag) && tag) {
+            nvmtl_asyncup *cand = (nvmtl_asyncup *)(uintptr_t)tag;
+            if (!cand->finished && cand->infl.fence && pvkWaitForFences(g_dev, 1, &cand->infl.fence, VK_TRUE, 0) == VK_SUCCESS) {
+                cand->refs++;
+                oldest = cand;
+            }
+        }
+        pthread_mutex_unlock(&g_asyncup_mutex);
+        if (!oldest) break;
+        nvmtl_asyncup_complete_locked_or_free(oldest);
+    }
+}
+
+static int nvmtl_upring_alloc_slot(size_t bytes, nvmtl_asyncup *au)
+{
+    if (bytes > NVMTL_UPRING_MAX1) return -1;
+    nvmtl_upring_reap_done();
+    for (;;) {
+        nvmtl_asyncup *oldest = NULL;
+        int need_retry = 0;
+        pthread_mutex_lock(&g_asyncup_mutex);
+        if (nvmtl_upring_ensure_locked() != 0) {
+            pthread_mutex_unlock(&g_asyncup_mutex);
+            return -1;
+        }
+        uint32_t slot = 0; size_t off = 0; uint64_t seq = 0;
+        if (nvmtl_upring_try_alloc(&g_upring, bytes, (uint64_t)(uintptr_t)au, &slot, &off, &seq) == 0) {
+            au->from_ring = 1;
+            au->ring_slot = slot;
+            au->ring_off = off;
+            au->ring_seq = seq;
+            au->refs++;
+            pthread_mutex_unlock(&g_asyncup_mutex);
+            return 0;
+        }
+        uint64_t tag = 0;
+        if (nvmtl_upring_oldest_active(&g_upring, &slot, &seq, &tag) && tag) {
+            nvmtl_asyncup *cand = (nvmtl_asyncup *)(uintptr_t)tag;
+            if (cand->infl.fence && !cand->finished) {
+                oldest = cand;
+                oldest->refs++;
+            } else {
+                need_retry = 1;
+            }
+        }
+        pthread_mutex_unlock(&g_asyncup_mutex);
+        if (oldest) {
+            nvmtl_asyncup_complete_locked_or_free(oldest);
+            continue;
+        }
+        if (need_retry) { sched_yield(); continue; }
+        return -1;
+    }
+}
+
 // Atomically read and clear an image's pending async-upload handle (the consume/finish-first decision).
 static uint64_t nvmtl_asyncup_take(nvk_image *img)
 {
@@ -6508,6 +6645,10 @@ static uint64_t nvmtl_asyncup_take(nvk_image *img)
     nvmtl_up_state s = { img->up_token };
     const uint64_t token = nvmtl_up_before_consume(&s);
     img->up_token = 0;
+    if (token) {
+        nvmtl_asyncup *au = (nvmtl_asyncup *)(uintptr_t)token;
+        au->img = NULL;
+    }
     pthread_mutex_unlock(&g_asyncup_mutex);
     return token;
 }
@@ -6517,6 +6658,11 @@ static void nvmtl_asyncup_store(nvk_image *img, uint64_t token)
     nvmtl_up_state s = { img->up_token };
     nvmtl_up_set(&s, token);
     img->up_token = s.infl;
+    if (token) {
+        nvmtl_asyncup *au = (nvmtl_asyncup *)(uintptr_t)token;
+        au->img = img;
+        au->refs++;
+    }
     pthread_mutex_unlock(&g_asyncup_mutex);
 }
 // Finish (fence-wait) and free a handle taken from an image. Called OUTSIDE the lock so one image's wait
@@ -6524,10 +6670,7 @@ static void nvmtl_asyncup_store(nvk_image *img, uint64_t token)
 static void nvmtl_asyncup_finish(uint64_t token)
 {
     if (!token) return;
-    nvmtl_asyncup *au = (nvmtl_asyncup *)(uintptr_t)token;
-    nvmtl_vk_submit_finish(&au->infl);
-    nvmtl_vk_buffer_destroy(&au->stage);
-    free(au);
+    nvmtl_asyncup_complete_locked_or_free((nvmtl_asyncup *)(uintptr_t)token);
 }
 // Public guard for the consumers (readback, surface-out, migration, destroy): finish a pending upload first.
 void nvmtl_vk_image_upload_barrier(nvk_image *img) { nvmtl_asyncup_finish(nvmtl_asyncup_take(img)); }
@@ -6559,27 +6702,58 @@ int nvmtl_vk_image_write_region_level_layer(nvk_queue *q, nvk_image *img, const 
     if (finish_first) nvmtl_asyncup_finish(nvmtl_asyncup_take(img));
     if (mode == NVMTL_UP_SUBMIT_ASYNC) {
         au = (nvmtl_asyncup *)calloc(1, sizeof *au);
-        if (!au || nvmtl_vk_buffer_create(bytes, 1, &au->stage)) { free(au); au = NULL; }   // fall back to sync
+        if (au) {
+            au->refs = 1;
+            if (nvmtl_upring_alloc_slot(bytes, au) != 0) {
+                if (nvmtl_vk_buffer_create(bytes, 1, &au->stage)) { free(au); au = NULL; }   // fall back to sync
+            }
+        }
     }
-    if (au) { stageb = &au->stage; c = &au->cb; }
+    size_t stage_off = 0;
+    if (au) {
+        stageb = au->from_ring ? &g_upring_buf : &au->stage;
+        stage_off = au->from_ring ? au->ring_off : 0;
+        c = &au->cb;
+    }
     else {
         if (nvmtl_vk_stage(q, bytes, &stage_sync)) return -1;
         stageb = &stage_sync; c = &local_cb;
     }
-    uint8_t *dst = (uint8_t *)stageb->map;
+    uint8_t *dst = (uint8_t *)stageb->map + stage_off;
     for (uint32_t r = 0; r < rows; r++) memcpy(dst + (size_t)r * cols * bpp, (const uint8_t *)src + (size_t)r * row_bytes, (size_t)cols * bpp);
-    if (nvmtl_vk_cmd_begin(q, c)) { if (au) { nvmtl_vk_buffer_destroy(&au->stage); free(au); } return -1; }
+    if (nvmtl_vk_cmd_begin(q, c)) {
+        if (au) {
+            if (au->from_ring) {
+                pthread_mutex_lock(&g_asyncup_mutex);
+                nvmtl_upring_mark_done(&g_upring, au->ring_slot, au->ring_seq);
+                au->refs--;
+                pthread_mutex_unlock(&g_asyncup_mutex);
+            } else nvmtl_vk_buffer_destroy(&au->stage);
+            nvmtl_asyncup_release(au);
+        }
+        return -1;
+    }
     img_to(c, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-    VkBufferImageCopy bic = { 0, 0, 0, { nvmtl_copy_aspect(img), level, img->mtl_type == 7 ? 0u : layer, 1 }, { (int32_t)x, (int32_t)y, img->mtl_type == 7 ? (int32_t)layer : 0 }, { w, h, 1 } };
+    VkBufferImageCopy bic = { stage_off, 0, 0, { nvmtl_copy_aspect(img), level, img->mtl_type == 7 ? 0u : layer, 1 }, { (int32_t)x, (int32_t)y, img->mtl_type == 7 ? (int32_t)layer : 0 }, { w, h, 1 } };
     pvkCmdCopyBufferToImage(c->cb, (VkBuffer)stageb->buf, (VkImage)img->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bic);
     img_to(c, img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
     if (au) {
         // submit without waiting; queue order + the SHADER_READ barrier above order the copy before any later
         // draw that samples this image, and the handle is finished before a readback, destroy or re-upload.
-        if (nvmtl_vk_submit_begin_at(c, &au->infl, "tex upload async")) { nvmtl_vk_buffer_destroy(&au->stage); free(au); return -1; }
+        if (nvmtl_vk_submit_begin_at(c, &au->infl, "tex upload async")) {
+            if (au->from_ring) {
+                pthread_mutex_lock(&g_asyncup_mutex);
+                nvmtl_upring_mark_done(&g_upring, au->ring_slot, au->ring_seq);
+                au->refs--;
+                pthread_mutex_unlock(&g_asyncup_mutex);
+            } else nvmtl_vk_buffer_destroy(&au->stage);
+            nvmtl_asyncup_release(au);
+            return -1;
+        }
         nvmtl_asyncup_store(img, (uint64_t)(uintptr_t)au);
+        nvmtl_asyncup_release(au);
         return 0;
     }
     return nvmtl_vk_submit_wait(c);

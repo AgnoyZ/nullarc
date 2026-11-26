@@ -2322,3 +2322,40 @@ check were run on the active zero-copy desktop:
   `nvrm610.conf` unchanged). Metal MSAA 4x buffer<->texture blit rejection
   completed cleanly (`status=4`) with `zc_flips=1381`, `zc_faults=0`,
   `zc_fallbacks=0`, `iop_fail=0`, `phx_hang_kills=0`.
+
+### November 27, 2026 (follow-up): Circular staging ring for `NVMTL_ASYNC_TEX_UPLOAD`
+
+To eliminate the per-upload staging buffer allocation overhead measured above
+(`51.176 ms` / `1599.2 us/tex` for `32 x 256x256` with `NVMTL_ASYNC_TEX_UPLOAD=1`),
+a bounded circular staging ring was implemented for async region uploads:
+
+- Added pure state machine `src/nmplugin/nvmtl_upload_ring.h` (`256 B` alignment,
+  `64` max slots, wrap-around padding accounting, out-of-order completion tracking
+  with contiguous oldest-prefix tail reclamation).
+- Wired a lazy persistent `16 MiB` (`NVMTL_UPRING_BYTES`, max single slot
+  `8 MiB`) GTT staging ring into `src/nmplugin/nvmtl_vk.c` with non-blocking
+  fence reaping (`vkWaitForFences(..., 0)`), backpressure wait on oldest slot
+  when full, reference-counted lifetime between ring and `nvk_image.up_token`,
+  and offset-based `VkBufferImageCopy`. Default remains `NVMTL_ASYNC_TEX_UPLOAD=0`
+  (zero allocation and zero overhead unless opted in).
+- Added ASan/UBSan unit tests in `tests/test_nmplugin_upload_ring.py` (wired into
+  `Makefile` `test`) and synced `tools/build34_dcn_render_write_stage.py`. Full
+  `make test` and `make check-build34-scanout-mode` passed.
+- Deployed rebuilt and ad-hoc signed `NVMTLDriver`
+  (UUID `DBA99633-B2C0-38EA-A734-9A295CC6CB7B`, SHA256
+  `004752b882190adc025b682133337bbb830709b16ce7d05e5c65fe93133e0da3`; previous
+  binary backed up under local isolated `backup/NVMTLDriver.pre-upring-20261127`,
+  `nvrm610.conf` unchanged).
+- Real Radeon 780M Metal `replaceRegion` benchmarks (`0` readback mismatches
+  across all batches, wrap-around, and 8x rapid same-texture overwrites):
+  - `96 x 256x256` (ring wrap): `NVMTL_ASYNC_TEX_UPLOAD=1` warmed `8.067 ms`
+    (`84.0 us/tex`) vs sync `12.553–12.857 ms` (`130.8–133.9 us/tex`, `1.6x`).
+  - `12 x 1024x1024` (`48 MiB`, full ring wrap + reclaim): warmed `3.674 ms`
+    (`306.2 us/tex`) vs sync `3.832–4.262 ms` (`319.3–355.2 us/tex`).
+  - Steady-state `64 x 256x256` (rounds 1–4): `NVMTL_ASYNC_TEX_UPLOAD=1`
+    `3.363–5.053 ms` (`52.5–79.0 us/tex`, `+drain_last 3.595–5.346 ms`) vs sync
+    `7.713–8.218 ms` (`120.5–128.4 us/tex`, `+drain_last 7.815–8.339 ms`) —
+    a **2.0–2.4x** steady-state speedup over sync and **25–30x** faster than
+    the previous per-upload allocating async path.
+- Live zero-copy counters remained clean: `zc_flips=1409`, `zc_faults=0`,
+  `zc_fallbacks=0`, `zc_tlb_flushes=3`, `iop_fail=0`, `phx_hang_kills=0`.
