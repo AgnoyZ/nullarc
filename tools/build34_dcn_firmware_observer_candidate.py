@@ -211,6 +211,10 @@ def sync_directory(path):
 
 def mode_report_path(out, report):
     out = private_output(out)
+    output_info = out.lstat()
+    if not stat.S_ISDIR(output_info.st_mode) or stat.S_IMODE(output_info.st_mode) != 0o700 or \
+            output_info.st_uid != os.getuid():
+        raise ValueError('Private candidate directory must be user-owned with mode 0700')
     report = Path(report)
     if report.is_symlink() or report.parent.resolve() != out or not report.name.endswith('-private.json'):
         raise ValueError('Native 2x report must be a private JSON file in the candidate directory')
@@ -257,7 +261,8 @@ def validate_scanout_mode_report(report, version, os_build, now_ns=None):
     descriptor = os.open(report, os.O_RDONLY | os.O_NOFOLLOW)
     try:
         info = os.fstat(descriptor)
-        if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600 or info.st_size > 4096:
+        if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600 or \
+                info.st_uid != os.getuid() or info.st_size > 4096:
             raise ValueError('Native 2x report must be a private regular file')
         payload = os.read(descriptor, 4097)
     finally:

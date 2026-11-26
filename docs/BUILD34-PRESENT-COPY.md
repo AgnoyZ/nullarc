@@ -93,14 +93,28 @@ signature verification and the private cache command with one exact-restore
 `finally` path for ordinary Python exceptions and returns. It cannot restore
 after `SIGKILL` or power loss. Seven host tests cover stale/mismatched mode
 reports, failure of the second rename and linker exceptions. These are tool/CPU
-checks only; the revised candidate recipe has not been used to build or link a
-new bundle. Because the linker temporarily presents the observer at the
+checks only. Because the linker temporarily presents the observer at the
 standard extension path, do not run it without a separate exact candidate
 scope and independent recovery guard; none is armed for this observer.
 No AuxKC, installed extension, cache, NVRAM/EFI or active driver was changed.
 Do not link, install or boot until a fresh candidate-specific scope admits the
 exact bundle/cache baseline and recovery. The observer still cannot prove the
 active HUBP route or device DMA address domain.
+
+After this review, the revised recipe completed a fresh private control and
+observer build from the pinned source/SDK and passed its independent bundle
+readback. The control remains byte-matched to the installed PhxAccel image;
+the observer remains the exact reviewed image. A non-root user-session gate
+then issued a fresh 120-second report for 1280x800 logical, 2560x1600 backing,
+120 Hz, scale 2.0 on macOS 26.7.2 build 25G332. A repeated filtered PCI-child
+observation still found one build34 PhxBringup and one PhxAMDFB, with no
+firmware sample published and both route-provider and DMA-domain proofs false.
+The private AuxKC linker was deliberately not run: the standard-path swap has
+no independent interruption-recovery guard, and the observer has no fresh
+candidate-specific cache/install/reboot scope. No GPU work or power action
+occurred. The private artifacts and mode report stay in the ignored build
+directory; only sanitized hashes/counts are retained in the local command
+result, not raw registry or cache data.
 
 ## Source-only mapper lookup probe, November 26
 
