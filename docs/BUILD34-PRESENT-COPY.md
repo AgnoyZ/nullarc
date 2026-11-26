@@ -78,6 +78,26 @@ NVRAM/EFI change, or sample execution occurred. The native 2x preference
 remains fixed; current runtime sampling, the qualifying route provider, and
 actual descriptor-to-DMA-domain verification are still pending.
 
+### Candidate-link safety review, November 26
+
+The private candidate recipe now requires a fresh user-session native-2x
+preflight report bound to the current scanout-gate source, OS build, exact
+1280x800 logical / 2560x1600 backing / 120 Hz / 2.0 mode, and a 120-second
+age limit. A privileged cache linker validates that report instead of starting
+AppKit/Swift in the root session; it records that the mode gate was not rerun
+after linking, so a separate user-session `make check-build34-scanout-mode`
+remains required afterward.
+
+The temporary PhxAccel standard-path swap now covers staging, both renames,
+signature verification and the private cache command with one exact-restore
+`finally` path. Seven host tests cover stale/mismatched mode reports, failure
+of the second rename and linker exceptions. These are tool/CPU checks only;
+the revised candidate recipe has not been used to build or link a new bundle.
+No AuxKC, installed extension, cache, NVRAM/EFI or active driver was changed.
+Do not link, install or boot until a fresh candidate-specific scope admits the
+exact bundle/cache baseline and recovery. The observer still cannot prove the
+active HUBP route or device DMA address domain.
+
 ## Source-only mapper lookup probe, November 26
 
 `tools/build34_dcn_mapper_probe_stage.py` derives an opt-in build34 source

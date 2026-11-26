@@ -78,6 +78,7 @@ test: $(TESTS)
 	CXX="$(CXX)" python3 -B tests/test_build34_dcn_mapper_probe.py
 	python3 -B tests/test_build34_dcn_route_observation.py
 	python3 -B tests/test_build34_dcn_firmware_observation.py
+	python3 -B tests/test_build34_dcn_firmware_observer_candidate.py
 	python3 -B tests/test_build34_pci_irq_observation.py
 	python3 -B tests/test_build34_pci_irq_candidate.py
 	python3 -B tests/test_build34_pci_irq_scope.py
