@@ -1,0 +1,36 @@
+{
+  "status": "current-mode-zero-copy-gate-refused",
+  "date": "2026-11-26",
+  "branch": "upstream34/vram-layout-fix",
+  "source_commit": "4fe59adf278c4b83f6cf9d9ccdcf860b83670247",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "method": "read-only-CoreGraphics-AppKit-mode-query-and-build34-scanout-mode-gate",
+  "online_display_count": 1,
+  "built_in_display_count": 1,
+  "current_mode": {
+    "logical_width": 2560,
+    "logical_height": 1600,
+    "backing_width": 2560,
+    "backing_height": 1600,
+    "refresh_hz": 120.0,
+    "appkit_backing_scale": 1.0
+  },
+  "required_mode": {
+    "logical_width": 1280,
+    "logical_height": 800,
+    "backing_width": 2560,
+    "backing_height": 1600,
+    "refresh_hz": 120.0,
+    "appkit_backing_scale": 2.0
+  },
+  "gate_passed": false,
+  "gate_refusal": "current-mode-does-not-match-native-2x-requirement",
+  "display_settings_changed": false,
+  "driver_installed_or_reloaded": false,
+  "registers_read_or_written": false,
+  "dma_mapping_created": false,
+  "gpu_work_submitted": false,
+  "restart_requested": false,
+  "display_identifiers_or_raw_registry_saved": false
+}

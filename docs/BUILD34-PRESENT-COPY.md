@@ -1799,3 +1799,16 @@ Only sanitized booleans and counts were retained. No raw registry data or
 property values were saved or emitted; no device registers were accessed, no
 driver was installed or reloaded, no GPU work was submitted and no restart was
 requested. See the [sanitized preflight record](validation/build34-dcn-domain-screen-20261126.json).
+
+### Current-mode gate recheck, November 26, 2026
+
+A later read-only `make check-build34-scanout-mode` recheck refused because
+the currently selected mode is 2560x1600 logical / 2560x1600 backing at
+120 Hz, with AppKit backing scale 1.0. The saved preference recorded above
+does not establish that the active session is still in native 2x. The
+separate sanitized [mode-gate result](validation/build34-scanout-mode-current-20261126.json)
+records only display counts and mode geometry. No display setting was
+changed, and no zero-copy comparison, DMA mapping, register access, driver
+installation/reload, GPU work, or restart was performed. Re-run the gate only
+after the user has selected 1280x800 logical / 2560x1600 backing at 120 Hz;
+passing that gate is a comparison prerequisite, not zero-copy admission.
