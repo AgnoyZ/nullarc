@@ -7,7 +7,7 @@
 # off the GPU; NVRAM phxfb-boot is armed again only after a good M2 boot and only while $G/phxboot-m2 exists.
 # Kill switch: the file $G/phxboot-off.
 G=/Users/Shared/gpu; export HOME=/Users/Shared
-LOG=/var/log/phxboot.log; MARK=/var/db/phxboot.pending; OFF=$G/phxboot-off
+LOG=/var/log/phxboot.log; MARK=/var/db/phxboot.pending; OFF=$G/phxboot-off; ZCOFF=$G/phxzc-off
 ALLOW=/Library/GPUBundles/nvmtl-allow.txt; DR=/Library/Logs/DiagnosticReports
 exec >>"$LOG" 2>&1
 echo "== $(date '+%F %T') phxboot"
@@ -29,7 +29,8 @@ all_apps() { { printf '# phxboot: Metal for every app%s\n' "$1"; for d in $DENY;
 # the firmware framebuffer
 m2_fail() {
     echo "M2 failed ($1): PhxAMDFB off, rebooting"
-    apps_only; sysctl -w debug.phxagdc=0 >/dev/null 2>&1
+    apps_only; sysctl -w debug.phxfb_zerocopy=0 debug.nvaccel_iop_flip=0 >/dev/null 2>&1
+    sysctl -w debug.phxagdc=0 >/dev/null 2>&1
     nvram -d phxfb-boot; nv_commit; rm -f "$MARK" $G/phxboot-m2; sync; shutdown -r now; exit 0
 }
 # PhxAMDFB comes from the Aux KC, which loads well after PhxBringup: wait for the panel's framebuffer (PhxAMDFB, or
@@ -54,6 +55,7 @@ $G/phxctl/mesboot claim
 # no BO cache flushing per submit/wait (the GPU maps system memory snooped): 41 fps window drag instead of 13, and no
 # artifacts seen (2026-10-20)
 sysctl -w debug.phxbos_flush=0 >/dev/null 2>&1
+sysctl -w debug.nvaccel_iop_flip=0 debug.phxfb_zerocopy=0 >/dev/null 2>&1 || true
 for i in $(seq 1 20); do ioreg -rc NMXAccel -d0 | grep -q NMXAccel && break; sleep 1; done
 if ! ioreg -rc NMXAccel -d0 | grep -q NMXAccel; then
     [ $M2 = 1 ] && m2_fail "NMXAccel did not start"
@@ -77,13 +79,27 @@ if [ $M2 = 1 ]; then
     before=$(ls $DR | grep -c '^WindowServer[-_]')
     release
     echo "armed and released at $(date '+%T'); agdc $(sysctl -n debug.phxagdc)"
-    for ((t = 0; t < 90; t += 5)); do
+    for ((t = 0; t < 20; t += 5)); do
         sleep 5
         n=$(( $(ls $DR | grep -c '^WindowServer[-_]') - before ))
         [ $n -ge 3 ] && m2_fail "WindowServer crashed or hung $n times on the 780M"
     done
     pgrep -qx WindowServer || m2_fail "no WindowServer"
-    echo "WindowServer pid $(pgrep -x WindowServer), frames on the panel $(sysctl -n debug.nvaccel_iop_ok)"
+    if [ ! -e "$ZCOFF" ] && [ "$(sysctl -n debug.nvaccel_iop_ok 2>/dev/null || echo 0)" -gt 0 ] && [ "$(sysctl -n debug.phxfb_zc_faults 2>/dev/null || echo 1)" = "0" ]; then
+        echo "enabling DCN 3.1.4 zero-copy at $(date '+%T')"
+        sysctl -w debug.nvaccel_iop_flip=1 debug.phxfb_zerocopy=1 >/dev/null 2>&1 || true
+    fi
+    for ((t = 20; t < 90; t += 5)); do
+        sleep 5
+        n=$(( $(ls $DR | grep -c '^WindowServer[-_]') - before ))
+        [ $n -ge 3 ] && m2_fail "WindowServer crashed or hung $n times after zero-copy"
+        if [ "$(sysctl -n debug.phxfb_zc_faults 2>/dev/null || echo 0)" != "0" ]; then
+            echo "zero-copy fault detected during boot watch: disabling immediately"
+            sysctl -w debug.phxfb_zerocopy=0 debug.nvaccel_iop_flip=0 >/dev/null 2>&1 || true
+        fi
+    done
+    pgrep -qx WindowServer || m2_fail "no WindowServer"
+    echo "WindowServer pid $(pgrep -x WindowServer), frames on the panel $(sysctl -n debug.nvaccel_iop_ok), zc_flips $(sysctl -n debug.phxfb_zc_flips 2>/dev/null || echo 0), zc_faults $(sysctl -n debug.phxfb_zc_faults 2>/dev/null || echo 0)"
 else
     release
     all_apps " (WindowServer stays on the firmware framebuffer)" ""
@@ -99,10 +115,15 @@ watch_hangs() {
     local base n now first=0
     base=$(ls $DR | grep -c '^WindowServer-.*\.ips$')
     while sleep 15; do
+        if [ "$(sysctl -n debug.phxfb_zerocopy 2>/dev/null || echo 0)" != "0" ] && [ "$(sysctl -n debug.phxfb_zc_faults 2>/dev/null || echo 0)" != "0" ]; then
+            echo "$(date '+%F %T') zero-copy VM fault detected during runtime: disabling immediately"
+            sysctl -w debug.phxfb_zerocopy=0 debug.nvaccel_iop_flip=0 >/dev/null 2>&1 || true
+        fi
         n=$(ls $DR | grep -c '^WindowServer-.*\.ips$'); [ $n -gt $base ] || continue
         now=$(date +%s); [ $first = 0 ] && first=$now
         if [ $((n - base)) -ge 2 ]; then
             echo "$(date '+%F %T') WindowServer hung $((n - base)) times on the GPU: rebooting"
+            sysctl -w debug.phxfb_zerocopy=0 debug.nvaccel_iop_flip=0 >/dev/null 2>&1 || true
             echo $now >> $G/hang-reboots
             if [ $(awk -v t=$((now - 3600)) '$1 > t' $G/hang-reboots | wc -l) -ge 3 ]; then
                 echo "3 GPU hangs within an hour: WindowServer goes back to the firmware framebuffer"

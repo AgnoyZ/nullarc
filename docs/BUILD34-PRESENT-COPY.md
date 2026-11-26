@@ -2078,3 +2078,29 @@ Post-reboot hardware verification on macOS 26.7.2 (`25G332`, native 2x HiDPI
 - **Re-enable recovery**: setting `debug.phxfb_zerocopy=1` and triggering a
   1.2 s redraw resumed zero-copy cleanly (`zc_flips` `540 -> 612`, `+72/72`
   flips, `0` new fallbacks, `0` faults, TLB flushes `166 -> 170`).
+
+### Boot script auto-enable and multi-app stability check, November 26, 2026
+
+- `tools/phxctl/phxboot.sh` (and the local isolated LaunchDaemon script
+  `phxboot-zerocopy.sh`) now auto-enables `debug.nvaccel_iop_flip=1
+  debug.phxfb_zerocopy=1` 20 s after release once `debug.nvaccel_iop_ok > 0`,
+  `debug.phxfb_zc_faults == 0`, and `/Users/Shared/gpu/phxzc-off` is absent,
+  with a 70 s boot watch plus continuous `watch_hangs()` monitoring that
+  immediately disables zero-copy on any VM fault (`debug.phxfb_zc_faults != 0`)
+  or WindowServer hang escalation.
+- **30 s multi-app everyday workload** (simultaneous Metal `MTKView` at
+  `1,649` frames on RADV Phoenix, CoreAnimation 2x HiDPI resizing window at
+  `1,671` ticks, plus foreground launch/activation cycling across `Finder`,
+  `Calculator`, `TextEdit`, `Safari`, and `System Settings`):
+  - Zero-copy flips `900 -> 2,084` (`+1,184`), `iop_ok` `1,400 -> 2,724`
+    (`+1,324`), `iop_fail=0`, `zc_faults=0`, MMHUB `ENG16` TLB flushes
+    `216 -> 713` (`+497`).
+  - Transient back-to-back presents while a prior flip was still pending fell
+    back cleanly (`zc_fallbacks` `86 -> 226`, `+140`, `last_status=8`
+    `kHwNotReady`) and resumed zero-copy on subsequent frames (`last_status=0`
+    at completion, BAR5 live scanout on VMID 3: `0x3ac9=0x3`,
+    `0x3aca/0x3acb=0x102_0000_0000`, `0x3ae5/0x3ae6=0x30000102_00000000`,
+    `0x3b03=0x19`, `0x3a8c=0`).
+  - `WindowServer` stayed on PID `204` with `0` new crash/spin reports in
+    `/Library/Logs/DiagnosticReports`, and `make check-build34-scanout-mode`
+    remained `1280x800` logical / `2560x1600` pixels / `120 Hz` / `2x`.
