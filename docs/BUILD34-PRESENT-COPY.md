@@ -24,6 +24,32 @@ read-only raw-register selector is too broad to use as an unqualified route
 probe. The staged mapper/direct-domain and qualified-route hooks remain
 unimplemented; do not treat these class counts as provider evidence.
 
+## Source-only mapper lookup probe, November 26
+
+`tools/build34_dcn_mapper_probe_stage.py` derives an opt-in build34 source
+overlay from the exact `PhxBringup.cpp` hash pinned in the stage. The added
+lookup runs only when `-phx-dcnmapperprobe` is explicitly present and the PCI
+vendor/device pair is `1002:1900`. It records whether the request was enabled,
+whether a lookup ran, whether a mapper was returned, and whether that mapper
+was active at the sample. The returned mapper reference is released
+immediately. The default start path performs no mapper lookup.
+
+This probe does not create a DMA mapping, read or write MMIO, or submit GPU
+work. A resolved/active mapper is only evidence that this API returned a
+mapper object at that instant; it does not qualify descriptor mappings, prove
+the device or HUBP address domain, identify the active display route, or
+authorize zero-copy. The address-domain and route-provider conclusions remain
+false. CPU fixture and stage tests do not build, install, load, or execute this
+overlay; no runtime result has been collected.
+
+The [pinned XNU implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMapper.cpp#L167-L207)
+returns immediately when `iommu-parent` is absent, but can call
+`waitForMatchingService()` without a deadline when the property names a
+service. That can hold driver `start`; this staged call is not approved for
+runtime use until its exact parent path has a bounded, verified resolution.
+The earlier filtered snapshot found the property absent, but that does not
+qualify a later boot or a different source state.
+
 ## Offline DCN zero-copy prerequisite, November 24
 
 For subsequent local hardware comparisons, hold the [verified internal 2x

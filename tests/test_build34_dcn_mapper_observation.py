@@ -29,7 +29,8 @@ class DcnMapperObservationTests(unittest.TestCase):
     def test_absent_property_is_only_classified(self):
         result = self.decode()
         self.assertEqual(result['iommu_parent_property'], 'absent')
-        self.assertFalse(result['runtime_mapper_resolved'])
+        self.assertEqual(result['runtime_mapper_probe_state'], 'not-published')
+        self.assertIsNone(result['runtime_mapper_resolved'])
         self.assertFalse(result['device_dma_domain_proven'])
 
     def test_nonempty_value_is_not_emitted_or_treated_as_resolution(self):
@@ -37,7 +38,7 @@ class DcnMapperObservationTests(unittest.TestCase):
         result = self.decode()
         encoded = json.dumps(result)
         self.assertEqual(result['iommu_parent_property'], 'present-nonempty-string')
-        self.assertFalse(result['runtime_mapper_resolved'])
+        self.assertEqual(result['runtime_mapper_probe_state'], 'not-published')
         self.assertNotIn('PRIVATE_MAPPER_SERVICE_NAME', encoded)
         self.assertNotIn('iommu-parent', encoded)
 
@@ -100,6 +101,61 @@ class DcnMapperObservationTests(unittest.TestCase):
         self.assertEqual(calls, [['/usr/bin/sw_vers', '-productVersion'], ['/usr/bin/sw_vers', '-buildVersion'],
                                  observation.PCI_QUERY])
         self.assertEqual(result['iommu_parent_property'], 'absent')
+
+    def test_mapper_probe_states_are_distinct_and_never_prove_domain(self):
+        expected = (
+            ({}, 'not-published', None, None, None),
+            ({'requested': False, 'performed': False, 'resolved': False, 'active': False},
+             'published-disabled', False, False, None),
+            ({'requested': True, 'performed': False, 'resolved': False, 'active': False},
+             'requested-not-performed', True, False, None),
+            ({'requested': True, 'performed': True, 'resolved': False, 'active': False},
+             'performed-unresolved', True, True, False),
+            ({'requested': True, 'performed': True, 'resolved': True, 'active': False},
+             'resolved-inactive-at-probe', True, True, True),
+            ({'requested': True, 'performed': True, 'resolved': True, 'active': True},
+             'active-at-probe', True, True, True),
+        )
+        for fields, state, requested, performed, resolved in expected:
+            with self.subTest(state=state):
+                device = copy.deepcopy(self.device)
+                child = device['IORegistryEntryChildren'][0]
+                for name, key in zip(observation.MAPPER_PROBE_PROPERTIES,
+                                     ('requested', 'performed', 'resolved', 'active')):
+                    if key in fields:
+                        child[name] = fields[key]
+                result = self.decode(device)
+                self.assertEqual(result['runtime_mapper_probe_state'], state)
+                self.assertEqual(result['runtime_mapper_probe_requested'], requested)
+                self.assertEqual(result['runtime_mapper_probe_performed'], performed)
+                self.assertEqual(result['runtime_mapper_resolved'], resolved)
+                self.assertFalse(result['device_dma_domain_proven'])
+                self.assertFalse(result.get('route_provider_proven', False))
+
+    def test_mapper_probe_metadata_rejects_partial_bad_or_inconsistent_flags(self):
+        invalid = (
+            {'phx-dcn-mapper-probe-requested': True},
+            {'phx-dcn-mapper-probe-requested': 1, 'phx-dcn-mapper-probe-performed': False,
+             'phx-dcn-mapper-resolved': False, 'phx-dcn-mapper-active-at-probe': False},
+            {'phx-dcn-mapper-probe-requested': False, 'phx-dcn-mapper-probe-performed': True,
+             'phx-dcn-mapper-resolved': False, 'phx-dcn-mapper-active-at-probe': False},
+            {'phx-dcn-mapper-probe-requested': True, 'phx-dcn-mapper-probe-performed': False,
+             'phx-dcn-mapper-resolved': True, 'phx-dcn-mapper-active-at-probe': False},
+            {'phx-dcn-mapper-probe-requested': True, 'phx-dcn-mapper-probe-performed': True,
+             'phx-dcn-mapper-resolved': False, 'phx-dcn-mapper-active-at-probe': True},
+        )
+        for fields in invalid:
+            device = copy.deepcopy(self.device)
+            device['IORegistryEntryChildren'][0].update(fields)
+            with self.subTest(fields=fields), self.assertRaises(ValueError):
+                self.decode(device)
+
+    def test_unrecognized_mapper_properties_are_not_emitted(self):
+        device = copy.deepcopy(self.device)
+        device['IORegistryEntryChildren'][0]['private-service-token'] = 'PRIVATE_SENTINEL'
+        encoded = json.dumps(self.decode(device))
+        self.assertNotIn('PRIVATE_SENTINEL', encoded)
+        self.assertNotIn('private-service-token', encoded)
 
     def test_non_macos_collector_refuses(self):
         with patch.object(observation.platform, 'system', return_value='Linux'):

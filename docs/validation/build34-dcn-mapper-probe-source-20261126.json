@@ -1,0 +1,31 @@
+{
+  "status": "source-only-opt-in-mapper-lookup-stage",
+  "date": "2026-11-26",
+  "branch": "upstream34/vram-layout-fix",
+  "base_commit": "bad2b1753ec7f743b8d47aaed8c01aae906047e7",
+  "pci_scope": "1002:1900",
+  "phxbringup_build": 34,
+  "driver_source_sha256": "81f45aa2e8166bc6ebed4106129bebebfd70f9b4bbea6dbe389be46263e3c699",
+  "probe_header_sha256": "f606f71e08bda0eaab377b072ae68d5635dbb65aee67e7643aaa993bdaa6e653",
+  "stage_script_sha256": "b33e7f768d7e32fa60beae78f13e57b2e1eb7bb1748105988a6f0647f742b309",
+  "boot_arg": "-phx-dcnmapperprobe",
+  "xnu_lookup_behavior": "missing iommu-parent returns immediately; a service identifier may wait for matching service without a deadline",
+  "runtime_probe_admissible": false,
+  "checks": {
+    "mapper_probe_stage_and_cpu_fixture_methods": 2,
+    "mapper_observation_methods": 11,
+    "route_observation_methods": 5,
+    "full_make_test": "passed",
+    "cpu_fixture_sanitizers": ["address", "undefined"]
+  },
+  "kernel_kext_built": false,
+  "runtime_probe_executed": false,
+  "driver_installed_or_reloaded": false,
+  "dma_mapping_created": false,
+  "registers_read_or_written": false,
+  "gpu_work_submitted": false,
+  "device_dma_domain_proven": false,
+  "active_hubp_route_observed": false,
+  "route_provider_proven": false,
+  "raw_registry_saved": false
+}

@@ -11,6 +11,12 @@ PCI_QUERY = ['/usr/sbin/ioreg', '-a', '-l', '-r', '-d', '2', '-c', 'IOPCIDevice'
 MAX_REGISTRY_BYTES = 8 * 1024 * 1024
 TARGET_VENDOR = bytes.fromhex('02100000')
 TARGET_DEVICE = bytes.fromhex('00190000')
+MAPPER_PROBE_PROPERTIES = (
+    'phx-dcn-mapper-probe-requested',
+    'phx-dcn-mapper-probe-performed',
+    'phx-dcn-mapper-resolved',
+    'phx-dcn-mapper-active-at-probe',
+)
 
 
 def roots(blob):
@@ -20,6 +26,43 @@ def roots(blob):
     if type(value) is not list or not all(type(item) is dict for item in value):
         raise ValueError('Unexpected registry collection')
     return value
+
+
+def classify_mapper_probe(service):
+    present = [key in service for key in MAPPER_PROBE_PROPERTIES]
+    if not any(present):
+        return {
+            'runtime_mapper_probe_state': 'not-published',
+            'runtime_mapper_probe_requested': None,
+            'runtime_mapper_probe_performed': None,
+            'runtime_mapper_resolved': None,
+            'runtime_mapper_active_at_probe': None,
+        }
+    if not all(present):
+        raise ValueError('Incomplete mapper-probe metadata')
+    values = [service[key] for key in MAPPER_PROBE_PROPERTIES]
+    if any(type(value) is not bool for value in values):
+        raise ValueError('Invalid mapper-probe metadata')
+    requested, performed, resolved, active = values
+    if (performed and not requested) or (resolved and not performed) or (active and not resolved):
+        raise ValueError('Inconsistent mapper-probe metadata')
+    if not requested:
+        state = 'published-disabled'
+    elif not performed:
+        state = 'requested-not-performed'
+    elif not resolved:
+        state = 'performed-unresolved'
+    elif active:
+        state = 'active-at-probe'
+    else:
+        state = 'resolved-inactive-at-probe'
+    return {
+        'runtime_mapper_probe_state': state,
+        'runtime_mapper_probe_requested': requested,
+        'runtime_mapper_probe_performed': performed,
+        'runtime_mapper_resolved': resolved if performed else None,
+        'runtime_mapper_active_at_probe': active if performed else None,
+    }
 
 
 def decode_snapshot(blob, os_version, os_build):
@@ -36,6 +79,7 @@ def decode_snapshot(blob, os_version, os_build):
                 type(entry.get('phx-build')) is int and entry.get('phx-build') == 34]
     if len(services) != 1:
         raise ValueError('Expected one build34 PhxBringup child')
+    probe = classify_mapper_probe(services[0])
     if 'iommu-parent' not in devices[0]:
         classification = 'absent'
     else:
@@ -53,7 +97,7 @@ def decode_snapshot(blob, os_version, os_build):
         'target': '1002:1900',
         'PhxBringup_build': 34,
         'iommu_parent_property': classification,
-        'runtime_mapper_resolved': False,
+        **probe,
         'device_dma_domain_proven': False,
         'raw_registry_saved': False,
         'property_value_emitted': False,
