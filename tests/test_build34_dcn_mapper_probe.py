@@ -28,8 +28,11 @@ class DcnMapperProbeTests(unittest.TestCase):
         self.assertIn('dcnMapperProbeRequested &&', rendered)
         self.assertIn('pci->configRead32(kIOPCIConfigVendorID) == 0x19001002u', rendered)
         self.assertIn('setProperty("phx-dcn-address-domain-proven", false);', rendered)
-        self.assertEqual(rendered.count('probeDeviceMapper<IOMapper>'), 1)
-        self.assertEqual((ROOT / 'src/phxbringup/PhxDcnMapperProbe.h').read_text().count('copyMapperForDevice'), 1)
+        self.assertEqual(rendered.count('probeDeviceMapperNoWait<IOMapper>'), 1)
+        probe = (ROOT / 'src/phxbringup/PhxDcnMapperProbe.h').read_text()
+        self.assertEqual(probe.count('IOService::getMatchingServices'), 1)
+        self.assertNotIn('copyMapperForDevice', probe)
+        self.assertNotIn('waitForMatchingService', probe)
         self.assertEqual(len(DRIVER_SHA256), 64)
 
     def test_cpu_lookup_lifetime_fixture(self):
@@ -38,7 +41,7 @@ class DcnMapperProbeTests(unittest.TestCase):
             built = subprocess.run([
                 *shlex.split(os.environ.get('CXX', 'clang++')), '-std=c++17', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
                 '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
-                '-I' + str(ROOT / 'tests/build34_dcn'), '-I' + str(ROOT / 'src/phxbringup'),
+                '-I' + str(ROOT / 'tests/build34_dcn_mapper'), '-I' + str(ROOT / 'src/phxbringup'),
                 str(FIXTURE), '-o', str(binary),
             ], capture_output=True, text=True, timeout=60)
             self.assertEqual(built.returncode, 0, built.stderr)
@@ -47,7 +50,7 @@ class DcnMapperProbeTests(unittest.TestCase):
                 self.assertNotIn('IOKit.framework', linkage)
             result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, '[PASS] build34 mapper lookup probe CPU-only\n')
+            self.assertEqual(result.stdout, '[PASS] build34 non-waiting mapper probe CPU-only\n')
 
 
 if __name__ == '__main__':

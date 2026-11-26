@@ -21,8 +21,9 @@ prove that either framebuffer service owns the live fetch, resolve a DMA
 address domain, or establish a route lease. No register was read or written,
 no DMA mapping was created, and no driver reload or GPU work occurred. The
 read-only raw-register selector is too broad to use as an unqualified route
-probe. The staged mapper/direct-domain and qualified-route hooks remain
-unimplemented; do not treat these class counts as provider evidence.
+probe. The source-only mapper observer does not attest a route; the
+direct-domain and qualified-route providers remain unimplemented. Do not treat
+these class counts as provider evidence.
 
 ## Source-only mapper lookup probe, November 26
 
@@ -45,28 +46,44 @@ overlay; no runtime result has been collected.
 The [pinned XNU implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMapper.cpp#L167-L207)
 returns immediately when `iommu-parent` is absent, but can call
 `waitForMatchingService()` without a deadline when the property names a
-service. That can hold driver `start`; this staged call is not approved for
-runtime use until its exact parent path has a bounded, verified resolution.
+service. That legacy path can hold driver `start` and remains unsuitable. The
+current staged source no longer calls it and instead uses the non-waiting
+resolver described next; that alternative still has no hard latency bound.
 The earlier filtered snapshot found the property absent, but that does not
 qualify a later boot or a different source state.
 
-The pinned XNU `IOService::getMatchingServices()` API is a possible
-non-waiting alternative: it returns an iterator over the currently matched
-services, whereas `waitForMatchingService()` waits for publication. A safe
-resolver would have to reproduce only the target device's `iommu-parent` match
-against `gIOMapperIDKey`, count the current results, require exactly one active
-`IOMapper`, retain it through the sample, and fail closed on zero or multiple
-matches. `IOMapper::start()` derives that key from the provider's `iommu-id`
+The pinned XNU `IOService::getMatchingServices()` API returns an iterator over
+currently published services; unlike `waitForMatchingService()`, it does not
+wait for future publication. The source-only resolver now builds an `IOMapper`
+class match with the target device's `iommu-parent` value under
+`gIOMapperIDKey`, counts all current results, retains the sole result while it
+samples active state, and rejects a missing/malformed parent, zero/multiple
+matches, inactive device, allocation failure or invalidated iterator. The
+`getNextObject()` result is borrowed, so it is retained before the iterator is
+released. `IOMapper::start()` derives that key from the provider's `iommu-id`
 or `AAPL,phandle`; an unrelated system mapper is not a substitute. See the
 [pinned lookup](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMapper.cpp#L121-L207)
 and [current-service enumeration](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOService.cpp#L6367-L6385).
 
-This alternative is not implemented yet: the installed 26.7.2 KDK contains no
-`IOService.h`/`IOMapper.h` kernel headers to verify its exact SDK ownership
-types, and the existing CPU stubs are not an SDK ABI check. The last filtered
-snapshot had no `iommu-parent` and no visible `IOMapper`, so even a no-wait
-resolver would currently return unresolved. Do not enable the staged blocking
-probe or infer address-domain/route proof from a service match.
+The API ownership/signatures were checked against the independently pinned
+MacKernelSDK `3f750085caa17ec3a7880f11c11bf4f48cd6a164` (1,216 reviewed input
+files). A source-only x86_64 `MH_OBJECT` compile imports
+`getMatchingServices()` and does not import either mapper lookup wait API; the
+CPU fixture passes AddressSanitizer and UndefinedBehaviorSanitizer cases for
+exact ID selection, missing results, unique/inactive/ambiguous results,
+allocation failures and iterator invalidation. This API avoids waiting for a
+service publication, not every possible lock or scheduling delay, and carries
+no hard real-time latency guarantee.
+
+This resolver is only used by the opt-in staged observation source. The
+production driver and default start path are unchanged; the staged boot-arg
+probe remains unexecuted and is not admitted for runtime use. The last
+filtered snapshot had no `iommu-parent` and no visible `IOMapper`, so a future
+observation would currently be unresolved. A unique active service would
+still prove only a current service match, not DMA address-domain qualification,
+translation lifetime, actual DCN fetches, the active HUBP route, or zero-copy
+safety. Those results remain false. See the
+[non-waiting source-only evidence](validation/build34-dcn-mapper-nonwait-20261126.json).
 
 ## Offline DCN zero-copy prerequisite, November 24
 

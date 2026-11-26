@@ -11,13 +11,49 @@ struct MapperProbeResult {
 };
 
 template<typename Mapper>
-MapperProbeResult probeDeviceMapper(IOPCIDevice *device) {
+MapperProbeResult probeDeviceMapperNoWait(IOService *device) {
     if (!device || device->isInactive()) return {};
     MapperProbeResult result{true, false, false};
-    auto *mapper = Mapper::copyMapperForDevice(device);
-    result.resolved = mapper != nullptr;
-    result.activeAtProbe = mapper && !mapper->isInactive();
-    if (mapper) mapper->release();
+
+    OSString *mapperID = OSDynamicCast(OSString, device->getProperty("iommu-parent"));
+    if (!mapperID || mapperID->getLength() == 0 || !gIOMapperIDKey) return result;
+
+    OSDictionary *matching = IOService::serviceMatching("IOMapper");
+    if (!matching) return result;
+    if (!matching->setObject(gIOMapperIDKey, mapperID)) {
+        matching->release();
+        return result;
+    }
+
+    OSIterator *services = IOService::getMatchingServices(matching);
+    matching->release();
+    if (!services) return result;
+
+    Mapper *uniqueMapper = nullptr;
+    unsigned matchingMapperCount = 0;
+    bool invalidMatch = false;
+    while (OSObject *object = services->getNextObject()) {
+        Mapper *mapper = OSDynamicCast(Mapper, object);
+        if (!mapper) {
+            invalidMatch = true;
+            continue;
+        }
+        ++matchingMapperCount;
+        if (matchingMapperCount == 1) {
+            mapper->retain();
+            uniqueMapper = mapper;
+        } else {
+            invalidMatch = true;
+        }
+    }
+    const bool iteratorValid = services->isValid();
+    services->release();
+
+    if (iteratorValid && !invalidMatch && matchingMapperCount == 1 && uniqueMapper && !device->isInactive()) {
+        result.resolved = true;
+        result.activeAtProbe = !uniqueMapper->isInactive();
+    }
+    if (uniqueMapper) uniqueMapper->release();
     return result;
 }
 

@@ -13,7 +13,7 @@ PROBE = '''    int dcnMapperProbeArg = 0;
                                                             sizeof(dcnMapperProbeArg));
     const bool dcnMapperProbeTarget = dcnMapperProbeRequested &&
         pci->configRead32(kIOPCIConfigVendorID) == 0x19001002u;
-    const auto dcnMapperProbe = dcnMapperProbeTarget ? build34::dcn::probeDeviceMapper<IOMapper>(pci) :
+    const auto dcnMapperProbe = dcnMapperProbeTarget ? build34::dcn::probeDeviceMapperNoWait<IOMapper>(pci) :
         build34::dcn::MapperProbeResult{};
     setProperty("phx-dcn-mapper-probe-requested", dcnMapperProbeRequested);
     setProperty("phx-dcn-mapper-probe-performed", dcnMapperProbe.attempted);

@@ -440,6 +440,12 @@ test-build34-exact-open:
 	@test -n "$(KERNEL_SDK)" -a -n "$(KDK)" -a -n "$(EXACT_OPEN_OUT)" || (echo "Set KERNEL_SDK, KDK and fresh EXACT_OPEN_OUT"; exit 2)
 	python3 -B tools/test_build34_exact_open.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(EXACT_OPEN_OUT)"
 
+# Mapper resolver header compile only; produces a nonloadable SDK object.
+.PHONY: test-build34-dcn-mapper-native
+test-build34-dcn-mapper-native:
+	@test -n "$(KERNEL_SDK)" -a -n "$(KDK)" -a -n "$(DCN_MAPPER_NATIVE_OUT)" || (echo "Set KERNEL_SDK, KDK and fresh DCN_MAPPER_NATIVE_OUT"; exit 2)
+	python3 -B tools/test_build34_dcn_mapper_probe_native.py --sdk "$(KERNEL_SDK)" --kdk "$(KDK)" --out "$(DCN_MAPPER_NATIVE_OUT)"
+
 # Passive mapping-metadata preparation only; never a kernel candidate/GPU test.
 .PHONY: test-build34-map-observation
 test-build34-map-observation:
