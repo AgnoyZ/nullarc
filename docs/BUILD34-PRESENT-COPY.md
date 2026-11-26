@@ -2260,3 +2260,65 @@ The isolated build34 candidate v10 (`PhxAccel.kext` + AuxKC) and rebuilt
   regression: `zc_flips` `750 -> 1,027` (`+277`), `iop_ok` `995 -> 1,272`
   (`+277`, 100% zero-copy), `zc_fallbacks=0`, `zc_pending_waits` `100 -> 113`
   (`+13`), `zc_tlb_flushes=3` (`+0`), `zc_faults=0`, `iop_fail=0`.
+
+### November 27, 2026: RADV 780M memory/upload measurement and multisample copy guard
+
+To evaluate the medium/high-impact NullMoth architectural items against real
+AMD Radeon 780M (RADV PHOENIX, `1002:1900`, build34 ABI 1.12) hardware before
+porting policies blindly, a direct Vulkan microbenchmark and Metal end-to-end
+check were run on the active zero-copy desktop:
+
+- **Memory heaps & bandwidth (NullMoth `10ed6bbe` evaluation)**: RADV exposes
+  `heap[0]` `256 MiB` HOST (GTT) and `heap[1]` `512 MiB` DEVICE_LOCAL (256 MiB
+  visible VRAM + 1536 MiB hi, GTT cap 512 MiB). Warmed 16 MiB (`2560x1600x4`)
+  transfers across the primary `HOST_VISIBLE` types measured:
+  - `type[2]` (`HOST_VISIBLE|HOST_COHERENT`, GTT WC): CPU write `6.5 GB/s`,
+    CPU read `8.8 GB/s`, random 64k read `0.26 ms`, GPU `B->B 33.1 GB/s`,
+    `B->I 31.5 GB/s`, `I->B 32.1 GB/s`.
+  - `type[3]` (`DEVICE_LOCAL|HOST_VISIBLE|HOST_COHERENT`, visible VRAM WC):
+    CPU write `4.5 GB/s`, CPU read `7.0 GB/s`, random 64k read `0.35 ms`,
+    GPU `B->B 32.1 GB/s`, `B->I 30.6 GB/s`, `I->B 32.3 GB/s`.
+  - `type[5]` (`HOST_VISIBLE|HOST_COHERENT|HOST_CACHED`, GTT cached):
+    CPU write `5.4 GB/s`, CPU read `7.9 GB/s`, random 64k read `0.19 ms`,
+    GPU `B->B 31.9 GB/s`, `B->I 31.9 GB/s`, `I->B 32.2 GB/s`.
+  - **Decision**: Keep `NVMTL_SHARED_VRAM=0` (GTT-first) as default on 780M
+    UMA. Unlike discrete PCIe GPUs, `type[2]` matches or beats visible-VRAM
+    `type[3]` on both CPU and GPU bandwidth without consuming the 256 MiB
+    visible VRAM aperture.
+- **4:2:2 video formats (NullMoth `e09445ee` evaluation)**: RADV reports
+  `linear=0x00000000` / `optimal=0x00000000` for both
+  `VK_FORMAT_G8B8G8R8_422_UNORM` and `VK_FORMAT_B8G8R8G8_422_UNORM` (whereas
+  `VK_FORMAT_G8_B8R8_2PLANE_420_UNORM` is natively supported at `0x00c6d001`).
+  Supporting `BGRG422`/`GBGR422` therefore requires a dedicated software/compute
+  unpack path and is deferred to an isolated change if a 4:2:2 workload needs it.
+- **Texture upload submission & lifecycle (`NVMTL_ASYNC_TEX_UPLOAD`)**:
+  With pre-allocated staging buffers in raw Vulkan (`32 x 256x256` BGRA8),
+  pipelined async submits reduced total time from `21.25–21.81 ms` to
+  `1.80–1.85 ms` (`11.5–12.1x`). However, on the real Metal plugin
+  `replaceRegion` path (`32 x 256x256`), default synchronous reuse
+  (`nvmtl_vk_stage`) ran in `7.491 ms` (`234.1 us/tex`, `0` readback
+  mismatches), whereas `NVMTL_ASYNC_TEX_UPLOAD=1` regressed to `51.176 ms`
+  (`1599.2 us/tex`, `0` mismatches) because each async upload currently allocates
+  a fresh staging buffer instead of suballocating from a ring. Therefore
+  `NVMTL_ASYNC_TEX_UPLOAD` remains OFF by default until a ring-backed uploader
+  is implemented, while its missing `nvmtl_vk_image_upload_barrier(img)` drains
+  on `nvmtl_vk_image_write`, bidirectional `nvmtl_vk_image_host_xfer`, and
+  `nvmtl_vk_image_write_region_level_layer` fallback were closed (zero-cost
+  no-op when `up_token == 0`).
+- **Multisample buffer<->image copy guard (NullMoth `71aa2a25` + Vulkan
+  VUID-07973)**: Added `nvmtl_vk_reject_multisample_copy()` to all 7
+  buffer<->image copy entry points in `src/nmplugin/nvmtl_vk.c`
+  (`nvmtl_vk_image_write`, `nvmtl_vk_image_read`, `nvmtl_vk_image_host_xfer`,
+  `nvmtl_vk_image_write_region_level_layer`,
+  `nvmtl_vk_image_read_region_level_layer`,
+  `nvmtl_vk_cmd_copy_buffer_to_image_level_layer`,
+  `nvmtl_vk_cmd_copy_image_to_buffer_level_layer`), added
+  `tests/test_nmplugin_multisample_copy_guard.py` to `Makefile` `test`, and
+  synced `tools/build34_dcn_render_write_stage.py`.
+- **Isolated plugin deployment & live check**: Rebuilt and ad-hoc signed
+  `NVMTLDriver` (UUID `89C63475-7EF2-3BD5-B798-997E34C129D6`, SHA256
+  `f54985d0e1a6e8fab0fb853927360fd3895bffcdb288484850b0e4cd9362b1ad`;
+  previous binary backed up under local isolated `backup/NVMTLDriver.pre-msaa-guard-20261127`,
+  `nvrm610.conf` unchanged). Metal MSAA 4x buffer<->texture blit rejection
+  completed cleanly (`status=4`) with `zc_flips=1381`, `zc_faults=0`,
+  `zc_fallbacks=0`, `iop_fail=0`, `phx_hang_kills=0`.

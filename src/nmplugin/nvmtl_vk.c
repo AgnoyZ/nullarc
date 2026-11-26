@@ -6307,8 +6307,20 @@ static void nvmtl_copy_from_surface(void *dst, const void *src, size_t n)
     memcpy(dst, src, n);
 }
 
+static inline int nvmtl_vk_reject_multisample_copy(const nvk_image *img, const char *who)
+{
+    if (!img) return -1;
+    if (img->samples > 1) {
+        nvlog("%s: multisampled image (%u samples) cannot be copied to/from a buffer — REFUSED", who, img->samples);
+        return -1;
+    }
+    return 0;
+}
+
 int nvmtl_vk_image_write(nvk_queue *q, nvk_image *img, const void *src, size_t row_bytes)
 {
+    if (nvmtl_vk_reject_multisample_copy(img, "image_write")) return -1;
+    nvmtl_vk_image_upload_barrier(img);
     const size_t bpp = img->bpp ? img->bpp : 4;
     const uint32_t cols = nvmtl_blocks(img->w, img->bw), rows = nvmtl_blocks(img->h, img->bh);
     if (row_bytes < (size_t)cols * bpp) { nvlog("image_write: bytesPerRow %zu < %u blocks * %zu B", row_bytes, cols, bpp); return -1; }
@@ -6353,6 +6365,7 @@ int nvmtl_vk_copy_buffer(nvk_queue *q, nvk_buffer *src, size_t srcOff, nvk_buffe
 
 int nvmtl_vk_image_read(nvk_queue *q, nvk_image *img, void *dst, size_t row_bytes)
 {
+    if (nvmtl_vk_reject_multisample_copy(img, "image_read")) return -1;
     nvmtl_vk_image_upload_barrier(img);   // a readback must observe a pending async upload: finish it first
     const size_t bpp = img->bpp ? img->bpp : 4;
     const uint32_t cols = nvmtl_blocks(img->w, img->bw), rows = nvmtl_blocks(img->h, img->bh);
@@ -6388,10 +6401,11 @@ int nvmtl_vk_image_read(nvk_queue *q, nvk_image *img, void *dst, size_t row_byte
 // its buffer this way, from offset.
 int nvmtl_vk_image_host_xfer(nvk_queue *q, nvk_image *img, nvk_buffer *hb, size_t offset, size_t row_bytes, int to_image)
 {
+    if (nvmtl_vk_reject_multisample_copy(img, "image_host_xfer")) return -1;
     const size_t bpp = img->bpp ? img->bpp : 4;
     if (img->bw > 1 || img->bh > 1 || row_bytes % bpp || row_bytes / bpp < img->w || offset % 4 || offset % bpp
         || offset > hb->size || row_bytes * (img->h - 1) + (size_t)img->w * bpp > hb->size - offset) return -1;
-    if (!to_image) nvmtl_vk_image_upload_barrier(img);   // a readback must observe a pending async upload: finish it first
+    nvmtl_vk_image_upload_barrier(img);   // both overwrite and readback must finish any pending async upload first
     nvk_cmdbuf c; if (nvmtl_vk_cmd_begin(q, &c)) return -1;
     VkImageSubresourceRange range = { nvmtl_barrier_aspect(img), 0, 1, 0, 1 };
     VkBufferImageCopy bic = { offset, (uint32_t)(row_bytes / bpp), 0, { nvmtl_copy_aspect(img), 0, 0, 1 }, { 0, 0, 0 }, { img->w, img->h, 1 } };
@@ -6524,6 +6538,7 @@ int nvmtl_vk_image_write_region_level(nvk_queue *q, nvk_image *img, const void *
 int nvmtl_vk_image_write_region_level_layer(nvk_queue *q, nvk_image *img, const void *src, size_t row_bytes,
                                       uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t level, uint32_t layer)
 {
+    if (nvmtl_vk_reject_multisample_copy(img, "image_write_region")) return -1;
     if (layer >= (img->layers ? img->layers : 1)) { nvlog("image_write_region: layer %u — this image has %u", layer, img->layers ? img->layers : 1); return -1; }
     { const uint32_t lw = img->w >> level ? img->w >> level : 1, lh = img->h >> level ? img->h >> level : 1;
       if (!w || !h || x > lw || w > lw - x || y > lh || h > lh - y) { nvlog("image_write_region: %ux%u at (%u,%u) is outside %ux%u (level %u)", w, h, x, y, lw, lh, level); return -1; } }
@@ -6540,9 +6555,9 @@ int nvmtl_vk_image_write_region_level_layer(nvk_queue *q, nvk_image *img, const 
     nvmtl_asyncup *au = NULL;
     nvk_buffer *stageb, stage_sync;
     nvk_cmdbuf local_cb, *c;
+    // a prior async upload to THIS image must land before we overwrite the texture or fall back to sync
+    if (finish_first) nvmtl_asyncup_finish(nvmtl_asyncup_take(img));
     if (mode == NVMTL_UP_SUBMIT_ASYNC) {
-        // a prior async upload to THIS image must land before we overwrite the texture or its staging
-        if (finish_first) nvmtl_asyncup_finish(nvmtl_asyncup_take(img));
         au = (nvmtl_asyncup *)calloc(1, sizeof *au);
         if (!au || nvmtl_vk_buffer_create(bytes, 1, &au->stage)) { free(au); au = NULL; }   // fall back to sync
     }
@@ -6576,6 +6591,7 @@ int nvmtl_vk_image_read_region_level(nvk_queue *q, nvk_image *img, void *dst, si
 int nvmtl_vk_image_read_region_level_layer(nvk_queue *q, nvk_image *img, void *dst, size_t row_bytes,
                                      uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t level, uint32_t layer)
 {
+    if (nvmtl_vk_reject_multisample_copy(img, "image_read_region")) return -1;
     nvmtl_vk_image_upload_barrier(img);   // a readback must observe a pending async upload: finish it first
     if (layer >= (img->layers ? img->layers : 1)) { nvlog("image_read_region: layer %u — this image has %u", layer, img->layers ? img->layers : 1); return -1; }
     { const uint32_t lw = img->w >> level ? img->w >> level : 1, lh = img->h >> level ? img->h >> level : 1;
@@ -7325,6 +7341,7 @@ int nvmtl_vk_cmd_copy_buffer_to_image_layer(nvk_cmdbuf *c, nvk_buffer *b, size_t
 int nvmtl_vk_cmd_copy_buffer_to_image_level_layer(nvk_cmdbuf *c, nvk_buffer *b, size_t off, uint32_t row_bytes,
                                   nvk_image *img, uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t level, uint32_t layer)
 {
+    if (nvmtl_vk_reject_multisample_copy(img, "copy_buffer_to_image")) return -1;
     if (level >= (img->mips ? img->mips : 1)) { nvlog("copy_buffer_to_image: level %u — this image has %u", level, img->mips ? img->mips : 1); return -1; }
     const uint32_t lw = nvmtl_lvl(img->w, level), lh = nvmtl_lvl(img->h, level);
     const uint32_t bpp = g_copy_bpp_override ? g_copy_bpp_override : (img->bpp ? img->bpp : 4);
@@ -7354,6 +7371,7 @@ int nvmtl_vk_cmd_copy_image_to_buffer_layer(nvk_cmdbuf *c, nvk_image *img, uint3
 int nvmtl_vk_cmd_copy_image_to_buffer_level_layer(nvk_cmdbuf *c, nvk_image *img, uint32_t x, uint32_t y, uint32_t w, uint32_t h,
                                   nvk_buffer *b, size_t off, uint32_t row_bytes, uint32_t level, uint32_t layer)
 {
+    if (nvmtl_vk_reject_multisample_copy(img, "copy_image_to_buffer")) return -1;
     if (level >= (img->mips ? img->mips : 1)) { nvlog("copy_image_to_buffer: level %u — this image has %u", level, img->mips ? img->mips : 1); return -1; }
     const uint32_t lw = nvmtl_lvl(img->w, level), lh = nvmtl_lvl(img->h, level);
     const uint32_t bpp = g_copy_bpp_override ? g_copy_bpp_override : (img->bpp ? img->bpp : 4);
