@@ -41,10 +41,64 @@ class DcnRouteObservationTests(unittest.TestCase):
         self.assertFalse(result['active_hubp_route_observed'])
         self.assertFalse(result['route_provider_proven'])
         self.assertFalse(result['device_dma_domain_proven'])
+        self.assertEqual(result['firmware_hubp_sample_state'], 'not-published')
+        self.assertIsNone(result['firmware_hubp_sample_valid'])
         encoded = json.dumps(result)
         self.assertNotIn('PRIVATE_SENTINEL', encoded)
         self.assertNotIn('PrivateService', encoded)
         self.assertNotIn('serial-number', encoded)
+
+    def test_valid_firmware_sample_is_sanitized_and_does_not_prove_route_or_domain(self):
+        framebuffer = self.device['IORegistryEntryChildren'][1]
+        framebuffer.update({
+            'phx-dcn-firmware-sample-v1': 1,
+            'phx-dcn-firmware-sample-attempted': True,
+            'phx-dcn-firmware-sample-valid': True,
+            'phx-dcn-route-provider-proven': False,
+            'phx-dcn-device-dma-domain-proven': False,
+            'phx-dcn-scanout-address': 'PRIVATE_ADDRESS_SENTINEL',
+        })
+        result = self.decode()
+        self.assertEqual(result['firmware_hubp_sample_state'], 'sample-valid')
+        self.assertTrue(result['firmware_hubp_sample_attempted'])
+        self.assertTrue(result['firmware_hubp_sample_valid'])
+        self.assertFalse(result['active_hubp_route_observed'])
+        self.assertFalse(result['route_provider_proven'])
+        self.assertFalse(result['device_dma_domain_proven'])
+        encoded = json.dumps(result)
+        self.assertNotIn('PRIVATE_ADDRESS_SENTINEL', encoded)
+        self.assertNotIn('phx-dcn-scanout-address', encoded)
+        self.assertNotIn('phx-dcn-firmware-sample-v1', encoded)
+
+    def test_firmware_sample_metadata_fails_closed(self):
+        framebuffer = self.device['IORegistryEntryChildren'][1]
+        properties = {
+            'phx-dcn-firmware-sample-v1': 1,
+            'phx-dcn-firmware-sample-attempted': True,
+            'phx-dcn-firmware-sample-valid': False,
+            'phx-dcn-route-provider-proven': False,
+            'phx-dcn-device-dma-domain-proven': False,
+        }
+        cases = (
+            {key: value for key, value in properties.items() if key != 'phx-dcn-firmware-sample-valid'},
+            dict(properties, **{'phx-dcn-firmware-sample-v1': True}),
+            dict(properties, **{'phx-dcn-firmware-sample-attempted': 1}),
+            dict(properties, **{'phx-dcn-firmware-sample-attempted': False}),
+            dict(properties, **{'phx-dcn-route-provider-proven': True}),
+            dict(properties, **{'phx-dcn-device-dma-domain-proven': True}),
+        )
+        for values in cases:
+            framebuffer.clear()
+            framebuffer['IOObjectClass'] = 'PhxAMDFB'
+            framebuffer.update(values)
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                self.decode()
+
+    def test_multiple_framebuffers_refuse_sample_attribution(self):
+        device = dict(self.device, **{'IORegistryEntryChildren': list(self.device['IORegistryEntryChildren']) +
+                                     [{'IOObjectClass': 'PhxAMDFB'}]})
+        with self.assertRaisesRegex(ValueError, 'at most one PhxAMDFB'):
+            self.decode(device)
 
     def test_requires_unique_target_and_exact_build34_child(self):
         for roots in ([], [self.device, dict(self.device)]):

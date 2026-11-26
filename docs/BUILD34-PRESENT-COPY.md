@@ -25,6 +25,59 @@ probe. The source-only mapper observer does not attest a route; the
 direct-domain and qualified-route providers remain unimplemented. Do not treat
 these class counts as provider evidence.
 
+### Current read-only preflight, November 26
+
+The live scanout-mode gate again passes at 1280x800 logical, 2560x1600 backing,
+120 Hz and AppKit scale 2.0 on macOS 26.7.2 (`25G332`). A targeted loaded-bundle
+query finds PhxAccel; strict signature verification of its on-disk bundle
+passes. The installed executable does not match the one-shot observer candidate
+hash, so the candidate remains offline. An in-memory parse of the complete
+boot/system/AuxKC metadata reports 232/180/4 records (416 total), including 29
+codeless records and the PhxAccel entry. The sanitized
+[preflight result](validation/build34-dcn-route-preflight-20261126.json)
+records no disk/cache change.
+
+The existing PhxAMDFB still publishes no firmware/HUBP sample metadata;
+`active_hubp_route_observed`, `route_provider_proven`, and
+`device_dma_domain_proven` remain false. This confirms neither a runtime
+observer result nor zero-copy admission. The existing R2a host wrapper is
+bound to a different exact candidate and is not reusable for this observer.
+Do not link, install or boot the observer until a fresh candidate-specific
+scope verifies the accepted binary/cache baseline, complete candidate cache,
+recovery copy and guarded rollback.
+
+## One-shot firmware-HUBP sample stage, November 26
+
+`tools/build34_dcn_firmware_observation_stage.py` derives from the hash-pinned
+build34 PhxFB firmware-sample overlay. After PhxFB is ready and powered, it
+calls the existing bounded `sampleDcnFirmware` path at most once per service
+instance. That path checks the firmware scanout sample against stable HUBP0
+geometry and the framebuffer aperture using read-only BAR5 accesses. The
+observer publishes only a schema marker, attempted/valid booleans, and explicit
+false route-provider and device-DMA-domain booleans. It does not publish the
+sample's addresses, register values, or raw registry data, and it creates no
+DMA mapping or GPU work.
+
+A valid result would show only that the sampled HUBP state matched the firmware
+front at one instant. It is not an active direct-present route lease and does
+not prove the device DMA domain; `active_hubp_route_observed`,
+`route_provider_proven`, and `device_dma_domain_proven` remain false. The
+filtered reader rejects partial, malformed, or positive route/domain metadata
+and emits only the allowlisted booleans/counts. If PhxFB is not both ready and
+powered, the sample remains unpublished. See the
+[source-only stage record](validation/build34-dcn-firmware-observer-source-20261126.json).
+
+The exact PhxAccel source was also built in a git-ignored private directory
+against the pinned MacKernelSDK and current KDK. A same-source control and the
+observer bundle compile, link and pass strict ad-hoc signature verification;
+the bundle `Info.plist` is unchanged. The observer adds two imports, both
+provided by existing `IOPCIFamily`/`com.apple.kpi.iokit` dependencies, and
+removes one unused framebuffer import. This is only a private offline build:
+it is not AuxKC-linked, installed, loaded, or runtime-admitted. No reboot,
+NVRAM/EFI change, or sample execution occurred. The native 2x preference
+remains fixed; current runtime sampling, the qualifying route provider, and
+actual descriptor-to-DMA-domain verification are still pending.
+
 ## Source-only mapper lookup probe, November 26
 
 `tools/build34_dcn_mapper_probe_stage.py` derives an opt-in build34 source

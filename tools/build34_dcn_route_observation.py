@@ -11,6 +11,41 @@ import build34_dcn_mapper_observation as mapper
 
 MAX_REGISTRY_BYTES = 8 * 1024 * 1024
 CHILD_CLASSES = ('AMDSupport', 'NMXAccel', 'PhxAMDFB', 'PhxBringup', 'PhxDeviceControl')
+FIRMWARE_SAMPLE_PROPERTIES = (
+    'phx-dcn-firmware-sample-v1',
+    'phx-dcn-firmware-sample-attempted',
+    'phx-dcn-firmware-sample-valid',
+    'phx-dcn-route-provider-proven',
+    'phx-dcn-device-dma-domain-proven',
+)
+
+
+def classify_firmware_sample(service):
+    if service is None:
+        present = [False] * len(FIRMWARE_SAMPLE_PROPERTIES)
+    else:
+        present = [key in service for key in FIRMWARE_SAMPLE_PROPERTIES]
+    if not any(present):
+        return {
+            'firmware_hubp_sample_state': 'not-published',
+            'firmware_hubp_sample_attempted': None,
+            'firmware_hubp_sample_valid': None,
+        }
+    if not all(present):
+        raise ValueError('Incomplete firmware-sample metadata')
+    schema, attempted, valid, route_proven, domain_proven = [service[key] for key in FIRMWARE_SAMPLE_PROPERTIES]
+    if type(schema) is not int or schema != 1 or any(type(value) is not bool for value in
+                                                     (attempted, valid, route_proven, domain_proven)):
+        raise ValueError('Invalid firmware-sample metadata')
+    if not attempted or (valid and not attempted):
+        raise ValueError('Inconsistent firmware-sample metadata')
+    if route_proven or domain_proven:
+        raise ValueError('Firmware sample cannot prove route or DMA domain')
+    return {
+        'firmware_hubp_sample_state': 'sample-valid' if valid else 'sample-invalid',
+        'firmware_hubp_sample_attempted': attempted,
+        'firmware_hubp_sample_valid': valid,
+    }
 
 
 def decode_snapshot(blob, os_version, os_build):
@@ -36,6 +71,10 @@ def decode_snapshot(blob, os_version, os_build):
         name = child.get('IOObjectClass')
         if type(name) is str and name in counts:
             counts[name] += 1
+    framebuffers = [child for child in children if child.get('IOObjectClass') == 'PhxAMDFB']
+    if len(framebuffers) > 1:
+        raise ValueError('Expected at most one PhxAMDFB child')
+    firmware_sample = classify_firmware_sample(framebuffers[0] if framebuffers else None)
     return {
         'status': 'filtered-dcn-route-topology-observation',
         'OS_version': os_version,
@@ -43,6 +82,7 @@ def decode_snapshot(blob, os_version, os_build):
         'target': '1002:1900',
         'PhxBringup_build34_child_count': 1,
         'known_direct_child_class_counts': counts,
+        **firmware_sample,
         'active_hubp_route_observed': False,
         'route_provider_proven': False,
         'device_dma_domain_proven': False,

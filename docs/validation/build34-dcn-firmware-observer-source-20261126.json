@@ -1,0 +1,67 @@
+{
+  "status": "private-native-build-one-shot-firmware-hubp-observer-not-loaded",
+  "date": "2026-11-26",
+  "branch": "upstream34/vram-layout-fix",
+  "based_on_commit": "d182b7695fe24b061cce08361838ab41d8fea2cf",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "target": "1002:1900",
+  "phxfb_source_sha256": "d5d2b930443e61a03ca336a460f4868adbe41e49edeb4fefc3cc7eb0cba936be",
+  "observer_stage_sha256": "ca40c5e657a7ed5bed5fa7a80760b4b3d8040aff397fbffb232543027b2b6be1",
+  "route_reader_sha256": "fa9b7865cf819eb231afb0f6046d31548f312b4bd56bafe129b82c536a59d99c",
+  "phxaccel_build_script_sha256": "ba8141a7316b131c1c78d00ca8d6f8829e20b50006fce9df68ac153954bd0f7e",
+  "mac_kernel_sdk_commit": "3f750085caa17ec3a7880f11c11bf4f48cd6a164",
+  "mac_kernel_sdk_tracked_input_count": 1232,
+  "kdk_build": "25G332",
+  "kdk_metadata_sha256": "6e9fcaff0538540835bf0c5929737f6b50da56ceeaae655d0949c5e76f4ae8b6",
+  "kdk_kernel_sha256": "a91aad0da9d0a2f545c06859524bb048f4e2e392e46aa12da9fabe652081be53",
+  "compiler_sha256": "f30550eab15fdf5ab8c0dc54c52679711241e5d4b636b027e18c09fef531775d",
+  "overlay_phxfb_source_sha256": "21f068420f91e80d6e508cb68dc1d142a11405610a2292ba33367976f18cf62f",
+  "control_binary_sha256": "8e677b77caa23f404e3a011ca0648fd839bd6ab9264d8697e27f8e2e70997564",
+  "observer_binary_sha256": "6543861256208467f1833be11176be9a83207bd2a348f7fa3159645e10790ff0",
+  "import_audit": {
+    "control_import_count": 1003,
+    "observer_import_count": 1004,
+    "added_imports": [
+      "__ZN11IOPCIDevice20extendedConfigRead32Ey",
+      "__ZNK9IOService10isInactiveEv"
+    ],
+    "removed_imports": [
+      "__ZN13IOFramebuffer4freeEv"
+    ],
+    "added_imports_have_existing_kdk_providers": true,
+    "existing_bundle_dependencies_cover_added_imports": true,
+    "bundle_info_plist_unchanged": true
+  },
+  "sampling": {
+    "calls_existing_sampleDcnFirmware": true,
+    "requires_ready_and_powered_phxfb": true,
+    "attempts_per_service_instance": 1,
+    "emits_only_sanitized_metadata": true,
+    "raw_addresses_emitted": false,
+    "raw_registers_emitted": false,
+    "route_provider_claim": false,
+    "device_dma_domain_claim": false
+  },
+  "checks": {
+    "route_reader_tests": 8,
+    "observer_stage_tests": 2,
+    "full_make_test": "passed"
+  },
+  "native_compile_link_and_strict_signature_check": true,
+  "kext_bundle_created_in_git_ignored_private_output": true,
+  "auxkc_linked": false,
+  "installed": false,
+  "loaded": false,
+  "restart_requested": false,
+  "nvram_or_efi_changed": false,
+  "dma_mapping_created": false,
+  "runtime_registers_read_or_written": false,
+  "gpu_work_submitted": false,
+  "runtime_sample_collected": false,
+  "active_hubp_route_observed": false,
+  "route_provider_proven": false,
+  "device_dma_domain_proven": false,
+  "zero_copy_candidate_admitted": false,
+  "raw_registry_saved": false
+}

@@ -1,0 +1,49 @@
+{
+  "status": "read-only-native-2x-and-route-preflight",
+  "date": "2026-11-26",
+  "branch": "upstream34/vram-layout-fix",
+  "source_commit": "d182b7695fe24b061cce08361838ab41d8fea2cf",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "scanout_mode": {
+    "logical_width": 1280,
+    "logical_height": 800,
+    "backing_width": 2560,
+    "backing_height": 1600,
+    "refresh_hz": 120.0,
+    "appkit_backing_scale": 2.0,
+    "native_2x_gate_passed": true
+  },
+  "installed_phxaccel": {
+    "target_loaded_query_passed": true,
+    "bundle_signature_valid": true,
+    "matches_one_shot_observer_candidate": false
+  },
+  "auxiliary_cache": {
+    "complete_three_collection_capture": true,
+    "boot_record_count": 232,
+    "system_record_count": 180,
+    "auxiliary_record_count": 4,
+    "combined_record_count": 416,
+    "codeless_record_count": 29,
+    "phxaccel_present_in_auxiliary_collection": true
+  },
+  "route_observation": {
+    "phxbringup_build34_child_count": 1,
+    "phxamdfb_child_count": 1,
+    "firmware_hubp_sample_state": "not-published",
+    "active_hubp_route_observed": false,
+    "route_provider_proven": false,
+    "device_dma_domain_proven": false
+  },
+  "raw_registry_saved": false,
+  "raw_registry_values_emitted": false,
+  "raw_cache_metadata_saved": false,
+  "device_registers_read_or_written": false,
+  "dma_mapping_created": false,
+  "gpu_work_submitted": false,
+  "driver_or_cache_changed": false,
+  "restart_requested": false,
+  "nvram_or_efi_changed": false,
+  "zero_copy_candidate_admitted": false
+}
