@@ -179,6 +179,8 @@ int main() {
         IODisplayModeInformation expected{};
         expected.nominalWidth = 2560;
         expected.nominalHeight = 1600;
+        expected.imageWidth = 344;
+        expected.imageHeight = 215;
         expected.refreshRate = 120u << 16;
         expected.flags = baseFlags | (hiRes ? kDisplayModeValidForHiResFlag : 0);
         check(std::memcmp(&mode, &expected, sizeof mode) == 0);

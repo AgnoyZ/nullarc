@@ -2104,3 +2104,13 @@ Post-reboot hardware verification on macOS 26.7.2 (`25G332`, native 2x HiDPI
   - `WindowServer` stayed on PID `204` with `0` new crash/spin reports in
     `/Library/Logs/DiagnosticReports`, and `make check-build34-scanout-mode`
     remained `1280x800` logical / `2560x1600` pixels / `120 Hz` / `2x`.
+
+### Physical panel size correction, November 26, 2026
+
+The native mode callback now reports the ThinkBook internal panel's EDID active
+image size (`IODisplayModeInformation.imageWidth=344 mm`,
+`imageHeight=215 mm`) instead of leaving both fields zero. With zero fields,
+CoreDisplay used its 72-DPI fallback and Settings showed an incorrect diagonal
+of about 42 inches; the EDID dimensions correspond to the actual 16-inch
+2560x1600 panel. The change is limited to display metadata and does not alter
+the native 2x scanout raster, timing, refresh, or zero-copy path.

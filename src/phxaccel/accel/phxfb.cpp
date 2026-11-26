@@ -1082,6 +1082,7 @@ public:
         if (mode != 1 || !info) return kIOReturnBadArgument;
         bzero(info, sizeof(*info));
         info->maxDepthIndex = 0; info->nominalWidth = fWidth; info->nominalHeight = fHeight;
+        info->imageWidth = 344; info->imageHeight = 215;
         info->refreshRate = (IOFixed1616)(((uint64_t)fRefreshMilliHz << 16) / 1000); info->flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag | kFramebufferSupportsGammaCorrection;
         if (fHiRes) info->flags |= kDisplayModeValidForHiResFlag;
         return kIOReturnSuccess;
