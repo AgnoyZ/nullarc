@@ -50,6 +50,24 @@ runtime use until its exact parent path has a bounded, verified resolution.
 The earlier filtered snapshot found the property absent, but that does not
 qualify a later boot or a different source state.
 
+The pinned XNU `IOService::getMatchingServices()` API is a possible
+non-waiting alternative: it returns an iterator over the currently matched
+services, whereas `waitForMatchingService()` waits for publication. A safe
+resolver would have to reproduce only the target device's `iommu-parent` match
+against `gIOMapperIDKey`, count the current results, require exactly one active
+`IOMapper`, retain it through the sample, and fail closed on zero or multiple
+matches. `IOMapper::start()` derives that key from the provider's `iommu-id`
+or `AAPL,phandle`; an unrelated system mapper is not a substitute. See the
+[pinned lookup](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMapper.cpp#L121-L207)
+and [current-service enumeration](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOService.cpp#L6367-L6385).
+
+This alternative is not implemented yet: the installed 26.7.2 KDK contains no
+`IOService.h`/`IOMapper.h` kernel headers to verify its exact SDK ownership
+types, and the existing CPU stubs are not an SDK ABI check. The last filtered
+snapshot had no `iommu-parent` and no visible `IOMapper`, so even a no-wait
+resolver would currently return unresolved. Do not enable the staged blocking
+probe or infer address-domain/route proof from a service match.
+
 ## Offline DCN zero-copy prerequisite, November 24
 
 For subsequent local hardware comparisons, hold the [verified internal 2x
