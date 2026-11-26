@@ -1817,3 +1817,14 @@ A same-session refresh on commit `0050c4f` repeated the refusal and found the
 mapper probe metadata still unpublished, `iommu-parent` absent, and the
 filtered child counts unchanged. The active HUBP route and device DMA domain
 remain unproven. See the consolidated [read-only recheck](validation/build34-dcn-admission-recheck-20261126.json).
+
+### Native 2x gate restored, November 26, 2026
+
+A fresh read-only check on commit `8124970` now passes the native 2x gate:
+1280x800 logical, 2560x1600 backing, 120 Hz and AppKit scale 2.0. The filtered
+mapper observer still reports `iommu-parent` absent and its runtime probe
+metadata unpublished. The service counts remain one each for PhxBringup and
+PhxAMDFB, but active HUBP route/provider and device DMA domain are still
+unproven. No mapper lookup was executed by this production image, no register
+or DMA operation was performed, and no zero-copy candidate was admitted. See
+the [post-2x prerequisite record](validation/build34-dcn-admission-after-2x-20261126.json).

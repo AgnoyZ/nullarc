@@ -1,0 +1,48 @@
+{
+  "status": "native-2x-gate-passed-zero-copy-blocked-by-domain-and-route-evidence",
+  "date": "2026-11-26",
+  "branch": "upstream34/vram-layout-fix",
+  "source_commit": "81249701adb130397b508442fbe89d663159b7f7",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "scanout_mode": {
+    "online_display_count": 1,
+    "built_in_display_count": 1,
+    "logical_width": 1280,
+    "logical_height": 800,
+    "backing_width": 2560,
+    "backing_height": 1600,
+    "refresh_hz": 120.0,
+    "appkit_backing_scale": 2.0,
+    "native_2x_gate_passed": true
+  },
+  "mapper_observation": {
+    "target": "1002:1900",
+    "phxbringup_build": 34,
+    "iommu_parent_property": "absent",
+    "runtime_mapper_probe_state": "not-published",
+    "runtime_mapper_resolved": null,
+    "device_dma_domain_proven": false
+  },
+  "route_topology": {
+    "phxbringup_build34_child_count": 1,
+    "known_direct_child_class_counts": {
+      "AMDSupport": 1,
+      "NMXAccel": 1,
+      "PhxAMDFB": 1,
+      "PhxBringup": 1,
+      "PhxDeviceControl": 1
+    },
+    "active_hubp_route_observed": false,
+    "route_provider_proven": false
+  },
+  "raw_registry_saved": false,
+  "property_values_emitted": false,
+  "display_settings_changed_by_collector": false,
+  "device_registers_read_or_written": false,
+  "dma_mapping_created": false,
+  "driver_installed_or_reloaded": false,
+  "gpu_work_submitted": false,
+  "restart_requested": false,
+  "zero_copy_candidate_admitted": false
+}
