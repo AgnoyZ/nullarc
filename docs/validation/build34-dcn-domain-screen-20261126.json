@@ -1,0 +1,22 @@
+{
+  "status": "filtered-read-only-registry-screen",
+  "date": "2026-11-26",
+  "branch": "upstream34/vram-layout-fix",
+  "source_commit": "b03ddcb15b5b09ed35a792d8406fbfe987606aad",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "pci": "1002:1900",
+  "phxbringup_build": 34,
+  "target_dma_mapper_domain_key_names": [],
+  "target_child_iomapper_class_present": false,
+  "system_iomapper_class_query_succeeded": true,
+  "system_iomapper_entry_count": 0,
+  "runtime_mapper_resolved": false,
+  "device_dma_domain_proven": false,
+  "identity_dma_proven": false,
+  "raw_registry_saved": false,
+  "property_values_emitted": false,
+  "gpu_work_submitted": false,
+  "driver_installed_or_reloaded": false,
+  "restart_requested": false
+}

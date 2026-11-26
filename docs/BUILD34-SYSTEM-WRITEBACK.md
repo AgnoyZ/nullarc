@@ -88,6 +88,14 @@ python3 -B tests/test_build34_dcn_mapper_observation.py
 python3 -B tools/build34_dcn_mapper_observation.py
 ```
 
+A separately authorized, read-only key screen on the same host found no
+DMA/mapper/domain-named properties on the exact PCI provider, no `IOMapper`
+class among its immediate children, and no entries from an `ioreg -c IOMapper`
+class query. Only these booleans/counts were retained; the raw registry was not
+saved and property values were not emitted. This is a bounded registry screen,
+not proof that no hidden runtime mapper exists and not evidence of identity DMA.
+See [the sanitized domain-screen record](validation/build34-dcn-domain-screen-20261126.json).
+
 No mapper lookup API, DMA mapping, device register access, driver operation,
 GPU submission, installation, or restart was performed.
 
