@@ -2123,3 +2123,63 @@ SHA256 `f4bd932826aee3eeb0cb627ae69323dc8597cc7e39193226fd41326950c21501`).
 Post-reboot readback measured `CGDisplayScreenSize=344.0x215.0 mm` and
 `15.97 in` diagonal; `make check-build34-scanout-mode` remained native 2x and
 zero-copy stayed enabled with `zc_faults=0` and `iop_fail=0`.
+
+### Pending-flip wait and VBL pacing optimization, November 27, 2026
+
+To eliminate the `+140` transient `kHwNotReady` (status `8`) fallbacks and
+associated `+497` MMHUB `ENG16` TLB flushes observed during back-to-back
+multi-app switching:
+
+- `phx::dcnzc::hubpGeometryReady()` in `src/phxaccel/accel/phx_dcn_zerocopy.h`
+  adds an optional `allowFlipPending` parameter (default `false`) so entry
+  validation in `PhxAMDFB::zcFlip()` can distinguish a transient
+  `SURFACE_FLIP_PENDING` from fatal HUBP geometry or lock mismatches.
+- `PhxAMDFB::zcFlip()` in `src/phxaccel/accel/phxfb.cpp` waits up to `25 ms`
+  via `zcWaitCurrentLatched(25)` when `kFlipPending` is set (counted by the
+  new read-only sysctl `debug.phxfb_zc_pending_waits`), yielding with
+  `IOSleep(1)` after 5 short `IODelay(100)` polls in `zcWaitLatched()` /
+  `zcWaitCurrentLatched()`. If waiting still times out, it falls back via
+  `zcHomeLocked(false)` without tearing down VMID 1–4 slots or apertures.
+- `NVDisplayPipe::performTransaction()` in `src/phxaccel/accel/nvrm-accel.cpp`
+  now records `gIopLastAbs` and `fIopVblSeq` on the zero-copy success path so
+  `isTransactionComplete()` paces zero-copy presents on VBL ticks when
+  `debug.nvaccel_iop_vsync=1`.
+- `tests/test_phx_dcn_zerocopy.cpp` adds `allowFlipPending` unit coverage, and
+  `tools/build34_dcn_firmware_home_stage.py` /
+  `tools/build34_dcn_present_backing_stage.py` source hashes were updated to
+  match. Full `make test` passed before build.
+
+The isolated build34 candidate v8 was rebuilt with the reviewed MacKernelSDK
+(`3f750085caa17ec3a7880f11c11bf4f48cd6a164`), verified with
+`codesign --verify --deep --strict`, installed to
+`/Library/Extensions/PhxAccel.kext`, and loaded after reboot as `PhxAccel`
+UUID `358EE1E9-E994-35AB-AA34-73BBDEB24E4E` (kext SHA256
+`4c7879e9beb7f2e1e4e17a19b4e4a6f173f9b6b3aba093c02f9691f5672ba6b1`, AuxKC
+SHA256 `d959e9b331ea631b445999953ae6e278c50acdde3d224ffa34bcae36160e0d3a`,
+prior v7 backed up under the local isolated `candidate-v8/` directory).
+
+Post-reboot hardware verification (`make check-build34-scanout-mode`:
+`1280x800` logical / `2560x1600` pixels / `120 Hz` / `2x`;
+`CGDisplayScreenSize=344.0x215.0 mm`, `15.97 in`):
+
+- **30 s multi-app everyday workload (pass 1)** (Metal `MTKView` `409` frames
+  on RADV Phoenix + CoreAnimation 2x resizing window `201` ticks + foreground
+  cycling across `Finder`, `Calculator`, `TextEdit`, `Safari`, and
+  `System Settings`):
+  - `zc_flips` `261 -> 965` (`+704`), `iop_ok` `670 -> 1,374` (`+704`, 100%
+    zero-copy), `zc_fallbacks` `0 -> 0` (`+0`, down from `+140`),
+    `zc_pending_waits` `28 -> 55` (`+27`), `zc_tlb_flushes` `3 -> 3` (`+0`,
+    down from `+497`), `zc_faults=0`, `iop_fail=0`.
+- **30 s floating high-rate multi-app workload (pass 2)** (floating Metal
+  `MTKView` `459` frames + floating CoreAnimation 2x resizing window `200`
+  ticks + foreground cycling across the same 5 apps):
+  - `zc_flips` `965 -> 1,833` (`+868`), `iop_ok` `1,374 -> 2,242` (`+868`,
+    100% zero-copy), `zc_fallbacks` `0 -> 0` (`+0`), `zc_pending_waits`
+    `55 -> 80` (`+25`), `zc_tlb_flushes` `3 -> 3` (`+0`),
+    `iop_vsync_late` unchanged at `1`, `zc_faults=0`, `iop_fail=0`.
+- Live BAR5 readback after both passes confirmed healthy zero-copy scanout on
+  VMID 3 (`0x03ac9=0x3`, `0x03aca/0x03acb=0x102_0000_0000`,
+  `0x03ae5/0x03ae6=0x30000102_00000000`, `0x03af5=0x200000`,
+  `0x03af6=0x203fff`, `0x03b03=0x19`, `0x03a8c=0`), `WindowServer` remained
+  on PID `204`, and `/Library/Logs/DiagnosticReports` showed `0` new crash or
+  spin reports (`88 -> 88`).

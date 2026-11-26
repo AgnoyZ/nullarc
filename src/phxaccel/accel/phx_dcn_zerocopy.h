@@ -256,7 +256,7 @@ inline bool contextMatchesExactState(const uint32_t expected[kContextFieldCount]
 
 template<typename ReadReg>
 bool hubpGeometryReady(uint32_t width, uint32_t height, uint32_t pitchBytes, const ReadReg &readReg,
-                       bool expectUpdateLocked = false) {
+                       bool expectUpdateLocked = false, bool allowFlipPending = false) {
     if (!width || !height || (pitchBytes & 3u) != 0) return false;
     const uint32_t pitchPixels = pitchBytes / 4u;
     if (pitchPixels < width || pitchPixels - 1u > kStrideMask) return false;
@@ -283,7 +283,8 @@ bool hubpGeometryReady(uint32_t width, uint32_t height, uint32_t pitchBytes, con
     const uint32_t pitchReg = readReg(kRegHubpPitch);
     if ((pitchReg & kStrideMask) != (pitchPixels - 1u)) return false;
     const uint32_t flipCtl = readReg(kRegHubpFlipCtl);
-    if ((flipCtl & (kFlipImmediate | kFlipPending | kFlipStereoMask)) != 0) return false;
+    const uint32_t disallowedFlipBits = kFlipImmediate | kFlipStereoMask | (allowFlipPending ? 0u : kFlipPending);
+    if ((flipCtl & disallowedFlipBits) != 0) return false;
     if (bool(flipCtl & kFlipUpdateLocked) != expectUpdateLocked) return false;
     const uint32_t flipCtl2 = readReg(kRegHubpFlipCtl2);
     if ((flipCtl2 & kFlip2UnsafeMask) != 0) return false;

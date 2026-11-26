@@ -96,6 +96,11 @@ static void testHubpGeometry() {
     registers[kRegHubpFlipCtl] = kFlipUpdateLocked;
     assert(!hubpGeometryReady(2560, 1600, 10240, read));
     assert(hubpGeometryReady(2560, 1600, 10240, read, true));
+    registers[kRegHubpFlipCtl] = kFlipPending;
+    assert(!hubpGeometryReady(2560, 1600, 10240, read));
+    assert(hubpGeometryReady(2560, 1600, 10240, read, false, true));
+    registers[kRegHubpFlipCtl] = kFlipPending | kFlipImmediate;
+    assert(!hubpGeometryReady(2560, 1600, 10240, read, false, true));
     registers[kRegHubpFlipCtl] = kFlipImmediate;
     assert(!hubpGeometryReady(2560, 1600, 10240, read));
     registers[kRegHubpFlipCtl] = 0;

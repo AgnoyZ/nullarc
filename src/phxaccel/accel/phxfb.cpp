@@ -39,7 +39,7 @@ static int gAlias = 1;
 SYSCTL_INT(_debug, OID_AUTO, phxfb_alias, CTLFLAG_RW | CTLFLAG_LOCKED, &gAlias, 0,
            "1 = frames are copied into the scan-out through its system-RAM address (the carve-out), 0 = through the GPU's BAR");
 int gPhxZeroCopy = 0;
-static SInt64 gZcFlips, gZcFaults, gZcFallbacks, gZcReuses, gZcTlbFlushes;
+static SInt64 gZcFlips, gZcFaults, gZcFallbacks, gZcReuses, gZcTlbFlushes, gZcPendingWaits;
 static int gZcLastStatus = 0;
 static unsigned int gZcLastFmt = 0;
 class PhxAMDFB;
@@ -53,6 +53,7 @@ SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_faults, CTLFLAG_RD | CTLFLAG_LOCKED, &gZc
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_fallbacks, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFallbacks, "zero-copy scanout requests refused");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_reuses, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcReuses, "DCN zero-copy VMID slots safely recycled via MMHUB TLB flush");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_tlb_flushes, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcTlbFlushes, "MMHUB ENG16 TLB invalidations completed for DCN zero-copy");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_pending_waits, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcPendingWaits, "DCN zero-copy flips that waited for a prior flip to latch");
 SYSCTL_INT(_debug, OID_AUTO, phxfb_zc_last_status, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcLastStatus, 0, "last zero-copy flip status");
 SYSCTL_UINT(_debug, OID_AUTO, phxfb_zc_last_fmt, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcLastFmt, 0, "last zero-copy request pixelFormat");
 
@@ -85,8 +86,9 @@ static IOService *phxBacklightCreate(PhxAMDFB *fb);
 static struct sysctl_oid *const kFbOids[] = { &sysctl__debug_phxfb_alias, &sysctl__debug_phxfb_zerocopy,
                                               &sysctl__debug_phxfb_zc_flips, &sysctl__debug_phxfb_zc_faults,
                                               &sysctl__debug_phxfb_zc_fallbacks, &sysctl__debug_phxfb_zc_reuses,
-                                              &sysctl__debug_phxfb_zc_tlb_flushes, &sysctl__debug_phxfb_zc_last_status,
-                                              &sysctl__debug_phxfb_zc_last_fmt, &sysctl__debug_phxfb_vbl_staged,
+                                              &sysctl__debug_phxfb_zc_tlb_flushes, &sysctl__debug_phxfb_zc_pending_waits,
+                                              &sysctl__debug_phxfb_zc_last_status, &sysctl__debug_phxfb_zc_last_fmt,
+                                              &sysctl__debug_phxfb_vbl_staged,
                                               &sysctl__debug_phxfb_vbl_n, &sysctl__debug_phxfb_vbl_late_us_sum,
                                               &sysctl__debug_phxfb_vbl_late_us_max };
 static bool gFbSysctl;
@@ -296,6 +298,7 @@ class PhxAMDFB : public IOFramebuffer {
     bool zcWaitLatched(uint32_t vmid, uint64_t address, uint32_t timeoutMs) {
         uint64_t deadline = 0;
         clock_interval_to_deadline(timeoutMs, kMillisecondScale, &deadline);
+        uint32_t spins = 0;
         while (mach_absolute_time() < deadline) {
             const uint32_t flip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
             const uint32_t vmidReg = zcRead(phx::dcnzc::kRegHubpVmid0);
@@ -308,7 +311,8 @@ class PhxAMDFB : public IOFramebuffer {
                 (vmidReg & 0xfu) == vmid &&
                 programmed == address && earliest == address)
                 return true;
-            IODelay(100);
+            if (spins++ < 5) IODelay(100);
+            else IOSleep(1);
         }
         return false;
     }
@@ -316,6 +320,7 @@ class PhxAMDFB : public IOFramebuffer {
     bool zcWaitCurrentLatched(uint32_t timeoutMs) {
         uint64_t deadline = 0;
         clock_interval_to_deadline(timeoutMs, kMillisecondScale, &deadline);
+        uint32_t spins = 0;
         while (mach_absolute_time() < deadline) {
             const uint32_t flip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
             const uint64_t programmed = zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi);
@@ -324,7 +329,8 @@ class PhxAMDFB : public IOFramebuffer {
                 return false;
             if (!(flip & (phx::dcnzc::kFlipPending | phx::dcnzc::kFlipUpdateLocked)) &&
                 programmed == earliest) return true;
-            IODelay(100);
+            if (spins++ < 5) IODelay(100);
+            else IOSleep(1);
         }
         return false;
     }
@@ -745,13 +751,33 @@ class PhxAMDFB : public IOFramebuffer {
             return home == kIOReturnSuccess ? kIOReturnNotReady : home;
         }
         if (!phx::dcnzc::hubpGeometryReady(fWidth, fHeight, fRowBytes,
-                [this](uint32_t reg) { return zcRead(reg); }) || !zcHubpPeersIdle()) {
+                [this](uint32_t reg) { return zcRead(reg); }, false, true) || !zcHubpPeersIdle()) {
             request->status = phx::dcnzc::kHwNotReady;
             gZcLastStatus = request->status;
             IOReturn home = zcHomeLocked(true);
             IOLockUnlock(fZcLock);
             OSAddAtomic64(1, &gZcFallbacks);
             return home == kIOReturnSuccess ? kIOReturnNotReady : home;
+        }
+        const uint32_t entryFlip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
+        if (entryFlip == UINT32_MAX) {
+            request->status = phx::dcnzc::kHwNotReady;
+            gZcLastStatus = request->status;
+            IOReturn home = zcHomeLocked(true);
+            IOLockUnlock(fZcLock);
+            OSAddAtomic64(1, &gZcFallbacks);
+            return home == kIOReturnSuccess ? kIOReturnNotReady : home;
+        }
+        if (entryFlip & phx::dcnzc::kFlipPending) {
+            OSAddAtomic64(1, &gZcPendingWaits);
+            if (!zcWaitCurrentLatched(25)) {
+                request->status = phx::dcnzc::kHwNotReady;
+                gZcLastStatus = request->status;
+                IOReturn home = zcHomeLocked(false);
+                IOLockUnlock(fZcLock);
+                OSAddAtomic64(1, &gZcFallbacks);
+                return home == kIOReturnSuccess ? kIOReturnNotReady : home;
+            }
         }
         if (!zcArm()) {
             request->status = phx::dcnzc::kApertureConflict;
