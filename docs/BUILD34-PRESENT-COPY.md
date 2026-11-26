@@ -2114,3 +2114,12 @@ CoreDisplay used its 72-DPI fallback and Settings showed an incorrect diagonal
 of about 42 inches; the EDID dimensions correspond to the actual 16-inch
 2560x1600 panel. The change is limited to display metadata and does not alter
 the native 2x scanout raster, timing, refresh, or zero-copy path.
+
+The isolated build34 candidate was rebuilt with the reviewed MacKernelSDK
+(`3f750085caa17ec3a7880f11c11bf4f48cd6a164`) and loaded after reboot as
+`PhxAccel` UUID `22824704-0489-3436-B64A-AF4BCAD7F014` (kext SHA256
+`6c37d39c6ed3866cc31c1168107fe49c236b31de75febed477287fa471bc96d`, AuxKC
+SHA256 `f4bd932826aee3eeb0cb627ae69323dc8597cc7e39193226fd41326950c21501`).
+Post-reboot readback measured `CGDisplayScreenSize=344.0x215.0 mm` and
+`15.97 in` diagonal; `make check-build34-scanout-mode` remained native 2x and
+zero-copy stayed enabled with `zc_faults=0` and `iop_fail=0`.
