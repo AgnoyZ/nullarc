@@ -1704,3 +1704,20 @@ bind the mapper/direct-domain, coherent-fence, GPUVM-ownership or display-route
 proof hooks, or establish real GPU execution. It has not been hardware tested.
 Keep the verified native 2x mode unchanged and retain the current build34
 execution boundaries.
+
+## Read-only zero-copy hardware preflight, November 26
+
+After explicit owner authorization for hardware admission, the read-only
+`make check-build34-scanout-mode` gate passed on macOS 26.7.2 (`25G332`):
+1280x800 logical, 2560x1600 backing, 120 Hz and AppKit scale 2.0. A filtered
+depth-2 registry read found one build34 PhxBringup child and one PhxAMDFB child
+under the target `1002:1900` PCI provider. It found no IOMapper child or
+DMA/mapper/domain property-name evidence. This confirms the saved mode and
+service attachment only; it does not establish a DMA address domain, identity
+mapping, HUBP route, GPUVM write exclusion or coherent-fence evidence. The
+required zero-copy hooks remain unbound, so no zero-copy candidate was admitted.
+
+Only sanitized booleans and counts were retained. No raw registry data or
+property values were saved or emitted; no device registers were accessed, no
+driver was installed or reloaded, no GPU work was submitted and no restart was
+requested. See the [sanitized preflight record](validation/build34-dcn-domain-screen-20261126.json).
