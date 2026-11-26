@@ -16,6 +16,8 @@ def main():
         "// ACTUAL_REFRESH_METHOD": "void measureRefresh()",
         "// ACTUAL_TIMING_METHOD": "IOReturn getTimingInfoForDisplayMode(",
         "// ACTUAL_MODE_INFO_METHOD": "IOReturn getInformationForDisplayMode(",
+        "// ACTUAL_SET_ATTR_METHOD": "IOReturn setAttribute(",
+        "// ACTUAL_GET_ATTR_METHOD": "IOReturn getAttribute(",
     }.items():
         template = template.replace(marker, method(source, signature).replace(" override", ""))
     build = ROOT / "build/tests/upstream34-panel-callbacks"

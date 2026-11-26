@@ -6,7 +6,7 @@ import hashlib
 INPUTS = {
     "NVMTLDevice.m": "5cc8292a4f3b335393317ca413c67e723dfd4591c3e9d8d75b77d9a40163b1df",
     "NVMTLObjects.m": "38dc8070cddb8368115ad41aec365a3463f59b27323b5b277238e74a5de50b34",
-    "NVMTLEventSync.m": "5bd4d3fdec30c72de05c989d5171602a433199746b619a8a56be60a81920f291",
+    "NVMTLEventSync.m": "6b73c8cbf06d84499398355d3d776a0413340d8d49950265420612e9cbe1a95b",
     "nvmtl_vk.c": "436abdc1f9e1435887de871858cfceb62bf1f33abcb46d61840197153c86c86c",
     "nvmtl_vk.h": "bc1eaebd516784f165c580d66780689cb7cbb5c1e5d0be572eeadfb635ee2cb0",
 }

@@ -2223,3 +2223,40 @@ Post-reboot hardware verification:
   pixels / `120 Hz` / `2x`; zero-copy auto-enabled cleanly (`zc_flips=493`,
   `zc_pending_waits=84`, `zc_fallbacks=0`, `zc_tlb_flushes=3`, `zc_faults=0`,
   `iop_fail=0`).
+
+### NullMoth quick wins: surface-plane mark deduplication and RGB gamma scale attributes, November 27, 2026
+
+- Ported NullMoth `#566` surface-plane mark deduplication into
+  `nvmtl_ws_mark_pending()` (`src/nmplugin/NVMTLEventSync.m`): each
+  `(IOSurfaceID, plane)` written by a WindowServer command buffer now issues
+  `nvmtl_vk_surface_dirty()` at most once per commit instead of once per
+  submission part and texture view, avoiding repeated accelerator-lock ioctls.
+- Added `tests/test_nmplugin_ws_mark_once.py` (wired into `Makefile` `test`)
+  and synced `tools/build34_dcn_render_write_stage.py` for the updated
+  `NVMTLEventSync.m` hash.
+- Added RGB gamma scale attribute storage (`fGammaScale[3]`, defaulting to
+  `0x10000` / 1.0 in 16.16 fixed point) to `PhxAMDFB::setAttribute()` and
+  `PhxAMDFB::getAttribute()` (`src/phxaccel/accel/phxfb.cpp`) for
+  `kIOFBRedGammaScaleAttribute`, `kIOFBGreenGammaScaleAttribute`, and
+  `kIOFBBlueGammaScaleAttribute`, with host unit tests in
+  `tests/upstream34_panel_callbacks.cpp` (`565` CPU assertions) and synced
+  `FRAMEBUFFER_SHA256` in `tools/build34_dcn_firmware_home_stage.py`. Full
+  `make test` passed.
+
+The isolated build34 candidate v10 (`PhxAccel.kext` + AuxKC) and rebuilt
+`NVMTLDriver` plugin were deployed with full v9 backups under local isolated
+`candidate-v10/` and loaded after reboot:
+- `PhxAccel` UUID `6052B13C-67BF-3EE4-B06E-1E624E567E95` (kext SHA256
+  `b81ededba7217b734f1c3d527e6f14c3dbcd966a8b87f0c4659f573fbebaaf86`, AuxKC
+  SHA256 `9fbdcf1797b813e3b8d4e34d0a222115c2d56af2501c5cb2d3b5d76759ee3131`).
+- `NVMTLDriver` UUID `EAAC25E5-D13A-3DB8-956A-B537E3524111` (SHA256
+  `a11fe08afdc7674703f832b7b236d8fa902eab6149bd8b15981d3405b6fa88d8`, verified
+  loaded in `WindowServer` PID `204` via `vmmap`/`lsof`, `nvrm610.conf`
+  unchanged).
+- Post-reboot verification: `make check-build34-scanout-mode` remained
+  `1280x800` logical / `2560x1600` pixels / `120 Hz` / `2x`,
+  `CGDisplayScreenSize=344.0x215.0 mm (15.97 in)`, `ioFlags=0x00c40007`.
+- 15 s floating Metal `MTKView` (`130` frames) + 5-app foreground switch
+  regression: `zc_flips` `750 -> 1,027` (`+277`), `iop_ok` `995 -> 1,272`
+  (`+277`, 100% zero-copy), `zc_fallbacks=0`, `zc_pending_waits` `100 -> 113`
+  (`+13`), `zc_tlb_flushes=3` (`+0`), `zc_faults=0`, `iop_fail=0`.

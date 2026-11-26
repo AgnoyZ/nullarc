@@ -211,10 +211,20 @@ static void nvmtl_ws_mark_pending(NVMTLCommandBuffer *cb) {
     holds->ids = ids; holds->early = nvmtl_ws_surface_wait();
     if (holds->early) {
         NSMutableSet *dirtied = [NSMutableSet new];
+        NSMutableDictionary<NSNumber *, NSNumber *> *marked = [NSMutableDictionary new];
         for (NVMTLSubmissionPart *part in cb->_parts) {
             if (![part isKindOfClass:[NVMTLSubmissionPart class]]) continue;
-            for (NVMTLTexture *t in part->surfaces)
-                if (t->_surf && t->_vramOn && !nvmtl_vk_surface_dirty((uint32_t)IOSurfaceGetID(t->_surf), (uint32_t)t->_plane)) [dirtied addObject:t];
+            for (NVMTLTexture *t in part->surfaces) {
+                if (!t->_surf || !t->_vramOn) continue;
+                const uint32_t sid = (uint32_t)IOSurfaceGetID(t->_surf), plane = (uint32_t)t->_plane;
+                NSNumber *key = @(((uint64_t)sid << 8) | (plane & 0xffu));
+                NSNumber *done = marked[key];
+                if (!done) {
+                    done = @(nvmtl_vk_surface_dirty(sid, plane));
+                    marked[key] = done;
+                }
+                if (!done.intValue) [dirtied addObject:t];
+            }
         }
         holds->dirtied = dirtied;
     }

@@ -9,10 +9,14 @@
 using IOReturn = int;
 using IODisplayModeID = uint32_t;
 using IOFixed1616 = uint32_t;
-constexpr int kIOReturnSuccess = 0, kIOReturnBadArgument = -2, kIOReturnUnsupportedMode = -3;
+using IOSelect = uint32_t;
+constexpr int kIOReturnSuccess = 0, kIOReturnBadArgument = -2, kIOReturnUnsupportedMode = -3, kIOReturnUnsupported = -4;
 constexpr uint32_t kDisplayModeValidFlag = 1, kDisplayModeSafeFlag = 2, kDisplayModeDefaultFlag = 4;
 constexpr uint32_t kFramebufferSupportsGammaCorrection = 0x00040000, kDisplayModeAcceleratorBackedFlag = 0x00400000,
     kDisplayModeValidForHiResFlag = 0x00800000;
+constexpr uint32_t kIOFBRedGammaScaleAttribute = 'gslr', kIOFBGreenGammaScaleAttribute = 'gslg',
+    kIOFBBlueGammaScaleAttribute = 'gslb', kIOWindowServerActiveAttribute = 'wsrv', kIOPowerAttribute = 'powr';
+constexpr uint32_t kIOFBNotifyDidPowerOn = 1, kIOFBNotifyWillPowerOff = 2;
 struct IODisplayModeInformation {
     uint32_t nominalWidth, nominalHeight, refreshRate, maxDepthIndex, flags;
     uint16_t imageWidth, imageHeight;
@@ -103,6 +107,10 @@ static void IOSleep(unsigned milliseconds) {
     activeMap->regs[counter] = (activeMap->regs[counter] + frames) & 0xffffff;
     if (changeMode) ++activeMap->regs[0x34c0 + 0x1b2a];
 }
+struct IOFramebuffer {
+    static IOReturn setAttribute(IOSelect, uintptr_t) { return kIOReturnUnsupported; }
+    static IOReturn getAttribute(IOSelect, uintptr_t *) { return kIOReturnUnsupported; }
+};
 struct Fixture {
     IOMemoryMap memory; MockPCI pci; MockPCI *fPCI = &pci;
     uint32_t fWidth = 2560, fHeight = 1600, fRefreshMilliHz = 60000, fHTotal = 0, fVTotal = 0;
@@ -110,9 +118,13 @@ struct Fixture {
     phx::PanelTiming fPanelTiming = {};
     bool fPanelTimingValid = false;
     uint16_t fPanelWidthMm = 0, fPanelHeightMm = 0;
+    uintptr_t fGammaScale[3] = { 0x10000, 0x10000, 0x10000 };
     bool fHiRes = false;
     const uint8_t *edidBytes = nullptr;
     size_t edidLength = 0;
+    void trace(const char *, uint32_t, uint64_t) {}
+    void displayPower(bool) {}
+    void handleEvent(uint32_t) {}
     void refreshPanelSizeFromEdid() {
         if (fPanelWidthMm && fPanelHeightMm) return;
         uint16_t widthMm = 0, heightMm = 0;
@@ -133,6 +145,8 @@ struct Fixture {
     // ACTUAL_REFRESH_METHOD
     // ACTUAL_TIMING_METHOD
     // ACTUAL_MODE_INFO_METHOD
+    // ACTUAL_SET_ATTR_METHOD
+    // ACTUAL_GET_ATTR_METHOD
 };
 static unsigned checks = 0;
 static void check(bool value) { assert(value); ++checks; }
@@ -323,5 +337,20 @@ int main() {
     }
     Fixture nonstandard; rateMilliHz = 130000; nonstandard.measureRefresh();
     check(nonstandard.fPanelTimingValid && nonstandard.fRefreshMilliHz == 130000);
+
+    // Verify RGB gamma scale defaults to 1.0 (16.16) and echoes written values.
+    {
+        Fixture gamma;
+        uintptr_t val = 0;
+        const IOSelect attrs[3] = { kIOFBRedGammaScaleAttribute, kIOFBGreenGammaScaleAttribute, kIOFBBlueGammaScaleAttribute };
+        const uintptr_t custom[3] = { 0x0f000, 0x0d800, 0x0b000 };
+        for (unsigned ch = 0; ch < 3; ++ch) {
+            check(gamma.getAttribute(attrs[ch], &val) == kIOReturnSuccess && val == 0x10000);
+            check(gamma.setAttribute(attrs[ch], custom[ch]) == kIOReturnSuccess);
+            check(gamma.getAttribute(attrs[ch], &val) == kIOReturnSuccess && val == custom[ch]);
+        }
+        check(gamma.getAttribute(kIOWindowServerActiveAttribute, &val) == kIOReturnSuccess && val == 1);
+        check(gamma.getAttribute('unkn', &val) == kIOReturnUnsupported);
+    }
     std::printf("actual refresh/timing/mode callbacks: %u CPU assertions passed\n", checks);
 }

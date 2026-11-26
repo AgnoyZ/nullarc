@@ -153,6 +153,7 @@ class PhxAMDFB : public IOFramebuffer {
     phx::PanelTiming fPanelTiming = {};
     bool fPanelTimingValid = false;
     uint16_t fPanelWidthMm = 0, fPanelHeightMm = 0;
+    uintptr_t fGammaScale[3] = { 0x10000, 0x10000, 0x10000 };
     static constexpr unsigned kBootHoldSec = 120;   // the boot daemon releases it sooner (debug.phxfb_hold=0)
     // The accelerator is NullMoth's, written against an NVIDIA RM: it backs each IOAccel surface with "VRAM" from the
     // framebuffer (nvAllocVram) and a GPU address from the RM (nvGpuVaAlloc/Map). On the 780M nothing on the GPU reads
@@ -1238,6 +1239,13 @@ public:
     }
     IOReturn setAttribute(IOSelect attribute, uintptr_t value) override {
         trace("attr", attribute, value);
+        if (attribute == kIOFBRedGammaScaleAttribute || attribute == kIOFBGreenGammaScaleAttribute ||
+            attribute == kIOFBBlueGammaScaleAttribute) {
+            const unsigned channel = attribute == kIOFBRedGammaScaleAttribute ? 0 :
+                (attribute == kIOFBGreenGammaScaleAttribute ? 1 : 2);
+            fGammaScale[channel] = value;
+            return kIOReturnSuccess;
+        }
         if (attribute == kIOWindowServerActiveAttribute) return kIOReturnSuccess;
         if (attribute == kIOPowerAttribute) {
             displayPower(value != 0);
@@ -1250,6 +1258,13 @@ public:
         return IOFramebuffer::setAttribute(attribute, value);
     }
     IOReturn getAttribute(IOSelect attribute, uintptr_t *value) override {
+        if (attribute == kIOFBRedGammaScaleAttribute || attribute == kIOFBGreenGammaScaleAttribute ||
+            attribute == kIOFBBlueGammaScaleAttribute) {
+            const unsigned channel = attribute == kIOFBRedGammaScaleAttribute ? 0 :
+                (attribute == kIOFBGreenGammaScaleAttribute ? 1 : 2);
+            if (value) *value = fGammaScale[channel];
+            return kIOReturnSuccess;
+        }
         if (attribute == kIOWindowServerActiveAttribute) { if (value) *value = 1; return kIOReturnSuccess; }
         return IOFramebuffer::getAttribute(attribute, value);
     }
