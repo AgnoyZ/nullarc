@@ -2044,3 +2044,37 @@ WindowServer kept <= 4 swapchain surfaces, though cross-toggle teardown/rebind
 exercised `150` MMHUB TLB flushes with zero faults; turning `phxfb_zerocopy=0`
 returns to HOME on the next present transaction rather than immediately when
 the screen is idle.
+
+### Immediate idle HOME return (`SYSCTL_PROC`) and gated boot enable, November 26, 2026
+
+Trial 5 (`PhxAccel` SHA256
+`ce028d143a726362ae78328d058296e5987bf5aaac3a722a2eb1196cf2d17cc1`, UUID
+`59E839E3-8522-387E-984B-3EC11731DA04`, AuxKC
+`ef4fdea9448f1b4bc97aa3dd57132cc3895c3f9c69f38babb9c86a96e6376087`, 0 import
+drift, `kmutil inspect` 416 records with only `com.luuumi.PhxAccel` changed)
+converts `debug.phxfb_zerocopy` to a `SYSCTL_PROC` handler
+(`phxfb_zerocopy_sysctl` in `src/phxaccel/accel/phxfb.cpp`): writing `0` now
+invokes `PhxAMDFB::zcDisableImmediate()` (`zcHome(true)`) synchronously without
+waiting for another present transaction.
+
+Post-reboot hardware verification on macOS 26.7.2 (`25G332`, native 2x HiDPI
+`1280x800` / `2560x1600` / `120 Hz` confirmed by `make check-build34-scanout-mode`):
+
+- **Gated boot enable**: after boot, the local isolated launcher
+  (`phxboot-zerocopy.sh`) waited 20 seconds for desktop stability (`iop_ok > 0`,
+  `zc_faults == 0`, no `/Users/Shared/gpu/phxzc-off` kill-switch) before
+  enabling `debug.nvaccel_iop_flip=1 debug.phxfb_zerocopy=1` and monitoring for
+  70 seconds (`WindowServer` PID `204`, `465` flips, `0` faults, `0`
+  `iop_fail`, `162` MMHUB TLB flushes).
+- **Idle immediate HOME return**: with the desktop active in VMID 2
+  (`0x3ac9=0x2`, `0x3aca/0x3acb=0x101_0000_0000`,
+  `0x3ae5/0x3ae6=0x20000101_00000000`, `0x3af5=0x200000`, `0x3af6=0x203fff`,
+  `0x3b03=0x19`, VMID 1–2 context registers non-zero) and completely idle
+  (`zc_flips=540`, `iop_ok=1022` unchanged for 0.5 s), running
+  `sysctl -w debug.phxfb_zerocopy=0` with **zero additional presents**
+  immediately restored HOME (`0x3ac9=0`, `0x3aca/0x3acb=0x80_0000_0000`,
+  `0x3ae5/0x3ae6=0x80_0000_0000`, `0x3af5`/`0x3af6`/`0x3b03=0`, `0x3aa5=8`,
+  `0x418f=8`, all 28 VMID 1–4 context registers `0`).
+- **Re-enable recovery**: setting `debug.phxfb_zerocopy=1` and triggering a
+  1.2 s redraw resumed zero-copy cleanly (`zc_flips` `540 -> 612`, `+72/72`
+  flips, `0` new fallbacks, `0` faults, TLB flushes `166 -> 170`).

@@ -42,8 +42,12 @@ int gPhxZeroCopy = 0;
 static SInt64 gZcFlips, gZcFaults, gZcFallbacks, gZcReuses, gZcTlbFlushes;
 static int gZcLastStatus = 0;
 static unsigned int gZcLastFmt = 0;
-SYSCTL_INT(_debug, OID_AUTO, phxfb_zerocopy, CTLFLAG_RW | CTLFLAG_LOCKED, &gPhxZeroCopy, 0,
-           "1 = allow opt-in DCN VMID flat-page-table scanout; 0 = CPU-copy fallback");
+class PhxAMDFB;
+static PhxAMDFB *gPhxFbInstance = nullptr;
+static int phxfb_zerocopy_sysctl SYSCTL_HANDLER_ARGS;
+SYSCTL_PROC(_debug, OID_AUTO, phxfb_zerocopy, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED, nullptr, 0,
+            phxfb_zerocopy_sysctl, "I",
+            "1 = allow opt-in DCN VMID flat-page-table scanout; 0 = immediate HOME return and CPU-copy fallback");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_flips, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFlips, "DCN zero-copy scanout flips issued");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_faults, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFaults, "DCN VM faults observed by zero-copy scanout");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_fallbacks, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFallbacks, "zero-copy scanout requests refused");
@@ -76,7 +80,6 @@ enum : uint32_t { kBlCntl = 0x34c0 + 0x2f19, kBlPeriod = 0x34c0 + 0x2f1b, kBlLoc
 // brightness as it was (2026-10-25: eDP DPCD 0x721 says the panel follows its PWM pin): both get the level.
 static constexpr uint32_t kBlSeqs[] = { 0, 0x2f85 - 0x2f19 };
 static constexpr uint32_t kBlMax = 1024;   // the brightness parameter's range
-class PhxAMDFB;
 static IOService *phxBacklightCreate(PhxAMDFB *fb);
 
 static struct sysctl_oid *const kFbOids[] = { &sysctl__debug_phxfb_alias, &sysctl__debug_phxfb_zerocopy,
@@ -1064,6 +1067,7 @@ public:
     }
     bool start(IOService *provider) override;
     void stop(IOService *provider) override;
+    IOReturn zcDisableImmediate() { return zcHome(true); }
     IOReturn enableController() override { return kIOReturnSuccess; }
     bool isConsoleDevice() override { return !fBeside; }
     IODeviceMemory *getApertureRange(IOPixelAperture aperture) override {
@@ -1501,6 +1505,7 @@ bool PhxAMDFB::start(IOService *provider)
     phxHoldInit(this, kBootHoldSec);
     phxAgdcInstall();
     if (!gFbSysctl) { for (auto *o : kFbOids) sysctl_register_oid(o); gFbSysctl = true; }
+    __atomic_store_n(&gPhxFbInstance, this, __ATOMIC_RELEASE);
     PFBLOG("panel published: %ux%u row %u at 0x%llx (vbl timer %s)", fWidth, fHeight, fRowBytes,
            (unsigned long long)fBase, fVblTimer ? "running" : "MISSING");
     return true;
@@ -1509,6 +1514,7 @@ bool PhxAMDFB::start(IOService *provider)
 void PhxAMDFB::stop(IOService *provider)
 {
     __atomic_store_n(&fStopping, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&gPhxFbInstance, nullptr, __ATOMIC_RELEASE);
     const IOReturn zcHomeResult = zcHome(true);
     if (zcHomeResult == kIOReturnSuccess) zcCleanupPageTables();
     if (fVblWorkLoop) {
@@ -1527,4 +1533,18 @@ void PhxAMDFB::stop(IOService *provider)
     poolFree();
     IOFramebuffer::stop(provider);
     if (zcHomeResult == kIOReturnSuccess && fZcLock) { IOLockFree(fZcLock); fZcLock = nullptr; }
+}
+
+static int phxfb_zerocopy_sysctl SYSCTL_HANDLER_ARGS
+{
+    int value = __atomic_load_n(&gPhxZeroCopy, __ATOMIC_ACQUIRE);
+    const int error = sysctl_handle_int(oidp, &value, 0, req);
+    if (error || !req->newptr) return error;
+    const int normalized = value ? 1 : 0;
+    __atomic_store_n(&gPhxZeroCopy, normalized, __ATOMIC_RELEASE);
+    if (!normalized) {
+        if (PhxAMDFB *fb = __atomic_load_n(&gPhxFbInstance, __ATOMIC_ACQUIRE))
+            (void)fb->zcDisableImmediate();
+    }
+    return 0;
 }
