@@ -6,7 +6,7 @@ from build34_exact_submit import once
 
 
 FRAMEBUFFER = 'src/phxaccel/accel/phxfb.cpp'
-FRAMEBUFFER_SHA256 = 'd5d2b930443e61a03ca336a460f4868adbe41e49edeb4fefc3cc7eb0cba936be'
+FRAMEBUFFER_SHA256 = '023fa181ec6e824409154305b59b4669f2549e3389cb214a62f2fc79899e059a'
 FIELDS = '''    IOLock *fDcnFirmwareLock = nullptr;
     bool fDcnFirmwareReady = false, fDcnFirmwarePower = false, fDcnFirmwareClosed = false;
 

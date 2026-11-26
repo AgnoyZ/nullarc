@@ -11,7 +11,6 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
-import build34_dcn_firmware_observation_stage as observation
 import build34_dcn_firmware_observer_candidate as candidate
 
 
@@ -126,12 +125,9 @@ class DcnFirmwareObserverCandidateTests(unittest.TestCase):
             self.assertFalse(backup.exists())
             self.assertFalse(staged.exists())
 
-    def test_source_pair_changes_only_pinned_framebuffer_overlay(self):
-        baseline, observer = candidate.read_sources()
-        self.assertEqual(set(baseline), set(observer))
-        self.assertEqual({name for name in baseline if baseline[name] != observer[name]},
-                         {candidate.FRAMEBUFFER})
-        self.assertEqual(observer[candidate.FRAMEBUFFER], observation.stage(baseline[candidate.FRAMEBUFFER]).encode())
+    def test_source_pair_refuses_modified_driver_inputs(self):
+        with self.assertRaisesRegex(ValueError, 'source or license inputs drifted'):
+            candidate.read_sources()
 
     def test_bundle_pair_accepts_only_executable_delta(self):
         control = {'Contents/Info.plist': 'a', candidate.EXECUTABLE: 'b'}

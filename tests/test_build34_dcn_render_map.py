@@ -33,7 +33,7 @@ def render_fixture(source):
                       "void IOAccelPhxNativeClient::freeAll(", "IOReturn IOAccelPhxNativeClient::clientClose(")
     copy = method(present_stage((ROOT / ACCEL).read_bytes()), "IOReturn NVDisplayPipe::performTransaction(")
     start = copy.index("    if (nvAccelObserveDcnCopyBacking &&")
-    end = copy.index("    nvAccelIopHome(fb, head);", start)
+    end = copy.index("    if (!nvAccelIopHome(fb, head))", start)
     slots = {
         "// PHX34_RENDER_MAP_CONSTANTS": constants,
         "    // PHX34_RENDER_MAP_TYPES": client[client.index("    struct Bo {"):client.index("    IOReturn doHello(")],
@@ -95,7 +95,7 @@ class RenderMapTests(unittest.TestCase):
         start = after.index("    if (nvAccelObserveDcnCopyBacking &&")
         self.assertLess(after.index("iopMapSurface(s->getSurfaceID(), md, H * P)"), start)
         self.assertLess(after.index("if (w != q.width || h != q.height)"), start)
-        home = "    nvAccelIopHome(fb, head);"
+        home = "    if (!nvAccelIopHome(fb, head)) return kIOReturnSuccess;"
         self.assertEqual(before[before.index(home):], after[after.index(home):])
 
     def test_staged_gpuvm_identities(self):

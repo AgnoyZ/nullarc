@@ -12,6 +12,10 @@
 
 #define NVRM_VRAM_FN_SCANOUT  "nvScanoutInfo"
 
+#define PHX_FB_ABI_ZEROCOPY_VERSION 1u
+#define PHX_FB_FN_ZEROCOPY_FLIP     "phxZeroCopyFlip"
+#define PHX_FB_FN_ZEROCOPY_HOME     "phxZeroCopyHome"
+
 #define NVRM_VRAM_BAR1_BUDGET (192ull * 1024ull * 1024ull)
 
 struct NVRMVramRequest {
@@ -25,4 +29,17 @@ struct NVRMVramRequest {
     unsigned long long mappedTotal;
     unsigned int width, height, pitch;
     unsigned long long allocationCookie;
+};
+
+struct PhxZeroCopyFlipRequest {
+    unsigned int version;
+    unsigned int flags;
+    unsigned int surfaceID;
+    unsigned int pixelFormat;
+    unsigned int width;
+    unsigned int height;
+    unsigned int pitch;
+    int status;
+    void *surface;
+    void *memoryDescriptor;
 };

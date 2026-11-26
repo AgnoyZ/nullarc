@@ -4,7 +4,7 @@ import hashlib
 
 
 ACCEL = "src/phxaccel/accel/nvrm-accel.cpp"
-ACCEL_SHA256 = "4855ecaf223a64f3da747d43f81d29e43b1066d7a72c11b5500c97609dff0335"
+ACCEL_SHA256 = "1598c256fb4a74614e2be41681fef3462f92b7e8678d026c05e2714fbca56f5e"
 
 
 def stage(accelerator):
@@ -28,7 +28,7 @@ def stage(accelerator):
     replace("        w = (unsigned)W; h = (unsigned)H; pitch = (unsigned)P;\n",
             "        w = (unsigned)W; h = (unsigned)H; pitch = (unsigned)P;\n"
             "        copyDescriptor = md;\n")
-    replace("    nvAccelIopHome(fb, head);\n    const unsigned words =",
+    replace("    if (!nvAccelIopHome(fb, head)) return kIOReturnSuccess;\n    const unsigned words =",
             """    if (nvAccelObserveDcnCopyBacking && copyDescriptor && !fromRes && !l10r &&
         txn->getPlaneIOSurface(0, 0) == s && s->getMemoryDescriptor() == copyDescriptor &&
         s->getWidth() == w && s->getHeight() == h && s->getBytesPerRow() == pitch) {
@@ -37,6 +37,6 @@ def stage(accelerator):
         if (observed.preparation)
             nvAccelObserveDcnCopyBacking(observed);
     }
-    nvAccelIopHome(fb, head);
+    if (!nvAccelIopHome(fb, head)) return kIOReturnSuccess;
     const unsigned words =""")
     return source

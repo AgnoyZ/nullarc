@@ -18,13 +18,16 @@
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <IOKit/IORangeAllocator.h>
 #include <IOKit/IOSubMemoryDescriptor.h>
+#include <libkern/c++/OSObject.h>
 #include <libkern/OSAtomic.h>
+#include <libkern/locks.h>
 #include <libkern/c++/OSData.h>
 #include <sys/sysctl.h>
 #include "nvrm_vram_abi.h"
 #include "nvrm_gpuva_abi.h"
 #include "../PhxHardwarePolicy.hpp"
 #include "phx_panel_timing.h"
+#include "phx_dcn_zerocopy.h"
 
 void phxAgdcInstall();   // phxagdc.cpp: the AppleGraphicsDeviceControl that reports this panel (debug.phxagdc)
 void phxAgdcRemove();
@@ -33,9 +36,19 @@ void phxHoldInit(IOService *fb, unsigned bootHoldSec);   // phxagdc.cpp: debug.p
 #define PFBLOG(fmt, ...) IOLog("PhxFB: " fmt "\n", ##__VA_ARGS__)
 
 static int gAlias = 1;
-static bool gAliasSysctl;
 SYSCTL_INT(_debug, OID_AUTO, phxfb_alias, CTLFLAG_RW | CTLFLAG_LOCKED, &gAlias, 0,
            "1 = frames are copied into the scan-out through its system-RAM address (the carve-out), 0 = through the GPU's BAR");
+int gPhxZeroCopy = 0;
+static SInt64 gZcFlips, gZcFaults, gZcFallbacks;
+static int gZcLastStatus = 0;
+static unsigned int gZcLastFmt = 0;
+SYSCTL_INT(_debug, OID_AUTO, phxfb_zerocopy, CTLFLAG_RW | CTLFLAG_LOCKED, &gPhxZeroCopy, 0,
+           "1 = allow opt-in DCN VMID flat-page-table scanout; 0 = CPU-copy fallback");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_flips, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFlips, "DCN zero-copy scanout flips issued");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_faults, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFaults, "DCN VM faults observed by zero-copy scanout");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_fallbacks, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFallbacks, "zero-copy scanout requests refused");
+SYSCTL_INT(_debug, OID_AUTO, phxfb_zc_last_status, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcLastStatus, 0, "last zero-copy flip status");
+SYSCTL_UINT(_debug, OID_AUTO, phxfb_zc_last_fmt, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcLastFmt, 0, "last zero-copy request pixelFormat");
 
 // The VBL tick. XNU's timer coalescing moves a kernel deadline by up to an eighth of its delay, at most 1 ms, so a
 // 120 Hz tick could land anywhere in the first millisecond after the vblank it stands for. The system-critical urgency
@@ -52,9 +65,6 @@ SYSCTL_INT(_debug, OID_AUTO, phxfb_vbl_staged, CTLFLAG_RW | CTLFLAG_LOCKED, &gVb
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_vbl_n, CTLFLAG_RD | CTLFLAG_LOCKED, &gVblN, "VBL ticks fired");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_vbl_late_us_sum, CTLFLAG_RW | CTLFLAG_LOCKED, &gVblLateUsSum, "microseconds the VBL ticks fired past their deadlines, summed");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_vbl_late_us_max, CTLFLAG_RW | CTLFLAG_LOCKED, &gVblLateUsMax, "the latest VBL tick, microseconds past its deadline (writable: 0 restarts it)");
-static struct sysctl_oid *const kFbOids[] = { &sysctl__debug_phxfb_alias, &sysctl__debug_phxfb_vbl_staged, &sysctl__debug_phxfb_vbl_n,
-                                              &sysctl__debug_phxfb_vbl_late_us_sum, &sysctl__debug_phxfb_vbl_late_us_max };
-
 // The panel's backlight is the display block's PWM (DCN 3.1.4 PWRSEQ0, segment 2 base 0x34c0): ACPI's _BCM only asks the
 // GPU driver through ATIF (AFN7), and the firmware leaves the PWM on at full duty (period 4000, 12 bits). It is set as
 // Linux's panel_cntl does without DMUB: lock the group, write the active count, unlock, wait for the pending update.
@@ -66,6 +76,14 @@ static constexpr uint32_t kBlSeqs[] = { 0, 0x2f85 - 0x2f19 };
 static constexpr uint32_t kBlMax = 1024;   // the brightness parameter's range
 class PhxAMDFB;
 static IOService *phxBacklightCreate(PhxAMDFB *fb);
+
+static struct sysctl_oid *const kFbOids[] = { &sysctl__debug_phxfb_alias, &sysctl__debug_phxfb_zerocopy,
+                                              &sysctl__debug_phxfb_zc_flips, &sysctl__debug_phxfb_zc_faults,
+                                              &sysctl__debug_phxfb_zc_fallbacks, &sysctl__debug_phxfb_zc_last_status,
+                                              &sysctl__debug_phxfb_zc_last_fmt, &sysctl__debug_phxfb_vbl_staged,
+                                              &sysctl__debug_phxfb_vbl_n, &sysctl__debug_phxfb_vbl_late_us_sum,
+                                              &sysctl__debug_phxfb_vbl_late_us_max };
+static bool gFbSysctl;
 
 // The class name carries "AMD": CoreDisplay tells the GPU vendor from the framebuffer's class name (Intel, AMD, NVDA,
 // AppleParavirt), and for any other name it turns IOPresentment off, which left the panel on the software compositor
@@ -80,6 +98,7 @@ class PhxAMDFB : public IOFramebuffer {
     // copied with plain stores stayed in the CPU cache: stripes), so the display pipe writes it with non-temporal stores.
     IOMemoryMap *fAliasMap = nullptr;
     IOMemoryMap *fMmio = nullptr;      // BAR5, for the backlight PWM
+    IOLock *fZcLock = nullptr;
     IOService *fBacklight = nullptr;   // the brightness parameter handler, named "backlight"
     unsigned fAliasTries = 0;    // mapping/pixel verification attempts
     unsigned fAliasWaits = 0;    // metadata waits do not spend verification attempts
@@ -95,6 +114,26 @@ class PhxAMDFB : public IOFramebuffer {
     bool fBeside = false;   // another framebuffer (the firmware's IONDRV one) already drives this GPU: not the console
     IOPhysicalAddress fBase = 0;
     uint32_t fWidth = 0, fHeight = 0, fRowBytes = 0;
+    struct ZcSlot {
+        OSObject *surface = nullptr;
+        IOMemoryDescriptor *memory = nullptr;
+        IOBufferMemoryDescriptor *pageTable = nullptr;
+        uint64_t *pageTableKva = nullptr;
+        uint64_t pageTablePhys = 0;
+        uint32_t surfaceID = 0;
+        uint32_t expectedContext[phx::dcnzc::kContextFieldCount]{};
+        bool prepared = false;
+        bool active = false;
+        bool contextReady = false;
+        bool contextOwned = false;
+    };
+    ZcSlot fZcSlots[phx::dcnzc::kSlotCount]{};
+    phx::dcnzc::ApertureSnapshot fZcAperture{};
+    uint64_t fZcHomeAddr = 0;
+    uint32_t fZcOrigSysLow = 0, fZcOrigSysHigh = 0, fZcOrigL1Tlb = 0;
+    uint32_t fZcVmidsConsumed = 0;
+    int fZcFrontSlot = -1;
+    bool fZcArmed = false, fZcTripped = false;
     bool fHiRes = false;
     static constexpr uint64_t kFrameNs = 16666667ull;   // 60 Hz, when the refresh cannot be measured
     uint64_t fFrameNs = kFrameNs;
@@ -122,6 +161,547 @@ class PhxAMDFB : public IOFramebuffer {
     IORangeAllocator *fPoolRange = nullptr;
     uint8_t *fPoolKva = nullptr;
     uint64_t fPoolPhys = 0, fPoolBytes = 0;
+
+    volatile uint32_t *zcRegs() const {
+        return fMmio ? reinterpret_cast<volatile uint32_t *>(fMmio->getVirtualAddress()) : nullptr;
+    }
+
+    uint32_t zcRead(uint32_t reg) const {
+        volatile uint32_t *regs = zcRegs();
+        return regs && (static_cast<uint64_t>(reg) + 1) * sizeof(uint32_t) <= fMmio->getLength() ? regs[reg] : UINT32_MAX;
+    }
+
+    bool zcWrite(uint32_t reg, uint32_t value) {
+        volatile uint32_t *regs = zcRegs();
+        if (!regs || (static_cast<uint64_t>(reg) + 1) * sizeof(uint32_t) > fMmio->getLength()) return false;
+        regs[reg] = value;
+        __asm__ __volatile__("mfence" ::: "memory");
+        return true;
+    }
+
+    uint64_t zcAddress(uint32_t lowReg, uint32_t highReg) const {
+        const uint32_t high = zcRead(highReg), low = zcRead(lowReg);
+        return (high == UINT32_MAX || low == UINT32_MAX) ? UINT64_MAX :
+            (static_cast<uint64_t>(high & 0xffffu) << 32) | low;
+    }
+
+    bool zcHubpPeersIdle() const {
+        return fMmio && fMmio->getLength() >= phx::dcnzc::kMinMmioBytes &&
+            phx::dcnzc::hubpPeersIdle([this](uint32_t reg) { return zcRead(reg); });
+    }
+
+    bool zcLockOtg(bool lock) {
+        if (lock) {
+            const uint32_t state = zcRead(phx::dcnzc::kRegOtgMasterLock);
+            const uint32_t flip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
+            if (state == UINT32_MAX || flip == UINT32_MAX ||
+                (state & phx::dcnzc::kOtgLockReqStatus) || (flip & phx::dcnzc::kFlipUpdateLocked)) return false;
+        }
+        if (!zcWrite(phx::dcnzc::kRegOtgMasterLock, lock ? 1u : 0u)) return false;
+        for (unsigned attempt = 0; attempt < 100; ++attempt) {
+            const uint32_t state = zcRead(phx::dcnzc::kRegOtgMasterLock);
+            const uint32_t flip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
+            if (state == UINT32_MAX || flip == UINT32_MAX) return false;
+            const bool registerLocked = (state & phx::dcnzc::kOtgLockReqStatus) ==
+                (lock ? phx::dcnzc::kOtgLockReqStatus : 0);
+            const bool hubpLocked = bool(flip & phx::dcnzc::kFlipUpdateLocked) == lock;
+            if (registerLocked && hubpLocked) return true;
+            IODelay(10);
+        }
+        if (lock) (void)zcWrite(phx::dcnzc::kRegOtgMasterLock, 0);
+        return false;
+    }
+
+    bool zcFlipTo(uint32_t vmid, uint64_t address) {
+        if (!zcHubpPeersIdle()) return false;
+        const uint32_t priorFlip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
+        const uint32_t priorVmid = zcRead(phx::dcnzc::kRegHubpVmid0);
+        const uint64_t priorProgrammed = zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi);
+        const uint64_t priorEarliest = zcAddress(phx::dcnzc::kRegHubpEarliestLo, phx::dcnzc::kRegHubpEarliestHi);
+        if (priorFlip == UINT32_MAX || priorVmid == UINT32_MAX || priorProgrammed == UINT64_MAX ||
+            priorEarliest == UINT64_MAX ||
+            (priorFlip & (phx::dcnzc::kFlipPending | phx::dcnzc::kFlipUpdateLocked)) ||
+            priorProgrammed != priorEarliest || !zcLockOtg(true)) return false;
+        const bool baselineCurrent = zcHubpPeersIdle() && zcApertureCurrent() &&
+            phx::dcnzc::hubpGeometryReady(fWidth, fHeight, fRowBytes,
+                [this](uint32_t reg) { return zcRead(reg); }, true) &&
+            zcRead(phx::dcnzc::kRegHubpVmid0) == priorVmid &&
+            zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi) == priorProgrammed &&
+            zcAddress(phx::dcnzc::kRegHubpEarliestLo, phx::dcnzc::kRegHubpEarliestHi) == priorEarliest;
+        uint32_t vmidReg = zcRead(phx::dcnzc::kRegHubpVmid0);
+        bool ok = baselineCurrent && vmidReg != UINT32_MAX &&
+            zcWrite(phx::dcnzc::kRegHubpVmid0, (vmidReg & ~0xfu) | (vmid & 0xfu)) &&
+            zcWrite(phx::dcnzc::kRegHubpPrimHi, static_cast<uint32_t>(address >> 32)) &&
+            zcWrite(phx::dcnzc::kRegHubpPrimLo, static_cast<uint32_t>(address));
+        const bool unlocked = zcLockOtg(false);
+        return ok && unlocked;
+    }
+
+    bool zcWaitLatched(uint32_t vmid, uint64_t address, uint32_t timeoutMs) {
+        uint64_t deadline = 0;
+        clock_interval_to_deadline(timeoutMs, kMillisecondScale, &deadline);
+        while (mach_absolute_time() < deadline) {
+            const uint32_t flip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
+            const uint32_t vmidReg = zcRead(phx::dcnzc::kRegHubpVmid0);
+            const uint64_t programmed = zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi);
+            const uint64_t earliest = zcAddress(phx::dcnzc::kRegHubpEarliestLo, phx::dcnzc::kRegHubpEarliestHi);
+            if (flip == UINT32_MAX || vmidReg == UINT32_MAX || programmed == UINT64_MAX ||
+                earliest == UINT64_MAX)
+                return false;
+            if (!(flip & (phx::dcnzc::kFlipPending | phx::dcnzc::kFlipUpdateLocked)) &&
+                (vmidReg & 0xfu) == vmid &&
+                programmed == address && earliest == address)
+                return true;
+            IODelay(100);
+        }
+        return false;
+    }
+
+    bool zcWaitCurrentLatched(uint32_t timeoutMs) {
+        uint64_t deadline = 0;
+        clock_interval_to_deadline(timeoutMs, kMillisecondScale, &deadline);
+        while (mach_absolute_time() < deadline) {
+            const uint32_t flip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
+            const uint64_t programmed = zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi);
+            const uint64_t earliest = zcAddress(phx::dcnzc::kRegHubpEarliestLo, phx::dcnzc::kRegHubpEarliestHi);
+            if (flip == UINT32_MAX || programmed == UINT64_MAX || earliest == UINT64_MAX)
+                return false;
+            if (!(flip & (phx::dcnzc::kFlipPending | phx::dcnzc::kFlipUpdateLocked)) &&
+                programmed == earliest) return true;
+            IODelay(100);
+        }
+        return false;
+    }
+
+    void zcFlushTable(ZcSlot &slot) {
+        const uint64_t bytes = phx::dcnzc::kPageTableBytes;
+        for (uint64_t offset = 0; offset < bytes; offset += 64)
+            __asm__ __volatile__("clflush (%0)" :: "r"(reinterpret_cast<uint8_t *>(slot.pageTableKva) + offset) : "memory");
+        __asm__ __volatile__("mfence" ::: "memory");
+    }
+
+    bool zcEnsurePageTable(ZcSlot &slot) {
+        if (slot.pageTable && slot.pageTableKva && slot.pageTablePhys) return true;
+        IOBufferMemoryDescriptor *buffer = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+            kernel_task, kIODirectionInOut | kIOMemoryPhysicallyContiguous, phx::dcnzc::kPageTableBytes,
+            phx::dcnzc::kPhysPageMask);
+        if (!buffer || buffer->prepare() != kIOReturnSuccess) {
+            OSSafeReleaseNULL(buffer);
+            return false;
+        }
+        const uint64_t phys = buffer->getPhysicalSegment(0, nullptr, kIOMemoryMapperNone);
+        if (!phx::dcnzc::validPhysPage(phys) || !buffer->getBytesNoCopy()) {
+            buffer->complete();
+            buffer->release();
+            return false;
+        }
+        slot.pageTable = buffer;
+        slot.pageTableKva = static_cast<uint64_t *>(buffer->getBytesNoCopy());
+        slot.pageTablePhys = phys;
+        bzero(slot.pageTableKva, phx::dcnzc::kPageTableBytes);
+        zcFlushTable(slot);
+        return true;
+    }
+
+    bool zcContextFields(uint32_t vmid, uint32_t fields[phx::dcnzc::kContextFieldCount]) const {
+        const uint32_t base = phx::dcnzc::vmCtxBase(vmid);
+        for (uint32_t field = 0; field < phx::dcnzc::kContextFieldCount; ++field) {
+            fields[field] = zcRead(base + field);
+            if (fields[field] == UINT32_MAX) return false;
+        }
+        return true;
+    }
+
+    bool zcClearContext(uint32_t vmid, ZcSlot &slot) {
+        if (!slot.contextOwned) return true;
+        uint32_t current[phx::dcnzc::kContextFieldCount]{};
+        if (!zcContextFields(vmid, current) ||
+            !phx::dcnzc::contextMatchesOwnedState(slot.expectedContext, current)) {
+            slot.active = false;
+            slot.contextReady = false;
+            return false;
+        }
+        const uint32_t base = phx::dcnzc::vmCtxBase(vmid);
+        bool writesOk = true;
+        writesOk &= zcWrite(base + 3, 0);
+        writesOk &= zcWrite(base + 4, 0);
+        writesOk &= zcWrite(base + 5, 0);
+        writesOk &= zcWrite(base + 6, 0);
+        writesOk &= zcWrite(base + 0, 0);
+        writesOk &= zcWrite(base + 1, 0);
+        writesOk &= zcWrite(base + 2, 0);
+        if (!writesOk || !zcContextFields(vmid, current) ||
+            !phx::dcnzc::contextFieldsClear(current)) {
+            slot.active = false;
+            slot.contextReady = false;
+            return false;
+        }
+        slot.contextOwned = false;
+        slot.contextReady = false;
+        return true;
+    }
+
+    bool zcProgramContext(uint32_t vmid, uint64_t vaBase, uint32_t pageCount, uint64_t ptPhys, ZcSlot &slot) {
+        uint64_t root = 0;
+        if (!phx::dcnzc::encodeRootEntry(ptPhys, root) || !pageCount || pageCount > phx::dcnzc::kMaxPages) return false;
+        const uint64_t firstPage = vaBase / phx::dcnzc::kPageBytes;
+        const uint64_t lastPage = firstPage + pageCount - 1;
+        const uint32_t base = phx::dcnzc::vmCtxBase(vmid);
+        slot.expectedContext[0] = 0;
+        slot.expectedContext[1] = static_cast<uint32_t>(root >> 32);
+        slot.expectedContext[2] = static_cast<uint32_t>(root);
+        slot.expectedContext[3] = static_cast<uint32_t>(firstPage >> 32);
+        slot.expectedContext[4] = static_cast<uint32_t>(firstPage);
+        slot.expectedContext[5] = static_cast<uint32_t>(lastPage >> 32);
+        slot.expectedContext[6] = static_cast<uint32_t>(lastPage);
+        uint32_t current[phx::dcnzc::kContextFieldCount]{};
+        if (!zcContextFields(vmid, current) || !phx::dcnzc::contextFieldsClear(current)) return false;
+        if (!zcConsumeVmid(vmid)) return false;
+        slot.contextOwned = true;
+        if (!zcWrite(base + 3, static_cast<uint32_t>(firstPage >> 32)) ||
+            !zcWrite(base + 4, slot.expectedContext[4]) ||
+            !zcWrite(base + 5, slot.expectedContext[5]) ||
+            !zcWrite(base + 6, slot.expectedContext[6]) ||
+            !zcWrite(base + 0, 0) ||
+            !zcWrite(base + 1, slot.expectedContext[1])) return false;
+        if (!zcContextFields(vmid, current) ||
+            !phx::dcnzc::contextMatchesOwnedState(slot.expectedContext, current) || current[2] != 0 ||
+            !zcWrite(base + 2, slot.expectedContext[2])) return false;
+        for (unsigned attempt = 0; attempt < 1000; ++attempt) {
+            const uint32_t ready = zcRead(base + 2);
+            if (ready == UINT32_MAX) return false;
+            if (ready == slot.expectedContext[2])
+                return zcContextFields(vmid, current) &&
+                    phx::dcnzc::contextMatchesExactState(slot.expectedContext, current);
+            IODelay(10);
+        }
+        return false;
+    }
+
+    bool zcRestoreAperture() {
+        return zcWrite(phx::dcnzc::kRegHubpL1TlbCntl, fZcOrigL1Tlb) &&
+            zcWrite(phx::dcnzc::kRegHubpSysAperLow, fZcOrigSysLow) &&
+            zcWrite(phx::dcnzc::kRegHubpSysAperHigh, fZcOrigSysHigh) &&
+            zcRead(phx::dcnzc::kRegHubpL1TlbCntl) == fZcOrigL1Tlb &&
+            zcRead(phx::dcnzc::kRegHubpSysAperLow) == fZcOrigSysLow &&
+            zcRead(phx::dcnzc::kRegHubpSysAperHigh) == fZcOrigSysHigh;
+    }
+
+    bool zcConsumeVmid(uint32_t vmid) {
+        if (vmid < phx::dcnzc::kFirstVmid || vmid >= phx::dcnzc::kFirstVmid + phx::dcnzc::kSlotCount)
+            return false;
+        const uint32_t slotIndex = vmid - phx::dcnzc::kFirstVmid;
+        if (!phx::dcnzc::slotUnconsumed(slotIndex, fZcVmidsConsumed) || !fPCI) return false;
+        const uint32_t consumed = fZcVmidsConsumed | (1u << slotIndex);
+        if (!fPCI->setProperty("PhxDcnZeroCopyVmidsConsumed", consumed, 32)) return false;
+        fZcVmidsConsumed = consumed;
+        return true;
+    }
+
+    void zcReleaseSurface(ZcSlot &slot) {
+        if (slot.memory) {
+            if (slot.prepared) slot.memory->complete(kIODirectionOut);
+            slot.memory->release();
+        }
+        if (slot.surface) slot.surface->release();
+        slot.memory = nullptr;
+        slot.surface = nullptr;
+        slot.surfaceID = 0;
+        slot.prepared = false;
+        slot.active = false;
+        slot.contextReady = false;
+        slot.contextOwned = false;
+        bzero(slot.expectedContext, sizeof(slot.expectedContext));
+    }
+
+    IOReturn zcHomeLocked(bool teardownAll) {
+        if (!fZcArmed) return kIOReturnSuccess;
+        const uint32_t fault = zcRead(phx::dcnzc::kRegVmFaultStatus);
+        if ((fault == UINT32_MAX || (fault & 0xffffu) != 0) && !fZcTripped) {
+            fZcTripped = true;
+            OSAddAtomic64(1, &gZcFaults);
+        }
+        const uint32_t vmid = zcRead(phx::dcnzc::kRegHubpVmid0);
+        const uint64_t current = zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi);
+        if (vmid == UINT32_MAX || current == UINT64_MAX) return kIOReturnNotReady;
+        if ((vmid & 0xfu) != 0 || current != fZcHomeAddr) {
+            if (!zcWaitCurrentLatched(50)) return kIOReturnBusy;
+            if (!zcFlipTo(0, fZcHomeAddr) || !zcWaitLatched(0, fZcHomeAddr, 50)) return kIOReturnBusy;
+        } else if (!zcWaitLatched(0, fZcHomeAddr, 50)) {
+            return kIOReturnBusy;
+        }
+        fZcFrontSlot = -1;
+        if (!teardownAll) return kIOReturnSuccess;
+        bool contextsCleared = true;
+        for (uint32_t index = 0; index < phx::dcnzc::kSlotCount; ++index) {
+            ZcSlot &slot = fZcSlots[index];
+            if (slot.contextOwned && !zcClearContext(phx::dcnzc::kFirstVmid + index, slot)) {
+                contextsCleared = false;
+                continue;
+            }
+            zcReleaseSurface(slot);
+        }
+        if (!contextsCleared) return kIOReturnNotReady;
+        if (!zcRestoreAperture()) return kIOReturnNotReady;
+        fZcArmed = false;
+        fZcHomeAddr = 0;
+        return kIOReturnSuccess;
+    }
+
+    IOReturn zcHome(bool teardownAll) {
+        if (!fZcLock) return kIOReturnNotReady;
+        IOLockLock(fZcLock);
+        IOReturn result = zcHomeLocked(teardownAll);
+        IOLockUnlock(fZcLock);
+        return result;
+    }
+
+    bool zcArm() {
+        if (fZcArmed) return true;
+        if (fZcVmidsConsumed == phx::dcnzc::kAllSlotBits) return false;
+        using namespace phx::dcnzc;
+        if (!fMmio || fMmio->getLength() < kMinMmioBytes) return false;
+        const uint32_t fault = zcRead(kRegVmFaultStatus);
+        const uint32_t vmidReg = zcRead(kRegHubpVmid0);
+        const uint32_t sysLow = zcRead(kRegHubpSysAperLow), sysHigh = zcRead(kRegHubpSysAperHigh);
+        const uint32_t l1 = zcRead(kRegHubpL1TlbCntl);
+        const uint32_t fbBase = zcRead(kRegFbBase), fbTop = zcRead(kRegFbTop);
+        const uint32_t agpBot = zcRead(kRegAgpBot), agpTop = zcRead(kRegAgpTop);
+        const uint64_t address = zcAddress(kRegHubpPrimLo, kRegHubpPrimHi);
+        const uint64_t earliest = zcAddress(kRegHubpEarliestLo, kRegHubpEarliestHi);
+        const uint64_t bytes = round_page_64(static_cast<uint64_t>(fRowBytes) * fHeight);
+        if (fault == UINT32_MAX || (fault & 0xffffu) != 0 || vmidReg == UINT32_MAX || (vmidReg & 0xfu) != 0 || address == UINT64_MAX ||
+            earliest != address || !zcHubpPeersIdle() ||
+            fbBase == UINT32_MAX || fbTop == UINT32_MAX || agpBot == UINT32_MAX || agpTop == UINT32_MAX ||
+            sysLow == UINT32_MAX || sysHigh == UINT32_MAX || l1 == UINT32_MAX ||
+            !addressInFbAperture(address, bytes, {fbBase, fbTop, agpBot, agpTop})) return false;
+        for (uint32_t vmid = kFirstVmid; vmid < kFirstVmid + kSlotCount; ++vmid)
+            for (uint32_t field = 0; field < kVmCtxStride; ++field)
+                if (zcRead(vmCtxBase(vmid) + field) != 0) return false;
+        for (uint32_t index = 0; index < kSlotCount; ++index)
+            if (!slotVaClearOfApertures(slotVa(index), static_cast<uint64_t>(kMaxPages) * kPageBytes,
+                                        {fbBase, fbTop, agpBot, agpTop})) return false;
+        fZcHomeAddr = address;
+        fZcAperture = {fbBase, fbTop, agpBot, agpTop};
+        fZcOrigSysLow = sysLow;
+        fZcOrigSysHigh = sysHigh;
+        fZcOrigL1Tlb = l1;
+        uint32_t low = 0, high = 0;
+        computeSystemApertureRegs(fZcAperture, low, high);
+        fZcArmed = true;
+        if (!zcWrite(kRegHubpSysAperLow, low) || !zcWrite(kRegHubpSysAperHigh, high) ||
+            !zcWrite(kRegHubpL1TlbCntl, kL1TlbEnableSysMode3) ||
+            !zcApertureCurrent()) {
+            if (zcRestoreAperture()) {
+                fZcArmed = false;
+                fZcHomeAddr = 0;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    bool zcApertureCurrent() const {
+        uint32_t low = 0, high = 0;
+        phx::dcnzc::computeSystemApertureRegs(fZcAperture, low, high);
+        return zcRead(phx::dcnzc::kRegHubpSysAperLow) == low &&
+            zcRead(phx::dcnzc::kRegHubpSysAperHigh) == high &&
+            zcRead(phx::dcnzc::kRegHubpL1TlbCntl) == phx::dcnzc::kL1TlbEnableSysMode3;
+    }
+
+    int zcFindSlot(uint32_t surfaceID, IOMemoryDescriptor *memory) {
+        for (uint32_t index = 0; index < phx::dcnzc::kSlotCount; ++index) {
+            const ZcSlot &slot = fZcSlots[index];
+            if (slot.active && slot.contextReady && slot.surfaceID == surfaceID && slot.memory == memory)
+                return static_cast<int>(index);
+        }
+        return -1;
+    }
+
+    int zcAcquireSlot(PhxZeroCopyFlipRequest *request, IOMemoryDescriptor *memory, uint64_t bytes, uint32_t pageCount) {
+        int selected = -1;
+        for (uint32_t index = 0; index < phx::dcnzc::kSlotCount; ++index)
+            if (phx::dcnzc::slotUnconsumed(index, fZcVmidsConsumed) &&
+                !fZcSlots[index].surface && !fZcSlots[index].memory && !fZcSlots[index].contextOwned) {
+                selected = static_cast<int>(index);
+                break;
+            }
+        if (selected < 0) { request->status = phx::dcnzc::kNoEvictableSlot; return -1; }
+        if (!zcWaitCurrentLatched(50)) { request->status = phx::dcnzc::kLockTimeout; return -1; }
+        ZcSlot &slot = fZcSlots[selected];
+        if (!zcEnsurePageTable(slot)) { request->status = phx::dcnzc::kPrepareFailed; return -1; }
+        if (!phx::dcnzc::validPhysPage(slot.pageTablePhys) ||
+            slot.pageTablePhys > phx::dcnzc::kAddressLimit - phx::dcnzc::kPageTableBytes) {
+            request->status = phx::dcnzc::kBadPhysPage;
+            return -1;
+        }
+        OSObject *surface = static_cast<OSObject *>(request->surface);
+        if (!surface || !memory) { request->status = phx::dcnzc::kBadArgs; return -1; }
+        surface->retain();
+        memory->retain();
+        if (memory->prepare(kIODirectionOut) != kIOReturnSuccess) {
+            memory->release();
+            surface->release();
+            request->status = phx::dcnzc::kPrepareFailed;
+            return -1;
+        }
+        if (memory->getLength() < bytes) {
+            memory->complete(kIODirectionOut);
+            memory->release();
+            surface->release();
+            request->status = phx::dcnzc::kGeometryMismatch;
+            return -1;
+        }
+        bzero(slot.pageTableKva, phx::dcnzc::kPageTableBytes);
+        for (uint32_t page = 0; page < pageCount; ++page) {
+            IOByteCount segmentLength = 0;
+            const uint64_t phys = memory->getPhysicalSegment(static_cast<uint64_t>(page) * phx::dcnzc::kPageBytes,
+                                                              &segmentLength, kIOMemoryMapperNone);
+            uint64_t pte = 0;
+            if (segmentLength < phx::dcnzc::kPageBytes ||
+                !phx::dcnzc::encodeLeafPte(phys, pte)) {
+                memory->complete(kIODirectionOut);
+                memory->release();
+                surface->release();
+                bzero(slot.pageTableKva, phx::dcnzc::kPageTableBytes);
+                zcFlushTable(slot);
+                request->status = phx::dcnzc::kBadPhysPage;
+                return -1;
+            }
+            slot.pageTableKva[page] = pte;
+        }
+        zcFlushTable(slot);
+        const uint32_t vmid = phx::dcnzc::kFirstVmid + static_cast<uint32_t>(selected);
+        slot.surface = surface;
+        slot.memory = memory;
+        slot.surfaceID = request->surfaceID;
+        slot.prepared = true;
+        if (!zcProgramContext(vmid, phx::dcnzc::slotVa(static_cast<uint32_t>(selected)), pageCount,
+                              slot.pageTablePhys, slot)) {
+            if (slot.contextOwned && zcClearContext(vmid, slot)) {
+                zcReleaseSurface(slot);
+                bzero(slot.pageTableKva, phx::dcnzc::kPageTableBytes);
+                zcFlushTable(slot);
+            } else if (!slot.contextOwned) {
+                zcReleaseSurface(slot);
+                bzero(slot.pageTableKva, phx::dcnzc::kPageTableBytes);
+                zcFlushTable(slot);
+            }
+            request->status = phx::dcnzc::kCtxTimeout;
+            return -1;
+        }
+        slot.active = true;
+        slot.contextReady = true;
+        return selected;
+    }
+
+    IOReturn zcFlip(PhxZeroCopyFlipRequest *request) {
+        if (!fZcLock) return kIOReturnNotReady;
+        IOLockLock(fZcLock);
+        if (!gPhxZeroCopy || fZcTripped || fStopping || !request ||
+            request->version != PHX_FB_ABI_ZEROCOPY_VERSION || !request->surface || !request->memoryDescriptor) {
+            gZcLastStatus = !gPhxZeroCopy ? phx::dcnzc::kDisabled : (fZcTripped ? phx::dcnzc::kTripped : phx::dcnzc::kBadArgs);
+            IOReturn result = (fZcArmed && !gPhxZeroCopy) ? zcHomeLocked(true) : kIOReturnNotReady;
+            IOLockUnlock(fZcLock);
+            OSAddAtomic64(1, &gZcFallbacks);
+            return result == kIOReturnSuccess ? kIOReturnNotOpen : result;
+        }
+        gZcLastFmt = request->pixelFormat;
+        request->status = phx::dcnzc::kBadArgs;
+        uint64_t bytes = 0;
+        uint32_t pageCount = 0;
+        if (!phx::dcnzc::validSurfaceRequest(request->pixelFormat, request->width, request->height,
+                                             request->pitch, fWidth, fHeight, fRowBytes, bytes, pageCount)) {
+            request->status = request->pixelFormat == phx::dcnzc::kPixelFormatBgra ?
+                phx::dcnzc::kGeometryMismatch : phx::dcnzc::kUnsupportedFormat;
+            gZcLastStatus = request->status;
+            IOReturn home = zcHomeLocked(false);
+            IOLockUnlock(fZcLock);
+            OSAddAtomic64(1, &gZcFallbacks);
+            return home == kIOReturnSuccess ? kIOReturnUnsupported : home;
+        }
+        const uint32_t fault = zcRead(phx::dcnzc::kRegVmFaultStatus);
+        if (fault == UINT32_MAX || (fault & 0xffffu) != 0) {
+            fZcTripped = true;
+            gPhxZeroCopy = 0;
+            OSAddAtomic64(1, &gZcFaults);
+            request->status = phx::dcnzc::kVmFault;
+            gZcLastStatus = request->status;
+            IOReturn home = zcHomeLocked(true);
+            IOLockUnlock(fZcLock);
+            OSAddAtomic64(1, &gZcFallbacks);
+            return home == kIOReturnSuccess ? kIOReturnError : home;
+        }
+        if (fZcArmed && !zcApertureCurrent()) {
+            request->status = phx::dcnzc::kHwNotReady;
+            gZcLastStatus = request->status;
+            IOReturn home = zcHomeLocked(true);
+            IOLockUnlock(fZcLock);
+            OSAddAtomic64(1, &gZcFallbacks);
+            return home == kIOReturnSuccess ? kIOReturnNotReady : home;
+        }
+        if (!phx::dcnzc::hubpGeometryReady(fWidth, fHeight, fRowBytes,
+                [this](uint32_t reg) { return zcRead(reg); }) || !zcHubpPeersIdle()) {
+            request->status = phx::dcnzc::kHwNotReady;
+            gZcLastStatus = request->status;
+            IOReturn home = zcHomeLocked(true);
+            IOLockUnlock(fZcLock);
+            OSAddAtomic64(1, &gZcFallbacks);
+            return home == kIOReturnSuccess ? kIOReturnNotReady : home;
+        }
+        if (!zcArm()) {
+            request->status = phx::dcnzc::kApertureConflict;
+            gZcLastStatus = request->status;
+            IOReturn home = fZcArmed ? zcHomeLocked(true) : kIOReturnSuccess;
+            IOLockUnlock(fZcLock);
+            OSAddAtomic64(1, &gZcFallbacks);
+            return home == kIOReturnSuccess ? kIOReturnNotReady : home;
+        }
+        IOMemoryDescriptor *memory = static_cast<IOMemoryDescriptor *>(request->memoryDescriptor);
+        int slotIndex = zcFindSlot(request->surfaceID, memory);
+        if (slotIndex < 0) slotIndex = zcAcquireSlot(request, memory, bytes, pageCount);
+        if (slotIndex < 0) {
+            if (request->status == phx::dcnzc::kBadArgs) request->status = phx::dcnzc::kNoEvictableSlot;
+            gZcLastStatus = request->status;
+            IOReturn home = zcHomeLocked(false);
+            IOLockUnlock(fZcLock);
+            OSAddAtomic64(1, &gZcFallbacks);
+            return home == kIOReturnSuccess ? kIOReturnBusy : home;
+        }
+        const uint64_t address = phx::dcnzc::slotVa(static_cast<uint32_t>(slotIndex));
+        const uint32_t vmid = phx::dcnzc::kFirstVmid + static_cast<uint32_t>(slotIndex);
+        if (slotIndex != fZcFrontSlot || (zcRead(phx::dcnzc::kRegHubpVmid0) & 0xfu) != vmid ||
+            zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi) != address) {
+            if (!zcWaitCurrentLatched(50) || !zcFlipTo(vmid, address)) {
+                request->status = phx::dcnzc::kLockTimeout;
+                gZcLastStatus = request->status;
+                IOReturn home = zcHomeLocked(true);
+                IOLockUnlock(fZcLock);
+                OSAddAtomic64(1, &gZcFallbacks);
+                return home == kIOReturnSuccess ? kIOReturnBusy : home;
+            }
+            fZcFrontSlot = slotIndex;
+        }
+        request->status = phx::dcnzc::kOk;
+        gZcLastStatus = request->status;
+        IOLockUnlock(fZcLock);
+        OSAddAtomic64(1, &gZcFlips);
+        return kIOReturnSuccess;
+    }
+
+    void zcCleanupPageTables() {
+        for (uint32_t index = 0; index < phx::dcnzc::kSlotCount; ++index) {
+            ZcSlot &slot = fZcSlots[index];
+            if (slot.contextOwned || slot.memory || slot.surface) continue;
+            if (slot.pageTable) {
+                slot.pageTable->complete();
+                slot.pageTable->release();
+            }
+            slot.pageTable = nullptr;
+            slot.pageTableKva = nullptr;
+            slot.pageTablePhys = 0;
+        }
+    }
 
     void poolInit() {
         for (uint64_t bytes : kPoolTry) {
@@ -348,6 +928,7 @@ public:
         return backlightWrite(level);
     }
     void displayPower(bool on) {
+        if (!on) (void)zcHome(true);
         if (!fBacklight || on != fBlDark) return;
         if (!on && !(backlightRead(&fBlSaved) && backlightWrite(0))) return;
         fBlDark = !on;
@@ -458,6 +1039,7 @@ public:
     // power and connection answers as NullMoth's NMIntelFB/NVRMFB give them: acknowledge at once, never queue on the
     // controller thread (a base-class power change waited 45 s for an acknowledge and froze WindowServer restarts)
     IOReturn setPowerState(unsigned long ordinal, IOService *) override {
+        if (ordinal == 0) (void)zcHome(true);
         handleEvent(ordinal ? kIOFBNotifyDidPowerOn : kIOFBNotifyWillPowerOff);
         return kIOPMAckImplied;
     }
@@ -561,6 +1143,10 @@ public:
         return fAliasMap;
     }
     IOReturn callPlatformFunction(const OSSymbol *fn, bool wait, void *p1, void *p2, void *p3, void *p4) override {
+        if (fn && fn->isEqualTo(PHX_FB_FN_ZEROCOPY_FLIP))
+            return zcFlip(static_cast<PhxZeroCopyFlipRequest *>(p1));
+        if (fn && fn->isEqualTo(PHX_FB_FN_ZEROCOPY_HOME))
+            return zcHome(true);
         if (fn && fn->isEqualTo(NVRM_VRAM_FN_SCANOUT)) {
             NVRMVramRequest *r = (NVRMVramRequest *)p1;
             if (!r || r->version != NVRM_VRAM_ABI_VERSION) return kIOReturnBadArgument;
@@ -695,6 +1281,10 @@ bool PhxAMDFB::start(IOService *provider)
     if (!takeBootArming()) { PFBLOG("NVRAM phxfb-boot not set: leaving the firmware framebuffer this boot"); return false; }
     fPCI = OSDynamicCast(IOPCIDevice, provider);
     if (!fPCI) return false;
+    if (OSNumber *consumed = OSDynamicCast(OSNumber, fPCI->getProperty("PhxDcnZeroCopyVmidsConsumed"))) {
+        const uint32_t mask = consumed->unsigned32BitValue();
+        fZcVmidsConsumed = (mask & ~phx::dcnzc::kAllSlotBits) ? phx::dcnzc::kAllSlotBits : mask;
+    }
     if (OSIterator *it = fPCI->getChildIterator(gIOServicePlane)) {
         while (OSObject *o = it->getNextObject())
             if (o != this && OSDynamicCast(IOFramebuffer, o)) fBeside = true;
@@ -762,8 +1352,14 @@ bool PhxAMDFB::start(IOService *provider)
     fHiRes = !((fWidth | fHeight) & 1) && !(fRowBytes & 3) && fRowBytes == v.v_rowBytes
         && hiResRequested();
     setProperty("PhxFBHiResModeFlag", fHiRes);
+    fZcLock = IOLockAlloc();
+    if (!fZcLock) {
+        if (fBacklight) { fBacklight->detach(this); OSSafeReleaseNULL(fBacklight); }
+        OSSafeReleaseNULL(fMmio); OSSafeReleaseNULL(fSurfMap); return false;
+    }
     if (!IOFramebuffer::start(provider)) {
         if (fBacklight) { fBacklight->detach(this); OSSafeReleaseNULL(fBacklight); }
+        IOLockFree(fZcLock); fZcLock = nullptr;
         OSSafeReleaseNULL(fMmio); OSSafeReleaseNULL(fSurfMap); return false; }
     fVa = IORangeAllocator::withRange(kVaSize - 1, PAGE_SIZE, 0, IORangeAllocator::kLocking);
     poolInit();
@@ -799,7 +1395,7 @@ bool PhxAMDFB::start(IOService *provider)
     registerPowerDriver(this, states, 2);
     phxHoldInit(this, kBootHoldSec);
     phxAgdcInstall();
-    if (!gAliasSysctl) { for (auto *o : kFbOids) sysctl_register_oid(o); gAliasSysctl = true; }
+    if (!gFbSysctl) { for (auto *o : kFbOids) sysctl_register_oid(o); gFbSysctl = true; }
     PFBLOG("panel published: %ux%u row %u at 0x%llx (vbl timer %s)", fWidth, fHeight, fRowBytes,
            (unsigned long long)fBase, fVblTimer ? "running" : "MISSING");
     return true;
@@ -808,13 +1404,15 @@ bool PhxAMDFB::start(IOService *provider)
 void PhxAMDFB::stop(IOService *provider)
 {
     __atomic_store_n(&fStopping, true, __ATOMIC_RELEASE);
+    const IOReturn zcHomeResult = zcHome(true);
+    if (zcHomeResult == kIOReturnSuccess) zcCleanupPageTables();
     if (fVblWorkLoop) {
         fVblWorkLoop->runAction(vblRetire, this);
         OSSafeReleaseNULL(fVblTimer);
         OSSafeReleaseNULL(fVblWorkLoop);
     }
     phxAgdcRemove();
-    if (gAliasSysctl) { for (auto *o : kFbOids) sysctl_unregister_oid(o); gAliasSysctl = false; }
+    if (gFbSysctl) { for (auto *o : kFbOids) sysctl_unregister_oid(o); gFbSysctl = false; }
     gPhxFrameAbs = 0;
     if (fBacklight) { fBacklight->terminate(); OSSafeReleaseNULL(fBacklight); }
     OSSafeReleaseNULL(fMmio);
@@ -823,4 +1421,5 @@ void PhxAMDFB::stop(IOService *provider)
     OSSafeReleaseNULL(fVa);
     poolFree();
     IOFramebuffer::stop(provider);
+    if (zcHomeResult == kIOReturnSuccess && fZcLock) { IOLockFree(fZcLock); fZcLock = nullptr; }
 }

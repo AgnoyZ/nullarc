@@ -49,6 +49,7 @@ static void               nvAccelWriteStamp(int index, unsigned int value);
 #endif
 #include <sys/sysctl.h>
 #include <libkern/OSAtomic.h>
+extern int gPhxZeroCopy;
 extern "C" {   // kern/thread_call.h and kern/clock.h clash with the family headers here, so the KPIs are declared by hand
 struct thread_call *thread_call_allocate(void (*func)(void *, void *), void *param0);
 int thread_call_enter_delayed(struct thread_call *call, uint64_t deadline);
@@ -1106,7 +1107,7 @@ static void nvAccelSurfScanoutSync(IOSurface *s);
 static bool nvAccelSurfCopyReady(IOSurface *s, unsigned head);
 static bool nvAccelIopFlip(IOService *fb, unsigned head, IOSurface *s, void *pipe);
 static bool nvSurfWaitReady(unsigned int id);
-static void nvAccelIopHome(IOService *fb, unsigned head);
+static bool nvAccelIopHome(IOService *fb, unsigned head);
 IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
 {
     if (!gNvIop) return (IOReturn)0xe00002c7;
@@ -1178,7 +1179,7 @@ IOReturn NVDisplayPipe::performTransaction(IOAccelDisplayPipeTransaction2 *txn)
     if (ret != kIOReturnSuccess || !q.kva || q.pitch < 4 || !q.height) NVIOP_FAIL(kIOReturnNotReady, "framebuffer would not describe its scanout (0x%x kva %p pitch %u)", (unsigned)ret, q.kva, q.pitch);
     if (w != q.width || h != q.height) NVIOP_FAIL(kIOReturnBadArgument, "source %ux%u is not the scanout's %ux%u", w, h, q.width, q.height);
 
-    nvAccelIopHome(fb, head);
+    if (!nvAccelIopHome(fb, head)) return kIOReturnSuccess;
     const unsigned words = (((pitch < q.pitch) ? pitch : q.pitch) & ~3u) / 4;
     const unsigned spr = pitch / 4, dpr = q.pitch / 4;
     volatile unsigned int *d = (volatile unsigned int *)q.kva;
@@ -2111,7 +2112,42 @@ static bool nvAccelIopAsyncStart(void *pipe, IOService *fb, unsigned head, IOSur
 }
 static bool nvAccelIopFlip(IOService *fb, unsigned head, IOSurface *s, void *pipe)
 {
-    if (!gIopFlip || !fb || !s || head >= kNvMaxFB) return false;
+    if (!fb || !s || head >= kNvMaxFB) return false;
+    if (fb->metaCast("PhxAMDFB")) {
+        const bool hadZeroCopyFront = gIopFlipped[head];
+        if (!gIopFlip || !gPhxZeroCopy || !nvSurfWaitReady(s->getSurfaceID())) {
+            if (hadZeroCopyFront) {
+                if (!nvAccelIopHome(fb, head)) return true;
+            }
+            return false;
+        }
+        const unsigned long long width = s->getWidth();
+        const unsigned long long height = s->getHeight();
+        const unsigned long long pitch = s->getBytesPerRow();
+        if (width > UINT32_MAX || height > UINT32_MAX || pitch > UINT32_MAX) return false;
+        struct PhxZeroCopyFlipRequest request; nvSVZero(&request, sizeof request);
+        request.version = PHX_FB_ABI_ZEROCOPY_VERSION;
+        request.surfaceID = s->getSurfaceID();
+        request.pixelFormat = s->getPixelFormat();
+        request.width = static_cast<unsigned int>(width);
+        request.height = static_cast<unsigned int>(height);
+        request.pitch = static_cast<unsigned int>(pitch);
+        request.surface = s;
+        request.memoryDescriptor = s->getMemoryDescriptor();
+        const OSSymbol *symbol = OSSymbol::withCStringNoCopy(PHX_FB_FN_ZEROCOPY_FLIP);
+        IOReturn result = symbol ? fb->callPlatformFunction(symbol, false, &request, nullptr, nullptr, nullptr) : kIOReturnNoMemory;
+        if (symbol) symbol->release();
+        if (result != kIOReturnSuccess) {
+            if (hadZeroCopyFront) {
+                if (!nvAccelIopHome(fb, head)) return true;
+            }
+            return false;
+        }
+        gIopFlipped[head] = true;
+        OSAddAtomic64(1, &gCntIopFlip);
+        return true;
+    }
+    if (!gIopFlip) return false;
     // zero-copy scan-out is an NVIDIA display-engine flip; another vendor's panel (NMIntelFB) always takes the copy
     if (!fb->metaCast("NVRMNVDAFramebuffer")) return false;
     NVAccel *a = NVAccel::gAccel;
@@ -2189,9 +2225,19 @@ static int nvaccel_crc_sysctl SYSCTL_HANDLER_ARGS
     int out = (int)v;
     return sysctl_handle_int(oidp, &out, 0, req);
 }
-static void nvAccelIopHome(IOService *fb, unsigned head)
+static bool nvAccelIopHome(IOService *fb, unsigned head)
 {
-    if (!fb || head >= kNvMaxFB || !gIopFlipped[head] || !fb->metaCast("NVRMNVDAFramebuffer")) return;
+    if (!fb || head >= kNvMaxFB || !gIopFlipped[head]) return true;
+    if (fb->metaCast("PhxAMDFB")) {
+        const OSSymbol *symbol = OSSymbol::withCStringNoCopy(PHX_FB_FN_ZEROCOPY_HOME);
+        IOReturn result = symbol ? fb->callPlatformFunction(symbol, false, nullptr, nullptr, nullptr, nullptr) : kIOReturnNoMemory;
+        if (symbol) symbol->release();
+        OSAddAtomic64(1, &gCntIopFlipHome);
+        if (result != kIOReturnSuccess) return false;
+        gIopFlipped[head] = false;
+        return true;
+    }
+    if (!fb->metaCast("NVRMNVDAFramebuffer")) return true;
     struct NVRMFlipRequest f; nvSVZero(&f, sizeof f);
     f.version = NVRM_FLIP_ABI_VERSION; f.flags = 1u;
     const OSSymbol *sym = OSSymbol::withCStringNoCopy("nvFlipToSurfacePure");
@@ -2200,9 +2246,13 @@ static void nvAccelIopHome(IOService *fb, unsigned head)
     OSAddAtomic64(1, &gCntIopFlipHome);
     // Busy: the flip before HOME is still landing and HOME was not submitted, so the panel is not home yet and the
     // next copied frame tries again. Clearing the flag here left every later copy offscreen behind that flip.
-    if (rr == kIOReturnBusy) return;
-    if (rr != kIOReturnSuccess && gIopFlipLogs < 8) { gIopFlipLogs++; ALOG("iop: HOME flip refused (0x%x) head %u", (unsigned)rr, head); }
+    if (rr == kIOReturnBusy) return false;
+    if (rr != kIOReturnSuccess) {
+        if (gIopFlipLogs < 8) { gIopFlipLogs++; ALOG("iop: HOME flip refused (0x%x) head %u", (unsigned)rr, head); }
+        return false;
+    }
     gIopFlipped[head] = false;
+    return true;
 }
 static void nvAccelSurfScanoutSync(IOSurface *s)
 {

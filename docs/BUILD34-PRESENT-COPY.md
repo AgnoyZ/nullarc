@@ -1919,3 +1919,88 @@ PhxAMDFB, but active HUBP route/provider and device DMA domain are still
 unproven. No mapper lookup was executed by this production image, no register
 or DMA operation was performed, and no zero-copy candidate was admitted. See
 the [post-2x prerequisite record](validation/build34-dcn-admission-after-2x-20261126.json).
+
+## DCN flat-page-table source integration, November 26, 2026
+
+The owner explicitly removed the blanket prohibition on candidate deployment
+and new GPU execution for this isolated zero-copy workstream. Manual deployment
+and GPU validation are authorized on the default build34 branch with the
+already validated native 2x HiDPI mode. This does not authorize build41/build42
+or change build34 admission requirements.
+
+The source now connects the PhxAMDFB platform-function route to the existing
+surface-present path. The opt-in remains off by default. The display code
+validates BGRA geometry, flat PTE addresses and apertures, pins each IOSurface
+descriptor while its VMID context may reference it, waits for the firmware
+surface to be restored before CPU-copy fallback, and retains quarantined pins
+when a VMID context cannot be verified clear. Teardown restores the captured
+system aperture and TLB mode only after verified HOME and context cleanup.
+The firmware HOME scanout surface must fall within the captured DCN FB
+aperture, while the flat page-table root and backing pages are checked as valid
+48-bit aligned system physical pages; pipe 0 geometry and all three peer HUBPs
+are rechecked before use.
+PhxBringup uses VMIDs 8–15; zero-copy only considers VMIDs 1–4 after checking
+their contexts are empty. Because this integration has no verified DCN
+TLB-invalidation sequence yet, each zero-copy VMID is single-use for the
+framebuffer lifetime; it is never rebound to a different physical mapping.
+Once the four VMIDs are consumed, presentation falls back to CPU copy until
+the framebuffer is restarted. The consumed mask is retained on the PCI
+provider to prevent reuse after a framebuffer service restart in the same
+boot.
+
+Activation requires both `debug.nvaccel_iop_flip=1` and
+`debug.phxfb_zerocopy=1`; both default off. Diagnostic read-only sysctls
+`debug.phxfb_zc_last_status` and `debug.phxfb_zc_last_fmt` report the last
+status code and surface pixel format.
+
+### Controlled hardware validation on native 2x HiDPI, November 26, 2026
+
+Under the owner's authorization, isolated build34 zero-copy candidates were
+linked against KDK `26.7.2/25G332` with an exact baseline backup and automatic
+rollback under `/private/var/db/nullarc-build34-dcn-zerocopy-trial-20261126`
+(baseline HiDPI `PhxAccel` SHA256
+`8e677b77caa23f404e3a011ca0648fd839bd6ab9264d8697e27f8e2e70997564`, AuxKC
+`9e5d4191397b2c62ccef210afae6ccafd8a64db16f480d1e3dde751b28df310b`). Three
+iterative hardware checks were performed on macOS 26.7.2 (`25G332`) with
+`PhxBringup` build34 (`2D6C39B3-1A0C-3E7F-979A-2821456A53B3`) and the native 2x
+mode gate passing (`1280x800` logical / `2560x1600` backing / `120 Hz` / `2x`):
+
+- **Trial 1** (`PhxAccel` SHA256
+  `9ccaf03a7f5aff2612cbaff8fbd65b92e5024758df53dca57cd4f462639fee1f`): 111
+  presents entered `zcFlip` and fell back cleanly (`flips=0`, `faults=0`).
+  Read-only BAR5 inspection showed `DCSURF_SURFACE_INUSE` (`0x3ae1`/`0x3ae2`)
+  reads `0` on this UEFI GOP DCN 3.1.4 pipe while
+  `DCSURF_SURFACE_EARLIEST_INUSE` (`0x3ae5`/`0x3ae6`) matches
+  `DCSURF_PRIMARY_SURFACE_ADDRESS` (`0x80_0000_0000`), consistent with Linux
+  `hubp1_is_flip_pending`.
+- **Trial 2** (`PhxAccel` SHA256
+  `fc63c2844d351b05849a1520f2a734e83b476b4ceeac78b0ffdeb64ada2b1e6f`): switching
+  latch checks to `DCSURF_SURFACE_EARLIEST_INUSE` passed `zcArm()` and
+  programmed VMID 1 (`PhxDcnZeroCopyVmidsConsumed=1`, `faults=0`), then stopped
+  with `last_status=14` (`kLockTimeout`) because `zcFlipTo()` rechecked
+  `hubpGeometryReady()` while holding the OTG update lock with
+  `HUBPREQ_MASTER_UPDATE_LOCK_STATUS` set.
+- **Trial 3** (`PhxAccel` SHA256
+  `2352e980f2421c3875e4402eb36e66b413288ba62388ca897c40cabab5d09ebf`, UUID
+  `A55E31E4-4393-3FA5-9E6E-2A4D0DD85B4F`, AuxKC
+  `2d8b5947848f77b8c4a1e0db96d1b0aa560f1bb2f93fca9e1a6deb2e0a3c92fd`, `kmutil
+  inspect` 416 records with only `com.luuumi.PhxAccel` changed, 0 import
+  drift): allowing `expectUpdateLocked=true` under the OTG lock yielded
+  **132/132 zero-copy flips** over a 5-second WindowServer redraw window
+  (`debug.phxfb_zc_flips=132`, `debug.nvaccel_iop_flips=132`,
+  `debug.phxfb_zc_fallbacks=0`, `debug.phxfb_zc_faults=0`,
+  `debug.nvaccel_iop_fail=0`, `last_fmt=0x42475241` `BGRA`,
+  `PhxDcnZeroCopyVmidsConsumed=3`, WindowServer PID unchanged).
+
+Mid-run BAR5 readback at `t=2s` confirmed live hardware scanout from flat-page
+VMID 2 (`0x3ac9=0x2`, `0x3aca/0x3acb=0x00000101_00000000`,
+`0x3ae5/0x3ae6=0x20000101_00000000`, `0x3af5=0x200000`, `0x3af6=0x203fff`,
+`0x3b03=0x19`, `0x3a8c=0`). Disabling the opt-in restored `HOME` scanout
+(`debug.nvaccel_iop_flip_home=1`, `0x3ac9=0`, `0x3aca/0x3acb=0x80_0000_0000`,
+`0x3ae5/0x3ae6=0x80_0000_0000`, `0x3af5/0x3af6/0x3b03=0`, all VMID 1–4 context
+dwords `0`, `0x3a8c=0`).
+
+Remaining limits: zero-copy remains opt-in (`0` at boot), currently handles
+only 8-bit `BGRA` (`l10r` falls back to CPU copy), single-use VMIDs 1–4 are
+not yet recycled via verified DCN TLB invalidation, and visual/FPS parity under
+sustained multi-app workloads has not yet been benchmarked.

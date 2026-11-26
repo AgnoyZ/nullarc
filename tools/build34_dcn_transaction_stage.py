@@ -291,7 +291,7 @@ def stage_accelerator(accelerator):
 ''' + ''.join('    ' + line for line in cpu_map.splitlines(True)) + '''        }
 ''')
     start = after.index('    if (nvAccelObserveDcnCopyBacking && ')
-    end = after.index('    nvAccelIopHome(fb, head);\n', start)
+    end = after.index('    if (!nvAccelIopHome(fb, head)) return kIOReturnSuccess;\n', start)
     after = once(after, after[start:end], '''#if defined(NMX_ACCEL) && defined(PHX_FB)
     if (dcnAttempt) {
         const auto sameSource = [&] {

@@ -1,5 +1,16 @@
 # Project instructions
 
+- Owner authorization update, 2026-11-26: the previous blanket prohibition on
+  deployment and new GPU execution is removed for isolated DCN 3.1.4 flat-page-
+  table zero-copy work on this default build34 branch. Manual candidate
+  deployment and GPU validation are authorized for this workstream; use the
+  already validated native 2x mode, preserve build34 identity/admission, and do
+  not prepare or test withdrawn build41/build42. This authorization is not
+  evidence of correctness or stability. Earlier no-deployment statements below
+  describe their historical R3 experiments and do not restrict this distinct
+  zero-copy workstream. See `docs/BUILD34-SCOPE.md` and
+  `docs/BUILD34-PRESENT-COPY.md`.
+
 - The owner has now explicitly authorized one exact mapping-only build34
   observer installation, one ordinary restart, bounded existing accelerated
   startup/desktop and passive metadata observation, with at most one startup-

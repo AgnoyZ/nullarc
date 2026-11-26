@@ -500,3 +500,15 @@ metadata and HiRes still enabled. No driver, EFI or NVRAM change or restart
 was needed. The saved preference was verified on disk; its restoration on a
 new login or boot has not been tested. Select 2560x1600 at 120 Hz in Displays
 to return to 1x without disabling the driver's HiRes capability.
+
+## Zero-copy authorization update, November 26, 2026
+
+The owner removed the previous blanket prohibition on candidate deployment
+and new GPU execution for the isolated DCN 3.1.4 flat-page-table zero-copy
+workstream on `upstream34/vram-layout-fix`. Manual candidate deployment and
+GPU validation are authorized for this workstream, using the already validated
+native 2x HiDPI mode. This does not change the build34 identity or admission
+requirements, authorize withdrawn build41/build42, or allow automatic
+deployment. It is authorization to perform the work, not evidence that this
+implementation is safe, correct, performant, or stable. Historical R3
+no-deployment notes above remain accurate for those separate experiments.
