@@ -1,5 +1,6 @@
 // Read-only DCN 3.1.4 panel timing description. No display programming.
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 
 namespace phx {
@@ -73,5 +74,54 @@ inline bool decodePanelTiming(const OtgTimingRegisters &before, const OtgTimingR
     t.pixelClock = ((uint64_t)t.hTotal * t.vTotal * refreshMilliHz + 500) / 1000;
     out = t;
     return true;
+}
+
+// Parse physical active image dimensions (millimetres) from an EDID 1.x base block.
+// Prefers DTD byte 12..14 millimetre precision (matching the active raster when available)
+// and falls back to EDID bytes 21..22 (centimetres * 10) when both are non-zero.
+inline bool decodeEdidPanelSizeMm(const uint8_t *edid, size_t len,
+                                  uint32_t activeWidth, uint32_t activeHeight,
+                                  uint16_t &widthMm, uint16_t &heightMm) {
+    widthMm = 0;
+    heightMm = 0;
+    if (!edid || len < 128) return false;
+    static constexpr uint8_t kHeader[8] = {0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00};
+    for (size_t index = 0; index < 8; ++index)
+        if (edid[index] != kHeader[index]) return false;
+    uint8_t sum = 0;
+    for (size_t index = 0; index < 128; ++index) sum = static_cast<uint8_t>(sum + edid[index]);
+    if (sum != 0) return false;
+
+    uint16_t firstDtdW = 0, firstDtdH = 0;
+    for (size_t slot = 0; slot < 4; ++slot) {
+        const uint8_t *dtd = edid + 54 + slot * 18;
+        const uint16_t pixelClock = static_cast<uint16_t>(dtd[0] | (static_cast<uint16_t>(dtd[1]) << 8));
+        if (!pixelClock) continue;
+        const uint32_t dtdActiveW = static_cast<uint32_t>(dtd[2]) | (static_cast<uint32_t>(dtd[4] & 0xf0u) << 4);
+        const uint32_t dtdActiveH = static_cast<uint32_t>(dtd[5]) | (static_cast<uint32_t>(dtd[7] & 0xf0u) << 4);
+        const uint16_t dtdMmW = static_cast<uint16_t>(dtd[12] | (static_cast<uint16_t>(dtd[14] & 0xf0u) << 4));
+        const uint16_t dtdMmH = static_cast<uint16_t>(dtd[13] | (static_cast<uint16_t>(dtd[14] & 0x0fu) << 8));
+        if (!dtdMmW || !dtdMmH) continue;
+        if (!firstDtdW) {
+            firstDtdW = dtdMmW;
+            firstDtdH = dtdMmH;
+        }
+        if (activeWidth && activeHeight && dtdActiveW == activeWidth && dtdActiveH == activeHeight) {
+            widthMm = dtdMmW;
+            heightMm = dtdMmH;
+            return true;
+        }
+    }
+    if (firstDtdW && firstDtdH) {
+        widthMm = firstDtdW;
+        heightMm = firstDtdH;
+        return true;
+    }
+    if (edid[21] && edid[22]) {
+        widthMm = static_cast<uint16_t>(edid[21]) * 10u;
+        heightMm = static_cast<uint16_t>(edid[22]) * 10u;
+        return true;
+    }
+    return false;
 }
 } // namespace phx

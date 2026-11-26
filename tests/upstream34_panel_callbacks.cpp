@@ -11,7 +11,8 @@ using IODisplayModeID = uint32_t;
 using IOFixed1616 = uint32_t;
 constexpr int kIOReturnSuccess = 0, kIOReturnBadArgument = -2, kIOReturnUnsupportedMode = -3;
 constexpr uint32_t kDisplayModeValidFlag = 1, kDisplayModeSafeFlag = 2, kDisplayModeDefaultFlag = 4;
-constexpr uint32_t kFramebufferSupportsGammaCorrection = 0x00040000, kDisplayModeValidForHiResFlag = 0x00800000;
+constexpr uint32_t kFramebufferSupportsGammaCorrection = 0x00040000, kDisplayModeAcceleratorBackedFlag = 0x00400000,
+    kDisplayModeValidForHiResFlag = 0x00800000;
 struct IODisplayModeInformation {
     uint32_t nominalWidth, nominalHeight, refreshRate, maxDepthIndex, flags;
     uint16_t imageWidth, imageHeight;
@@ -108,7 +109,18 @@ struct Fixture {
     uint64_t fFrameNs = 16666667;
     phx::PanelTiming fPanelTiming = {};
     bool fPanelTimingValid = false;
+    uint16_t fPanelWidthMm = 0, fPanelHeightMm = 0;
     bool fHiRes = false;
+    const uint8_t *edidBytes = nullptr;
+    size_t edidLength = 0;
+    void refreshPanelSizeFromEdid() {
+        if (fPanelWidthMm && fPanelHeightMm) return;
+        uint16_t widthMm = 0, heightMm = 0;
+        if (phx::decodeEdidPanelSizeMm(edidBytes, edidLength, fWidth, fHeight, widthMm, heightMm)) {
+            fPanelWidthMm = widthMm;
+            fPanelHeightMm = heightMm;
+        }
+    }
     Fixture() {
         // Reviewed upstream fixture; these are not new target observations.
         const unsigned offsets[] = {0x1b2a,0x1b2b,0x1b2c,0x1b2d,0x1b2f,0x1b36,0x1b37,0x1b38,0x1b41,0x1b44,0x1b33};
@@ -156,8 +168,62 @@ static void testHiResRequest() {
     IORegistryEntry::options = nullptr;
     bootArg = -1;
 }
+static void buildSyntheticEdid(uint8_t out[128], uint8_t widthCm, uint8_t heightCm,
+                               uint32_t dtdActiveW, uint32_t dtdActiveH,
+                               uint16_t dtdMmW, uint16_t dtdMmH) {
+    std::memset(out, 0, 128);
+    static constexpr uint8_t kHeader[8] = {0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00};
+    std::memcpy(out, kHeader, 8);
+    out[18] = 1; out[19] = 4;
+    out[21] = widthCm; out[22] = heightCm;
+    if (dtdActiveW && dtdActiveH) {
+        uint8_t *dtd = out + 54;
+        dtd[0] = 0x01; dtd[1] = 0x20;
+        dtd[2] = static_cast<uint8_t>(dtdActiveW & 0xffu);
+        dtd[4] = static_cast<uint8_t>(((dtdActiveW >> 8) & 0x0fu) << 4);
+        dtd[5] = static_cast<uint8_t>(dtdActiveH & 0xffu);
+        dtd[7] = static_cast<uint8_t>(((dtdActiveH >> 8) & 0x0fu) << 4);
+        dtd[12] = static_cast<uint8_t>(dtdMmW & 0xffu);
+        dtd[13] = static_cast<uint8_t>(dtdMmH & 0xffu);
+        dtd[14] = static_cast<uint8_t>((((dtdMmW >> 8) & 0x0fu) << 4) | ((dtdMmH >> 8) & 0x0fu));
+    }
+    uint8_t sum = 0;
+    for (size_t index = 0; index < 127; ++index) sum = static_cast<uint8_t>(sum + out[index]);
+    out[127] = static_cast<uint8_t>(0 - sum);
+}
+static void testEdidPanelSizeDecode() {
+    uint8_t edid[128];
+    buildSyntheticEdid(edid, 34, 22, 2560, 1600, 344, 215);
+    uint16_t widthMm = 99, heightMm = 99;
+    check(phx::decodeEdidPanelSizeMm(edid, sizeof edid, 2560, 1600, widthMm, heightMm));
+    check(widthMm == 344 && heightMm == 215);
+
+    // Bad checksum must be rejected and leave outputs zeroed.
+    edid[127] ^= 1;
+    check(!phx::decodeEdidPanelSizeMm(edid, sizeof edid, 2560, 1600, widthMm, heightMm));
+    check(widthMm == 0 && heightMm == 0);
+    edid[127] ^= 1;
+
+    // Short buffer or bad header must be rejected.
+    check(!phx::decodeEdidPanelSizeMm(edid, 127, 2560, 1600, widthMm, heightMm));
+    edid[0] = 0x55;
+    check(!phx::decodeEdidPanelSizeMm(edid, sizeof edid, 2560, 1600, widthMm, heightMm));
+    edid[0] = 0x00;
+
+    // When DTDs carry no millimetre size, fall back to EDID bytes 21/22 (cm * 10).
+    uint8_t cmOnly[128];
+    buildSyntheticEdid(cmOnly, 34, 22, 0, 0, 0, 0);
+    check(phx::decodeEdidPanelSizeMm(cmOnly, sizeof cmOnly, 2560, 1600, widthMm, heightMm));
+    check(widthMm == 340 && heightMm == 220);
+
+    // Aspect-ratio encoding (one of bytes 21/22 is zero) must not produce a bogus size.
+    buildSyntheticEdid(cmOnly, 34, 0, 0, 0, 0, 0);
+    check(!phx::decodeEdidPanelSizeMm(cmOnly, sizeof cmOnly, 2560, 1600, widthMm, heightMm));
+    check(widthMm == 0 && heightMm == 0);
+}
 int main() {
     testHiResRequest();
+    testEdidPanelSizeDecode();
     // Replay the logged 25-frame / 200,965-us input with a one-frame endpoint
     // phase. At 2 s the corresponding synthetic input is 241 / 2,000,965 us.
     // The assumed 120-Hz clock here is a CPU model, not a panel-rate finding.
@@ -170,7 +236,19 @@ int main() {
     good.measureRefresh();
     check(good.fPanelTimingValid && good.fRefreshMilliHz == 120000 && good.fFrameNs == 8333333);
     constexpr uint32_t baseFlags = kDisplayModeValidFlag | kDisplayModeSafeFlag
-        | kDisplayModeDefaultFlag | kFramebufferSupportsGammaCorrection;
+        | kDisplayModeDefaultFlag | kFramebufferSupportsGammaCorrection
+        | kDisplayModeAcceleratorBackedFlag;
+    uint8_t sampleEdid[128];
+    buildSyntheticEdid(sampleEdid, 34, 22, 2560, 1600, 344, 215);
+    // Without an EDID, physical dimensions stay zero until an EDID becomes available.
+    {
+        IODisplayModeInformation mode;
+        std::memset(&mode, 0xa5, sizeof mode);
+        check(good.getInformationForDisplayMode(1, &mode) == kIOReturnSuccess);
+        check(mode.imageWidth == 0 && mode.imageHeight == 0 && mode.flags == baseFlags);
+    }
+    good.edidBytes = sampleEdid;
+    good.edidLength = sizeof sampleEdid;
     for (bool hiRes : {false, true}) {
         good.fHiRes = hiRes;
         IODisplayModeInformation mode;

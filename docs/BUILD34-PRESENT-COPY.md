@@ -2183,3 +2183,43 @@ Post-reboot hardware verification (`make check-build34-scanout-mode`:
   `0x03af6=0x203fff`, `0x03b03=0x19`, `0x03a8c=0`), `WindowServer` remained
   on PID `204`, and `/Library/Logs/DiagnosticReports` showed `0` new crash or
   spin reports (`88 -> 88`).
+
+### Dynamic EDID panel size and `kDisplayModeAcceleratorBackedFlag`, November 27, 2026
+
+- Added `phx::decodeEdidPanelSizeMm()` in `src/phxaccel/accel/phx_panel_timing.h`
+  to validate the 128-byte EDID 1.x base block (header + checksum), prefer
+  millimetre-precision DTD active image dimensions matching the active raster
+  (falling back to the first valid DTD, then EDID bytes 21–22 in `cm * 10`
+  while rejecting zero / EDID 1.4 aspect-ratio encodings).
+- Replaced the hardcoded `344x215 mm` dimensions in `PhxAMDFB`
+  (`src/phxaccel/accel/phxfb.cpp`) with `refreshPanelSizeFromEdid()`, which
+  discovers `IODisplayEDID` / `IODisplayEDIDOriginal` from the framebuffer
+  subtree (`display0` / `AppleBacklightDisplay`) or PCI provider, caches the
+  decoded size, and publishes `PhxFBPanelWidthMm` / `PhxFBPanelHeightMm`.
+- Added `kDisplayModeAcceleratorBackedFlag` (`0x00400000`) to
+  `PhxAMDFB::getInformationForDisplayMode()` alongside the existing mode flags.
+- Added synthetic EDID decode and mode-flag unit tests in
+  `tests/upstream34_panel_callbacks.cpp` (`554` CPU assertions) and synced
+  `FRAMEBUFFER_SHA256` in `tools/build34_dcn_firmware_home_stage.py`; full
+  `make test` passed.
+
+The isolated build34 candidate v9 was rebuilt with the reviewed MacKernelSDK
+(`3f750085caa17ec3a7880f11c11bf4f48cd6a164`), verified with
+`codesign --verify --deep --strict`, installed to
+`/Library/Extensions/PhxAccel.kext`, and loaded after reboot as `PhxAccel`
+UUID `6486751E-0DF4-3E4C-8D46-EAC9A7F6713C` (kext SHA256
+`b45e5cbc889aa7e381905bfdf167dcdb86cd8a3e581ad10eae5873cd349f7cb7`, AuxKC
+SHA256 `72cbb8876561c6aeeeabdf8b55a7c0f2528295ddd270b836397296ea72905fab`,
+prior v8 backed up under local isolated `candidate-v9/`).
+
+Post-reboot hardware verification:
+- Dynamic EDID decode published `PhxFBPanelWidthMm=344` and
+  `PhxFBPanelHeightMm=215`, with `CGDisplayScreenSize=344.0x215.0 mm`
+  (`15.97 in` diagonal).
+- `IOFBConfig` `DF=12845063` and `CGDisplayMode.ioFlags=0x00c40007` confirmed
+  `kDisplayModeAcceleratorBackedFlag` (`0x00400000`) active alongside
+  `kDisplayModeValidForHiResFlag` (`0x00800000`).
+- `make check-build34-scanout-mode` remained `1280x800` logical / `2560x1600`
+  pixels / `120 Hz` / `2x`; zero-copy auto-enabled cleanly (`zc_flips=493`,
+  `zc_pending_waits=84`, `zc_fallbacks=0`, `zc_tlb_flushes=3`, `zc_faults=0`,
+  `iop_fail=0`).

@@ -152,6 +152,7 @@ class PhxAMDFB : public IOFramebuffer {
     uint32_t fRefreshMilliHz = 60000, fHTotal = 0, fVTotal = 0;
     phx::PanelTiming fPanelTiming = {};
     bool fPanelTimingValid = false;
+    uint16_t fPanelWidthMm = 0, fPanelHeightMm = 0;
     static constexpr unsigned kBootHoldSec = 120;   // the boot daemon releases it sooner (debug.phxfb_hold=0)
     // The accelerator is NullMoth's, written against an NVIDIA RM: it backs each IOAccel surface with "VRAM" from the
     // framebuffer (nvAllocVram) and a GPU address from the RM (nvGpuVaAlloc/Map). On the 780M nothing on the GPU reads
@@ -1019,6 +1020,59 @@ class PhxAMDFB : public IOFramebuffer {
         PFBLOG("refresh: OTG0 %ux%u totals, %u frames in %llu us -> %u.%03u Hz", ht, vt, frames, ns / 1000, mhz / 1000, mhz % 1000);
     }
 
+    bool tryReadEdidSizeFromEntry(IORegistryEntry *entry) {
+        if (!entry) return false;
+        static const char *const kEdidKeys[] = { kIODisplayEDIDKey, kIODisplayEDIDOriginalKey };
+        for (const char *key : kEdidKeys) {
+            OSObject *obj = entry->copyProperty(key);
+            const auto *data = OSDynamicCast(OSData, obj);
+            uint16_t widthMm = 0, heightMm = 0;
+            const bool ok = data && data->getBytesNoCopy() &&
+                phx::decodeEdidPanelSizeMm(static_cast<const uint8_t *>(data->getBytesNoCopy()),
+                                           data->getLength(), fWidth, fHeight, widthMm, heightMm);
+            OSSafeReleaseNULL(obj);
+            if (ok) {
+                fPanelWidthMm = widthMm;
+                fPanelHeightMm = heightMm;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void refreshPanelSizeFromEdid() {
+        if (fPanelWidthMm && fPanelHeightMm) return;
+        bool found = tryReadEdidSizeFromEntry(this);
+        if (!found) {
+            if (OSIterator *children = getChildIterator(gIOServicePlane)) {
+                while (!found) {
+                    OSObject *childObj = children->getNextObject();
+                    if (!childObj) break;
+                    IORegistryEntry *child = OSDynamicCast(IORegistryEntry, childObj);
+                    if (!child) continue;
+                    found = tryReadEdidSizeFromEntry(child);
+                    if (!found) {
+                        if (OSIterator *grand = child->getChildIterator(gIOServicePlane)) {
+                            while (!found) {
+                                OSObject *grandObj = grand->getNextObject();
+                                if (!grandObj) break;
+                                found = tryReadEdidSizeFromEntry(OSDynamicCast(IORegistryEntry, grandObj));
+                            }
+                            grand->release();
+                        }
+                    }
+                }
+                children->release();
+            }
+        }
+        if (!found && fPCI) found = tryReadEdidSizeFromEntry(fPCI);
+        if (found) {
+            setProperty("PhxFBPanelWidthMm", fPanelWidthMm, 32);
+            setProperty("PhxFBPanelHeightMm", fPanelHeightMm, 32);
+            PFBLOG("panel physical size from EDID: %ux%u mm", fPanelWidthMm, fPanelHeightMm);
+        }
+    }
+
 public:
     // the backlight as 0..kBlMax of full duty; false without a running PWM
     bool backlightRead(uint32_t *level) {
@@ -1107,9 +1161,12 @@ public:
     IOReturn getInformationForDisplayMode(IODisplayModeID mode, IODisplayModeInformation *info) override {
         if (mode != 1 || !info) return kIOReturnBadArgument;
         bzero(info, sizeof(*info));
+        refreshPanelSizeFromEdid();
         info->maxDepthIndex = 0; info->nominalWidth = fWidth; info->nominalHeight = fHeight;
-        info->imageWidth = 344; info->imageHeight = 215;
-        info->refreshRate = (IOFixed1616)(((uint64_t)fRefreshMilliHz << 16) / 1000); info->flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag | kFramebufferSupportsGammaCorrection;
+        info->imageWidth = fPanelWidthMm; info->imageHeight = fPanelHeightMm;
+        info->refreshRate = (IOFixed1616)(((uint64_t)fRefreshMilliHz << 16) / 1000);
+        info->flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag |
+            kFramebufferSupportsGammaCorrection | kDisplayModeAcceleratorBackedFlag;
         if (fHiRes) info->flags |= kDisplayModeValidForHiResFlag;
         return kIOReturnSuccess;
     }
