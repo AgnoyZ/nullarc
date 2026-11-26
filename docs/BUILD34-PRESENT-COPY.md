@@ -2000,7 +2000,47 @@ VMID 2 (`0x3ac9=0x2`, `0x3aca/0x3acb=0x00000101_00000000`,
 `0x3ae5/0x3ae6=0x80_0000_0000`, `0x3af5/0x3af6/0x3b03=0`, all VMID 1–4 context
 dwords `0`, `0x3a8c=0`).
 
-Remaining limits: zero-copy remains opt-in (`0` at boot), currently handles
-only 8-bit `BGRA` (`l10r` falls back to CPU copy), single-use VMIDs 1–4 are
-not yet recycled via verified DCN TLB invalidation, and visual/FPS parity under
-sustained multi-app workloads has not yet been benchmarked.
+### MMHUB ENG16 TLB invalidation, VMID reuse, `l10r` format path, and 10s A/B check, November 26, 2026
+
+Trial 4 (`PhxAccel` SHA256
+`6ff22fcfdff84a00d64c4af8843d2697fc14532214dbb255d3619ff41fc3ceb1`, UUID
+`6C5B12F8-E11D-3183-93E6-0B8C154C8068`, AuxKC
+`3ec56af2816a22f3b8ea464652ce7caf0ea733534869530594e8feacbe460e44`, 0 import
+drift, `kmutil inspect` 416 records with only `com.luuumi.PhxAccel` changed)
+adds:
+
+- MMHUB 3.0.1 `ENG16` TLB invalidation (`0x1a761`/`0x1a773`/`0x1a785` plus
+  L2 `RESERVED_CID2` private invalidation at `0x1a71b` bit 25) on VMID 1–4
+  context programming and teardown, plus LRU eviction of non-front latched
+  slots (`debug.phxfb_zc_tlb_flushes`, `debug.phxfb_zc_reuses`).
+- Native 10-bit `l10r` (`0x6c313072`, DCN `ARGB2101010` = `10`) support by
+  updating `HUBP0_DCSURF_SURFACE_CONFIG` (`0x3aa5`) and
+  `CNVC_CFG0_CNVC_SURFACE_PIXEL_FORMAT` (`0x418f`) under the OTG lock,
+  restoring the captured HOME format (`8`) on HOME return.
+
+Controlled hardware A/B measurement under the same 60 Hz AppKit redraw window
+on macOS 26.7.2 (`25G332`, native 2x HiDPI `1280x800` / `2560x1600` / `120 Hz`):
+
+- **10s CPU-copy baseline**: `603` presents (`60.3 FPS`), CPU scanout copy
+  time `1,023,559 us` (`~1.70 ms/frame`), WindowServer CPU time `+3.29 s`.
+- **10s zero-copy**: `603` presents (`60.3 FPS`), **604/604 flips** with `0`
+  fallbacks, `0` VM faults, CPU scanout copy time `0 us`, WindowServer CPU time
+  `+2.21 s` (`-32.8%`). Mid-run BAR5 readback confirmed live VMID 1 scanout
+  (`0x3ac9=1`, `0x3aca/0x3acb=0x100_0000_0000`, `0x3ae5/0x3ae6=0x10000100_00000000`,
+  `0x3aa5=8`, `0x418f=8`, `0x3b03=0x19`, `0x3a8c=0`).
+- **Toggle/teardown stress**: cumulative `3,918` zero-copy flips and `150`
+  MMHUB `ENG16` TLB invalidations across repeated enable/disable cycles with
+  `debug.phxfb_zc_faults=0`, `debug.nvaccel_iop_fail=0`, and WindowServer PID
+  `204` intact. Disabling restored HOME (`0x3ac9=0`,
+  `0x3aca/0x3acb=0x80_0000_0000`, `0x3ae5/0x3ae6=0x80_0000_0000`,
+  `0x3aa5=8`, `0x418f=8`, `0x3af5`/`0x3af6`/`0x3b03=0`, all VMID 1–4 context
+  dwords `0`, `0x3a8c=0`).
+
+Remaining limits: zero-copy remains opt-in (`0` at boot); `l10r` hardware
+format switching is unit-tested and wired but has not yet been hit by a live
+10-bit `l10r` WindowServer surface (`last_fmt` stayed `BGRA` in this session);
+in-session slot eviction (`debug.phxfb_zc_reuses`) did not trigger while
+WindowServer kept <= 4 swapchain surfaces, though cross-toggle teardown/rebind
+exercised `150` MMHUB TLB flushes with zero faults; turning `phxfb_zerocopy=0`
+returns to HOME on the next present transaction rather than immediately when
+the screen is idle.

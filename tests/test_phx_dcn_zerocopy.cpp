@@ -36,7 +36,14 @@ static void testSurfaceGeometry() {
     assert(bytes == 4096000ull);
     assert(pages == 1000);
     assert(!validSurfaceRequest(kPixelFormatBgra, 1280, 800, 5116, 1280, 800, 5120, bytes, pages));
-    assert(!validSurfaceRequest(0x6c313072u, 1280, 800, 5120, 1280, 800, 5120, bytes, pages));
+    assert(validSurfaceRequest(kPixelFormatL10r, 1280, 800, 5120, 1280, 800, 5120, bytes, pages));
+    assert(!validSurfaceRequest(0x52474241u, 1280, 800, 5120, 1280, 800, 5120, bytes, pages));
+    uint32_t dcnFmt = 0;
+    assert(dcnPixelFormatFor(kPixelFormatBgra, dcnFmt) && dcnFmt == kDcnFormatArgb8888);
+    assert(dcnPixelFormatFor(kPixelFormatL10r, dcnFmt) && dcnFmt == kDcnFormatArgb2101010);
+    assert(!dcnPixelFormatFor(0x52474241u, dcnFmt));
+    assert(mmhubInvalidateReq(1) == (kMmhubInvLegacyL2L1Mask | (1u << 1)));
+    assert(mmhubInvalidateReq(4) == (kMmhubInvLegacyL2L1Mask | (1u << 4)));
     assert(!validSurfaceRequest(kPixelFormatBgra, 0x4000, 1, 0, 0x4000, 1, 0, bytes, pages));
     assert(!validSurfaceRequest(kPixelFormatBgra, 1280, 800, 4, 1280, 800, 4, bytes, pages));
 }
@@ -80,6 +87,11 @@ static void testHubpGeometry() {
         return found == registers.end() ? 0u : found->second;
     };
     assert(hubpGeometryReady(2560, 1600, 10240, read));
+    registers[kRegHubpSurfaceConfig] = kDcnFormatArgb2101010;
+    assert(hubpGeometryReady(2560, 1600, 10240, read));
+    registers[kRegHubpSurfaceConfig] = 1u;
+    assert(!hubpGeometryReady(2560, 1600, 10240, read));
+    registers[kRegHubpSurfaceConfig] = kDcnFormatArgb8888;
     assert(!hubpGeometryReady(2560, 1600, 10240, read, true));
     registers[kRegHubpFlipCtl] = kFlipUpdateLocked;
     assert(!hubpGeometryReady(2560, 1600, 10240, read));

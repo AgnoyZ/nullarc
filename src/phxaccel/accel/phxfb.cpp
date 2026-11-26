@@ -39,7 +39,7 @@ static int gAlias = 1;
 SYSCTL_INT(_debug, OID_AUTO, phxfb_alias, CTLFLAG_RW | CTLFLAG_LOCKED, &gAlias, 0,
            "1 = frames are copied into the scan-out through its system-RAM address (the carve-out), 0 = through the GPU's BAR");
 int gPhxZeroCopy = 0;
-static SInt64 gZcFlips, gZcFaults, gZcFallbacks;
+static SInt64 gZcFlips, gZcFaults, gZcFallbacks, gZcReuses, gZcTlbFlushes;
 static int gZcLastStatus = 0;
 static unsigned int gZcLastFmt = 0;
 SYSCTL_INT(_debug, OID_AUTO, phxfb_zerocopy, CTLFLAG_RW | CTLFLAG_LOCKED, &gPhxZeroCopy, 0,
@@ -47,6 +47,8 @@ SYSCTL_INT(_debug, OID_AUTO, phxfb_zerocopy, CTLFLAG_RW | CTLFLAG_LOCKED, &gPhxZ
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_flips, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFlips, "DCN zero-copy scanout flips issued");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_faults, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFaults, "DCN VM faults observed by zero-copy scanout");
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_fallbacks, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcFallbacks, "zero-copy scanout requests refused");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_reuses, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcReuses, "DCN zero-copy VMID slots safely recycled via MMHUB TLB flush");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_tlb_flushes, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcTlbFlushes, "MMHUB ENG16 TLB invalidations completed for DCN zero-copy");
 SYSCTL_INT(_debug, OID_AUTO, phxfb_zc_last_status, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcLastStatus, 0, "last zero-copy flip status");
 SYSCTL_UINT(_debug, OID_AUTO, phxfb_zc_last_fmt, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcLastFmt, 0, "last zero-copy request pixelFormat");
 
@@ -79,7 +81,8 @@ static IOService *phxBacklightCreate(PhxAMDFB *fb);
 
 static struct sysctl_oid *const kFbOids[] = { &sysctl__debug_phxfb_alias, &sysctl__debug_phxfb_zerocopy,
                                               &sysctl__debug_phxfb_zc_flips, &sysctl__debug_phxfb_zc_faults,
-                                              &sysctl__debug_phxfb_zc_fallbacks, &sysctl__debug_phxfb_zc_last_status,
+                                              &sysctl__debug_phxfb_zc_fallbacks, &sysctl__debug_phxfb_zc_reuses,
+                                              &sysctl__debug_phxfb_zc_tlb_flushes, &sysctl__debug_phxfb_zc_last_status,
                                               &sysctl__debug_phxfb_zc_last_fmt, &sysctl__debug_phxfb_vbl_staged,
                                               &sysctl__debug_phxfb_vbl_n, &sysctl__debug_phxfb_vbl_late_us_sum,
                                               &sysctl__debug_phxfb_vbl_late_us_max };
@@ -121,6 +124,8 @@ class PhxAMDFB : public IOFramebuffer {
         uint64_t *pageTableKva = nullptr;
         uint64_t pageTablePhys = 0;
         uint32_t surfaceID = 0;
+        uint32_t pixelFormat = 0;
+        uint64_t lastUseSeq = 0;
         uint32_t expectedContext[phx::dcnzc::kContextFieldCount]{};
         bool prepared = false;
         bool active = false;
@@ -130,7 +135,9 @@ class PhxAMDFB : public IOFramebuffer {
     ZcSlot fZcSlots[phx::dcnzc::kSlotCount]{};
     phx::dcnzc::ApertureSnapshot fZcAperture{};
     uint64_t fZcHomeAddr = 0;
+    uint64_t fZcUseSeq = 0;
     uint32_t fZcOrigSysLow = 0, fZcOrigSysHigh = 0, fZcOrigL1Tlb = 0;
+    uint32_t fZcOrigSurfCfg = 0, fZcOrigCnvcFmt = 0;
     uint32_t fZcVmidsConsumed = 0;
     int fZcFrontSlot = -1;
     bool fZcArmed = false, fZcTripped = false;
@@ -212,8 +219,47 @@ class PhxAMDFB : public IOFramebuffer {
         return false;
     }
 
-    bool zcFlipTo(uint32_t vmid, uint64_t address) {
+    bool zcFlushMmhubTlb(uint32_t vmid) {
+        using namespace phx::dcnzc;
+        if (vmid < kFirstVmid || vmid >= kFirstVmid + kSlotCount) return false;
+        if (!fMmio || fMmio->getLength() < kMinMmioBytes) return false;
+        bool gotSem = false;
+        for (unsigned attempt = 0; attempt < 200; ++attempt) {
+            const uint32_t sem = zcRead(kRegMmhubInvEng16Sem);
+            if (sem == UINT32_MAX) return false;
+            if (sem & 1u) {
+                gotSem = true;
+                break;
+            }
+            IODelay(5);
+        }
+        if (!gotSem) return false;
+        const uint32_t mask = 1u << (vmid & 0xfu);
+        bool acked = false;
+        if (zcWrite(kRegMmhubInvEng16Req, mmhubInvalidateReq(vmid))) {
+            for (unsigned attempt = 0; attempt < 500; ++attempt) {
+                const uint32_t ack = zcRead(kRegMmhubInvEng16Ack);
+                if (ack == UINT32_MAX) break;
+                if (ack & mask) {
+                    acked = true;
+                    break;
+                }
+                IODelay(2);
+            }
+        }
+        (void)zcWrite(kRegMmhubInvEng16Sem, 0u);
+        if (!acked) return false;
+        const uint32_t cid2 = zcRead(kRegMmhubL2ReservedCid2);
+        if (cid2 == UINT32_MAX || !zcWrite(kRegMmhubL2ReservedCid2, cid2 | kMmhubL2PrivateInvBit))
+            return false;
+        (void)zcRead(kRegMmhubL2ReservedCid2);
+        OSAddAtomic64(1, &gZcTlbFlushes);
+        return true;
+    }
+
+    bool zcFlipTo(uint32_t vmid, uint64_t address, uint32_t dcnFormat) {
         if (!zcHubpPeersIdle()) return false;
+        if (!phx::dcnzc::supportedDcnFormat(dcnFormat)) return false;
         const uint32_t priorFlip = zcRead(phx::dcnzc::kRegHubpFlipCtl);
         const uint32_t priorVmid = zcRead(phx::dcnzc::kRegHubpVmid0);
         const uint64_t priorProgrammed = zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi);
@@ -229,7 +275,14 @@ class PhxAMDFB : public IOFramebuffer {
             zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi) == priorProgrammed &&
             zcAddress(phx::dcnzc::kRegHubpEarliestLo, phx::dcnzc::kRegHubpEarliestHi) == priorEarliest;
         uint32_t vmidReg = zcRead(phx::dcnzc::kRegHubpVmid0);
-        bool ok = baselineCurrent && vmidReg != UINT32_MAX &&
+        const uint32_t surfCfg = zcRead(phx::dcnzc::kRegHubpSurfaceConfig);
+        const uint32_t cnvcFmt = zcRead(phx::dcnzc::kRegCnvcPixelFormat);
+        bool fmtOk = surfCfg != UINT32_MAX && cnvcFmt != UINT32_MAX;
+        if (fmtOk && (surfCfg & phx::dcnzc::kFormatMask) != dcnFormat)
+            fmtOk = zcWrite(phx::dcnzc::kRegHubpSurfaceConfig, (surfCfg & ~phx::dcnzc::kFormatMask) | dcnFormat);
+        if (fmtOk && (cnvcFmt & phx::dcnzc::kFormatMask) != dcnFormat)
+            fmtOk = zcWrite(phx::dcnzc::kRegCnvcPixelFormat, (cnvcFmt & ~phx::dcnzc::kFormatMask) | dcnFormat);
+        bool ok = baselineCurrent && fmtOk && vmidReg != UINT32_MAX &&
             zcWrite(phx::dcnzc::kRegHubpVmid0, (vmidReg & ~0xfu) | (vmid & 0xfu)) &&
             zcWrite(phx::dcnzc::kRegHubpPrimHi, static_cast<uint32_t>(address >> 32)) &&
             zcWrite(phx::dcnzc::kRegHubpPrimLo, static_cast<uint32_t>(address));
@@ -336,6 +389,11 @@ class PhxAMDFB : public IOFramebuffer {
             slot.contextReady = false;
             return false;
         }
+        if (!zcFlushMmhubTlb(vmid)) {
+            slot.active = false;
+            slot.contextReady = false;
+            return false;
+        }
         slot.contextOwned = false;
         slot.contextReady = false;
         return true;
@@ -356,7 +414,7 @@ class PhxAMDFB : public IOFramebuffer {
         slot.expectedContext[6] = static_cast<uint32_t>(lastPage);
         uint32_t current[phx::dcnzc::kContextFieldCount]{};
         if (!zcContextFields(vmid, current) || !phx::dcnzc::contextFieldsClear(current)) return false;
-        if (!zcConsumeVmid(vmid)) return false;
+        (void)zcRecordVmidUsed(vmid);
         slot.contextOwned = true;
         if (!zcWrite(base + 3, static_cast<uint32_t>(firstPage >> 32)) ||
             !zcWrite(base + 4, slot.expectedContext[4]) ||
@@ -372,7 +430,8 @@ class PhxAMDFB : public IOFramebuffer {
             if (ready == UINT32_MAX) return false;
             if (ready == slot.expectedContext[2])
                 return zcContextFields(vmid, current) &&
-                    phx::dcnzc::contextMatchesExactState(slot.expectedContext, current);
+                    phx::dcnzc::contextMatchesExactState(slot.expectedContext, current) &&
+                    zcFlushMmhubTlb(vmid);
             IODelay(10);
         }
         return false;
@@ -387,13 +446,13 @@ class PhxAMDFB : public IOFramebuffer {
             zcRead(phx::dcnzc::kRegHubpSysAperHigh) == fZcOrigSysHigh;
     }
 
-    bool zcConsumeVmid(uint32_t vmid) {
+    bool zcRecordVmidUsed(uint32_t vmid) {
         if (vmid < phx::dcnzc::kFirstVmid || vmid >= phx::dcnzc::kFirstVmid + phx::dcnzc::kSlotCount)
             return false;
         const uint32_t slotIndex = vmid - phx::dcnzc::kFirstVmid;
-        if (!phx::dcnzc::slotUnconsumed(slotIndex, fZcVmidsConsumed) || !fPCI) return false;
         const uint32_t consumed = fZcVmidsConsumed | (1u << slotIndex);
-        if (!fPCI->setProperty("PhxDcnZeroCopyVmidsConsumed", consumed, 32)) return false;
+        if (consumed != fZcVmidsConsumed && fPCI)
+            (void)fPCI->setProperty("PhxDcnZeroCopyVmidsConsumed", consumed, 32);
         fZcVmidsConsumed = consumed;
         return true;
     }
@@ -407,6 +466,8 @@ class PhxAMDFB : public IOFramebuffer {
         slot.memory = nullptr;
         slot.surface = nullptr;
         slot.surfaceID = 0;
+        slot.pixelFormat = 0;
+        slot.lastUseSeq = 0;
         slot.prepared = false;
         slot.active = false;
         slot.contextReady = false;
@@ -424,9 +485,11 @@ class PhxAMDFB : public IOFramebuffer {
         const uint32_t vmid = zcRead(phx::dcnzc::kRegHubpVmid0);
         const uint64_t current = zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi);
         if (vmid == UINT32_MAX || current == UINT64_MAX) return kIOReturnNotReady;
-        if ((vmid & 0xfu) != 0 || current != fZcHomeAddr) {
+        const uint32_t homeFmt = fZcOrigSurfCfg & phx::dcnzc::kFormatMask;
+        const uint32_t liveFmt = zcRead(phx::dcnzc::kRegHubpSurfaceConfig) & phx::dcnzc::kFormatMask;
+        if ((vmid & 0xfu) != 0 || current != fZcHomeAddr || liveFmt != homeFmt) {
             if (!zcWaitCurrentLatched(50)) return kIOReturnBusy;
-            if (!zcFlipTo(0, fZcHomeAddr) || !zcWaitLatched(0, fZcHomeAddr, 50)) return kIOReturnBusy;
+            if (!zcFlipTo(0, fZcHomeAddr, homeFmt) || !zcWaitLatched(0, fZcHomeAddr, 50)) return kIOReturnBusy;
         } else if (!zcWaitLatched(0, fZcHomeAddr, 50)) {
             return kIOReturnBusy;
         }
@@ -458,13 +521,14 @@ class PhxAMDFB : public IOFramebuffer {
 
     bool zcArm() {
         if (fZcArmed) return true;
-        if (fZcVmidsConsumed == phx::dcnzc::kAllSlotBits) return false;
         using namespace phx::dcnzc;
         if (!fMmio || fMmio->getLength() < kMinMmioBytes) return false;
         const uint32_t fault = zcRead(kRegVmFaultStatus);
         const uint32_t vmidReg = zcRead(kRegHubpVmid0);
         const uint32_t sysLow = zcRead(kRegHubpSysAperLow), sysHigh = zcRead(kRegHubpSysAperHigh);
         const uint32_t l1 = zcRead(kRegHubpL1TlbCntl);
+        const uint32_t surfCfg = zcRead(kRegHubpSurfaceConfig);
+        const uint32_t cnvcFmt = zcRead(kRegCnvcPixelFormat);
         const uint32_t fbBase = zcRead(kRegFbBase), fbTop = zcRead(kRegFbTop);
         const uint32_t agpBot = zcRead(kRegAgpBot), agpTop = zcRead(kRegAgpTop);
         const uint64_t address = zcAddress(kRegHubpPrimLo, kRegHubpPrimHi);
@@ -474,6 +538,7 @@ class PhxAMDFB : public IOFramebuffer {
             earliest != address || !zcHubpPeersIdle() ||
             fbBase == UINT32_MAX || fbTop == UINT32_MAX || agpBot == UINT32_MAX || agpTop == UINT32_MAX ||
             sysLow == UINT32_MAX || sysHigh == UINT32_MAX || l1 == UINT32_MAX ||
+            surfCfg == UINT32_MAX || cnvcFmt == UINT32_MAX ||
             !addressInFbAperture(address, bytes, {fbBase, fbTop, agpBot, agpTop})) return false;
         for (uint32_t vmid = kFirstVmid; vmid < kFirstVmid + kSlotCount; ++vmid)
             for (uint32_t field = 0; field < kVmCtxStride; ++field)
@@ -486,6 +551,8 @@ class PhxAMDFB : public IOFramebuffer {
         fZcOrigSysLow = sysLow;
         fZcOrigSysHigh = sysHigh;
         fZcOrigL1Tlb = l1;
+        fZcOrigSurfCfg = surfCfg;
+        fZcOrigCnvcFmt = cnvcFmt;
         uint32_t low = 0, high = 0;
         computeSystemApertureRegs(fZcAperture, low, high);
         fZcArmed = true;
@@ -509,10 +576,11 @@ class PhxAMDFB : public IOFramebuffer {
             zcRead(phx::dcnzc::kRegHubpL1TlbCntl) == phx::dcnzc::kL1TlbEnableSysMode3;
     }
 
-    int zcFindSlot(uint32_t surfaceID, IOMemoryDescriptor *memory) {
+    int zcFindSlot(uint32_t surfaceID, IOMemoryDescriptor *memory, uint32_t pixelFormat) {
         for (uint32_t index = 0; index < phx::dcnzc::kSlotCount; ++index) {
             const ZcSlot &slot = fZcSlots[index];
-            if (slot.active && slot.contextReady && slot.surfaceID == surfaceID && slot.memory == memory)
+            if (slot.active && slot.contextReady && slot.surfaceID == surfaceID &&
+                slot.memory == memory && slot.pixelFormat == pixelFormat)
                 return static_cast<int>(index);
         }
         return -1;
@@ -520,12 +588,41 @@ class PhxAMDFB : public IOFramebuffer {
 
     int zcAcquireSlot(PhxZeroCopyFlipRequest *request, IOMemoryDescriptor *memory, uint64_t bytes, uint32_t pageCount) {
         int selected = -1;
+        bool recycled = false;
         for (uint32_t index = 0; index < phx::dcnzc::kSlotCount; ++index)
-            if (phx::dcnzc::slotUnconsumed(index, fZcVmidsConsumed) &&
-                !fZcSlots[index].surface && !fZcSlots[index].memory && !fZcSlots[index].contextOwned) {
+            if (!fZcSlots[index].surface && !fZcSlots[index].memory && !fZcSlots[index].contextOwned) {
                 selected = static_cast<int>(index);
                 break;
             }
+        if (selected < 0) {
+            // Recycle the least recently used non-front slot once current scanout has latched.
+            if (!zcWaitCurrentLatched(50)) { request->status = phx::dcnzc::kLockTimeout; return -1; }
+            const uint32_t liveVmid = zcRead(phx::dcnzc::kRegHubpVmid0);
+            if (liveVmid == UINT32_MAX) { request->status = phx::dcnzc::kHwNotReady; return -1; }
+            const uint32_t activeVmid = liveVmid & 0xfu;
+            uint64_t oldestSeq = UINT64_MAX;
+            for (uint32_t index = 0; index < phx::dcnzc::kSlotCount; ++index) {
+                const uint32_t vmid = phx::dcnzc::kFirstVmid + index;
+                if (static_cast<int>(index) == fZcFrontSlot || vmid == activeVmid) continue;
+                if (fZcSlots[index].lastUseSeq < oldestSeq) {
+                    oldestSeq = fZcSlots[index].lastUseSeq;
+                    selected = static_cast<int>(index);
+                }
+            }
+            if (selected < 0) { request->status = phx::dcnzc::kNoEvictableSlot; return -1; }
+            const uint32_t victimVmid = phx::dcnzc::kFirstVmid + static_cast<uint32_t>(selected);
+            ZcSlot &victim = fZcSlots[selected];
+            if (victim.contextOwned && !zcClearContext(victimVmid, victim)) {
+                request->status = phx::dcnzc::kCtxTimeout;
+                return -1;
+            }
+            zcReleaseSurface(victim);
+            if (victim.pageTableKva) {
+                bzero(victim.pageTableKva, phx::dcnzc::kPageTableBytes);
+                zcFlushTable(victim);
+            }
+            recycled = true;
+        }
         if (selected < 0) { request->status = phx::dcnzc::kNoEvictableSlot; return -1; }
         if (!zcWaitCurrentLatched(50)) { request->status = phx::dcnzc::kLockTimeout; return -1; }
         ZcSlot &slot = fZcSlots[selected];
@@ -575,6 +672,7 @@ class PhxAMDFB : public IOFramebuffer {
         slot.surface = surface;
         slot.memory = memory;
         slot.surfaceID = request->surfaceID;
+        slot.pixelFormat = request->pixelFormat;
         slot.prepared = true;
         if (!zcProgramContext(vmid, phx::dcnzc::slotVa(static_cast<uint32_t>(selected)), pageCount,
                               slot.pageTablePhys, slot)) {
@@ -592,6 +690,8 @@ class PhxAMDFB : public IOFramebuffer {
         }
         slot.active = true;
         slot.contextReady = true;
+        slot.lastUseSeq = ++fZcUseSeq;
+        if (recycled) OSAddAtomic64(1, &gZcReuses);
         return selected;
     }
 
@@ -612,7 +712,8 @@ class PhxAMDFB : public IOFramebuffer {
         uint32_t pageCount = 0;
         if (!phx::dcnzc::validSurfaceRequest(request->pixelFormat, request->width, request->height,
                                              request->pitch, fWidth, fHeight, fRowBytes, bytes, pageCount)) {
-            request->status = request->pixelFormat == phx::dcnzc::kPixelFormatBgra ?
+            uint32_t dummyDcnFmt = 0;
+            request->status = phx::dcnzc::dcnPixelFormatFor(request->pixelFormat, dummyDcnFmt) ?
                 phx::dcnzc::kGeometryMismatch : phx::dcnzc::kUnsupportedFormat;
             gZcLastStatus = request->status;
             IOReturn home = zcHomeLocked(false);
@@ -658,7 +759,9 @@ class PhxAMDFB : public IOFramebuffer {
             return home == kIOReturnSuccess ? kIOReturnNotReady : home;
         }
         IOMemoryDescriptor *memory = static_cast<IOMemoryDescriptor *>(request->memoryDescriptor);
-        int slotIndex = zcFindSlot(request->surfaceID, memory);
+        uint32_t targetDcnFmt = phx::dcnzc::kDcnFormatArgb8888;
+        (void)phx::dcnzc::dcnPixelFormatFor(request->pixelFormat, targetDcnFmt);
+        int slotIndex = zcFindSlot(request->surfaceID, memory, request->pixelFormat);
         if (slotIndex < 0) slotIndex = zcAcquireSlot(request, memory, bytes, pageCount);
         if (slotIndex < 0) {
             if (request->status == phx::dcnzc::kBadArgs) request->status = phx::dcnzc::kNoEvictableSlot;
@@ -670,9 +773,11 @@ class PhxAMDFB : public IOFramebuffer {
         }
         const uint64_t address = phx::dcnzc::slotVa(static_cast<uint32_t>(slotIndex));
         const uint32_t vmid = phx::dcnzc::kFirstVmid + static_cast<uint32_t>(slotIndex);
+        fZcSlots[slotIndex].lastUseSeq = ++fZcUseSeq;
         if (slotIndex != fZcFrontSlot || (zcRead(phx::dcnzc::kRegHubpVmid0) & 0xfu) != vmid ||
-            zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi) != address) {
-            if (!zcWaitCurrentLatched(50) || !zcFlipTo(vmid, address)) {
+            zcAddress(phx::dcnzc::kRegHubpPrimLo, phx::dcnzc::kRegHubpPrimHi) != address ||
+            (zcRead(phx::dcnzc::kRegHubpSurfaceConfig) & phx::dcnzc::kFormatMask) != targetDcnFmt) {
+            if (!zcWaitCurrentLatched(50) || !zcFlipTo(vmid, address, targetDcnFmt)) {
                 request->status = phx::dcnzc::kLockTimeout;
                 gZcLastStatus = request->status;
                 IOReturn home = zcHomeLocked(true);

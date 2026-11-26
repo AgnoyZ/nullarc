@@ -36,6 +36,16 @@ inline constexpr uint32_t kRegHubpSysAperLow = 0x03af5u;
 inline constexpr uint32_t kRegHubpSysAperHigh = 0x03af6u;
 inline constexpr uint32_t kRegHubpL1TlbCntl = 0x03b03u;
 inline constexpr uint32_t kRegHubpReturnCtl = 0x03b2cu;
+inline constexpr uint32_t kRegCnvcPixelFormat = kDcnSeg2Base + 0x0ccfu; // 0x0418f
+
+// MMHUB 3.0.1 segment 1 (0x1a000): ENG16 TLB invalidation + L2 reserved CID2 flush
+inline constexpr uint32_t kMmhubSeg1Base = 0x1a000u;
+inline constexpr uint32_t kRegMmhubL2ReservedCid2 = kMmhubSeg1Base + 0x071bu;
+inline constexpr uint32_t kRegMmhubInvEng16Sem = kMmhubSeg1Base + 0x0761u;
+inline constexpr uint32_t kRegMmhubInvEng16Req = kMmhubSeg1Base + 0x0773u;
+inline constexpr uint32_t kRegMmhubInvEng16Ack = kMmhubSeg1Base + 0x0785u;
+inline constexpr uint32_t kMmhubInvLegacyL2L1Mask = 0x00f80000u; // L2 PTE/PDE0..2 + L1 PTE
+inline constexpr uint32_t kMmhubL2PrivateInvBit = 1u << 25;
 
 inline constexpr uint32_t kRegOdmSelect = 0x04f8bu;
 inline constexpr uint32_t kRegOtgControl = 0x05001u;
@@ -44,7 +54,9 @@ inline constexpr uint32_t kRegOtgMasterLock = 0x0504au;
 inline constexpr uint32_t kRegOtgGlobalCtl2 = 0x05051u;
 
 inline constexpr uint32_t kPixelFormatBgra = 0x42475241u;
+inline constexpr uint32_t kPixelFormatL10r = 0x6c313072u;
 inline constexpr uint32_t kDcnFormatArgb8888 = 8u;
+inline constexpr uint32_t kDcnFormatArgb2101010 = 10u;
 inline constexpr uint32_t kFormatMask = 0x7fu;
 inline constexpr uint32_t kOrientationMask = 0xf00u;
 inline constexpr uint32_t kSwizzleMask = 0x1fu;
@@ -64,7 +76,7 @@ inline constexpr uint32_t kHubpPeerPowerStride = 2u;
 inline constexpr uint32_t kHubpPeerPowerMask = 0xc0000000u;
 inline constexpr uint32_t kHubpPeerPowerGated = 0x80000000u;
 inline constexpr uint64_t kMinMmioBytes =
-    (static_cast<uint64_t>(kRegOtgControl + 3u * kOtgStride) + 1ull) * sizeof(uint32_t);
+    (static_cast<uint64_t>(kRegMmhubInvEng16Ack) + 1ull) * sizeof(uint32_t);
 
 inline constexpr uint32_t kHubpBlank = 1u << 0;
 inline constexpr uint32_t kHubpNoOutstanding = 1u << 1;
@@ -128,6 +140,26 @@ inline constexpr uint32_t vmCtxBase(uint32_t vmid) {
     return kRegVmCtx0 + vmid * kVmCtxStride;
 }
 
+inline constexpr uint32_t mmhubInvalidateReq(uint32_t vmid) {
+    return kMmhubInvLegacyL2L1Mask | (1u << (vmid & 0xfu));
+}
+
+inline constexpr bool dcnPixelFormatFor(uint32_t pixelFormat, uint32_t &dcnFormatOut) {
+    if (pixelFormat == kPixelFormatBgra) {
+        dcnFormatOut = kDcnFormatArgb8888;
+        return true;
+    }
+    if (pixelFormat == kPixelFormatL10r) {
+        dcnFormatOut = kDcnFormatArgb2101010;
+        return true;
+    }
+    return false;
+}
+
+inline constexpr bool supportedDcnFormat(uint32_t dcnFormat) {
+    return dcnFormat == kDcnFormatArgb8888 || dcnFormat == kDcnFormatArgb2101010;
+}
+
 inline constexpr uint64_t slotVa(uint32_t slotIndex) {
     return kSlotVaBase + static_cast<uint64_t>(slotIndex) * kSlotVaStride;
 }
@@ -188,7 +220,8 @@ inline void computeSystemApertureRegs(const ApertureSnapshot &ap, uint32_t &lowR
 inline bool validSurfaceRequest(uint32_t pixelFormat, uint32_t width, uint32_t height, uint32_t pitch,
                                 uint32_t fbWidth, uint32_t fbHeight, uint32_t fbPitch,
                                 uint64_t &bytesOut, uint32_t &pagesOut) {
-    if (pixelFormat != kPixelFormatBgra) return false;
+    uint32_t dcnFormat = 0;
+    if (!dcnPixelFormatFor(pixelFormat, dcnFormat)) return false;
     if (!width || !height || width > 0x3fffu || height > 0x3fffu ||
         width != fbWidth || height != fbHeight || pitch != fbPitch) return false;
     if (static_cast<uint64_t>(pitch) < static_cast<uint64_t>(width) * 4ull || (pitch & 3u) != 0) return false;
@@ -236,7 +269,7 @@ bool hubpGeometryReady(uint32_t width, uint32_t height, uint32_t pitchBytes, con
     const uint32_t lockSel = readReg(kRegOtgGlobalCtl2);
     if ((lockSel & kOtgLockSelMask) != 0) return false;
     const uint32_t surfCfg = readReg(kRegHubpSurfaceConfig);
-    if ((surfCfg & (kFormatMask | kOrientationMask)) != kDcnFormatArgb8888) return false;
+    if ((surfCfg & kOrientationMask) != 0 || !supportedDcnFormat(surfCfg & kFormatMask)) return false;
     const uint32_t retCtl = readReg(kRegHubpReturnCtl);
     if ((retCtl & kRedBlueMask) != kArgbRedBlue) return false;
     const uint32_t surfCtl = readReg(kRegHubpSurfaceCtl);
