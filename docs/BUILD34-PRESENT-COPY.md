@@ -1812,3 +1812,8 @@ changed, and no zero-copy comparison, DMA mapping, register access, driver
 installation/reload, GPU work, or restart was performed. Re-run the gate only
 after the user has selected 1280x800 logical / 2560x1600 backing at 120 Hz;
 passing that gate is a comparison prerequisite, not zero-copy admission.
+
+A same-session refresh on commit `0050c4f` repeated the refusal and found the
+mapper probe metadata still unpublished, `iommu-parent` absent, and the
+filtered child counts unchanged. The active HUBP route and device DMA domain
+remain unproven. See the consolidated [read-only recheck](validation/build34-dcn-admission-recheck-20261126.json).
