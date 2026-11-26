@@ -90,9 +90,13 @@ remains required afterward.
 
 The temporary PhxAccel standard-path swap now covers staging, both renames,
 signature verification and the private cache command with one exact-restore
-`finally` path. Seven host tests cover stale/mismatched mode reports, failure
-of the second rename and linker exceptions. These are tool/CPU checks only;
-the revised candidate recipe has not been used to build or link a new bundle.
+`finally` path for ordinary Python exceptions and returns. It cannot restore
+after `SIGKILL` or power loss. Seven host tests cover stale/mismatched mode
+reports, failure of the second rename and linker exceptions. These are tool/CPU
+checks only; the revised candidate recipe has not been used to build or link a
+new bundle. Because the linker temporarily presents the observer at the
+standard extension path, do not run it without a separate exact candidate
+scope and independent recovery guard; none is armed for this observer.
 No AuxKC, installed extension, cache, NVRAM/EFI or active driver was changed.
 Do not link, install or boot until a fresh candidate-specific scope admits the
 exact bundle/cache baseline and recovery. The observer still cannot prove the
