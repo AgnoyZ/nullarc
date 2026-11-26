@@ -7,6 +7,23 @@ remains active with R1b/VBL/optimized AML/accepted plugin. The earlier
 offline/preparation statuses below describe their original checkpoints; the
 latest new-boot result is recorded at the end of this document.
 
+## Passive route-topology observation, November 26
+
+A bounded, filtered IORegistry read on macOS 26.7.2 build 25G332 found one
+build34 `PhxBringup` child and one `PhxAMDFB` child under the target PCI
+device. It also counted the known `AMDSupport`, `NMXAccel` and
+`PhxDeviceControl` children without retaining the registry snapshot or
+emitting property values; see the [route observer](../tools/build34_dcn_route_observation.py)
+and [sanitized result](validation/build34-dcn-route-topology-20261126.json).
+
+This is service topology only. It does not identify the active HUBP route,
+prove that either framebuffer service owns the live fetch, resolve a DMA
+address domain, or establish a route lease. No register was read or written,
+no DMA mapping was created, and no driver reload or GPU work occurred. The
+read-only raw-register selector is too broad to use as an unqualified route
+probe. The staged mapper/direct-domain and qualified-route hooks remain
+unimplemented; do not treat these class counts as provider evidence.
+
 ## Offline DCN zero-copy prerequisite, November 24
 
 For subsequent local hardware comparisons, hold the [verified internal 2x

@@ -1,0 +1,25 @@
+{
+  "status": "filtered-dcn-route-topology-observation",
+  "date": "2026-11-26",
+  "source_commit": "74c945db1a6eeb405f5b32ecfd227b559a6a472b",
+  "os_version": "26.7.2",
+  "os_build": "25G332",
+  "target": "1002:1900",
+  "PhxBringup_build34_child_count": 1,
+  "known_direct_child_class_counts": {
+    "AMDSupport": 1,
+    "NMXAccel": 1,
+    "PhxAMDFB": 1,
+    "PhxBringup": 1,
+    "PhxDeviceControl": 1
+  },
+  "active_hubp_route_observed": false,
+  "route_provider_proven": false,
+  "device_dma_domain_proven": false,
+  "raw_registry_saved": false,
+  "property_values_emitted": false,
+  "registers_read_or_written": false,
+  "dma_mapping_created": false,
+  "driver_installed_or_reloaded": false,
+  "gpu_work_submitted": false
+}
