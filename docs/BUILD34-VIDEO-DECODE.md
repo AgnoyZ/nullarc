@@ -98,14 +98,23 @@ is semantically valid for VCN or that the kernel can execute it.
 These helpers are not connected to an adopted VCN queue and do not implement
 VCN VM flushes, firmware loading/validation, VCN startup and teardown, doorbell
 routing, interrupt/fence retirement, or Vulkan decoded-picture/DPB ownership.
-The CPU-only `encode_reg_wait` helper mirrors the four-dword Linux VCN
-`REG_WAIT` encoding with output-capacity and register-shift bounds. In Linux
-v6.16, `vcn_v2_0_enc_ring_emit_vm_flush` first calls
+The CPU-only `encode_reg_wait`, `encode_reg_write`,
+`encode_reg_write_reg_wait` and `encode_vm_flush_core_sequence` helpers
+mirror bounded Linux VCN command encodings. The last validates VMID and all
+four register indexes, then encodes page-table-base low/high writes, the
+invalidation request/ACK write-and-wait sequence and a final page-table-low
+wait. In Linux v6.16,
+`vcn_v2_0_enc_ring_emit_vm_flush` first calls
 `amdgpu_gmc_emit_flush_gpu_tlb` and then emits a `REG_WAIT` for the VMID's
-page-table-base register. Darwin currently has neither that GMC ring-emission
-route nor an adopted VCN ring/VM-hub register mapping; emitting only the wait
-would not invalidate translations. This helper does not complete a VM flush,
-and no GFX/compute flush is treated as a substitute.
+page-table-base register. On this generation, the GMC helper derives its
+request from the VM hub, writes both page-table-base halves and emits the
+invalidation request/ACK sequence (plus optional power-gating semaphore
+operations). The CPU helper accepts caller-supplied register indexes and
+request bits; it does not identify those values for Darwin, produce the
+required MMHUB0 semaphore acquire/release protocol, or perform TLB
+invalidation. Darwin currently has no adopted VCN ring/VM-hub register mapping,
+so this core sequence is not a usable VM-flush route, and no GFX/compute flush
+is treated as a substitute.
 
 The pinned Mesa transport currently rejects non-GFX/compute IP submissions in
 the exact-completion path, and the PhxBringup queue owner exposes only GFX and
@@ -127,9 +136,9 @@ actual initialized capability-array declaration as a CPU-only check. These
 tests do not load a provider, initialize Vulkan, submit GPU work, or test a
 VideoToolbox session. `test_rdna3_vcn_firmware` exercises synthetic valid and
 malformed container headers only; it does not consume a real firmware image.
-`test_phx_vcn_queue` exercises the standalone CPU IB/fence and `REG_WAIT`
-encoders and shared-structure layout only; it does not flush a VM, adopt or
-submit a queue, or execute GPU work.
+`test_phx_vcn_queue` exercises the standalone CPU IB/fence, register-write,
+`REG_WAIT` and VM-flush-sequence encoders and shared-structure layout only; it
+does not flush a VM, adopt or submit a queue, or execute GPU work.
 
 The next implementation gate is a reviewed Darwin VCN route: connect the
 exactly identified firmware through a provenance-reviewed load path, implement
@@ -143,3 +152,19 @@ explicitly authorized in `BUILD34-SCOPE.md`; that authorization does not make
 the current incomplete path deployable, authorize automatic deployment, or
 count as decode evidence. No candidate has been installed or VCN decode task
 submitted in this step.
+
+## Candidate admission and rollback
+
+The VCN authorization permits an isolated manual candidate only after all of
+the following gates are reviewed: exact `vcn_4_0_2.bin` source/license/hash and
+header/CRC validation; Darwin VCN startup, queue/ring mapping, GMC VM flush,
+doorbell, interrupt and fence retirement; IB synchronization and decoded
+surface/DPB ownership; a provider with auditable source/license/build
+provenance; exact build34 source identity and admission checks; and a bounded
+rollback plan. The current implementation has not passed these gates. No
+candidate should be built for installation, installed, loaded or submitted to
+the GPU until then. Any future trial must preserve the known working EFI and
+baseline, change only the isolated build34 candidate, record hashes and OS
+build, perform finite codec/output validation, and restore the recorded
+baseline on a failed admission or runtime check. Automatic deployment,
+build41/build42 and unreviewed firmware/provider binaries remain out of scope.

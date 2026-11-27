@@ -81,6 +81,75 @@ int main() {
     assert(!encode_reg_wait(nullptr, 4, 0x1234, 0xffffffff, 0x56789abc, &reg_wait_dw));
     assert(!encode_reg_wait(reg_wait, 4, 0x1234, 0xffffffff, 0x56789abc, nullptr));
 
+    uint32_t write_wait[7] = {0xfeedface, 0xfeedface, 0xfeedface, 0xfeedface,
+                              0xfeedface, 0xfeedface, 0xfeedface};
+    uint32_t write_wait_dw = 0xabcdef01;
+    assert(encode_reg_write_reg_wait(write_wait, 7, 0x1111, 0x2222, 0xaabbccdd, 0x0000ff00,
+                                     &write_wait_dw));
+    assert(write_wait_dw == 7);
+    assert(write_wait[0] == kUnifiedRegWrite);
+    assert(write_wait[1] == 0x4444);
+    assert(write_wait[2] == 0xaabbccdd);
+    assert(write_wait[3] == kUnifiedRegWait);
+    assert(write_wait[4] == 0x8888);
+    assert(write_wait[5] == 0x0000ff00);
+    assert(write_wait[6] == 0x0000ff00);
+    for (uint32_t &value : write_wait)
+        value = 0xfeedface;
+    write_wait_dw = 0xabcdef01;
+    assert(!encode_reg_write_reg_wait(write_wait, 6, 0x1111, 0x2222, 0xaabbccdd, 0x0000ff00,
+                                      &write_wait_dw));
+    assert(write_wait_dw == 0xabcdef01);
+    for (uint32_t value : write_wait)
+        assert(value == 0xfeedface);
+    assert(!encode_reg_write_reg_wait(write_wait, 7, 0x1111, 0x2222, 0xaabbccdd, 0, &write_wait_dw));
+    assert(!encode_reg_write_reg_wait(write_wait, 7, (UINT32_MAX >> 2) + 1, 0x2222, 0xaabbccdd,
+                                      0xffffffff, &write_wait_dw));
+    for (uint32_t value : write_wait)
+        assert(value == 0xfeedface);
+
+    uint32_t vm_flush[17];
+    for (uint32_t &value : vm_flush)
+        value = 0xfeedface;
+    uint32_t vm_flush_dw = 0xabcdef01;
+    assert(encode_vm_flush_core_sequence(vm_flush, 17, 8, 0x123456789abcdef0ull, 0x100, 0x101,
+                                         0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(vm_flush_dw == 17);
+    assert(vm_flush[0] == kUnifiedRegWrite);
+    assert(vm_flush[1] == 0x400);
+    assert(vm_flush[2] == 0x9abcdef0);
+    assert(vm_flush[3] == kUnifiedRegWrite);
+    assert(vm_flush[4] == 0x404);
+    assert(vm_flush[5] == 0x12345678);
+    assert(vm_flush[6] == kUnifiedRegWrite);
+    assert(vm_flush[7] == 0x800);
+    assert(vm_flush[8] == 0x80000001);
+    assert(vm_flush[9] == kUnifiedRegWait);
+    assert(vm_flush[10] == 0x804);
+    assert(vm_flush[11] == 0x100);
+    assert(vm_flush[12] == 0x100);
+    assert(vm_flush[13] == kUnifiedRegWait);
+    assert(vm_flush[14] == 0x400);
+    assert(vm_flush[15] == UINT32_MAX);
+    assert(vm_flush[16] == 0x9abcdef0);
+    for (uint32_t &value : vm_flush)
+        value = 0xfeedface;
+    vm_flush_dw = 0xabcdef01;
+    assert(!encode_vm_flush_core_sequence(vm_flush, 16, 8, 0x123456789abcdef0ull, 0x100, 0x101,
+                                          0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(vm_flush_dw == 0xabcdef01);
+    for (uint32_t value : vm_flush)
+        assert(value == 0xfeedface);
+    assert(!encode_vm_flush_core_sequence(vm_flush, 17, 0, 0x123456789abcdef0ull, 0x100, 0x101,
+                                          0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(!encode_vm_flush_core_sequence(vm_flush, 17, 16, 0x123456789abcdef0ull, 0x100, 0x101,
+                                          0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(!encode_vm_flush_core_sequence(vm_flush, 17, 8, 0x123456789abcdef0ull, 0x100, 0x101,
+                                          0x200, UINT32_MAX, 0x80000001, &vm_flush_dw));
+    assert(vm_flush_dw == 0xabcdef01);
+    for (uint32_t value : vm_flush)
+        assert(value == 0xfeedface);
+
     uint32_t output[kUnifiedMaxSubmissionDwords]{};
     uint32_t output_dw = 0;
     uint64_t next_wptr_dw = 0;
@@ -246,6 +315,16 @@ int main() {
     assert(multi_ring[255] == kUnifiedIndirectBuffer);
     assert(multi_ring[4] == kUnifiedIndirectBuffer);
     assert(multi_ring[9] == kUnifiedFence);
+    for (uint32_t &value : multi_ring)
+        value = 0xfeedface;
+    multi_submitted_dw = 0xabcdef01;
+    multi_ring_next_wptr = 0x123456789abcdef0ull;
+    assert(!place_unified_submission(multi_ring, 256, 250, 64, 8, multi_ib_va, multi_ib_dw, 3, 256,
+                                     fence_gpu_va, fence_sequence, &multi_submitted_dw, &multi_ring_next_wptr));
+    assert(multi_submitted_dw == 0xabcdef01);
+    assert(multi_ring_next_wptr == 0x123456789abcdef0ull);
+    for (uint32_t value : multi_ring)
+        assert(value == 0xfeedface);
 
     uint32_t ring[256];
     for (uint32_t &value : ring)

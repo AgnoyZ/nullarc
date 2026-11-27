@@ -9,6 +9,7 @@ constexpr uint32_t kUnifiedEnd = 0x1;
 constexpr uint32_t kUnifiedIndirectBuffer = 0x2;
 constexpr uint32_t kUnifiedFence = 0x3;
 constexpr uint32_t kUnifiedTrap = 0x4;
+constexpr uint32_t kUnifiedRegWrite = 0xb;
 constexpr uint32_t kUnifiedRegWait = 0xc;
 constexpr uint32_t kVmidMin = 8;
 constexpr uint32_t kVmidMax = 15;
@@ -119,6 +120,92 @@ inline bool encode_reg_wait(uint32_t *output,
     output[2] = mask;
     output[3] = expected_value;
     *output_dw = command_dw;
+    return true;
+}
+
+inline bool encode_reg_write(uint32_t *output,
+                             uint32_t output_capacity_dw,
+                             uint32_t register_index,
+                             uint32_t value,
+                             uint32_t *output_dw) {
+    constexpr uint32_t command_dw = 3;
+    if (!output || !output_dw || output_capacity_dw < command_dw || register_index > (UINT32_MAX >> 2))
+        return false;
+
+    output[0] = kUnifiedRegWrite;
+    output[1] = register_index << 2;
+    output[2] = value;
+    *output_dw = command_dw;
+    return true;
+}
+
+inline bool encode_reg_write_reg_wait(uint32_t *output,
+                                     uint32_t output_capacity_dw,
+                                     uint32_t write_register_index,
+                                     uint32_t wait_register_index,
+                                     uint32_t reference_value,
+                                     uint32_t wait_mask,
+                                     uint32_t *output_dw) {
+    constexpr uint32_t command_dw = 7;
+    if (!output || !output_dw || output_capacity_dw < command_dw || wait_mask == 0 ||
+        write_register_index > (UINT32_MAX >> 2) || wait_register_index > (UINT32_MAX >> 2))
+        return false;
+
+    uint32_t encoded[command_dw];
+    uint32_t write_dw = 0;
+    uint32_t wait_dw = 0;
+    if (!encode_reg_write(encoded, 3, write_register_index, reference_value, &write_dw) ||
+        !encode_reg_wait(encoded + write_dw, 4, wait_register_index, wait_mask, wait_mask, &wait_dw))
+        return false;
+
+    for (uint32_t index = 0; index < command_dw; ++index)
+        output[index] = encoded[index];
+    *output_dw = command_dw;
+    return true;
+}
+
+inline bool encode_vm_flush_core_sequence(uint32_t *output,
+                                          uint32_t output_capacity_dw,
+                                          uint32_t vmid,
+                                          uint64_t page_table_base,
+                                          uint32_t page_table_low_register_index,
+                                          uint32_t page_table_high_register_index,
+                                          uint32_t invalidate_request_register_index,
+                                          uint32_t invalidate_ack_register_index,
+                                          uint32_t invalidate_request,
+                                          uint32_t *output_dw) {
+    constexpr uint32_t command_dw = 17;
+    constexpr uint32_t vmid_limit = 15;
+    if (!output || !output_dw || output_capacity_dw < command_dw || vmid == 0 || vmid > vmid_limit ||
+        page_table_low_register_index > (UINT32_MAX >> 2) ||
+        page_table_high_register_index > (UINT32_MAX >> 2) ||
+        invalidate_request_register_index > (UINT32_MAX >> 2) ||
+        invalidate_ack_register_index > (UINT32_MAX >> 2))
+        return false;
+
+    uint32_t encoded[command_dw];
+    uint32_t cursor = 0;
+    uint32_t encoded_dw = 0;
+    if (!encode_reg_write(encoded + cursor, command_dw - cursor, page_table_low_register_index,
+                          static_cast<uint32_t>(page_table_base), &encoded_dw))
+        return false;
+    cursor += encoded_dw;
+    if (!encode_reg_write(encoded + cursor, command_dw - cursor, page_table_high_register_index,
+                          static_cast<uint32_t>(page_table_base >> 32), &encoded_dw))
+        return false;
+    cursor += encoded_dw;
+    if (!encode_reg_write_reg_wait(encoded + cursor, command_dw - cursor, invalidate_request_register_index,
+                                   invalidate_ack_register_index, invalidate_request, 1u << vmid, &encoded_dw))
+        return false;
+    cursor += encoded_dw;
+    if (!encode_reg_wait(encoded + cursor, command_dw - cursor, page_table_low_register_index, UINT32_MAX,
+                         static_cast<uint32_t>(page_table_base), &encoded_dw))
+        return false;
+    cursor += encoded_dw;
+
+    for (uint32_t index = 0; index < cursor; ++index)
+        output[index] = encoded[index];
+    *output_dw = cursor;
     return true;
 }
 
