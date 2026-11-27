@@ -21,6 +21,7 @@
 #include <stdatomic.h>
 #include <time.h>
 #include "nvmtl_sample_positions.h"
+#include "nvmtl_video_decode_gate.h"
 #include "nvmtl_log_failure.h"
 #include <sys/sysctl.h>
 #ifndef NVMTL_RELEASE
@@ -361,6 +362,40 @@ static void nvmtl_nvencvt_register(void)
               st ? "NOT registered" : "REGISTERED", me, (int)st, rating, path);
     });
 }
+static void nvmtl_nmxvt_register(void)
+{
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        const char *me = getprogname();
+        if (!nvmtl_nmxvt_registration_allowed(nvmtl_vk_vendor(), me, getenv("NMXVT"))) return;
+        Dl_info di;
+        if (!dladdr((const void *)nvmtl_nmxvt_register, &di) || !di.dli_fname) {
+            nvlog("nmxvt: dladdr failed - not registering");
+            return;
+        }
+        char dir[1024], path[1200];
+        strlcpy(dir, di.dli_fname, sizeof dir);
+        snprintf(path, sizeof path, "%s/libnmxvt.dylib", dirname(dir));
+        if (!nvmtl_loadable_root_only(path)) {
+            nvlog("nmxvt: %s is absent, or is not a root-owned file inside a root-owned directory - REFUSED", path);
+            return;
+        }
+        void *h = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+        if (!h) {
+            nvlog("nmxvt: dlopen %s FAILED: %s", path, dlerror());
+            return;
+        }
+        typedef int32_t (*RegFn)(int);
+        RegFn reg = (RegFn)dlsym(h, "NMXVT_Register");
+        if (!reg) {
+            nvlog("nmxvt: %s has no NMXVT_Register", path);
+            return;
+        }
+        int32_t st = reg(1100);
+        nvlog("nmxvt: AMD video provider %s in %s (NMXVT_Register -> %d)",
+              st ? "NOT registered" : "REGISTERED", me, (int)st);
+    });
+}
 static void nvmtl_nvdec_hevc_register(void)
 {
     static dispatch_once_t once;
@@ -577,6 +612,7 @@ static void nvmtl_install_hw_resource_pools(id dev)
         return nil;
     }
     nvmtl_gl_caps_enable();
+    nvmtl_nmxvt_register();
     if (nvmtl_vk_vendor() == 0x10de) {   /* NVDEC/NVENC are NVIDIA engines reached through NVRM */
         nvmtl_nvdec_register();
         nvmtl_nvenc_register();

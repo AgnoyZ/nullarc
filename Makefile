@@ -12,7 +12,8 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_phx_topology \
         $(TEST_BIN_DIR)/test_phx_dcn_zerocopy \
         $(TEST_BIN_DIR)/test_build34_dcn_page_layout \
-        $(TEST_BIN_DIR)/test_build34_dcn_flip_readback
+        $(TEST_BIN_DIR)/test_build34_dcn_flip_readback \
+        $(TEST_BIN_DIR)/test_nmplugin_video_decode_gate
 
 .PHONY: all test clean kext fixtures
 
@@ -53,6 +54,9 @@ $(TEST_BIN_DIR)/test_rdna3_ucode: src/amd/rdna3_ucode_extract.cpp tests/test_rdn
 $(TEST_BIN_DIR)/test_r3n_abi: src/uapi/r3n_user_client.cpp src/winsys/radv_r3n_winsys.cpp tests/test_r3n_abi.cpp | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@
 
+$(TEST_BIN_DIR)/test_nmplugin_video_decode_gate: tests/test_nmplugin_video_decode_gate.c src/nmplugin/nvmtl_video_decode_gate.h | $(TEST_BIN_DIR)
+	$(CC) -std=c11 -Wall -Wextra -Werror -O2 $< -o $@
+
 test: $(TESTS)
 	python3 -B tests/test_release_pci_matches.py
 	python3 -B tests/test_render_surface_clear.py
@@ -61,6 +65,7 @@ test: $(TESTS)
 	python3 -B tests/test_nmplugin_ws_mark_once.py
 	python3 -B tests/test_nmplugin_multisample_copy_guard.py
 	python3 -B tests/test_nmplugin_upload_ring.py
+	python3 -B tests/test_nmplugin_nmxvt_registration.py
 	python3 -B tests/test_build34_wait_deadline.py
 	python3 -B tests/test_build34_ring_backpressure.py
 	python3 -B tests/test_build34_startup_recovery.py
@@ -311,6 +316,11 @@ test-nmplugin-surface-key:
 
 test-nmplugin-descriptor-mask:
 	python3 tests/test_nmplugin_descriptor_mask.py
+
+.PHONY: test-nmplugin-video-decode
+test-nmplugin-video-decode: $(TEST_BIN_DIR)/test_nmplugin_video_decode_gate
+	./$(TEST_BIN_DIR)/test_nmplugin_video_decode_gate
+	python3 -B tests/test_nmplugin_nmxvt_registration.py
 
 # Narrow plugin PR backports: Foundation/POSIX only, no Metal device creation.
 .PHONY: test-upstream34-plugin-prs
