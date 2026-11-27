@@ -1475,25 +1475,17 @@ public:
     }
     IOReturn setCursorImage(void *cursorImage) override {
         if (!fZcLock) return kIOReturnUnsupported;
-        if (!cursorImage || !__atomic_load_n(&gPhxHwCursor, __ATOMIC_ACQUIRE) ||
-            fCurTripped || fStopping || !fCurBufReady || !fCurScratch) {
+        if (fCurTripped || fStopping || !fCurBufReady || !fCurScratch) {
             IOLockLock(fZcLock);
             fCurHasImage = false;
             curDisableLocked();
             IOLockUnlock(fZcLock);
             return kIOReturnUnsupported;
         }
-        IOLockLock(fZcLock);
-        const bool zcActive = fZcArmed && !fZcTripped && fZcFrontSlot >= 0 &&
-            fZcFrontSlot < static_cast<int>(phx::dcnzc::kSlotCount);
-        if (!zcActive) {
-            fCurHasImage = false;
-            curDisableLocked();
-            IOLockUnlock(fZcLock);
-            return kIOReturnUnsupported;
-        }
-        IOLockUnlock(fZcLock);
 
+        // IOFramebuffer passes cursor frame index 0..N as cursorImage (0 is the normal cursor
+        // AND is also used during postOpen/processConnectChange capability probing to populate
+        // IOFBCursorInfo). Always invoke convertCursorImage first so IOFBCursorInfo is recorded.
         IOHardwareCursorDescriptor desc;
         bzero(&desc, sizeof(desc));
         desc.majorVersion = kHardwareCursorDescriptorMajorVersion;
@@ -1511,7 +1503,13 @@ public:
         info.minorVersion = kHardwareCursorInfoMinorVersion;
         info.hardwareCursorData = reinterpret_cast<UInt8 *>(fCurScratch);
         if (!convertCursorImage(cursorImage, &desc, &info)) {
-            OSAddAtomic64(1, &gCurErrors);
+            IOLockLock(fZcLock);
+            fCurHasImage = false;
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnUnsupported;
+        }
+        if (!__atomic_load_n(&gPhxHwCursor, __ATOMIC_ACQUIRE)) {
             IOLockLock(fZcLock);
             fCurHasImage = false;
             curDisableLocked();
