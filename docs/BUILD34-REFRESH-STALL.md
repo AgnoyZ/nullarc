@@ -64,12 +64,21 @@ at the stall. The patch does not change any heap size or budget.
 
 ## Desktop verification pending
 
-The running WindowServer still maps an older image, confirmed by its mapping
-inode rather than its unchanged path. Disk installation and isolated GPU
-correctness do not establish a desktop fix. After a user-controlled session
-restart, first verify that WindowServer maps the new executable. For the
-before/after comparison, use the same app and native 2x mode, switch between
-visually distinct pages with the keyboard, and hold the pointer still. Record
+At installation, WindowServer still mapped an older image. After the one
+owner-requested reboot on November 27, 2026 at 18:12:57 local time (UTC+8),
+WindowServer's mapped executable inode matched the exact signed installed
+candidate. The original rollback backup remained intact. The native 2x mode
+and zero-copy remained active, with present and zero-copy flip counts both
+advancing during a 12-second observation of the same process. The four
+checked error counters stayed at zero. A filtered boot-to-observation log
+query contained plugin messages but found no matching failed descriptor
+allocations, skipped submissions, pool ceiling, Vulkan out-of-memory or
+IOSurface failure/timeout messages. There was no pending shutdown task.
+
+This verifies desktop loading and brief present progress, not the reported
+page-switch behavior. For the before/after comparison, use the same app and
+native 2x mode, switch between visually distinct pages with the keyboard, and
+hold the pointer still. Record
 the elapsed time until the whole page refreshes, then whether pointer movement
 only refreshes a small area. Compare the matching log intervals for allocation
 errors, skipped draws and IOSurface publication or upload errors. If the
