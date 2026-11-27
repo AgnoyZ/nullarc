@@ -102,3 +102,47 @@ publication separately: a host-backed texture currently does not advance the
 surface seed in `nvmtlSurfaceOutDirtied:`. It is not yet known whether this
 affects compositor invalidation in the failing case. This change neither
 tests nor modifies it.
+
+## Surface-publication and host-seed follow-up (source-only candidate)
+
+Subsequent desktop inspection on the same boot (`WindowServer` PID 204,
+installed candidate `D41A9465-5446-3156-916C-C7CC41994EE5`) found zero
+descriptor-pool errors, zero skipped draws, zero fence timeouts, and zero
+kernel flip/wait errors (`phxfb_zc_flips == nvaccel_iop_flips`,
+`phxfb_zc_fallbacks = 0`, `nvaccel_surface_gpu_timeouts = 0`). Two
+userspace publication gaps were verified on the live Radeon 780M:
+
+1. **Early `addScheduledHandler:` / `waitUntilScheduled` before GPU writes
+   finish**: with `NVMTL_SURFACE_COMMIT_WAIT=1` in
+   `/Library/GPUBundles/nvmtl/nvrm610.conf` and
+   `NVMTL_SCHEDULE_AFTER_SURFACE_WRITES` unset, a live Metal IOSurface probe
+   fired `addScheduledHandler:` at `+450 us` with stale pixels (`0xff112233`)
+   while GPU completion finished at `+20082 us` (`0xff00ff00`). Enabling
+   `NVMTL_SCHEDULE_AFTER_SURFACE_WRITES=1` deferred the handler to `+19800 us`
+   after the new pixels were visible, though the unpatched code still excludes
+   `s == drawable`.
+2. **Unchanged `IOSurfaceGetSeed()` on `_hostOn` textures**: in
+   `nvmtlSurfaceOutDirtied:`, host-imported IOSurfaces return early without
+   advancing the surface seed. Live probing confirmed `IOSurfaceGetSeed()`
+   remained unchanged after GPU render and blit writes, while
+   `IOSurfaceLock`/`Unlock` with `kIOSurfaceLockAvoidSync` advances the seed
+   cleanly in ~4.3 us.
+
+The isolated source-only patch
+[`tools/build34_refresh_surface_publish.patch`](../tools/build34_refresh_surface_publish.patch)
+preserves all existing baseline source files and DCN source pins:
+
+- In `src/nmplugin/NVMTLEventSync.m`, when `NVMTL_SCHEDULE_AFTER_SURFACE_WRITES`
+  is unset and `nvmtl_surface_commit_wait_on()` is active (ordinary
+  applications, WindowServer excluded), defer `nvmtlMarkScheduled` until GPU
+  completion for command buffers that dirty an IOSurface (including
+  `s == drawable`). Explicit `NVMTL_SCHEDULE_AFTER_SURFACE_WRITES=0` disables
+  the deferral and `=1` forces it.
+- In `src/nmplugin/NVMTLObjects.m`, in `nvmtlSurfaceOutDirtied:`, advance the
+  IOSurface seed for `_hostOn` surfaces via `kIOSurfaceLockAvoidSync`
+  lock/unlock unless `nvmtl_noseed()` is active, keeping lock errors non-fatal.
+
+Run `make test-nmplugin-refresh-surface-publish` for CPU-only ASan/UBSan
+verification against the pinned source SHA-256 digests. This patch is
+**uninstalled and untested as a compiled plugin binary**; rollback is reverting
+the patch/test files.

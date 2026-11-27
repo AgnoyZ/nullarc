@@ -330,7 +330,7 @@ $(TEST_BIN_DIR)/test_nmplugin_sampler_key: tests/test_nmplugin_sampler_key.m src
 		-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 		tests/test_nmplugin_sampler_key.m -framework Foundation -o $@
 
-.PHONY: test-nmplugin-sampler-key test-nmplugin-surface-key test-nmplugin-descriptor-mask
+.PHONY: test-nmplugin-sampler-key test-nmplugin-surface-key test-nmplugin-descriptor-mask test-nmplugin-refresh-surface-publish
 test-nmplugin-sampler-key: $(TEST_BIN_DIR)/test_nmplugin_sampler_key
 	./$(TEST_BIN_DIR)/test_nmplugin_sampler_key
 
@@ -339,6 +339,9 @@ test-nmplugin-surface-key:
 
 test-nmplugin-descriptor-mask:
 	python3 tests/test_nmplugin_descriptor_mask.py
+
+test-nmplugin-refresh-surface-publish:
+	python3 -B tests/test_nmplugin_refresh_surface_publish.py
 
 .PHONY: test-nmplugin-video-decode
 test-nmplugin-video-decode: $(TEST_BIN_DIR)/test_nmplugin_video_decode_gate
