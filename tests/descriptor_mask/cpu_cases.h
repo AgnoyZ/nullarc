@@ -1,7 +1,10 @@
 static unsigned cases;
 static void start(nvk_cmdbuf *c, nvmtl_bindtable *t) {
     memset(c, 0, sizeof *c); memset(t, 0, sizeof *t); c->table = t;
-    fail_alloc = fail_address = 0; h3 = ubo = 1; reset_observation();
+    fail_address = 0; h3 = ubo = 1; reset_observation();
+    g_ndescPools = 1; pool_opens = alloc_attempts = 0;
+    memset(alloc_results, 0, sizeof alloc_results);
+    pool_open_result = logged_allocation_error = VK_SUCCESS;
 }
 static void finish(nvk_cmdbuf *c) { free(c->sets); c->sets = NULL; ++cases; }
 static int seen(uint32_t binding) {
@@ -71,9 +74,6 @@ static void check_snapshot_cases(void) {
     start(&c, &t); h3 = 0;
     assert(nvmtl_snapshot_set_c(&c, 1, &base) && writes == NVMTL_STEX_BASE); finish(&c);
 
-    start(&c, &t); fail_alloc = 1;
-    assert(!nvmtl_snapshot_set_c(&c, 1, &base) && c.skipped == 1 && !calls); finish(&c);
-
     start(&c, &t); fail_address = 1;
     assert(!nvmtl_snapshot_set_c(&c, 1, &base) && c.skipped == 1 && !calls); finish(&c);
 
@@ -84,6 +84,44 @@ static void check_snapshot_cases(void) {
     int storage_address = 0;
     for (unsigned i = 0; i < writes; ++i) if (observed_bindings[i] == 640 && observed_types[i] == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) storage_address = 1;
     assert(storage_address && observed_address_offset > 0); finish(&c);
+}
+static void check_pool_pressure(void) {
+    nvk_cmdbuf commands;
+    nvmtl_bindtable table;
+    const uint64_t empty_mask[4] = {0};
+    const unsigned batch = nvmtl_desc_batch();
+    assert(batch > 1);
+
+    start(&commands, &table);
+    alloc_results[0] = VK_ERROR_OUT_OF_POOL_MEMORY;
+    assert(nvmtl_snapshot_set_m(&commands, 0, 0, empty_mask, NULL));
+    assert(alloc_attempts == 2 && !pool_opens && !commands.ndcache && !commands.skipped);
+    assert(requested_sets[0] == batch && requested_sets[1] == 1);
+    finish(&commands);
+
+    start(&commands, &table);
+    alloc_results[0] = alloc_results[1] = VK_ERROR_FRAGMENTED_POOL;
+    assert(nvmtl_snapshot_set_m(&commands, 0, 0, empty_mask, NULL));
+    assert(alloc_attempts == 3 && pool_opens == 1 && commands.ndcache == batch - 1);
+    assert(requested_sets[0] == batch && requested_sets[1] == 1 && requested_sets[2] == batch);
+    finish(&commands);
+
+    start(&commands, &table);
+    alloc_results[0] = alloc_results[1] = VK_ERROR_OUT_OF_POOL_MEMORY;
+    pool_open_result = VK_ERROR_OUT_OF_DEVICE_MEMORY;
+    assert(!nvmtl_snapshot_set_m(&commands, 0, 0, empty_mask, NULL));
+    assert(alloc_attempts == 2 && pool_opens == 1 && g_ndescPools == 1);
+    assert(commands.skipped == 1 && !commands.nsets && !calls);
+    assert(logged_allocation_error == VK_ERROR_OUT_OF_DEVICE_MEMORY);
+    finish(&commands);
+
+    start(&commands, &table);
+    g_ndescPools = 2;
+    alloc_results[0] = VK_ERROR_OUT_OF_HOST_MEMORY;
+    assert(!nvmtl_snapshot_set_m(&commands, 0, 0, empty_mask, NULL));
+    assert(alloc_attempts == 1 && !pool_opens && commands.skipped == 1 && !calls);
+    assert(logged_allocation_error == VK_ERROR_OUT_OF_HOST_MEMORY);
+    finish(&commands);
 }
 static void check_bad_inputs(void) {
     uint64_t out[4];
@@ -131,7 +169,7 @@ static void check_parser_boundaries(void) {
     ++cases;
 }
 int main(int argc, char **argv) {
-    check_snapshot_cases(); check_bad_inputs(); check_parser_boundaries();
+    check_snapshot_cases(); check_pool_pressure(); check_bad_inputs(); check_parser_boundaries();
     unsigned files = 0, improved = 0, mismatches = 0;
     for (int i = 1; i < argc; ++i) {
         FILE *f = fopen(argv[i], "rb"); assert(f);

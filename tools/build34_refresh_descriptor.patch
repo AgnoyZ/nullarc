@@ -1,0 +1,51 @@
+diff --git a/src/nmplugin/nvmtl_vk.c b/src/nmplugin/nvmtl_vk.c
+--- a/src/nmplugin/nvmtl_vk.c
++++ b/src/nmplugin/nvmtl_vk.c
+@@ -2327 +2327 @@ static VkDescriptorType binding_type(uint32_t i)
+-static int nvmtl_desc_pool_open(void)
++static VkResult nvmtl_desc_pool_open(void)
+@@ -2331 +2331 @@ static int nvmtl_desc_pool_open(void)
+-        return -1;
++        return VK_ERROR_OUT_OF_POOL_MEMORY;
+@@ -2351 +2351,5 @@ static int nvmtl_desc_pool_open(void)
+-    VKCK(pvkCreateDescriptorPool(g_dev, &pci, NULL, &g_descPools[g_ndescPools]), "vkCreateDescriptorPool");
++    VkResult result = pvkCreateDescriptorPool(g_dev, &pci, NULL, &g_descPools[g_ndescPools]);
++    if (result != VK_SUCCESS) {
++        nvlog("vk: vkCreateDescriptorPool -> %d", result);
++        return result;
++    }
+@@ -2355 +2359 @@ static int nvmtl_desc_pool_open(void)
+-    return 0;
++    return VK_SUCCESS;
+@@ -2834,0 +2839,4 @@ static int nvmtl_spirv_uses_set(const void *code, size_t words, uint32_t set)
++static int nvmtl_desc_pool_exhausted(VkResult result)
++{
++    return result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL;
++}
+@@ -2865,0 +2874 @@ static VkDescriptorSet nvmtl_snapshot_set_md(nvk_cmdbuf *c, uint32_t which, uint
++    unsigned pools = 0;
+@@ -2879 +2888,2 @@ static VkDescriptorSet nvmtl_snapshot_set_md(nvk_cmdbuf *c, uint32_t which, uint
+-        unsigned n = nvmtl_desc_batch();
++        const unsigned batch = nvmtl_desc_batch();
++        unsigned n = batch;
+@@ -2885 +2895,2 @@ static VkDescriptorSet nvmtl_snapshot_set_md(nvk_cmdbuf *c, uint32_t which, uint
+-            for (unsigned k = g_ndescPools; k-- > 0 && r != VK_SUCCESS;) {
++            for (unsigned k = g_ndescPools; k > 0 && nvmtl_desc_pool_exhausted(r);) {
++                --k;
+@@ -2889 +2900,7 @@ static VkDescriptorSet nvmtl_snapshot_set_md(nvk_cmdbuf *c, uint32_t which, uint
+-            if (r != VK_SUCCESS && nvmtl_desc_pool_open() == 0) {
++            if (!nvmtl_desc_pool_exhausted(r) || n == 1) break;
++            n = 1;
++        }
++        if (nvmtl_desc_pool_exhausted(r)) {
++            r = nvmtl_desc_pool_open();
++            if (r == VK_SUCCESS) {
++                n = batch;
+@@ -2893,2 +2909,0 @@ static VkDescriptorSet nvmtl_snapshot_set_md(nvk_cmdbuf *c, uint32_t which, uint
+-            if (r == VK_SUCCESS || n == 1) break;
+-            n = 1;
+@@ -2915,0 +2931 @@ static VkDescriptorSet nvmtl_snapshot_set_md(nvk_cmdbuf *c, uint32_t which, uint
++        pools = g_ndescPools;
+@@ -2919 +2935 @@ static VkDescriptorSet nvmtl_snapshot_set_md(nvk_cmdbuf *c, uint32_t which, uint
+-        nvlog("vk: descriptor set allocation FAILED (%d) with %u pools — this draw is SKIPPED, not recorded blind", r, g_ndescPools);
++        nvlog("vk: descriptor set allocation FAILED (%d) with %u pools — this draw is SKIPPED, not recorded blind", r, pools);

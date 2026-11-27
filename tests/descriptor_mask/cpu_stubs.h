@@ -10,11 +10,14 @@ static nvk_buffer g_dummyBuf;
 static nvk_image g_dummyImg, g_dummyStex = { .view = (void *)(uintptr_t)0x222 };
 static VkSampler g_dummySampler;
 static void *g_dummyTexView;
-static int g_mutable = 1, g_mutable_stex = 1;
+static int g_mutable = 1, g_mutable_layout = 1, g_mutable_stex = 1;
 enum { NVMTL_E78_H3 = 1, E78C_WRITES, E78C_SETNEW, E78C_SETREUSE };
 typedef struct nvmtl_address_page { nvk_buffer buffer; struct nvmtl_address_page *next; } nvmtl_address_page;
 static unsigned calls, writes, copies, allocated;
-static int fail_alloc, fail_address, h3 = 1, ubo = 1;
+static int fail_address, h3 = 1, ubo = 1;
+static unsigned pool_opens, alloc_attempts;
+static uint32_t requested_sets[4];
+static VkResult alloc_results[4], pool_open_result;
 static uint32_t observed_bindings[1024];
 static VkDescriptorType observed_types[1024];
 static uint64_t observed_address_offset;
@@ -28,10 +31,19 @@ static int nvmtl_enc78_on(int bit) { (void)bit; return h3; }
 static void nvmtl_enc78_count(int key, uint64_t value) { (void)key; (void)value; }
 static int nvmtl_table_ubo(void) { return ubo; }
 static int ensure_descriptors_locked(void) { return 0; }
-static int nvmtl_desc_pool_open(void) { return -1; }
+static VkResult pvkCreateDescriptorPool(VkDevice dev, const VkDescriptorPoolCreateInfo *info,
+                                        const VkAllocationCallbacks *callbacks, VkDescriptorPool *out) {
+    (void)dev; (void)info; (void)callbacks;
+    ++pool_opens;
+    if (pool_open_result == VK_SUCCESS) *out = (VkDescriptorPool)(uintptr_t)(g_ndescPools + 1);
+    return pool_open_result;
+}
 static VkResult pvkAllocateDescriptorSets(VkDevice d, const VkDescriptorSetAllocateInfo *a, VkDescriptorSet *out) {
     (void)d;
-    if (fail_alloc) return VK_ERROR_OUT_OF_POOL_MEMORY;
+    assert(alloc_attempts < sizeof requested_sets / sizeof *requested_sets);
+    requested_sets[alloc_attempts] = a->descriptorSetCount;
+    VkResult result = alloc_results[alloc_attempts++];
+    if (result != VK_SUCCESS) return result;
     for (uint32_t i = 0; i < a->descriptorSetCount; ++i) out[i] = (VkDescriptorSet)(uintptr_t)(0x1000 + ++allocated);
     return VK_SUCCESS;
 }
