@@ -14,6 +14,7 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_phx_topology \
         $(TEST_BIN_DIR)/test_phx_dcn_zerocopy \
         $(TEST_BIN_DIR)/test_phx_dcn_cursor \
+        $(TEST_BIN_DIR)/test_phx_uma_pool \
         $(TEST_BIN_DIR)/test_build34_dcn_page_layout \
         $(TEST_BIN_DIR)/test_build34_dcn_flip_readback \
         $(TEST_BIN_DIR)/test_nmplugin_video_decode_gate
@@ -33,6 +34,9 @@ $(TEST_BIN_DIR)/test_phx_dcn_zerocopy: tests/test_phx_dcn_zerocopy.cpp src/phxac
 
 $(TEST_BIN_DIR)/test_phx_dcn_cursor: tests/test_phx_dcn_cursor.cpp src/phxaccel/accel/phx_dcn_cursor.h src/phxaccel/accel/phx_dcn_zerocopy.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all $< -o $@
+
+$(TEST_BIN_DIR)/test_phx_uma_pool: tests/test_phx_uma_pool.cpp src/phxbringup/PhxUmaPool.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc/phxbringup $< -o $@
 
 $(TEST_BIN_DIR)/test_rdna3_discovery_uma: src/amd/rdna3_ip_discovery.cpp src/amd/rdna3_rebar_uma.cpp src/amd/rdna3_chip_profile.cpp tests/test_rdna3_discovery_uma.cpp | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@
@@ -102,6 +106,7 @@ test: $(TESTS)
 	CXX="$(CXX)" python3 -B tests/test_build34_dcn_mapper_probe.py
 	python3 -B tests/test_build34_dcn_route_observation.py
 	python3 -B tests/test_build34_uma_observation.py
+	python3 -B tests/test_build34_uma_stage.py
 	python3 -B tests/test_build34_dcn_firmware_observation.py
 	python3 -B tests/test_build34_dcn_firmware_observer_candidate.py
 	python3 -B tests/test_build34_pci_irq_observation.py
@@ -154,11 +159,13 @@ test-upstream34-layout:
 	python3 tests/test_upstream34_layout.py -v
 
 .PHONY: test-build34-uma-vram
-test-build34-uma-vram: $(TEST_BIN_DIR)/test_build34_uma_vram $(TEST_BIN_DIR)/test_build34_uma_boot_map
+test-build34-uma-vram: $(TEST_BIN_DIR)/test_build34_uma_vram $(TEST_BIN_DIR)/test_build34_uma_boot_map $(TEST_BIN_DIR)/test_phx_uma_pool
 	$(TEST_BIN_DIR)/test_build34_uma_vram
 	$(TEST_BIN_DIR)/test_build34_uma_boot_map
+	$(TEST_BIN_DIR)/test_phx_uma_pool
 	python3 -B tests/test_build34_uma_observation.py
 	python3 -B tests/test_build34_uma_host_map.py
+	python3 -B tests/test_build34_uma_stage.py
 
 $(TEST_BIN_DIR)/test_build34_uma_vram: tests/test_build34_uma_vram.cpp tools/build34_uma_vram.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all $< -o $@

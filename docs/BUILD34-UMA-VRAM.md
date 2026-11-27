@@ -200,3 +200,100 @@ map/unmap, close and sleep. Only after bounded hardware validation should RADV
 be told about any new allocatable heap. No installation, GPU submission or
 reboot was performed for this preflight. There is no installed state to roll
 back; reverting the source-only changes removes the experiment and its tests.
+
+## Staged Phase 1 + Phase 2 Opt-In Candidate
+
+To test real BIOS UMA carve-out high-VRAM without altering the pinned stock
+`src/phxbringup/PhxBringup.cpp` baseline (SHA-256
+`81f45aa2e8166bc6ebed4106129bebebfd70f9b4bbea6dbe389be46263e3c699`), the
+clean-room MIT/GPL-2.0 allocator and staging pipeline live in:
+
+- `src/phxbringup/PhxUmaPool.h`: freestanding geometry validator, IP Discovery
+  register/signature classifier, high-UMA window planner (`pilotWindow`
+  `[256 MiB, 320 MiB)` and `fullHighWindow` `[256 MiB, fbSize - 64 MiB)`
+  clamped below IP Discovery), read-only BAR0-vs-`phx-fb-phys` alias matcher,
+  x86_64 `boot_args` EFI memory-map classifier, local VRAM PTE encoder
+  (`0x21`/`0x61 | (4 << 48)` — `VALID|READ(|WRITE)`, `SYSTEM=0`, `SNOOPED=0`,
+  `EXEC=0`, `MTYPE=4`), and fixed-capacity `HighUmaAllocator` with quarantine
+  and fault latch.
+- `tools/build34_uma_stage.py`: stages Phase 1 + Phase 2 onto exact build34
+  `PhxBringup.cpp` and builds a signed `PhxBringup.kext` in a fresh
+  `build/*-private` directory using `MacKernelSDK`.
+- `tests/test_phx_uma_pool.cpp` and `tests/test_build34_uma_stage.py`: ASan/UBSan
+  unit tests (`7560` checks) and staging invariant tests, wired into `make test`
+  and `make test-build34-uma-vram`.
+
+### Phase 1 (Read-Only Probe on Start)
+
+On `PhxBringup::start()`, `probeUmaReadOnly()` performs only read-only checks
+and publishes `phx-uma-*` properties on the `PhxBringup` IORegistry entry:
+
+1. Reads `RCC_CONFIG_MEMSIZE`, `IP_DISCOVERY_VERSION`, `DRIVER_SCRATCH_0..2`,
+   and verifies the IP Discovery signature (`0x282114`) via `MM_INDEX`/`MM_DATA`.
+2. Samples 128 dwords across the first 16 MiB of `phx-fb-phys` vs BAR0
+   (`kIOMapWriteCombineCache`, read-only) to confirm `phx-fb-phys` aliases VRAM.
+3. Maps the EFI memory map pointed to by `PE_state.bootArgs` read-only and
+   classifies both the 64 MiB pilot window and the full high-UMA window with
+   `phx::uma::classifyBootMap()`.
+
+Default runtime behavior is completely unchanged (`debug.phx_uma_vram = 0`).
+
+### Phase 2 (Opt-In `debug.phx_uma_vram` High-VRAM Pool)
+
+Controlled at runtime via `sysctl debug.phx_uma_vram`:
+
+- `0` (default): off; stock build34 system-memory BO path unchanged.
+- `1`: admits the 64 MiB pilot window `[256 MiB, 320 MiB)` only if Phase 1
+  proved geometry, discovery signature, alias match, and `ReservedTypeOnly`
+  host exclusion.
+- `2`: admits the full verified high-UMA window `[256 MiB, fbSize - 64 MiB)`
+  (~3776 MiB on a 4 GiB carve-out, yielding ~4032 MiB total VRAM when combined
+  with 256 MiB visible VRAM) only if Phase 1 proved full-window coverage.
+
+Safety invariants enforced by the staged kext:
+
+- High-UMA BOs are admitted only for `VRAM | NO_CPU_ACCESS` requests without
+  `CPU_ACCESS_REQUIRED`.
+- `clientMemoryForType()` refuses CPU mmap (`kIOReturnUnsupported`) on UMA BOs.
+- `doGemVa()` refuses `PHX_AMDGPU_VM_PAGE_EXECUTABLE` mappings on UMA BOs and
+  decodes `AMDGPU_VM_PAGE_WRITEABLE` (`1u << 2`) for read-only vs read-write
+  local PTEs.
+- Each UMA allocation is zeroed via write-combining alias mapping + `sfence` +
+  `hdpFlush()` before handoff; zeroing failure quarantines the slot.
+- `doBoFree()` unmaps PTEs and waits for GPU retirement outside `lock` before
+  returning pages to the pool (quarantining on timeout).
+- `clientClose()` calls `vmidFree()` before `freeAll()` so page tables and GPU
+  waves drain before UMA ranges can be reused.
+- Sleep (`powerStateWillChangeTo(0)`) trips the UMA fault latch.
+
+### Building and Checking the Staged Kext Offline
+
+```sh
+make test-build34-uma-vram
+python3 -B tools/build34_uma_stage.py \
+  --sdk /Users/zhazhatao/nullarc/build/allocation-live-20261114-072303-private/MacKernelSDK \
+  --out build/uma-vram-candidate-private
+```
+
+Against `KDK_26.7.2_25G332.kdk`, the staged `PhxBringup` binary adds only three
+undefined KPI symbols over stock build34: `_PE_state` (`com.apple.kpi.unsupported`),
+`IODeviceMemory::withRange` (`com.apple.kpi.iokit`), and `_OSAddAtomic`
+(`com.apple.kpi.libkern`) — all already declared in `src/phxbringup/Info.plist`.
+
+### Controlled Live Test Procedure (Requires Explicit User Approval)
+
+`PhxBringup.kext` is loaded by OpenCore from EFI (`OC/Kexts/PhxBringup.kext`).
+No EFI/kext installation or reboot is performed automatically. When approved:
+
+1. Back up the current EFI `OC/Kexts/PhxBringup.kext` and install the staged
+   candidate; reboot with default `debug.phx_uma_vram = 0`.
+2. Verify Phase 1 read-only evidence via `ioreg -rn PhxBringup`: confirm
+   `phx-uma-discovery-valid = Yes`, `phx-uma-alias-matched = Yes`,
+   `phx-uma-pilot-host-status = 1` (`ReservedTypeOnly`), and
+   `phx-uma-full-host-status = 1`.
+3. Only if Phase 1 checks pass, opt in to the 64 MiB pilot:
+   `sudo sysctl -w debug.phx_uma_vram=1`, run a Vulkan/Metal client, and check
+   `sysctl debug.phx_uma_vram_allocs debug.phx_uma_vram_frees debug.phx_uma_vram_bytes debug.phx_uma_vram_faults`.
+4. If the 64 MiB pilot succeeds with zero faults/artifacts, reboot or test
+   mode `2` (`sudo sysctl -w debug.phx_uma_vram=2`) to expose the full verified
+   high-UMA heap to RADV/Metal.
