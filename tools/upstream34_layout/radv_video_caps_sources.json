@@ -1,0 +1,9 @@
+{
+  "approved_original34_checkpoint": "64f3d991a4ddc3af5bbf30cbced9f11d3e7dd50c",
+  "mesa_commit": "f5cb8ee032adabef599ae892ec4e42d796b84da9",
+  "input_sha256": {
+    "src/amd/common/ac_video.c": "b0a95f8202721453a859b7fabc32c49c0571e69f31df15a33268d3fab8b07214"
+  },
+  "patch": "mesa-patches-build34/0008-radv-zero-initialize-video-capabilities.patch",
+  "patch_sha256": "51d2811cf2eabf48629420737cd9d93166a711b9ac215956377fc714e0cea72f"
+}

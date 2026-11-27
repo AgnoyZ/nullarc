@@ -1,0 +1,13 @@
+From: nullarc build34 maintainers
+Subject: [PATCH] radv: zero-initialize video capability query data
+
+SPDX-License-Identifier: MIT
+
+Fail closed when the platform reports success without writing capability data.
+
+diff --git a/src/amd/common/ac_video.c b/src/amd/common/ac_video.c
+--- a/src/amd/common/ac_video.c
++++ b/src/amd/common/ac_video.c
+@@ -678 +678 @@
+-   } dec_cap[8], enc_cap[8];
++   } dec_cap[8] = {0}, enc_cap[8] = {0};

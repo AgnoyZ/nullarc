@@ -16,6 +16,7 @@ enum class HwId : uint16_t {
     Osssys  = 40,   // IH / OS system
     Hdp     = 41,   // Host Data Path
     Sdma0   = 42,   // System DMA 0
+    Vcn     = 12,   // Video codec engine (UVD / VCN)
     Nbif    = 108,  // NBIO / Bus interface
     Umc     = 150,  // Unified Memory Controller
     Mp0     = 255,  // PSP / Security processor

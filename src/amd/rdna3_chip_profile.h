@@ -30,6 +30,11 @@ struct ChipProfile {
     uint8_t external_rev_add;
 };
 
+struct VcnFirmwareProfile {
+    IpVersion ip;
+    const char *firmware_file;
+};
+
 // Absolute MMIO dword indices (BAR5) of the registers that depend on the chip's IP layout.
 struct ChipRegs {
     uint32_t psp_c2pmsg_58, psp_c2pmsg_64, psp_c2pmsg_67, psp_c2pmsg_69, psp_c2pmsg_70, psp_c2pmsg_71, psp_c2pmsg_81;
@@ -41,6 +46,9 @@ struct ChipRegs {
 
 // The profile for this discovery table, or nullptr (unknown chip: do not touch the hardware).
 const ChipProfile *chip_profile(const IpDiscoveryParser &disc);
+
+// Exact Phoenix VCN firmware identity. This does not imply an initialized VCN engine or decode support.
+const VcnFirmwareProfile *vcn_firmware_profile(const IpDiscoveryParser &disc);
 
 // Fills regs from the discovery table's segment bases. False if a needed IP or segment is missing.
 bool chip_regs(const IpDiscoveryParser &disc, const ChipProfile &prof, ChipRegs &regs);

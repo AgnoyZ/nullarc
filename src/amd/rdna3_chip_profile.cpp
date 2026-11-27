@@ -30,6 +30,8 @@ constexpr ChipProfile kProfiles[] = {
     },
 };
 
+constexpr VcnFirmwareProfile kPhoenixVcnFirmware = {{4, 0, 2}, "vcn_4_0_2.bin"};
+
 // Register dword offsets inside their IP segment. Identical in mp_13_0_4_offset.h and mp_13_0_2_offset.h; only the
 // BASE_IDX differs (ChipProfile).
 constexpr uint32_t kMp0C2pmsg58 = 0x007a, kMp0C2pmsg64 = 0x0080, kMp0C2pmsg67 = 0x0083, kMp0C2pmsg69 = 0x0085,
@@ -70,6 +72,13 @@ const ChipProfile *chip_profile(const IpDiscoveryParser &disc) {
         if (same(gc, p.gc) && same(mp0, p.mp0) && same(mp1, p.mp1) && same(mmhub, p.mmhub) && same(nbif, p.nbif))
             return &p;
     return nullptr;
+}
+
+const VcnFirmwareProfile *vcn_firmware_profile(const IpDiscoveryParser &disc) {
+    IpEntry vcn;
+    if (!disc.is_valid() || !disc.find_ip(HwId::Vcn, 0, vcn) || !same(vcn, kPhoenixVcnFirmware.ip))
+        return nullptr;
+    return &kPhoenixVcnFirmware;
 }
 
 bool chip_regs(const IpDiscoveryParser &disc, const ChipProfile &prof, ChipRegs &r) {

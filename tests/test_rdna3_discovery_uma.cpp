@@ -4,6 +4,7 @@
 //
 #include "../src/amd/rdna3_ip_discovery.h"
 #include "../src/amd/rdna3_rebar_uma.h"
+#include "../src/amd/rdna3_chip_profile.h"
 #include <iostream>
 #include <vector>
 #include <cassert>
@@ -23,12 +24,13 @@ static std::vector<uint8_t> create_synthetic_phoenix_ip_discovery() {
     //   u32 sig ("IPDS" = 0x53445049), u16 version (3), u16 size (84), u32 id (0), u16 num_dies (1), u16 pad
     //   die_info[0]: u16 die_id (0), u16 die_offset (0x80)
     // 0x80: die_header (4 bytes):
-    //   u16 die_id (0), u16 num_ips (4)
+    //   u16 die_id (0), u16 num_ips (5)
     // 0x84+: IP entries:
     //   GC:   hw_id=11,  inst=0, nbase=2, maj=11, min=0, rev=3, sub=0, bases=[0x1000, 0x2000] (8+8 = 16 bytes)
     //   MP0:  hw_id=255, inst=0, nbase=1, maj=13, min=0, rev=4, sub=0, bases=[0x3000] (8+4 = 12 bytes)
     //   DMU:  hw_id=271, inst=0, nbase=1, maj=3,  min=1, rev=4, sub=0, bases=[0x4000] (8+4 = 12 bytes)
     //   SDMA: hw_id=42,  inst=0, nbase=1, maj=6,  min=0, rev=3, sub=0, bases=[0x5000] (8+4 = 12 bytes)
+    //   VCN:  hw_id=12,  inst=0, nbase=1, maj=4,  min=0, rev=2, sub=0, bases=[0x6000] (8+4 = 12 bytes)
 
     std::vector<uint8_t> buf(1024, 0);
 
@@ -54,7 +56,7 @@ static std::vector<uint8_t> create_synthetic_phoenix_ip_discovery() {
 
     // Write die_header
     *reinterpret_cast<uint16_t *>(&buf[0x80]) = 0; // die_id
-    *reinterpret_cast<uint16_t *>(&buf[0x82]) = 4; // num_ips
+    *reinterpret_cast<uint16_t *>(&buf[0x82]) = 5; // num_ips
 
     // IP entry 0: GC v11.0.3
     size_t p = 0x84;
@@ -102,6 +104,16 @@ static std::vector<uint8_t> create_synthetic_phoenix_ip_discovery() {
     *reinterpret_cast<uint32_t *>(&buf[p + 8]) = 0x00005000;
     p += 12;
 
+    // IP entry 4: VCN v4.0.2
+    *reinterpret_cast<uint16_t *>(&buf[p + 0]) = static_cast<uint16_t>(HwId::Vcn);
+    buf[p + 2] = 0;
+    buf[p + 3] = 1;
+    buf[p + 4] = 4;
+    buf[p + 5] = 0;
+    buf[p + 6] = 2;
+    buf[p + 7] = 0;
+    *reinterpret_cast<uint32_t *>(&buf[p + 8]) = 0x00006000;
+
     // Compute checksum (16-bit sum of bytes [10 .. binary_size])
     uint16_t sum = 0;
     for (size_t i = 10; i < 256; ++i) {
@@ -118,7 +130,7 @@ static void test_ip_discovery_phoenix() {
 
     assert(parser.init(buf.data(), buf.size()));
     assert(parser.is_valid());
-    assert(parser.ip_count() == 4);
+    assert(parser.ip_count() == 5);
     assert(parser.is_phoenix_apu());
 
     IpEntry gc;
@@ -143,11 +155,30 @@ static void test_ip_discovery_phoenix() {
     IpEntry absent;
     assert(!parser.find_ip(HwId::Nbif, 0, absent));
 
+    IpEntry vcn;
+    assert(parser.find_ip(HwId::Vcn, 0, vcn));
+    assert(vcn.major == 4 && vcn.minor == 0 && vcn.revision == 2);
+    const VcnFirmwareProfile *vcn_profile = vcn_firmware_profile(parser);
+    assert(vcn_profile && std::strcmp(vcn_profile->firmware_file, "vcn_4_0_2.bin") == 0);
+    char prefix[32] = {};
+    assert(fw_prefix(parser, HwId::Vcn, prefix, sizeof(prefix)));
+    assert(std::strcmp(prefix, "vcn_4_0_2") == 0);
+    assert(!fw_prefix(parser, HwId::Vcn, prefix, 9));
+
     std::cout << "[PASS] test_ip_discovery_phoenix" << std::endl;
 }
 
 static void test_ip_discovery_fuzzer() {
     auto valid_buf = create_synthetic_phoenix_ip_discovery();
+
+    valid_buf[0x84 + 16 + 12 + 12 + 12 + 6] = 3;
+    uint16_t sum = 0;
+    for (size_t i = 10; i < 256; ++i)
+        sum = static_cast<uint16_t>(sum + valid_buf[i]);
+    *reinterpret_cast<uint16_t *>(&valid_buf[8]) = sum;
+    IpDiscoveryParser unsupported_vcn;
+    assert(unsupported_vcn.init(valid_buf.data(), valid_buf.size()));
+    assert(!vcn_firmware_profile(unsupported_vcn));
 
     uint32_t lcg = 0x98765432;
     auto rnd = [&]() -> uint32_t {
