@@ -6,11 +6,13 @@ pure-C++17 register/layout helpers in `src/phxaccel/accel/phx_dcn_cursor.h`.
 
 ## Status
 
-- **Offline compile-verified** (`PhxAccel.kext` built cleanly against pinned
-  `MacKernelSDK`) and **CPU unit-tested** under ASan/UBSan.
-- **Not yet installed or hardware-validated on live Radeon 780M silicon.** Do
-  not claim live cursor rendering, latency, or glitch-free behavior until
-  explicitly tested on hardware.
+- **Offline compile-verified**, **CPU unit-tested** under ASan/UBSan, and
+  **live Radeon 780M hardware-tested** on macOS 26.7.2 (`25G332`) in native 2x
+  HiDPI zero-copy mode (`debug.phxfb_hwcursor` remains default-off `0` until
+  opted in).
+- Visual inspection of cursor pixels on the physical panel is performed by the
+  owner; automated verification confirms register programming, counters,
+  zero-copy coexistence, hot-toggle fallback, and zero faults/crashes.
 
 ## Design
 
@@ -64,3 +66,35 @@ pure-C++17 register/layout helpers in `src/phxaccel/accel/phx_dcn_cursor.h`.
   `make test-upstream34-panel-timing` (including `kIOHardwareCursorAttribute`),
   and `tests/test_build34_dcn_firmware_observer_candidate.py`.
 - Offline `src/phxaccel/build.sh` compile of `PhxAccel.kext`.
+
+## Live Radeon 780M hardware test, November 27, 2026
+
+- **Candidate**: `PhxAccel.kext` UUID `DD297165-F4C4-349E-B886-504B95617A4D`
+  (SHA-256 `30ad3ec5aba8d78e0aaf274a7020a87dd3e427c9b12d6db92909f5f107baa58f`),
+  AuxKC UUID `6EA2A13B-85B2-A931-F5B0-7C8E7B87ECAB` (SHA-256
+  `d4f77d901683e993962fe4c0f03bec13c39415591f0b8751698c57bfbc6ba01a`), built
+  from `3bc015862a0548db76ff5aab334aaf4d4e9ec93b` with pinned `MacKernelSDK`
+  (`3f750085caa17ec3a7880f11c11bf4f48cd6a164`). `PhxBringup` remained build34
+  (`2D6C39B3-1A0C-3E7F-979A-2821456A53B3`). Prior v10 `PhxAccel.kext` and AuxKC
+  backed up locally for rollback.
+- **Post-reboot baseline**: `1280x800` logical / `2560x1600` pixels / `120 Hz`
+  / `2x` (`make check-build34-scanout-mode`), `IOFBCursorInfo` published as
+  `128x128 32bpp` (104-byte descriptor), `debug.phxfb_zerocopy=1`,
+  `debug.phxfb_hwcursor=0`, `zc_faults=0`, `zc_fallbacks=0`.
+- **Opt-in activation and stress test (`debug.phxfb_hwcursor=1`)**:
+  - Exercised cursor shape transitions (`arrow`, `iBeam`, `crosshair`,
+    `pointingHand`, `openHand`, `closedHand`, `resizeLeftRight`,
+    `resizeUpDown`), screen corner/edge positions (`(0,0)`, `(1279,0)`,
+    `(0,799)`, `(1279,799)`), hide/unhide, and concurrent zero-copy flips.
+  - Counters advanced cleanly: `phxfb_hwcur_images=0 -> 41`,
+    `phxfb_hwcur_moves=0 -> 119`, `phxfb_zc_flips=506 -> 1178`
+    (`nvaccel_iop_flips=1178`, 100% zero-copy), `phxfb_hwcur_errors=0`,
+    `phxfb_zc_faults=0`, `phxfb_zc_fallbacks=0`, `phxfb_zc_tlb_flushes=3`
+    (unchanged), `nvaccel_iop_fail=0`.
+- **Runtime hot-toggle rollback and re-enable**:
+  - Setting `debug.phxfb_hwcursor=0` immediately froze hardware cursor counters
+    (`41` / `119`) with clean software-cursor fallback and zero errors.
+  - Re-enabling `debug.phxfb_hwcursor=1` resumed hardware cursor updates
+    (`41 -> 45` images, `119 -> 128` moves, `zc_flips=1483`, `0` errors/faults).
+  - `WindowServer` remained on PID `204` with zero new crash/spin reports in
+    `/Library/Logs/DiagnosticReports`.
