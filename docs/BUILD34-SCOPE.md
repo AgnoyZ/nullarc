@@ -512,3 +512,15 @@ requirements, authorize withdrawn build41/build42, or allow automatic
 deployment. It is authorization to perform the work, not evidence that this
 implementation is safe, correct, performant, or stable. Historical R3
 no-deployment notes above remain accurate for those separate experiments.
+
+## VCN video-decode authorization update, November 27, 2026
+
+The owner separately authorizes isolated manual installation/loading of a
+build34 VCN video-decode candidate and finite real-GPU decode validation on
+`upstream34/vram-layout-fix`. The authorization applies only after the VCN
+firmware provenance, startup/queue/completion path, resource lifetime, exact
+candidate admission and rollback plan are reviewed. It does not authorize
+build41/build42, automatic deployment, weakened build34 admission, bundling
+unreviewed firmware/provider binaries, or claims beyond measured decode
+evidence. Authorization is not evidence that the current implementation is
+loadable or functional; no VCN candidate deployment or GPU decode has yet run.

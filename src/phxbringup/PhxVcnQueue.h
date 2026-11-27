@@ -13,12 +13,13 @@ constexpr uint32_t kVmidMin = 8;
 constexpr uint32_t kVmidMax = 15;
 constexpr uint32_t kUnifiedSubmissionDwords = 11;
 constexpr uint32_t kUnifiedAlignDwords = 64;
-constexpr uint32_t kUnifiedSuffixDwords = kUnifiedAlignDwords - kUnifiedSubmissionDwords;
-constexpr uint32_t kUnifiedMaxSubmissionDwords = kUnifiedSubmissionDwords + kUnifiedSuffixDwords;
+constexpr uint32_t kUnifiedMaxSuffixDwords = kUnifiedAlignDwords - 1;
+constexpr uint32_t kUnifiedMaxSubmissionDwords = kUnifiedSubmissionDwords + kUnifiedMaxSuffixDwords;
 constexpr uint32_t kUnifiedRingReservedDwords = 1;
 constexpr uint32_t kVcn402UnifiedQueueFlag = 1u << 2;
 constexpr uint32_t kVcn402DrmKeyInjectFlag = 1u << 4;
 constexpr uint32_t kVcn402SmuDpmInterfaceFlag = 1u << 11;
+constexpr uint32_t kVcn402RingSetupFlag = 1u << 14;
 constexpr uint8_t kVcn402DrmKeyWorkaroundMethod = 2;
 
 struct Vcn402UnifiedQueueLayout {
@@ -73,10 +74,12 @@ struct Vcn402FirmwareSharedLayout {
 
 constexpr uint32_t kVcn402FwSharedSize = sizeof(Vcn402FirmwareSharedLayout);
 constexpr uint32_t kVcn402UnifiedQueueOffset = offsetof(Vcn402FirmwareSharedLayout, unified_queue);
+constexpr uint32_t kVcn402RingSetupOffset = offsetof(Vcn402FirmwareSharedLayout, ring_setup);
 constexpr uint32_t kVcn402SmuDpmInterfaceOffset = offsetof(Vcn402FirmwareSharedLayout, smu_interface);
 constexpr uint32_t kVcn402DrmKeyWorkaroundOffset = offsetof(Vcn402FirmwareSharedLayout, drm_key_workaround);
 static_assert(kVcn402FwSharedSize == 148);
 static_assert(kVcn402UnifiedQueueOffset == 16);
+static_assert(kVcn402RingSetupOffset == 68);
 static_assert(kVcn402SmuDpmInterfaceOffset == 120);
 static_assert(kVcn402DrmKeyWorkaroundOffset == 124);
 
@@ -98,6 +101,39 @@ inline bool encode_vcn402_fw_shared(uint8_t *output, uint32_t output_capacity_by
     return true;
 }
 
+inline void write_u32_le(uint8_t *output, uint32_t value) {
+    output[0] = static_cast<uint8_t>(value);
+    output[1] = static_cast<uint8_t>(value >> 8);
+    output[2] = static_cast<uint8_t>(value >> 16);
+    output[3] = static_cast<uint8_t>(value >> 24);
+}
+
+inline bool encode_vcn402_ring_setup(uint8_t *fw_shared,
+                                     uint32_t fw_shared_capacity_bytes,
+                                     uint64_t ring_gpu_va,
+                                     uint32_t ring_dw,
+                                     uint32_t rb_enabled_flags) {
+    constexpr uint32_t ring_alignment_bytes = kUnifiedAlignDwords * sizeof(uint32_t);
+    if (!fw_shared || fw_shared_capacity_bytes < kVcn402FwSharedSize || !rb_enabled_flags ||
+        (ring_gpu_va & (ring_alignment_bytes - 1)) || ring_dw < kUnifiedAlignDwords ||
+        (ring_dw & (ring_dw - 1)) || ring_gpu_va > UINT64_MAX - static_cast<uint64_t>(ring_dw) * sizeof(uint32_t))
+        return false;
+
+    uint32_t present_flags = static_cast<uint32_t>(fw_shared[0]) |
+                             (static_cast<uint32_t>(fw_shared[1]) << 8) |
+                             (static_cast<uint32_t>(fw_shared[2]) << 16) |
+                             (static_cast<uint32_t>(fw_shared[3]) << 24);
+    present_flags |= kVcn402RingSetupFlag;
+    write_u32_le(fw_shared, present_flags);
+
+    uint8_t *ring_setup = fw_shared + kVcn402RingSetupOffset;
+    write_u32_le(ring_setup, rb_enabled_flags);
+    write_u32_le(ring_setup + 4, static_cast<uint32_t>(ring_gpu_va));
+    write_u32_le(ring_setup + 8, static_cast<uint32_t>(ring_gpu_va >> 32));
+    write_u32_le(ring_setup + 12, ring_dw);
+    return true;
+}
+
 inline bool encode_unified_submission(uint32_t *output,
                                       uint32_t output_capacity_dw,
                                       uint64_t wptr_dw,
@@ -110,14 +146,18 @@ inline bool encode_unified_submission(uint32_t *output,
                                       uint32_t fence_sequence,
                                       uint32_t *output_dw,
                                       uint64_t *next_wptr_dw) {
-    if (!output || !output_dw || !next_wptr_dw || (wptr_dw & (kUnifiedAlignDwords - 1)) ||
-        ring_dw < kUnifiedAlignDwords ||
+    if (!output || !output_dw || !next_wptr_dw || ring_dw < kUnifiedAlignDwords ||
         (ring_dw & (ring_dw - 1)) || vmid < kVmidMin || vmid > kVmidMax || ib_dw == 0 ||
         ib_alignment < 4 || (ib_alignment & (ib_alignment - 1)) || (ib_gpu_va & (ib_alignment - 1)) ||
         (fence_gpu_va & 3) || ib_gpu_va > UINT64_MAX - (static_cast<uint64_t>(ib_dw) * 4 - 1))
         return false;
 
-    const uint32_t suffix_dw = kUnifiedSuffixDwords;
+    if (wptr_dw > UINT64_MAX - kUnifiedSubmissionDwords)
+        return false;
+    const uint32_t suffix_dw = static_cast<uint32_t>(
+        (kUnifiedAlignDwords - ((wptr_dw & (kUnifiedAlignDwords - 1)) + kUnifiedSubmissionDwords) %
+                                   kUnifiedAlignDwords) &
+        (kUnifiedAlignDwords - 1));
     const uint32_t total_dw = kUnifiedSubmissionDwords + suffix_dw;
     if (total_dw > output_capacity_dw || wptr_dw > UINT64_MAX - total_dw)
         return false;
@@ -154,8 +194,7 @@ inline bool place_unified_submission(uint32_t *ring,
                                      uint32_t fence_sequence,
                                      uint32_t *submitted_dw,
                                      uint64_t *next_wptr_dw) {
-    if (!ring || !submitted_dw || !next_wptr_dw || (wptr_dw & (kUnifiedAlignDwords - 1)) ||
-        ring_dw < kUnifiedMaxSubmissionDwords + kUnifiedRingReservedDwords ||
+    if (!ring || !submitted_dw || !next_wptr_dw || ring_dw < kUnifiedMaxSubmissionDwords + kUnifiedRingReservedDwords ||
         (ring_dw & (ring_dw - 1)) || wptr_dw < rptr_dw ||
         wptr_dw - rptr_dw > ring_dw - kUnifiedRingReservedDwords)
         return false;

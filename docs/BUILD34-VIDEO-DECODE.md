@@ -78,13 +78,15 @@ wrap, capacity exhaustion, and no-write-on-rejection.
 
 A further CPU-only helper encodes the zero-initialized VCN 4.0 shared structure
 used by the Linux v6.16 VCN4 implementation. It lays out the unified-queue,
-SMU DPM interface and VCN 4.0.2 DRM-key workaround fields at their reviewed
-offsets, with compile-time size/offset assertions, an explicit APU/dGPU
-selector and bounded output size. This is layout evidence only: it does not
-allocate or map the shared buffer, attest firmware provenance, run the VCN
-firmware initializer, write registers, or enable the queue. CPU tests validate
-the expected fields, zeroed reserved bytes, and refusal without writes when the
-output buffer is undersized.
+ring setup, SMU DPM interface and VCN 4.0.2 DRM-key workaround fields at their
+reviewed offsets, with compile-time size/offset assertions, an explicit
+APU/dGPU selector and bounded output size. Ring setup validates GPU-VA
+alignment, power-of-two ring size, capacity and address overflow before
+publishing the ring base/size and setup-present flag. This is layout evidence
+only: it does not allocate or map either buffer, attest firmware provenance,
+run the VCN firmware initializer, write registers, or enable the queue. CPU
+tests validate the expected fields, zeroed reserved bytes, invalid input
+no-write behavior, and refusal without writes when output storage is too small.
 
 These helpers are not connected to an adopted VCN queue and do not implement
 VCN VM flushes, firmware loading/validation, VCN startup and teardown, doorbell
@@ -111,7 +113,7 @@ tests do not load a provider, initialize Vulkan, submit GPU work, or test a
 VideoToolbox session. `test_rdna3_vcn_firmware` exercises synthetic valid and
 malformed container headers only; it does not consume a real firmware image.
 `test_phx_vcn_queue` exercises the standalone CPU encoder and shared-structure
-layout only; it does not adopt or submit a queue.
+and ring-setup layout only; it does not adopt or submit a queue.
 
 The next implementation gate is a reviewed Darwin VCN route: connect the
 exactly identified firmware through a provenance-reviewed load path, implement
@@ -119,6 +121,9 @@ VCN-specific unified-queue startup/submission/completion, and prove
 synchronization plus decoded-surface/DPB ownership. Separately obtain provider
 source and complete license/build provenance (or implement an independently
 auditable VideoToolbox provider against the exact RADV runtime), then confirm
-codec/profile support and the output-buffer contract. Do not install or
-auto-load a provider as part of this source-only change. Video decode GPU
-validation is not authorized by the separate zero-copy workstream scope.
+codec/profile support and the output-buffer contract. An isolated build34 VCN
+candidate installation/load and finite GPU decode validation have since been
+explicitly authorized in `BUILD34-SCOPE.md`; that authorization does not make
+the current incomplete path deployable, authorize automatic deployment, or
+count as decode evidence. No candidate has been installed or VCN decode task
+submitted in this step.
