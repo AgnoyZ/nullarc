@@ -162,6 +162,33 @@ was made. A later caller would still need to prove the final handoff point,
 immutable view lifetime, and same-boot binding to the independently checked
 Radeon physical interval before the result could be used as host evidence.
 
+### Handoff placement and guarded replay
+
+The pinned OpenCore [x86-64 worker](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcAfterBootCompatLib/X64/KernelSupport64.c#L90)
+invokes normal boot preparation before forwarding to the original call gate;
+it handles hibernate separately. Immediately after normal preparation, on
+the no-relocation path, is the first point in that worker after its known
+type restorations. It is only a candidate observation point: the original
+gate has not executed, and the worker may not run at all when its hook is
+disabled or absent. A version marker does not show that the physical boot
+used it. Do not enable boot quirks simply to reach it.
+
+The [relocation path](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcAfterBootCompatLib/RelocationBlock.c#L367)
+rebases the map address before the separate call gate moves the payload.
+The rebased address must not be read as though its destination already holds
+the map. Leave relocation and hibernate out of any first observation scope.
+
+The synthetic fixture seals the argument and map views in read-only pages
+with inaccessible guard pages. It observes an intentionally changed map
+type only after the simulated fixup, refuses the stale map view without
+reading it, then accepts the supplied immutable view after a modeled copy.
+This tests the actual classifier without writing the inputs. It does not
+execute OpenCore or demonstrate that a live observation preserves the call
+gate, paging state, boot timing, or kernel inputs. A real trial still needs
+evidence that the exact boot reaches the candidate point, a verified mapping
+with a stable lifetime, and a boot-bound result channel that does not change
+the memory map. No hook or output transport is implemented or installed.
+
 No file in the kernel build consumes this pool. Before wiring it to native BOs,
 obtain an explicit per-boot reservation from an owner that can prevent both
 host reuse and concurrent firmware or driver access. Check it against the

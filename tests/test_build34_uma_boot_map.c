@@ -1,8 +1,11 @@
+#define _DEFAULT_SOURCE
 #include "build34_uma_boot_map.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 enum { PAGE = 4096, STRIDE = 48, MAP_PHYS = 0x2000 };
 static const uint64_t candidate = UINT64_C(1) << 32;
@@ -148,11 +151,56 @@ static void test_shape_and_bound(void)
     assert(run(args, entries, sizeof(entries)) == PHX34_BOOT_MAP_REFUSED);
 }
 
+static void test_guarded_handoff_views(void)
+{
+    const long host_page = sysconf(_SC_PAGESIZE);
+    assert(host_page >= 4096);
+    const size_t page = (size_t)host_page;
+    uint8_t *guard = mmap(NULL, 7 * page, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    assert(guard != MAP_FAILED);
+    uint8_t *args_page = guard + page;
+    uint8_t *map_page = guard + 3 * page;
+    uint8_t *rebased_page = guard + 5 * page;
+    uint8_t *args = args_page + page - 4096;
+    uint8_t *entry = map_page + page - STRIDE;
+    uint8_t *rebased = rebased_page + page - STRIDE;
+
+    assert(mprotect(args_page, page, PROT_READ | PROT_WRITE) == 0);
+    assert(mprotect(map_page, page, PROT_READ | PROT_WRITE) == 0);
+    setup_args(args, MAP_PHYS, STRIDE, STRIDE);
+    descriptor(entry, 0, candidate, 2, 0);
+    assert(mprotect(args_page, page, PROT_READ) == 0);
+    assert(mprotect(map_page, page, PROT_READ) == 0);
+    assert(run(args, entry, STRIDE) == PHX34_BOOT_MAP_RESERVED_TYPE_ONLY);
+
+    assert(mprotect(map_page, page, PROT_READ | PROT_WRITE) == 0);
+    descriptor(entry, 7, candidate, 2, 0);
+    assert(mprotect(map_page, page, PROT_READ) == 0);
+    assert(run(args, entry, STRIDE) == PHX34_BOOT_MAP_HOST_USABLE_OVERLAP);
+
+    const uint64_t rebased_phys = MAP_PHYS - PAGE;
+    assert(mprotect(args_page, page, PROT_READ | PROT_WRITE) == 0);
+    store_le(args + 1032, 4, rebased_phys);
+    assert(mprotect(args_page, page, PROT_READ) == 0);
+    assert(mprotect(map_page, page, PROT_NONE) == 0);
+    assert(run(args, entry, STRIDE) == PHX34_BOOT_MAP_REFUSED);
+
+    assert(mprotect(map_page, page, PROT_READ) == 0);
+    assert(mprotect(rebased_page, page, PROT_READ | PROT_WRITE) == 0);
+    memcpy(rebased, entry, STRIDE);
+    assert(mprotect(map_page, page, PROT_NONE) == 0);
+    assert(mprotect(rebased_page, page, PROT_READ) == 0);
+    const struct phx34_boot_map_view final = {rebased, STRIDE, rebased_phys};
+    assert(phx34_classify_boot_map(args, 4096, final, candidate, 2 * PAGE) == PHX34_BOOT_MAP_HOST_USABLE_OVERLAP);
+    assert(munmap(guard, 7 * page) == 0);
+}
+
 int main(void)
 {
     test_classification();
     test_input_binding();
     test_shape_and_bound();
+    test_guarded_handoff_views();
     puts("PASS build34 UMA boot-args map classifier (synthetic inputs only)");
     return 0;
 }
