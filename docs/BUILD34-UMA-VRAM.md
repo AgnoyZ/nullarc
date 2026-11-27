@@ -106,6 +106,37 @@ tests feed synthetic descriptors only. No same-boot typed map or owner grant
 was obtained, and no PSP command, physical map, EFI change, or reboot was
 performed for this audit.
 
+### Current-boot memory-map availability
+
+On macOS 26.7.2 (25G332), `sysctl machdep.memmap` worked and reported about
+4206 MiB under `Reserved`. The pinned [XNU sysctl definitions](https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.1.9/bsd/dev/i386/sysctl.c#L817)
+expose byte counters by type, not descriptor addresses, order, or attributes.
+A reserved total close to 4096 MiB cannot establish any overlap with the
+Radeon's UMA. The inspected `/efi`, `/memory`, and `/chosen/memory-map` nodes
+did not publish the EFI descriptor fields checked here. A filtered current-boot
+kernel log query returned no `EFI region` lines or memory-region truncation
+warnings. The reference XNU per-region print is debug-only; zero matches
+prove neither completeness nor absence of a reservation. No raw registry or
+log records were retained.
+
+The pinned OpenCore 1.0.8 reference can change the map at two points: its
+[GetMemoryMap override](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcAfterBootCompatLib/ServiceOverrides.c#L575)
+can protect, split, merge, or retype descriptors, and its
+[normal-boot preparation](https://github.com/acidanthera/OpenCorePkg/blob/6fe4d15cb66596d99d8cfedce69d8fc6dad71886/Library/OcAfterBootCompatLib/KernelSupport.c#L326)
+can still restore descriptor types in `boot_args` at the kernel boundary.
+These are source capabilities, not a claim about which options ran on this
+boot. A standalone EFI application's earlier snapshot, even if complete, is
+not the final map handed to XNU.
+
+For a future authorized observation, first identify a non-perturbing way to
+classify the final `boot_args` descriptors after all loader fixups, bound to
+that boot and the same independently identified Radeon range. Do not add
+allocations, logging, or file writes between the final map acquisition and
+`ExitBootServices`. Export only a sanitized classification, and keep the
+host-side result separate from a firmware or driver grant for that interval.
+No suitable live source was found through the interfaces checked here; no
+capture candidate was prepared, and no EFI or boot setting was changed.
+
 No file in the kernel build consumes this pool. Before wiring it to native BOs,
 obtain an explicit per-boot reservation from an owner that can prevent both
 host reuse and concurrent firmware or driver access. Check it against the
