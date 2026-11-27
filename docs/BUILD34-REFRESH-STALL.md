@@ -62,7 +62,7 @@ and a separate 512 MiB GTT cap. The 4096 MiB property is not the allocator's
 available budget, and these heap sizes are not a measurement of free memory
 at the stall. The patch does not change any heap size or budget.
 
-## Desktop verification pending
+## Desktop verification
 
 At installation, WindowServer still mapped an older image. After the one
 owner-requested reboot on November 27, 2026 at 18:12:57 local time (UTC+8),
@@ -75,14 +75,30 @@ query contained plugin messages but found no matching failed descriptor
 allocations, skipped submissions, pool ceiling, Vulkan out-of-memory or
 IOSurface failure/timeout messages. There was no pending shutdown task.
 
-This verifies desktop loading and brief present progress, not the reported
-page-switch behavior. For the before/after comparison, use the same app and
-native 2x mode, switch between visually distinct pages with the keyboard, and
-hold the pointer still. Record
-the elapsed time until the whole page refreshes, then whether pointer movement
-only refreshes a small area. Compare the matching log intervals for allocation
-errors, skipped draws and IOSurface publication or upload errors. If the
-symptom persists without allocation errors, investigate IOSurface publication
-separately: a host-backed texture currently does not advance the surface seed
-in `nvmtlSurfaceOutDirtied:`. It is not yet known whether this affects compositor
-invalidation in the failing case. This change neither tests nor modifies it.
+### Bounded page-switch retest
+
+At 18:26:16-18:26:43 local time on the same boot, a nonactivating AppKit
+test panel alternated two visually distinct pages 48 times. The app drew
+all 48 page visits and passed all 48 window-onscreen metadata checks.
+The maximum request-to-app-draw delay was 9.27 ms. The sampled pointer
+position stayed unchanged. Display-copy and zero-copy flip counters each
+advanced by 55 on the same WindowServer; the four error counters stayed at
+zero. The matching filtered WindowServer log contained no descriptor or
+IOSurface failure, Vulkan memory error or skipped submission.
+
+Screen-capture preflight was false, so no display pixels were sampled and
+no screen-capture permission was requested or changed. App draw callbacks
+and window metadata do not establish what appeared on the physical panel.
+The test did not reproduce descriptor pressure and does not cover the
+original application or establish a fix for stale pixels.
+
+For a comparison in the affected app, keep native 2x mode, switch between
+visually distinct pages with the keyboard, and hold the pointer still.
+Record the elapsed time until the entire page refreshes and whether pointer
+movement refreshes only a small area. Compare the matching log intervals for
+allocation errors, skipped draws and IOSurface publication or upload errors.
+If the symptom persists without allocation errors, investigate IOSurface
+publication separately: a host-backed texture currently does not advance the
+surface seed in `nvmtlSurfaceOutDirtied:`. It is not yet known whether this
+affects compositor invalidation in the failing case. This change neither
+tests nor modifies it.
