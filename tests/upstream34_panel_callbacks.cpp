@@ -6,6 +6,7 @@
 #include <initializer_list>
 #include <vector>
 #include "accel/phx_panel_timing.h"
+#include "accel/phx_dcn_zerocopy.h"
 using IOReturn = int;
 using IODisplayModeID = uint32_t;
 using IOFixed1616 = uint32_t;
@@ -16,6 +17,7 @@ constexpr uint32_t kFramebufferSupportsGammaCorrection = 0x00040000, kDisplayMod
     kDisplayModeValidForHiResFlag = 0x00800000;
 constexpr uint32_t kIOFBRedGammaScaleAttribute = 'gslr', kIOFBGreenGammaScaleAttribute = 'gslg',
     kIOFBBlueGammaScaleAttribute = 'gslb', kIOWindowServerActiveAttribute = 'wsrv', kIOPowerAttribute = 'powr';
+constexpr uint32_t kIOHardwareCursorAttribute = 'crsr';
 constexpr uint32_t kIOFBNotifyDidPowerOn = 1, kIOFBNotifyWillPowerOff = 2;
 struct IODisplayModeInformation {
     uint32_t nominalWidth, nominalHeight, refreshRate, maxDepthIndex, flags;
@@ -113,6 +115,8 @@ struct IOFramebuffer {
 };
 struct Fixture {
     IOMemoryMap memory; MockPCI pci; MockPCI *fPCI = &pci;
+    IOMemoryMap *fMmio = nullptr;
+    bool fCurBufReady = false, fCurTripped = false;
     uint32_t fWidth = 2560, fHeight = 1600, fRefreshMilliHz = 60000, fHTotal = 0, fVTotal = 0;
     uint64_t fFrameNs = 16666667;
     phx::PanelTiming fPanelTiming = {};
@@ -350,6 +354,17 @@ int main() {
             check(gamma.getAttribute(attrs[ch], &val) == kIOReturnSuccess && val == custom[ch]);
         }
         check(gamma.getAttribute(kIOWindowServerActiveAttribute, &val) == kIOReturnSuccess && val == 1);
+        check(gamma.getAttribute(kIOHardwareCursorAttribute, &val) == kIOReturnSuccess && val == 0);
+        IOMemoryMap fullMmio;
+        fullMmio.length = phx::dcnzc::kMinMmioBytes;
+        gamma.fMmio = &fullMmio;
+        gamma.fCurBufReady = true;
+        check(gamma.getAttribute(kIOHardwareCursorAttribute, &val) == kIOReturnSuccess && val == 1);
+        gamma.fCurTripped = true;
+        check(gamma.getAttribute(kIOHardwareCursorAttribute, &val) == kIOReturnSuccess && val == 0);
+        gamma.fCurTripped = false;
+        fullMmio.length = phx::dcnzc::kMinMmioBytes - 4;
+        check(gamma.getAttribute(kIOHardwareCursorAttribute, &val) == kIOReturnSuccess && val == 0);
         check(gamma.getAttribute('unkn', &val) == kIOReturnUnsupported);
     }
     std::printf("actual refresh/timing/mode callbacks: %u CPU assertions passed\n", checks);

@@ -107,6 +107,8 @@ inline constexpr uint32_t kFirstVmid = 1u;
 inline constexpr uint32_t kContextFieldCount = 7u;
 inline constexpr uint32_t kAllSlotBits = (1u << kSlotCount) - 1u;
 inline constexpr uint32_t kMaxPages = 8192u; // 32 MiB scanout capacity (64 KiB flat page table)
+inline constexpr uint32_t kReservedCursorPages = 32u; // Top 128 KiB reserved for double-buffered 128x128 HW cursor
+inline constexpr uint32_t kMaxScanoutPages = kMaxPages - kReservedCursorPages;
 inline constexpr uint64_t kPageTableBytes = static_cast<uint64_t>(kMaxPages) * sizeof(uint64_t);
 inline constexpr uint64_t kSlotVaBase = 0x0000010000000000ull; // 1 TiB
 inline constexpr uint64_t kSlotVaStride = 0x0000000100000000ull; // 4 GiB per slot
@@ -228,7 +230,7 @@ inline bool validSurfaceRequest(uint32_t pixelFormat, uint32_t width, uint32_t h
     const uint64_t footprint = static_cast<uint64_t>(pitch) * static_cast<uint64_t>(height);
     const uint64_t alignedBytes = (footprint + kPageBytes - 1ull) & ~(kPageBytes - 1ull);
     const uint64_t pages = alignedBytes / kPageBytes;
-    if (!pages || pages > kMaxPages) return false;
+    if (!pages || pages > kMaxScanoutPages) return false;
     bytesOut = alignedBytes;
     pagesOut = static_cast<uint32_t>(pages);
     return true;

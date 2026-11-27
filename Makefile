@@ -13,6 +13,7 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_r3n_abi \
         $(TEST_BIN_DIR)/test_phx_topology \
         $(TEST_BIN_DIR)/test_phx_dcn_zerocopy \
+        $(TEST_BIN_DIR)/test_phx_dcn_cursor \
         $(TEST_BIN_DIR)/test_build34_dcn_page_layout \
         $(TEST_BIN_DIR)/test_build34_dcn_flip_readback \
         $(TEST_BIN_DIR)/test_nmplugin_video_decode_gate
@@ -29,6 +30,9 @@ $(TEST_BIN_DIR)/test_phx_topology: tests/test_phx_topology.cpp | $(TEST_BIN_DIR)
 
 $(TEST_BIN_DIR)/test_phx_dcn_zerocopy: tests/test_phx_dcn_zerocopy.cpp src/phxaccel/accel/phx_dcn_zerocopy.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $< -o $@
+
+$(TEST_BIN_DIR)/test_phx_dcn_cursor: tests/test_phx_dcn_cursor.cpp src/phxaccel/accel/phx_dcn_cursor.h src/phxaccel/accel/phx_dcn_zerocopy.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all $< -o $@
 
 $(TEST_BIN_DIR)/test_rdna3_discovery_uma: src/amd/rdna3_ip_discovery.cpp src/amd/rdna3_rebar_uma.cpp src/amd/rdna3_chip_profile.cpp tests/test_rdna3_discovery_uma.cpp | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@

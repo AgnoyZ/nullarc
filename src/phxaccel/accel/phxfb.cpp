@@ -28,6 +28,7 @@
 #include "../PhxHardwarePolicy.hpp"
 #include "phx_panel_timing.h"
 #include "phx_dcn_zerocopy.h"
+#include "phx_dcn_cursor.h"
 
 void phxAgdcInstall();   // phxagdc.cpp: the AppleGraphicsDeviceControl that reports this panel (debug.phxagdc)
 void phxAgdcRemove();
@@ -42,9 +43,12 @@ int gPhxZeroCopy = 0;
 static SInt64 gZcFlips, gZcFaults, gZcFallbacks, gZcReuses, gZcTlbFlushes, gZcPendingWaits;
 static int gZcLastStatus = 0;
 static unsigned int gZcLastFmt = 0;
+int gPhxHwCursor = 0;
+static SInt64 gCurImages, gCurMoves, gCurErrors;
 class PhxAMDFB;
 static PhxAMDFB *gPhxFbInstance = nullptr;
 static int phxfb_zerocopy_sysctl SYSCTL_HANDLER_ARGS;
+static int phxfb_hwcursor_sysctl SYSCTL_HANDLER_ARGS;
 SYSCTL_PROC(_debug, OID_AUTO, phxfb_zerocopy, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED, nullptr, 0,
             phxfb_zerocopy_sysctl, "I",
             "1 = allow opt-in DCN VMID flat-page-table scanout; 0 = immediate HOME return and CPU-copy fallback");
@@ -56,6 +60,12 @@ SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_tlb_flushes, CTLFLAG_RD | CTLFLAG_LOCKED,
 SYSCTL_QUAD(_debug, OID_AUTO, phxfb_zc_pending_waits, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcPendingWaits, "DCN zero-copy flips that waited for a prior flip to latch");
 SYSCTL_INT(_debug, OID_AUTO, phxfb_zc_last_status, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcLastStatus, 0, "last zero-copy flip status");
 SYSCTL_UINT(_debug, OID_AUTO, phxfb_zc_last_fmt, CTLFLAG_RD | CTLFLAG_LOCKED, &gZcLastFmt, 0, "last zero-copy request pixelFormat");
+SYSCTL_PROC(_debug, OID_AUTO, phxfb_hwcursor, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED, nullptr, 0,
+            phxfb_hwcursor_sysctl, "I",
+            "1 = enable opt-in DCN 3.1.4 hardware cursor while zero-copy is active; 0 = disable HW cursor (SW fallback)");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_hwcur_images, CTLFLAG_RD | CTLFLAG_LOCKED, &gCurImages, "DCN hardware cursor images programmed");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_hwcur_moves, CTLFLAG_RD | CTLFLAG_LOCKED, &gCurMoves, "DCN hardware cursor state updates");
+SYSCTL_QUAD(_debug, OID_AUTO, phxfb_hwcur_errors, CTLFLAG_RD | CTLFLAG_LOCKED, &gCurErrors, "DCN hardware cursor fallback or programming errors");
 
 // The VBL tick. XNU's timer coalescing moves a kernel deadline by up to an eighth of its delay, at most 1 ms, so a
 // 120 Hz tick could land anywhere in the first millisecond after the vblank it stands for. The system-critical urgency
@@ -88,6 +98,8 @@ static struct sysctl_oid *const kFbOids[] = { &sysctl__debug_phxfb_alias, &sysct
                                               &sysctl__debug_phxfb_zc_fallbacks, &sysctl__debug_phxfb_zc_reuses,
                                               &sysctl__debug_phxfb_zc_tlb_flushes, &sysctl__debug_phxfb_zc_pending_waits,
                                               &sysctl__debug_phxfb_zc_last_status, &sysctl__debug_phxfb_zc_last_fmt,
+                                              &sysctl__debug_phxfb_hwcursor, &sysctl__debug_phxfb_hwcur_images,
+                                              &sysctl__debug_phxfb_hwcur_moves, &sysctl__debug_phxfb_hwcur_errors,
                                               &sysctl__debug_phxfb_vbl_staged,
                                               &sysctl__debug_phxfb_vbl_n, &sysctl__debug_phxfb_vbl_late_us_sum,
                                               &sysctl__debug_phxfb_vbl_late_us_max };
@@ -146,6 +158,16 @@ class PhxAMDFB : public IOFramebuffer {
     uint32_t fZcVmidsConsumed = 0;
     int fZcFrontSlot = -1;
     bool fZcArmed = false, fZcTripped = false;
+    IOBufferMemoryDescriptor *fCurBuf = nullptr;
+    uint32_t *fCurKva = nullptr;
+    uint64_t fCurPtes[phx::dcncur::kCursorTotalPages]{};
+    uint32_t *fCurScratch = nullptr;
+    uint32_t fCurBufIdx = 0;
+    uint32_t fCurWidth = 0, fCurHeight = 0;
+    uint32_t fCurPitchPixels = 0, fCurHwPitch = 0, fCurLpc = 0;
+    int32_t fCurX = 0, fCurY = 0;
+    bool fCurBufReady = false;
+    bool fCurVisible = false, fCurHasImage = false, fCurHwEnabled = false, fCurTripped = false;
     bool fHiRes = false;
     static constexpr uint64_t kFrameNs = 16666667ull;   // 60 Hz, when the refresh cannot be measured
     uint64_t fFrameNs = kFrameNs;
@@ -293,8 +315,173 @@ class PhxAMDFB : public IOFramebuffer {
             zcWrite(phx::dcnzc::kRegHubpVmid0, (vmidReg & ~0xfu) | (vmid & 0xfu)) &&
             zcWrite(phx::dcnzc::kRegHubpPrimHi, static_cast<uint32_t>(address >> 32)) &&
             zcWrite(phx::dcnzc::kRegHubpPrimLo, static_cast<uint32_t>(address));
+        if (ok) curSyncInOtgLock(vmid);
         const bool unlocked = zcLockOtg(false);
         return ok && unlocked;
+    }
+
+    void curFlushSlot(uint32_t bufIdx) {
+        uint8_t *base = reinterpret_cast<uint8_t *>(fCurKva) +
+            static_cast<uint64_t>(bufIdx % phx::dcncur::kCursorBufferCount) * phx::dcncur::kCursorSlotBytes;
+        for (uint64_t offset = 0; offset < phx::dcncur::kCursorSlotBytes; offset += 64)
+            __asm__ __volatile__("clflush (%0)" :: "r"(base + offset) : "memory");
+        __asm__ __volatile__("mfence" ::: "memory");
+    }
+
+    void curInitBuffer() {
+        if (fCurBuf || !fMmio || fMmio->getLength() < phx::dcnzc::kMinMmioBytes) return;
+        IOBufferMemoryDescriptor *buffer = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+            kernel_task, kIODirectionInOut | kIOMemoryPhysicallyContiguous,
+            phx::dcncur::kCursorTotalBytes, phx::dcnzc::kPhysPageMask);
+        if (!buffer || buffer->prepare() != kIOReturnSuccess) {
+            OSSafeReleaseNULL(buffer);
+            return;
+        }
+        uint32_t *kva = static_cast<uint32_t *>(buffer->getBytesNoCopy());
+        if (!kva) {
+            buffer->complete();
+            buffer->release();
+            return;
+        }
+        bool pagesOk = true;
+        for (uint32_t page = 0; page < phx::dcncur::kCursorTotalPages; ++page) {
+            IOByteCount segLen = 0;
+            const uint64_t phys = buffer->getPhysicalSegment(
+                static_cast<uint64_t>(page) * phx::dcnzc::kPageBytes, &segLen, kIOMemoryMapperNone);
+            uint64_t pte = 0;
+            if (segLen < phx::dcnzc::kPageBytes || !phx::dcnzc::encodeLeafPte(phys, pte)) {
+                pagesOk = false;
+                break;
+            }
+            fCurPtes[page] = pte;
+        }
+        if (!pagesOk) {
+            bzero(fCurPtes, sizeof(fCurPtes));
+            buffer->complete();
+            buffer->release();
+            return;
+        }
+        uint32_t *scratch = static_cast<uint32_t *>(IOMalloc(phx::dcncur::kCursorSlotBytes));
+        if (!scratch) {
+            bzero(fCurPtes, sizeof(fCurPtes));
+            buffer->complete();
+            buffer->release();
+            return;
+        }
+        fCurBuf = buffer;
+        fCurKva = kva;
+        fCurScratch = scratch;
+        bzero(fCurKva, phx::dcncur::kCursorTotalBytes);
+        curFlushSlot(0);
+        curFlushSlot(1);
+        fCurBufReady = true;
+    }
+
+    void curFreeBuffer() {
+        fCurBufReady = false;
+        fCurHasImage = false;
+        fCurHwEnabled = false;
+        if (fCurScratch) {
+            IOFree(fCurScratch, phx::dcncur::kCursorSlotBytes);
+            fCurScratch = nullptr;
+        }
+        if (fCurBuf) {
+            fCurBuf->complete();
+            fCurBuf->release();
+            fCurBuf = nullptr;
+        }
+        fCurKva = nullptr;
+        bzero(fCurPtes, sizeof(fCurPtes));
+    }
+
+    void curWriteDisabledInLock() {
+        using namespace phx::dcncur;
+        const uint32_t ctl = zcRead(kRegCursorControl);
+        if (ctl != UINT32_MAX && (ctl & kCurCtlEnable))
+            (void)zcWrite(kRegCursorControl, ctl & ~kCurCtlEnable);
+        const uint32_t cnvc = zcRead(kRegCnvcCur0Control);
+        if (cnvc != UINT32_MAX && (cnvc & kCnvcCur0Enable))
+            (void)zcWrite(kRegCnvcCur0Control, cnvc & ~kCnvcCur0Enable);
+        fCurHwEnabled = false;
+    }
+
+    void curProgramActiveInLock(uint32_t slotIndex, uint32_t bufIdx) {
+        using namespace phx::dcncur;
+        const uint32_t pixelClkKhz = fPanelTimingValid ? static_cast<uint32_t>(fPanelTiming.pixelClock / 1000ull) : 0u;
+        const PositionRegs pos = computeCursorPosition(
+            fCurX, fCurY, fCurVisible, fCurWidth, fCurHeight, fWidth, fHeight, 100000u, pixelClkKhz);
+        const uint32_t pwr = zcRead(kRegCursorMemPwrCtrl);
+        if (pwr != UINT32_MAX && (pwr & kCurMemPwrForceMask))
+            (void)zcWrite(kRegCursorMemPwrCtrl, pwr & ~kCurMemPwrForceMask);
+        const uint64_t va = cursorVaForSlot(slotIndex, bufIdx);
+        const uint32_t priorCtl = zcRead(kRegCursorControl);
+        const uint32_t priorCnvc = zcRead(kRegCnvcCur0Control);
+        if (priorCtl == UINT32_MAX || priorCnvc == UINT32_MAX) {
+            fCurTripped = true;
+            OSAddAtomic64(1, &gCurErrors);
+            curWriteDisabledInLock();
+            return;
+        }
+        bool ok = true;
+        ok &= zcWrite(kRegCursorSurfAddrHi, static_cast<uint32_t>(va >> 32));
+        ok &= zcWrite(kRegCursorSurfAddrLo, static_cast<uint32_t>(va));
+        ok &= zcWrite(kRegCursorSize, encodeCursorSize(fCurWidth, fCurHeight));
+        ok &= zcWrite(kRegCursorSettings, kCurSettingsChunkHdlAdjust);
+        if (pos.visible) {
+            ok &= zcWrite(kRegCursorPosition, pos.positionReg);
+            ok &= zcWrite(kRegCursorHotSpot, pos.hotSpotReg);
+            ok &= zcWrite(kRegCursorDstOffset, pos.dstOffsetReg);
+        }
+        ok &= zcWrite(kRegCursorControl, encodeCursorControl(
+            priorCtl, pos.visible, kCursorModeColorUnPreMultAlpha, fCurHwPitch, fCurLpc));
+        ok &= zcWrite(kRegCnvcCur0Control, encodeCnvcCursorControl(
+            priorCnvc, pos.visible, kCursorModeColorUnPreMultAlpha));
+        if (!ok) {
+            fCurTripped = true;
+            OSAddAtomic64(1, &gCurErrors);
+            curWriteDisabledInLock();
+            return;
+        }
+        fCurHwEnabled = pos.visible;
+    }
+
+    void curSyncInOtgLock(uint32_t vmid) {
+        if (vmid >= phx::dcnzc::kFirstVmid &&
+            vmid < phx::dcnzc::kFirstVmid + phx::dcnzc::kSlotCount &&
+            fCurBufReady && fCurHasImage && !fCurTripped &&
+            __atomic_load_n(&gPhxHwCursor, __ATOMIC_ACQUIRE)) {
+            curProgramActiveInLock(vmid - phx::dcnzc::kFirstVmid, fCurBufIdx);
+        } else if (fCurHwEnabled) {
+            curWriteDisabledInLock();
+        }
+    }
+
+    void curDisableLocked() {
+        if (!fMmio || fMmio->getLength() < phx::dcnzc::kMinMmioBytes) {
+            fCurHwEnabled = false;
+            return;
+        }
+        if (!fCurHwEnabled) {
+            const uint32_t ctl = zcRead(phx::dcncur::kRegCursorControl);
+            const uint32_t cnvc = zcRead(phx::dcncur::kRegCnvcCur0Control);
+            if ((ctl == UINT32_MAX || !(ctl & phx::dcncur::kCurCtlEnable)) &&
+                (cnvc == UINT32_MAX || !(cnvc & phx::dcncur::kCnvcCur0Enable)))
+                return;
+        }
+        if (zcLockOtg(true)) {
+            curWriteDisabledInLock();
+            (void)zcLockOtg(false);
+        } else {
+            curWriteDisabledInLock();
+        }
+    }
+
+    void curDisableImmediate() {
+        if (!fZcLock) return;
+        IOLockLock(fZcLock);
+        fCurHasImage = false;
+        curDisableLocked();
+        IOLockUnlock(fZcLock);
     }
 
     bool zcWaitLatched(uint32_t vmid, uint64_t address, uint32_t timeoutMs) {
@@ -488,6 +675,7 @@ class PhxAMDFB : public IOFramebuffer {
 
     IOReturn zcHomeLocked(bool teardownAll) {
         if (!fZcArmed) return kIOReturnSuccess;
+        curDisableLocked();
         const uint32_t fault = zcRead(phx::dcnzc::kRegVmFaultStatus);
         if ((fault == UINT32_MAX || (fault & 0xffffu) != 0) && !fZcTripped) {
             fZcTripped = true;
@@ -678,6 +866,11 @@ class PhxAMDFB : public IOFramebuffer {
             }
             slot.pageTableKva[page] = pte;
         }
+        const uint32_t contextPages = fCurBufReady ? phx::dcnzc::kMaxPages : pageCount;
+        if (fCurBufReady) {
+            for (uint32_t curPage = 0; curPage < phx::dcncur::kCursorTotalPages; ++curPage)
+                slot.pageTableKva[phx::dcncur::kCursorPageStart + curPage] = fCurPtes[curPage];
+        }
         zcFlushTable(slot);
         const uint32_t vmid = phx::dcnzc::kFirstVmid + static_cast<uint32_t>(selected);
         slot.surface = surface;
@@ -685,7 +878,7 @@ class PhxAMDFB : public IOFramebuffer {
         slot.surfaceID = request->surfaceID;
         slot.pixelFormat = request->pixelFormat;
         slot.prepared = true;
-        if (!zcProgramContext(vmid, phx::dcnzc::slotVa(static_cast<uint32_t>(selected)), pageCount,
+        if (!zcProgramContext(vmid, phx::dcnzc::slotVa(static_cast<uint32_t>(selected)), contextPages,
                               slot.pageTablePhys, slot)) {
             if (slot.contextOwned && zcClearContext(vmid, slot)) {
                 zcReleaseSurface(slot);
@@ -1117,7 +1310,10 @@ public:
         return backlightWrite(level);
     }
     void displayPower(bool on) {
-        if (!on) (void)zcHome(true);
+        if (!on) {
+            curDisableImmediate();
+            (void)zcHome(true);
+        }
         if (!fBacklight || on != fBlDark) return;
         if (!on && !(backlightRead(&fBlSaved) && backlightWrite(0))) return;
         fBlDark = !on;
@@ -1149,6 +1345,7 @@ public:
     bool start(IOService *provider) override;
     void stop(IOService *provider) override;
     IOReturn zcDisableImmediate() { return zcHome(true); }
+    void hwCursorDisableImmediate() { curDisableImmediate(); }
     IOReturn enableController() override { return kIOReturnSuccess; }
     bool isConsoleDevice() override { return !fBeside; }
     IODeviceMemory *getApertureRange(IOPixelAperture aperture) override {
@@ -1233,7 +1430,10 @@ public:
     // power and connection answers as NullMoth's NMIntelFB/NVRMFB give them: acknowledge at once, never queue on the
     // controller thread (a base-class power change waited 45 s for an acknowledge and froze WindowServer restarts)
     IOReturn setPowerState(unsigned long ordinal, IOService *) override {
-        if (ordinal == 0) (void)zcHome(true);
+        if (ordinal == 0) {
+            curDisableImmediate();
+            (void)zcHome(true);
+        }
         handleEvent(ordinal ? kIOFBNotifyDidPowerOn : kIOFBNotifyWillPowerOff);
         return kIOPMAckImplied;
     }
@@ -1258,6 +1458,11 @@ public:
         return IOFramebuffer::setAttribute(attribute, value);
     }
     IOReturn getAttribute(IOSelect attribute, uintptr_t *value) override {
+        if (attribute == kIOHardwareCursorAttribute) {
+            if (value) *value = (fCurBufReady && fMmio && fMmio->getLength() >= phx::dcnzc::kMinMmioBytes &&
+                                 !fCurTripped) ? 1u : 0u;
+            return kIOReturnSuccess;
+        }
         if (attribute == kIOFBRedGammaScaleAttribute || attribute == kIOFBGreenGammaScaleAttribute ||
             attribute == kIOFBBlueGammaScaleAttribute) {
             const unsigned channel = attribute == kIOFBRedGammaScaleAttribute ? 0 :
@@ -1267,6 +1472,162 @@ public:
         }
         if (attribute == kIOWindowServerActiveAttribute) { if (value) *value = 1; return kIOReturnSuccess; }
         return IOFramebuffer::getAttribute(attribute, value);
+    }
+    IOReturn setCursorImage(void *cursorImage) override {
+        if (!fZcLock) return kIOReturnUnsupported;
+        if (!cursorImage || !__atomic_load_n(&gPhxHwCursor, __ATOMIC_ACQUIRE) ||
+            fCurTripped || fStopping || !fCurBufReady || !fCurScratch) {
+            IOLockLock(fZcLock);
+            fCurHasImage = false;
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnUnsupported;
+        }
+        IOLockLock(fZcLock);
+        const bool zcActive = fZcArmed && !fZcTripped && fZcFrontSlot >= 0 &&
+            fZcFrontSlot < static_cast<int>(phx::dcnzc::kSlotCount);
+        if (!zcActive) {
+            fCurHasImage = false;
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnUnsupported;
+        }
+        IOLockUnlock(fZcLock);
+
+        IOHardwareCursorDescriptor desc;
+        bzero(&desc, sizeof(desc));
+        desc.majorVersion = kHardwareCursorDescriptorMajorVersion;
+        desc.minorVersion = kHardwareCursorDescriptorMinorVersion;
+        desc.height = phx::dcncur::kMaxCursorDim;
+        desc.width = phx::dcncur::kMaxCursorDim;
+        desc.bitDepth = 32;
+        desc.numColors = 0;
+        desc.flags = 0;
+        desc.supportedSpecialEncodings = 0;
+
+        IOHardwareCursorInfo info;
+        bzero(&info, sizeof(info));
+        info.majorVersion = kHardwareCursorInfoMajorVersion;
+        info.minorVersion = kHardwareCursorInfoMinorVersion;
+        info.hardwareCursorData = reinterpret_cast<UInt8 *>(fCurScratch);
+        if (!convertCursorImage(cursorImage, &desc, &info)) {
+            OSAddAtomic64(1, &gCurErrors);
+            IOLockLock(fZcLock);
+            fCurHasImage = false;
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnUnsupported;
+        }
+        uint32_t pitchPixels = 0, hwPitch = 0, lpc = 0;
+        if (!phx::dcncur::selectCursorPitch(info.cursorWidth, pitchPixels, hwPitch) ||
+            !phx::dcncur::selectLinesPerChunk32bpp(info.cursorWidth, lpc) ||
+            info.cursorHeight == 0 || info.cursorHeight > phx::dcncur::kMaxCursorDim) {
+            OSAddAtomic64(1, &gCurErrors);
+            IOLockLock(fZcLock);
+            fCurHasImage = false;
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnUnsupported;
+        }
+
+        IOLockLock(fZcLock);
+        if (!__atomic_load_n(&gPhxHwCursor, __ATOMIC_ACQUIRE) || fCurTripped || fStopping ||
+            !fCurBufReady || !fZcArmed || fZcTripped || fZcFrontSlot < 0 ||
+            fZcFrontSlot >= static_cast<int>(phx::dcnzc::kSlotCount)) {
+            fCurHasImage = false;
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnUnsupported;
+        }
+        const uint32_t nextBuf = fCurBufIdx ^ 1u;
+        uint32_t *dst = fCurKva + static_cast<uint64_t>(nextBuf) *
+            (phx::dcncur::kCursorSlotBytes / sizeof(uint32_t));
+        if (!phx::dcncur::repackCursorImage32(
+                fCurScratch, info.cursorWidth, info.cursorHeight,
+                dst, pitchPixels, phx::dcncur::kCursorSlotBytes / sizeof(uint32_t))) {
+            OSAddAtomic64(1, &gCurErrors);
+            fCurHasImage = false;
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnUnsupported;
+        }
+        curFlushSlot(nextBuf);
+        fCurBufIdx = nextBuf;
+        fCurWidth = info.cursorWidth;
+        fCurHeight = info.cursorHeight;
+        fCurPitchPixels = pitchPixels;
+        fCurHwPitch = hwPitch;
+        fCurLpc = lpc;
+        fCurHasImage = true;
+        if (!zcLockOtg(true)) {
+            OSAddAtomic64(1, &gCurErrors);
+            fCurHasImage = false;
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnUnsupported;
+        }
+        curProgramActiveInLock(static_cast<uint32_t>(fZcFrontSlot), fCurBufIdx);
+        const bool unlocked = zcLockOtg(false);
+        const bool ok = unlocked && !fCurTripped;
+        if (!ok) {
+            fCurHasImage = false;
+            curDisableLocked();
+        }
+        IOLockUnlock(fZcLock);
+        if (!ok) {
+            OSAddAtomic64(1, &gCurErrors);
+            return kIOReturnUnsupported;
+        }
+        OSAddAtomic64(1, &gCurImages);
+        return kIOReturnSuccess;
+    }
+    IOReturn setCursorState(SInt32 x, SInt32 y, bool visible) override {
+        if (!fZcLock) return kIOReturnSuccess;
+        IOLockLock(fZcLock);
+        fCurX = x;
+        fCurY = y;
+        fCurVisible = visible;
+        if (!__atomic_load_n(&gPhxHwCursor, __ATOMIC_ACQUIRE) || fCurTripped || fStopping ||
+            !fCurBufReady || !fCurHasImage || !fZcArmed || fZcTripped || fZcFrontSlot < 0 ||
+            fZcFrontSlot >= static_cast<int>(phx::dcnzc::kSlotCount)) {
+            curDisableLocked();
+            IOLockUnlock(fZcLock);
+            return kIOReturnSuccess;
+        }
+        using namespace phx::dcncur;
+        const uint32_t pixelClkKhz = fPanelTimingValid ? static_cast<uint32_t>(fPanelTiming.pixelClock / 1000ull) : 0u;
+        const PositionRegs pos = computeCursorPosition(
+            fCurX, fCurY, fCurVisible, fCurWidth, fCurHeight, fWidth, fHeight, 100000u, pixelClkKhz);
+        if (!zcLockOtg(true)) {
+            OSAddAtomic64(1, &gCurErrors);
+            IOLockUnlock(fZcLock);
+            return kIOReturnSuccess;
+        }
+        const uint32_t priorCtl = zcRead(kRegCursorControl);
+        const uint32_t priorCnvc = zcRead(kRegCnvcCur0Control);
+        bool ok = priorCtl != UINT32_MAX && priorCnvc != UINT32_MAX;
+        if (ok && pos.visible) {
+            ok &= zcWrite(kRegCursorPosition, pos.positionReg);
+            ok &= zcWrite(kRegCursorHotSpot, pos.hotSpotReg);
+            ok &= zcWrite(kRegCursorDstOffset, pos.dstOffsetReg);
+        }
+        if (ok) {
+            ok &= zcWrite(kRegCursorControl, encodeCursorControl(
+                priorCtl, pos.visible, kCursorModeColorUnPreMultAlpha, fCurHwPitch, fCurLpc));
+            ok &= zcWrite(kRegCnvcCur0Control, encodeCnvcCursorControl(
+                priorCnvc, pos.visible, kCursorModeColorUnPreMultAlpha));
+        }
+        if (ok) {
+            fCurHwEnabled = pos.visible;
+        } else {
+            fCurTripped = true;
+            OSAddAtomic64(1, &gCurErrors);
+            curWriteDisabledInLock();
+        }
+        (void)zcLockOtg(false);
+        IOLockUnlock(fZcLock);
+        if (ok) OSAddAtomic64(1, &gCurMoves);
+        return kIOReturnSuccess;
     }
     IOReturn setAttributeForConnection(IOIndex idx, IOSelect attribute, uintptr_t value) override {
         trace("conn", attribute, value);
@@ -1565,7 +1926,12 @@ bool PhxAMDFB::start(IOService *provider)
         if (fBacklight) { fBacklight->detach(this); OSSafeReleaseNULL(fBacklight); }
         OSSafeReleaseNULL(fMmio); OSSafeReleaseNULL(fSurfMap); return false;
     }
+    uint32_t hwCurArg = 0;
+    if (PE_parse_boot_argn("phxfbhwcursor", &hwCurArg, sizeof hwCurArg) && hwCurArg == 1)
+        __atomic_store_n(&gPhxHwCursor, 1, __ATOMIC_RELEASE);
+    curInitBuffer();
     if (!IOFramebuffer::start(provider)) {
+        curFreeBuffer();
         if (fBacklight) { fBacklight->detach(this); OSSafeReleaseNULL(fBacklight); }
         IOLockFree(fZcLock); fZcLock = nullptr;
         OSSafeReleaseNULL(fMmio); OSSafeReleaseNULL(fSurfMap); return false; }
@@ -1614,8 +1980,12 @@ void PhxAMDFB::stop(IOService *provider)
 {
     __atomic_store_n(&fStopping, true, __ATOMIC_RELEASE);
     __atomic_store_n(&gPhxFbInstance, nullptr, __ATOMIC_RELEASE);
+    curDisableImmediate();
     const IOReturn zcHomeResult = zcHome(true);
-    if (zcHomeResult == kIOReturnSuccess) zcCleanupPageTables();
+    if (zcHomeResult == kIOReturnSuccess) {
+        zcCleanupPageTables();
+        curFreeBuffer();
+    }
     if (fVblWorkLoop) {
         fVblWorkLoop->runAction(vblRetire, this);
         OSSafeReleaseNULL(fVblTimer);
@@ -1644,6 +2014,20 @@ static int phxfb_zerocopy_sysctl SYSCTL_HANDLER_ARGS
     if (!normalized) {
         if (PhxAMDFB *fb = __atomic_load_n(&gPhxFbInstance, __ATOMIC_ACQUIRE))
             (void)fb->zcDisableImmediate();
+    }
+    return 0;
+}
+
+static int phxfb_hwcursor_sysctl SYSCTL_HANDLER_ARGS
+{
+    int value = __atomic_load_n(&gPhxHwCursor, __ATOMIC_ACQUIRE);
+    const int error = sysctl_handle_int(oidp, &value, 0, req);
+    if (error || !req->newptr) return error;
+    const int normalized = value ? 1 : 0;
+    __atomic_store_n(&gPhxHwCursor, normalized, __ATOMIC_RELEASE);
+    if (!normalized) {
+        if (PhxAMDFB *fb = __atomic_load_n(&gPhxFbInstance, __ATOMIC_ACQUIRE))
+            fb->hwCursorDisableImmediate();
     }
     return 0;
 }
