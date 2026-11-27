@@ -63,6 +63,33 @@ cover valid and malformed metadata only. It neither validates firmware
 provenance or CRC nor stages, loads, or executes the image. Firmware must not be
 bundled or installed by this parser.
 
+The current source-only step also adds a standalone VCN unified-ring encoder
+for the `IB`, `FENCE`, `TRAP`, and `END` frame plus 64-dword ring alignment.
+`place_unified_submission` checks ring geometry and free capacity before
+writing, including wrap at the ring boundary. Both command frame start and
+resulting write pointer are aligned to the VCN ring's `align_mask = 0x3f`
+(64 dwords / 256 bytes); ring capacity is kept in dwords and one sentinel
+dword remains unused. The command values/layout follow the Linux v6.16 VCN
+encoder-ring ABI
+(`amdgpu_vcn.h`, `vcn_v2_0_enc_ring_emit_ib`,
+`vcn_v2_0_enc_ring_emit_fence`, and `amdgpu_ring_alloc`); no Linux driver
+implementation was copied. CPU tests exercise encoding, alignment, validation,
+wrap, capacity exhaustion, and no-write-on-rejection.
+
+A further CPU-only helper encodes the zero-initialized VCN 4.0 shared structure
+used by the Linux v6.16 VCN4 implementation. It lays out the unified-queue,
+SMU DPM interface and VCN 4.0.2 DRM-key workaround fields at their reviewed
+offsets, with compile-time size/offset assertions, an explicit APU/dGPU
+selector and bounded output size. This is layout evidence only: it does not
+allocate or map the shared buffer, attest firmware provenance, run the VCN
+firmware initializer, write registers, or enable the queue. CPU tests validate
+the expected fields, zeroed reserved bytes, and refusal without writes when the
+output buffer is undersized.
+
+These helpers are not connected to an adopted VCN queue and do not implement
+VCN VM flushes, firmware loading/validation, VCN startup and teardown, doorbell
+routing, interrupt/fence retirement, or Vulkan decoded-picture/DPB ownership.
+
 The pinned Mesa transport currently rejects non-GFX/compute IP submissions in
 the exact-completion path, and the PhxBringup queue owner exposes only GFX and
 compute rings. The Linux VCN 4.x reference uses a VCN unified queue; queue
@@ -83,6 +110,8 @@ actual initialized capability-array declaration as a CPU-only check. These
 tests do not load a provider, initialize Vulkan, submit GPU work, or test a
 VideoToolbox session. `test_rdna3_vcn_firmware` exercises synthetic valid and
 malformed container headers only; it does not consume a real firmware image.
+`test_phx_vcn_queue` exercises the standalone CPU encoder and shared-structure
+layout only; it does not adopt or submit a queue.
 
 The next implementation gate is a reviewed Darwin VCN route: connect the
 exactly identified firmware through a provenance-reviewed load path, implement

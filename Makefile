@@ -7,6 +7,7 @@ INCLUDES = -Isrc -Isrc/amd -Isrc/uapi -Isrc/winsys
 TEST_BIN_DIR = build/tests
 TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_rdna3_vcn_firmware \
+        $(TEST_BIN_DIR)/test_phx_vcn_queue \
         $(TEST_BIN_DIR)/test_rdna3_ip_dcn \
         $(TEST_BIN_DIR)/test_rdna3_ucode \
         $(TEST_BIN_DIR)/test_r3n_abi \
@@ -34,6 +35,9 @@ $(TEST_BIN_DIR)/test_rdna3_discovery_uma: src/amd/rdna3_ip_discovery.cpp src/amd
 
 $(TEST_BIN_DIR)/test_rdna3_vcn_firmware: src/amd/rdna3_vcn_firmware.cpp src/amd/rdna3_vcn_firmware.h src/amd/rdna3_chip_profile.h tests/test_rdna3_vcn_firmware.cpp | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) src/amd/rdna3_vcn_firmware.cpp tests/test_rdna3_vcn_firmware.cpp -o $@
+
+$(TEST_BIN_DIR)/test_phx_vcn_queue: tests/test_phx_vcn_queue.cpp src/phxbringup/PhxVcnQueue.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $< -o $@
 
 $(TEST_BIN_DIR)/test_rdna3_ip_dcn: src/amd/rdna3_ip_blocks.cpp src/amd/rdna3_dcn314_scanout.cpp src/amd/rdna3_rebar_uma.cpp tests/test_rdna3_ip_dcn.cpp | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@
