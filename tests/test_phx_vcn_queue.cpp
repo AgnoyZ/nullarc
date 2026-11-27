@@ -59,38 +59,27 @@ int main() {
     for (uint8_t value : fw_shared)
         assert(value == 0x5a);
 
-    assert(encode_vcn402_fw_shared(fw_shared, sizeof(fw_shared), true));
-    constexpr uint64_t ring_gpu_va = 0x1234567800010000ull;
-    constexpr uint32_t ring_dw = 1024;
-    constexpr uint32_t rb_enabled_flags = 1;
-    assert(encode_vcn402_ring_setup(fw_shared, sizeof(fw_shared), ring_gpu_va, ring_dw, rb_enabled_flags));
-    assert(fw_shared[0] == 0x14);
-    assert(fw_shared[1] == 0x48);
-    assert(fw_shared[kVcn402RingSetupOffset] == rb_enabled_flags);
-    assert(fw_shared[kVcn402RingSetupOffset + 1] == 0);
-    assert(fw_shared[kVcn402RingSetupOffset + 4] == 0x00);
-    assert(fw_shared[kVcn402RingSetupOffset + 5] == 0x00);
-    assert(fw_shared[kVcn402RingSetupOffset + 6] == 0x01);
-    assert(fw_shared[kVcn402RingSetupOffset + 7] == 0x00);
-    assert(fw_shared[kVcn402RingSetupOffset + 8] == 0x78);
-    assert(fw_shared[kVcn402RingSetupOffset + 9] == 0x56);
-    assert(fw_shared[kVcn402RingSetupOffset + 10] == 0x34);
-    assert(fw_shared[kVcn402RingSetupOffset + 11] == 0x12);
-    assert(fw_shared[kVcn402RingSetupOffset + 12] == 0x00);
-    assert(fw_shared[kVcn402RingSetupOffset + 13] == 0x04);
-    assert(fw_shared[kVcn402RingSetupOffset + 14] == 0x00);
-    assert(fw_shared[kVcn402RingSetupOffset + 15] == 0x00);
-
-    uint8_t unchanged_shared[kVcn402FwSharedSize];
-    for (uint32_t index = 0; index < sizeof(fw_shared); ++index)
-        unchanged_shared[index] = fw_shared[index];
-    assert(!encode_vcn402_ring_setup(fw_shared, sizeof(fw_shared) - 1, ring_gpu_va, ring_dw, rb_enabled_flags));
-    assert(!encode_vcn402_ring_setup(fw_shared, sizeof(fw_shared), ring_gpu_va + 4, ring_dw, rb_enabled_flags));
-    assert(!encode_vcn402_ring_setup(fw_shared, sizeof(fw_shared), ring_gpu_va, ring_dw, 0));
-    assert(!encode_vcn402_ring_setup(fw_shared, sizeof(fw_shared), ring_gpu_va, 63, rb_enabled_flags));
-    assert(!encode_vcn402_ring_setup(fw_shared, sizeof(fw_shared), UINT64_MAX - 255, ring_dw, rb_enabled_flags));
-    for (uint32_t index = 0; index < sizeof(fw_shared); ++index)
-        assert(fw_shared[index] == unchanged_shared[index]);
+    uint32_t reg_wait[4] = {0xfeedface, 0xfeedface, 0xfeedface, 0xfeedface};
+    uint32_t reg_wait_dw = 0xabcdef01;
+    assert(encode_reg_wait(reg_wait, 4, 0x1234, 0xffffffff, 0x56789abc, &reg_wait_dw));
+    assert(reg_wait_dw == 4);
+    assert(reg_wait[0] == kUnifiedRegWait);
+    assert(reg_wait[1] == 0x48d0);
+    assert(reg_wait[2] == 0xffffffff);
+    assert(reg_wait[3] == 0x56789abc);
+    for (uint32_t index = 0; index < 4; ++index)
+        reg_wait[index] = 0xfeedface;
+    reg_wait_dw = 0xabcdef01;
+    assert(!encode_reg_wait(reg_wait, 3, 0x1234, 0xffffffff, 0x56789abc, &reg_wait_dw));
+    assert(reg_wait_dw == 0xabcdef01);
+    for (uint32_t value : reg_wait)
+        assert(value == 0xfeedface);
+    assert(!encode_reg_wait(reg_wait, 4, (UINT32_MAX >> 2) + 1, 0xffffffff, 0x56789abc, &reg_wait_dw));
+    assert(reg_wait_dw == 0xabcdef01);
+    for (uint32_t value : reg_wait)
+        assert(value == 0xfeedface);
+    assert(!encode_reg_wait(nullptr, 4, 0x1234, 0xffffffff, 0x56789abc, &reg_wait_dw));
+    assert(!encode_reg_wait(reg_wait, 4, 0x1234, 0xffffffff, 0x56789abc, nullptr));
 
     uint32_t output[kUnifiedMaxSubmissionDwords]{};
     uint32_t output_dw = 0;
@@ -159,6 +148,104 @@ int main() {
                                       fence_gpu_va, fence_sequence, &no_output_dw, &no_next_wptr));
     assert(!encode_unified_submission(output, kUnifiedMaxSubmissionDwords, 0, 512, 8, ib_gpu_va, ib_dw, 256,
                                       fence_gpu_va, fence_sequence, nullptr, &no_next_wptr));
+
+    const uint64_t multi_ib_va[] = {ib_gpu_va, ib_gpu_va + 0x1000, ib_gpu_va + 0x2000};
+    const uint32_t multi_ib_dw[] = {ib_dw, 8, 16};
+    assert(encode_unified_submission(output, kUnifiedMaxSubmissionDwords, 5, 512, 8, multi_ib_va, multi_ib_dw,
+                                     3, 256, fence_gpu_va, fence_sequence, &output_dw, &next_wptr_dw));
+    assert(output_dw == 59);
+    assert(next_wptr_dw == 64);
+    assert(output[0] == kUnifiedIndirectBuffer);
+    assert(output[4] == ib_dw);
+    assert(output[5] == kUnifiedIndirectBuffer);
+    assert(output[9] == 8);
+    assert(output[10] == kUnifiedIndirectBuffer);
+    assert(output[14] == 16);
+    assert(output[15] == kUnifiedFence);
+    assert(output[20] == kUnifiedEnd);
+    for (uint32_t index = 21; index < output_dw; ++index)
+        assert(output[index] == kUnifiedNoop);
+
+    uint64_t max_ib_va[kUnifiedMaxIndirectBuffers];
+    uint32_t max_ib_dw[kUnifiedMaxIndirectBuffers];
+    for (uint32_t index = 0; index < kUnifiedMaxIndirectBuffers; ++index) {
+        max_ib_va[index] = ib_gpu_va + static_cast<uint64_t>(index) * 0x1000;
+        max_ib_dw[index] = 1;
+    }
+    assert(encode_unified_submission(output, kUnifiedMaxSubmissionDwords, 0, 4096, 15, max_ib_va, max_ib_dw,
+                                     kUnifiedMaxIndirectBuffers, 256, fence_gpu_va, fence_sequence, &output_dw,
+                                     &next_wptr_dw));
+    assert(output_dw == 6 * kUnifiedAlignDwords);
+    assert(next_wptr_dw == 6 * kUnifiedAlignDwords);
+    assert(output[0] == kUnifiedIndirectBuffer);
+    assert(output[5 * (kUnifiedMaxIndirectBuffers - 1)] == kUnifiedIndirectBuffer);
+    assert(output[5 * (kUnifiedMaxIndirectBuffers - 1) + 4] == 1);
+    assert(output[5 * kUnifiedMaxIndirectBuffers] == kUnifiedFence);
+    assert(output[5 * kUnifiedMaxIndirectBuffers + 5] == kUnifiedEnd);
+
+    uint32_t short_output[kUnifiedMaxSubmissionDwords];
+    for (uint32_t &value : short_output)
+        value = 0xfeedface;
+    uint32_t short_output_dw = 0xabcdef01;
+    uint64_t short_next_wptr = 0x123456789abcdef0ull;
+    assert(!encode_unified_submission(short_output, 6 * kUnifiedAlignDwords - 1, 0, 4096, 15, max_ib_va,
+                                      max_ib_dw, kUnifiedMaxIndirectBuffers, 256, fence_gpu_va, fence_sequence,
+                                      &short_output_dw, &short_next_wptr));
+    assert(short_output_dw == 0xabcdef01);
+    assert(short_next_wptr == 0x123456789abcdef0ull);
+    for (uint32_t value : short_output)
+        assert(value == 0xfeedface);
+
+    uint64_t excessive_ib_va[kUnifiedMaxIndirectBuffers + 1];
+    uint32_t excessive_ib_dw[kUnifiedMaxIndirectBuffers + 1];
+    for (uint32_t index = 0; index < kUnifiedMaxIndirectBuffers + 1; ++index) {
+        excessive_ib_va[index] = ib_gpu_va + static_cast<uint64_t>(index) * 0x1000;
+        excessive_ib_dw[index] = 1;
+    }
+    assert(!encode_unified_submission(short_output, kUnifiedMaxSubmissionDwords, 0, 4096, 15, excessive_ib_va,
+                                      excessive_ib_dw, kUnifiedMaxIndirectBuffers + 1, 256, fence_gpu_va,
+                                      fence_sequence, &short_output_dw, &short_next_wptr));
+    assert(short_output_dw == 0xabcdef01);
+    assert(short_next_wptr == 0x123456789abcdef0ull);
+    for (uint32_t value : short_output)
+        assert(value == 0xfeedface);
+
+    const uint64_t overflowing_ib_va[] = {ib_gpu_va, UINT64_MAX - 255};
+    const uint32_t overflowing_ib_dw[] = {ib_dw, 128};
+    assert(!encode_unified_submission(short_output, kUnifiedMaxSubmissionDwords, 0, 512, 8, overflowing_ib_va,
+                                      overflowing_ib_dw, 2, 256, fence_gpu_va, fence_sequence,
+                                      &short_output_dw, &short_next_wptr));
+    for (uint32_t value : short_output)
+        assert(value == 0xfeedface);
+
+    uint32_t multi_output[kUnifiedMaxSubmissionDwords];
+    for (uint32_t &value : multi_output)
+        value = 0xfeedface;
+    uint32_t multi_output_dw = 0xabcdef01;
+    uint64_t multi_next_wptr = 0x123456789abcdef0ull;
+    const uint64_t bad_multi_ib_va[] = {ib_gpu_va, ib_gpu_va + 4};
+    const uint32_t bad_multi_ib_dw[] = {ib_dw, 8};
+    assert(!encode_unified_submission(multi_output, kUnifiedMaxSubmissionDwords, 0, 512, 8, bad_multi_ib_va,
+                                      bad_multi_ib_dw, 2, 256, fence_gpu_va, fence_sequence, &multi_output_dw,
+                                      &multi_next_wptr));
+    assert(multi_output_dw == 0xabcdef01);
+    assert(multi_next_wptr == 0x123456789abcdef0ull);
+    for (uint32_t value : multi_output)
+        assert(value == 0xfeedface);
+
+    uint32_t multi_ring[256];
+    for (uint32_t &value : multi_ring)
+        value = 0xfeedface;
+    uint32_t multi_submitted_dw = 0;
+    uint64_t multi_ring_next_wptr = 0;
+    assert(place_unified_submission(multi_ring, 256, 250, 200, 8, multi_ib_va, multi_ib_dw, 3, 256,
+                                    fence_gpu_va, fence_sequence, &multi_submitted_dw, &multi_ring_next_wptr));
+    assert(multi_ring_next_wptr == 320);
+    assert(multi_ring[250] == kUnifiedIndirectBuffer);
+    assert(multi_ring[254] == ib_dw);
+    assert(multi_ring[255] == kUnifiedIndirectBuffer);
+    assert(multi_ring[4] == kUnifiedIndirectBuffer);
+    assert(multi_ring[9] == kUnifiedFence);
 
     uint32_t ring[256];
     for (uint32_t &value : ring)

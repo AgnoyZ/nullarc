@@ -66,10 +66,11 @@ bundled or installed by this parser.
 The current source-only step also adds a standalone VCN unified-ring encoder
 for the `IB`, `FENCE`, `TRAP`, and `END` frame plus 64-dword ring alignment.
 `place_unified_submission` checks ring geometry and free capacity before
-writing, including wrap at the ring boundary. Both command frame start and
-resulting write pointer are aligned to the VCN ring's `align_mask = 0x3f`
-(64 dwords / 256 bytes); ring capacity is kept in dwords and one sentinel
-dword remains unused. The command values/layout follow the Linux v6.16 VCN
+writing, including wrap at the ring boundary. Like Linux's ring commit path, it
+appends NOPs after the frame so the resulting write pointer obeys the VCN
+ring's `align_mask = 0x3f` (64 dwords / 256 bytes); frame start itself need not
+be aligned. Ring capacity is kept in dwords and one sentinel dword remains
+unused. The command values/layout follow the Linux v6.16 VCN
 encoder-ring ABI
 (`amdgpu_vcn.h`, `vcn_v2_0_enc_ring_emit_ib`,
 `vcn_v2_0_enc_ring_emit_fence`, and `amdgpu_ring_alloc`); no Linux driver
@@ -78,19 +79,33 @@ wrap, capacity exhaustion, and no-write-on-rejection.
 
 A further CPU-only helper encodes the zero-initialized VCN 4.0 shared structure
 used by the Linux v6.16 VCN4 implementation. It lays out the unified-queue,
-ring setup, SMU DPM interface and VCN 4.0.2 DRM-key workaround fields at their
-reviewed offsets, with compile-time size/offset assertions, an explicit
-APU/dGPU selector and bounded output size. Ring setup validates GPU-VA
-alignment, power-of-two ring size, capacity and address overflow before
-publishing the ring base/size and setup-present flag. This is layout evidence
-only: it does not allocate or map either buffer, attest firmware provenance,
-run the VCN firmware initializer, write registers, or enable the queue. CPU
-tests validate the expected fields, zeroed reserved bytes, invalid input
-no-write behavior, and refusal without writes when output storage is too small.
+SMU DPM interface and VCN 4.0.2 DRM-key workaround fields at their reviewed
+offsets, with compile-time size/offset assertions, an explicit APU/dGPU
+selector and bounded output size. This is layout evidence only: it does not
+allocate or map the shared buffer, attest firmware provenance, run the VCN
+firmware initializer, write registers, or enable the queue. CPU tests validate
+the expected fields, zeroed reserved bytes, and refusal without writes when the
+output buffer is undersized. The separate RB_SETUP shared fields are only
+initialized by Linux's VCN4 SR-IOV/VF startup path, so this native Radeon 780M
+work does not emit or set those VF-only fields.
+
+The unified submission encoder also supports up to a local safety cap of 64
+indirect buffers in a single fence/trap/end frame, validates every IB before
+writing any output, and retains ring wrap and capacity checks. This matches
+the native ABI's repeated-IB packet shape, but does not prove RADV's IB chain
+is semantically valid for VCN or that the kernel can execute it.
 
 These helpers are not connected to an adopted VCN queue and do not implement
 VCN VM flushes, firmware loading/validation, VCN startup and teardown, doorbell
 routing, interrupt/fence retirement, or Vulkan decoded-picture/DPB ownership.
+The CPU-only `encode_reg_wait` helper mirrors the four-dword Linux VCN
+`REG_WAIT` encoding with output-capacity and register-shift bounds. In Linux
+v6.16, `vcn_v2_0_enc_ring_emit_vm_flush` first calls
+`amdgpu_gmc_emit_flush_gpu_tlb` and then emits a `REG_WAIT` for the VMID's
+page-table-base register. Darwin currently has neither that GMC ring-emission
+route nor an adopted VCN ring/VM-hub register mapping; emitting only the wait
+would not invalidate translations. This helper does not complete a VM flush,
+and no GFX/compute flush is treated as a substitute.
 
 The pinned Mesa transport currently rejects non-GFX/compute IP submissions in
 the exact-completion path, and the PhxBringup queue owner exposes only GFX and
@@ -112,8 +127,9 @@ actual initialized capability-array declaration as a CPU-only check. These
 tests do not load a provider, initialize Vulkan, submit GPU work, or test a
 VideoToolbox session. `test_rdna3_vcn_firmware` exercises synthetic valid and
 malformed container headers only; it does not consume a real firmware image.
-`test_phx_vcn_queue` exercises the standalone CPU encoder and shared-structure
-and ring-setup layout only; it does not adopt or submit a queue.
+`test_phx_vcn_queue` exercises the standalone CPU IB/fence and `REG_WAIT`
+encoders and shared-structure layout only; it does not flush a VM, adopt or
+submit a queue, or execute GPU work.
 
 The next implementation gate is a reviewed Darwin VCN route: connect the
 exactly identified firmware through a provenance-reviewed load path, implement
