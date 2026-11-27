@@ -62,6 +62,50 @@ visible VRAM, 1536 MiB high VRAM and a separate 512 MiB GTT cap. These values
 neither measure free memory at the reported refresh stall nor identify its
 cause; see [the page-switch retest](BUILD34-REFRESH-STALL.md).
 
+### Ownership audit and host exclusion
+
+Two independent conditions are required: the target interval must be excluded
+from host reuse, and the GPU/firmware owner must be able to grant it with no
+other writer. Build34 only publishes the MMHUB framebuffer geometry and the
+BAR0 mapping. Its `BO_CREATE` owns the pages returned by XNU, not a GPU-local
+partition. The existing offsets used for GOP, bring-up, and queue adoption do
+not implement a high-UMA ownership transfer. Do not map the published
+backing address as a substitute for BAR0. The [historical bring-up
+notes](stage3-acceleration-plan.md) describe an earlier attempt where the
+apparent physical address reached live host RAM instead of the expected BAR0
+contents. That is not a measurement of this boot, but it rules out assuming
+the addresses are interchangeable.
+
+- **Host side:** The pinned [XNU x86 reference](https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.1.9/osfmk/i386/i386_vm_init.c#L448)
+  initializes physical ranges from the EFI descriptors passed in `boot_args`.
+  Unused loader, boot-services, and conventional memory may be reclaimed;
+  merely making an EFI boot-services allocation does not secure it for this
+  driver after boot. `EfiReservedMemoryType` is not a grant either; the
+  [UEFI 2.11 specification](https://uefi.org/specs/UEFI/2.11/07_Services_Boot_Services.html#efi-boot-services-getmemorymap)
+  says it describes memory the OS is not supposed to access. Local read-only
+  inspection found `/memory` with `reg` and a `/chosen/memory-map` node, but
+  did not establish either as the complete typed map passed to XNU.
+  [XNU's platform expert](https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.1.9/pexpert/i386/pe_init.c#L137)
+  uses the latter node for named boot payloads such as `BootCLUT`.
+- **Firmware side:** The existing PSP selector 103 submits a real command,
+  modifies the ring and reads back transport status, not a complete reservation
+  record. On the historical 13.0.4 bring-up the two query commands returned
+  unknown-command status; this is not an empty reservation list. Linux v6.18
+  [gates both commands](https://github.com/torvalds/linux/blob/v6.18/drivers/gpu/drm/amd/amdgpu/amdgpu_psp.c#L1040)
+  to specific PSP 14.0.2/14.0.3 firmware versions. Its separate
+  [TTM path](https://github.com/torvalds/linux/blob/v6.18/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c#L1758)
+  accounts for firmware/VBIOS and discovery exclusions in the Linux-owned
+  VRAM allocator; that is not an ownership grant to macOS build34.
+
+[The offline host-map check](../tools/build34_uma_host_map.py) validates the
+descriptor encoding, complete interval coverage and overlap for one bounded
+pilot window. Even `reserved-type-only` reports descriptor type, not
+permission to touch the range. Missing coverage, other firmware types and
+host-usable types are distinct. It has no collector or production caller;
+tests feed synthetic descriptors only. No same-boot typed map or owner grant
+was obtained, and no PSP command, physical map, EFI change, or reboot was
+performed for this audit.
+
 No file in the kernel build consumes this pool. Before wiring it to native BOs,
 obtain an explicit per-boot reservation from an owner that can prevent both
 host reuse and concurrent firmware or driver access. Check it against the

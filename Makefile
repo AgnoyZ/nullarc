@@ -153,6 +153,7 @@ test-upstream34-layout:
 test-build34-uma-vram: $(TEST_BIN_DIR)/test_build34_uma_vram
 	$<
 	python3 -B tests/test_build34_uma_observation.py
+	python3 -B tests/test_build34_uma_host_map.py
 
 $(TEST_BIN_DIR)/test_build34_uma_vram: tests/test_build34_uma_vram.cpp tools/build34_uma_vram.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all $< -o $@
