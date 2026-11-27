@@ -26,17 +26,54 @@ Run `make test-nmplugin-descriptor-mask` with Vulkan headers for the CPU
 fault-injection checks. The runner checks the SHA-256 of the base source and
 applies the patch in a temporary directory; it does not load the plugin or
 execute on the GPU.
-The candidate has not been installed and the current display path is unchanged.
 
-For a future authorized comparison, first reproduce by switching between two
-visually distinct pages with the keyboard and leaving the pointer stationary.
-Record the app and elapsed time until the whole page refreshes, then whether
-moving the pointer updates only a small area. Compare before/after log intervals
-for allocation errors, skipped draws and IOSurface publication or upload
-errors. Verify the exact plugin mapped by each WindowServer process, hold the
-native 2x mode and the rest of the build34 stack fixed, and retain an exact
-copy of the previous plugin for manual rollback. If the symptom persists
-without allocation errors, investigate IOSurface publication separately: a
-host-backed texture currently does not advance the surface seed in
-`nvmtlSurfaceOutDirtied:`. It is not yet known whether this affects compositor
+## Local installation, November 27, 2026
+
+The owner requested installation and verification of this build34 plugin
+candidate. It was rebuilt from `213dc68` to match the pre-installation disk
+plugin, not from the newer VCN source. The control build matched the disk
+image's text, string and constant sections and its import/export sets. The
+candidate differed from that source only in `nvmtl_vk.c`. The descriptor CPU
+test passed 324 cases in each of three configurations. The full `make test`
+run stopped at the existing DCN source pin for `NVMTLDevice.m`; that check was
+left unchanged.
+
+Only the signed `NVMTLDriver` executable was atomically replaced. Independent
+readback verified the installed hash, complete bundle signature, unchanged
+bundle contents apart from the executable, and exact pre-installation backup.
+The root-only, same-volume backup includes a separate rollback link. For manual
+rollback, verify the installed candidate and exact backup hashes, atomically
+replace only the executable using the rollback link, then recheck the original
+hash and complete bundle signature. Already-mapped processes must be checked
+separately after either disk change. No kernel, EFI, security setting or startup
+policy was changed, and no logout or restart was requested.
+
+The original disk plugin and staged candidate each passed a real Radeon 780M
+IOSurface GPU readback and CPU-lock test in a separate process. A fresh process
+then loaded the candidate directly from its installed path and again verified
+557,056 pixels at ABI 1.12, build34. Four driver counters (zero-copy faults,
+IOP failures, flips without VRAM and surface GPU timeouts) stayed at zero during
+the installed test. The active mode remained 1280x800 logical, 2560x1600 backing,
+120 Hz, native 2x. This finite test did not reproduce descriptor pool pressure.
+
+The GPU's IORegistry property reports 4096 MiB, but the installed process's
+RADV initialization reports 256 MiB of visible VRAM plus 1536 MiB of high VRAM
+and a separate 512 MiB GTT cap. The 4096 MiB property is not the allocator's
+available budget, and these heap sizes are not a measurement of free memory
+at the stall. The patch does not change any heap size or budget.
+
+## Desktop verification pending
+
+The running WindowServer still maps an older image, confirmed by its mapping
+inode rather than its unchanged path. Disk installation and isolated GPU
+correctness do not establish a desktop fix. After a user-controlled session
+restart, first verify that WindowServer maps the new executable. For the
+before/after comparison, use the same app and native 2x mode, switch between
+visually distinct pages with the keyboard, and hold the pointer still. Record
+the elapsed time until the whole page refreshes, then whether pointer movement
+only refreshes a small area. Compare the matching log intervals for allocation
+errors, skipped draws and IOSurface publication or upload errors. If the
+symptom persists without allocation errors, investigate IOSurface publication
+separately: a host-backed texture currently does not advance the surface seed
+in `nvmtlSurfaceOutDirtied:`. It is not yet known whether this affects compositor
 invalidation in the failing case. This change neither tests nor modifies it.
