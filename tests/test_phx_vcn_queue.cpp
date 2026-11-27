@@ -108,44 +108,53 @@ int main() {
     for (uint32_t value : write_wait)
         assert(value == 0xfeedface);
 
-    uint32_t vm_flush[17];
+    uint32_t vm_flush[24];
     for (uint32_t &value : vm_flush)
         value = 0xfeedface;
     uint32_t vm_flush_dw = 0xabcdef01;
-    assert(encode_vm_flush_core_sequence(vm_flush, 17, 8, 0x123456789abcdef0ull, 0x100, 0x101,
-                                         0x200, 0x201, 0x80000001, &vm_flush_dw));
-    assert(vm_flush_dw == 17);
-    assert(vm_flush[0] == kUnifiedRegWrite);
-    assert(vm_flush[1] == 0x400);
-    assert(vm_flush[2] == 0x9abcdef0);
-    assert(vm_flush[3] == kUnifiedRegWrite);
-    assert(vm_flush[4] == 0x404);
-    assert(vm_flush[5] == 0x12345678);
-    assert(vm_flush[6] == kUnifiedRegWrite);
-    assert(vm_flush[7] == 0x800);
-    assert(vm_flush[8] == 0x80000001);
-    assert(vm_flush[9] == kUnifiedRegWait);
-    assert(vm_flush[10] == 0x804);
-    assert(vm_flush[11] == 0x100);
-    assert(vm_flush[12] == 0x100);
+    assert(encode_mmhub_vm_flush_core_sequence(vm_flush, 24, 8, 0x123456789abcd000ull, 0x99, 0x100,
+                                               0x101, 0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(vm_flush_dw == 24);
+    assert(vm_flush[0] == kUnifiedRegWait);
+    assert(vm_flush[1] == 0x264);
+    assert(vm_flush[2] == 1);
+    assert(vm_flush[3] == 1);
+    assert(vm_flush[4] == kUnifiedRegWrite);
+    assert(vm_flush[5] == 0x400);
+    assert(vm_flush[6] == 0x9abcd000);
+    assert(vm_flush[7] == kUnifiedRegWrite);
+    assert(vm_flush[8] == 0x404);
+    assert(vm_flush[9] == 0x12345678);
+    assert(vm_flush[10] == kUnifiedRegWrite);
+    assert(vm_flush[11] == 0x800);
+    assert(vm_flush[12] == 0x80000001);
     assert(vm_flush[13] == kUnifiedRegWait);
-    assert(vm_flush[14] == 0x400);
-    assert(vm_flush[15] == UINT32_MAX);
-    assert(vm_flush[16] == 0x9abcdef0);
+    assert(vm_flush[14] == 0x804);
+    assert(vm_flush[15] == 0x100);
+    assert(vm_flush[16] == 0x100);
+    assert(vm_flush[17] == kUnifiedRegWrite);
+    assert(vm_flush[18] == 0x264);
+    assert(vm_flush[19] == 0);
+    assert(vm_flush[20] == kUnifiedRegWait);
+    assert(vm_flush[21] == 0x400);
+    assert(vm_flush[22] == UINT32_MAX);
+    assert(vm_flush[23] == 0x9abcd000);
     for (uint32_t &value : vm_flush)
         value = 0xfeedface;
     vm_flush_dw = 0xabcdef01;
-    assert(!encode_vm_flush_core_sequence(vm_flush, 16, 8, 0x123456789abcdef0ull, 0x100, 0x101,
-                                          0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(!encode_mmhub_vm_flush_core_sequence(vm_flush, 23, 8, 0x123456789abcd000ull, 0x99, 0x100,
+                                                0x101, 0x200, 0x201, 0x80000001, &vm_flush_dw));
     assert(vm_flush_dw == 0xabcdef01);
     for (uint32_t value : vm_flush)
         assert(value == 0xfeedface);
-    assert(!encode_vm_flush_core_sequence(vm_flush, 17, 0, 0x123456789abcdef0ull, 0x100, 0x101,
-                                          0x200, 0x201, 0x80000001, &vm_flush_dw));
-    assert(!encode_vm_flush_core_sequence(vm_flush, 17, 16, 0x123456789abcdef0ull, 0x100, 0x101,
-                                          0x200, 0x201, 0x80000001, &vm_flush_dw));
-    assert(!encode_vm_flush_core_sequence(vm_flush, 17, 8, 0x123456789abcdef0ull, 0x100, 0x101,
-                                          0x200, UINT32_MAX, 0x80000001, &vm_flush_dw));
+    assert(!encode_mmhub_vm_flush_core_sequence(vm_flush, 24, 0, 0x123456789abcd000ull, 0x99, 0x100,
+                                                0x101, 0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(!encode_mmhub_vm_flush_core_sequence(vm_flush, 24, 16, 0x123456789abcd000ull, 0x99, 0x100,
+                                                0x101, 0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(!encode_mmhub_vm_flush_core_sequence(vm_flush, 24, 8, 0x123456789abcd001ull, 0x99, 0x100,
+                                                0x101, 0x200, 0x201, 0x80000001, &vm_flush_dw));
+    assert(!encode_mmhub_vm_flush_core_sequence(vm_flush, 24, 8, 0x123456789abcd000ull, 0x99, 0x100,
+                                                0x101, 0x200, UINT32_MAX, 0x80000001, &vm_flush_dw));
     assert(vm_flush_dw == 0xabcdef01);
     for (uint32_t value : vm_flush)
         assert(value == 0xfeedface);

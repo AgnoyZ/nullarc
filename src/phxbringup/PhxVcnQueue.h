@@ -164,19 +164,23 @@ inline bool encode_reg_write_reg_wait(uint32_t *output,
     return true;
 }
 
-inline bool encode_vm_flush_core_sequence(uint32_t *output,
-                                          uint32_t output_capacity_dw,
-                                          uint32_t vmid,
-                                          uint64_t page_table_base,
-                                          uint32_t page_table_low_register_index,
-                                          uint32_t page_table_high_register_index,
-                                          uint32_t invalidate_request_register_index,
-                                          uint32_t invalidate_ack_register_index,
-                                          uint32_t invalidate_request,
-                                          uint32_t *output_dw) {
-    constexpr uint32_t command_dw = 17;
+inline bool encode_mmhub_vm_flush_core_sequence(uint32_t *output,
+                                                uint32_t output_capacity_dw,
+                                                uint32_t vmid,
+                                                uint64_t page_table_base,
+                                                uint32_t invalidate_semaphore_register_index,
+                                                uint32_t page_table_low_register_index,
+                                                uint32_t page_table_high_register_index,
+                                                uint32_t invalidate_request_register_index,
+                                                uint32_t invalidate_ack_register_index,
+                                                uint32_t invalidate_request,
+                                                uint32_t *output_dw) {
+    constexpr uint32_t command_dw = 24;
     constexpr uint32_t vmid_limit = 15;
+    constexpr uint64_t page_table_alignment = 4096;
     if (!output || !output_dw || output_capacity_dw < command_dw || vmid == 0 || vmid > vmid_limit ||
+        (page_table_base & (page_table_alignment - 1)) ||
+        invalidate_semaphore_register_index > (UINT32_MAX >> 2) ||
         page_table_low_register_index > (UINT32_MAX >> 2) ||
         page_table_high_register_index > (UINT32_MAX >> 2) ||
         invalidate_request_register_index > (UINT32_MAX >> 2) ||
@@ -186,6 +190,10 @@ inline bool encode_vm_flush_core_sequence(uint32_t *output,
     uint32_t encoded[command_dw];
     uint32_t cursor = 0;
     uint32_t encoded_dw = 0;
+    if (!encode_reg_wait(encoded + cursor, command_dw - cursor, invalidate_semaphore_register_index, 1, 1,
+                         &encoded_dw))
+        return false;
+    cursor += encoded_dw;
     if (!encode_reg_write(encoded + cursor, command_dw - cursor, page_table_low_register_index,
                           static_cast<uint32_t>(page_table_base), &encoded_dw))
         return false;
@@ -196,6 +204,10 @@ inline bool encode_vm_flush_core_sequence(uint32_t *output,
     cursor += encoded_dw;
     if (!encode_reg_write_reg_wait(encoded + cursor, command_dw - cursor, invalidate_request_register_index,
                                    invalidate_ack_register_index, invalidate_request, 1u << vmid, &encoded_dw))
+        return false;
+    cursor += encoded_dw;
+    if (!encode_reg_write(encoded + cursor, command_dw - cursor, invalidate_semaphore_register_index, 0,
+                          &encoded_dw))
         return false;
     cursor += encoded_dw;
     if (!encode_reg_wait(encoded + cursor, command_dw - cursor, page_table_low_register_index, UINT32_MAX,
