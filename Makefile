@@ -150,13 +150,18 @@ test-upstream34-layout:
 	python3 tests/test_upstream34_layout.py -v
 
 .PHONY: test-build34-uma-vram
-test-build34-uma-vram: $(TEST_BIN_DIR)/test_build34_uma_vram
-	$<
+test-build34-uma-vram: $(TEST_BIN_DIR)/test_build34_uma_vram $(TEST_BIN_DIR)/test_build34_uma_boot_map
+	$(TEST_BIN_DIR)/test_build34_uma_vram
+	$(TEST_BIN_DIR)/test_build34_uma_boot_map
 	python3 -B tests/test_build34_uma_observation.py
 	python3 -B tests/test_build34_uma_host_map.py
 
 $(TEST_BIN_DIR)/test_build34_uma_vram: tests/test_build34_uma_vram.cpp tools/build34_uma_vram.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all $< -o $@
+
+$(TEST_BIN_DIR)/test_build34_uma_boot_map: tests/test_build34_uma_boot_map.c tools/build34_uma_boot_map.c tools/build34_uma_boot_map.h | $(TEST_BIN_DIR)
+	$(CC) -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all \
+		-Itools tests/test_build34_uma_boot_map.c tools/build34_uma_boot_map.c -o $@
 
 # Actual integrated compute submit, with CPU fakes and no device frameworks.
 .PHONY: test-upstream34-submit-memsync

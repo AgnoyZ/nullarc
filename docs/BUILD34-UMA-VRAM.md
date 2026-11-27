@@ -137,6 +137,31 @@ host-side result separate from a firmware or driver grant for that interval.
 No suitable live source was found through the interfaces checked here; no
 capture candidate was prepared, and no EFI or boot setting was changed.
 
+### Offline final-boot-args classifier
+
+[The freestanding C core](../tools/build34_uma_boot_map.c) accepts immutable
+views of the supplied x86 `boot_args` and its memory map. It checks version 2,
+revision 0/1, EFI64, and the exact map physical base and byte count against
+the supplied map view. It never converts the physical pointer into a host
+pointer. Those checks reject mismatched views; they do not establish that
+the caller's bytes are genuine, final, stable, or from the target boot.
+
+The core reads little-endian fields, checks descriptor stride, overflow,
+overlap and complete coverage, and accepts at most 256 descriptors and 1 MiB
+of map data. It requires no allocation, boot service, file, or register I/O
+and returns only the classification. `RESERVED_TYPE_ONLY` still describes
+the host map, not GPU ownership or permission to access it. The command line
+and unrelated boot-argument fields are neither parsed nor returned.
+
+`make test-build34-uma-vram` passes the synthetic handoff fixtures under
+ASan/UBSan, plus the existing allocator and observation suites. The offsets
+and descriptor types were independently checked against the pinned XNU x86
+`boot.h`, and a freestanding x86-64 COFF compile produced an unlinked object
+with no unresolved symbols. No loader hook, EFI image, capture, or deployment
+was made. A later caller would still need to prove the final handoff point,
+immutable view lifetime, and same-boot binding to the independently checked
+Radeon physical interval before the result could be used as host evidence.
+
 No file in the kernel build consumes this pool. Before wiring it to native BOs,
 obtain an explicit per-boot reservation from an owner that can prevent both
 host reuse and concurrent firmware or driver access. Check it against the
