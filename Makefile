@@ -97,6 +97,7 @@ test: $(TESTS)
 	python3 -B tests/test_build34_dcn_mapper_observation.py
 	CXX="$(CXX)" python3 -B tests/test_build34_dcn_mapper_probe.py
 	python3 -B tests/test_build34_dcn_route_observation.py
+	python3 -B tests/test_build34_uma_observation.py
 	python3 -B tests/test_build34_dcn_firmware_observation.py
 	python3 -B tests/test_build34_dcn_firmware_observer_candidate.py
 	python3 -B tests/test_build34_pci_irq_observation.py
@@ -151,6 +152,7 @@ test-upstream34-layout:
 .PHONY: test-build34-uma-vram
 test-build34-uma-vram: $(TEST_BIN_DIR)/test_build34_uma_vram
 	$<
+	python3 -B tests/test_build34_uma_observation.py
 
 $(TEST_BIN_DIR)/test_build34_uma_vram: tests/test_build34_uma_vram.cpp tools/build34_uma_vram.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all $< -o $@
