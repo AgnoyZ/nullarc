@@ -23,6 +23,12 @@
 #include "IOAccelLegacyDisplayMachine.h"
 #include "IOAccelTask.h"
 #include "IOAccelMemoryMap.h"
+#ifdef NMX_ACCEL
+#include "IOAccelStatistics2.h"
+#include "IOAccelAllocationInfo.h"
+#include "IOAccelSubmitter2.h"
+#include "PhxTelemetry.h"
+#endif
 #include "../nvrm_gpuva_abi.h"
 class NVMemoryMap;
 static unsigned long long nvAccelGpuVaAlloc(IOAccelMemoryMap *map,
@@ -53,6 +59,8 @@ extern int gPhxZeroCopy;
 extern "C" {   // kern/thread_call.h and kern/clock.h clash with the family headers here, so the KPIs are declared by hand
 struct thread_call *thread_call_allocate(void (*func)(void *, void *), void *param0);
 int thread_call_enter_delayed(struct thread_call *call, uint64_t deadline);
+int thread_call_cancel(struct thread_call *call);
+int thread_call_free(struct thread_call *call);
 void clock_interval_to_deadline(uint32_t interval, uint32_t scale_factor, uint64_t *result);
 uint64_t mach_absolute_time(void);
 void absolutetime_to_nanoseconds(uint64_t abstime, uint64_t *result);
@@ -205,6 +213,99 @@ public:
     void free() APPLE_KEXT_OVERRIDE { dropInner(); IOUserClient::free(); }
 };
 OSDefineMetaClassAndStructors(IOAccelNMXNativeProxy, IOUserClient)
+
+class NMXTelemetrySubmitter : public IOAccelSubmitter2 {
+    OSDeclareDefaultStructors(NMXTelemetrySubmitter)
+public:
+    int32_t fPid = 0;
+    bool fActive = false;
+    bool initForPid(int32_t pid, const char *procName) {
+        if (!IOAccelSubmitter2::init()) return false;
+        fPid = pid;
+        char creator[64];
+        snprintf(creator, sizeof(creator), "pid %d, %s", pid, (procName && procName[0]) ? procName : "unknown");
+        setProperty("IOUserClientCreator", creator);
+        setProperty("API", "Metal");
+        return true;
+    }
+    void updateTelemetry(const PhxPidTelemetry &entry) {
+        if (entry.procName[0]) {
+            char creator[64];
+            snprintf(creator, sizeof(creator), "pid %d, %s", entry.pid, entry.procName);
+            setProperty("IOUserClientCreator", creator);
+        }
+        setProperty("lastSubmittedTime", entry.lastSubmittedAbs, 64);
+        setProperty("accumulatedGPUTime", entry.accumulatedGpuNs, 64);
+        setProperty("vramUsedBytes", entry.vramBytes, 64);
+        setProperty("gttUsedBytes", entry.gttBytes, 64);
+        setProperty("hostUsedBytes", entry.hostBytes, 64);
+    }
+    void *getOwningTask() const APPLE_KEXT_OVERRIDE { return nullptr; }
+    void *getGPUTask() const APPLE_KEXT_OVERRIDE { return nullptr; }
+    void getOwningTaskPid() const APPLE_KEXT_OVERRIDE {}
+    void affectedByHardwareReset(bool, unsigned int) APPLE_KEXT_OVERRIDE {}
+    void retireCommandBuffer(IOAccelEventFence *) APPLE_KEXT_OVERRIDE {}
+    bool shouldHardwareCommandNooped() APPLE_KEXT_OVERRIDE { return false; }
+    void setSubmissionError(unsigned int) APPLE_KEXT_OVERRIDE {}
+    bool isOpportunisticWorkload() const APPLE_KEXT_OVERRIDE { return false; }
+};
+OSDefineMetaClassAndStructors(NMXTelemetrySubmitter, IOAccelSubmitter2)
+
+class NVAccel;
+static bool nmxQueryTelemetry(NVAccel *accel, PhxGpuTelemetrySnapshot *out);
+
+class NVStatistics : public IOAccelStatistics2 {
+    OSDeclareDefaultStructors(NVStatistics)
+public:
+    NVAccel *fAccel = nullptr;
+    bool init(IOGraphicsAccelerator2 *accelerator) APPLE_KEXT_OVERRIDE {
+        fAccel = reinterpret_cast<NVAccel *>(accelerator);
+        return IOAccelStatistics2::init(accelerator);
+    }
+    void writeTelemetryDict(OSDictionary *dict) {
+        if (!dict || !fAccel) return;
+        PhxGpuTelemetrySnapshot snap;
+        if (!nmxQueryTelemetry(fAccel, &snap)) return;
+        auto setU64 = [dict](const char *key, uint64_t val) {
+            if (OSNumber *num = OSNumber::withNumber(val, 64)) {
+                dict->setObject(key, num);
+                num->release();
+            }
+        };
+        auto setU32 = [dict](const char *key, uint32_t val) {
+            if (OSNumber *num = OSNumber::withNumber(val, 32)) {
+                dict->setObject(key, num);
+                num->release();
+            }
+        };
+        const uint64_t vramFree = snap.vramTotalBytes > snap.vramUsedBytes
+                                      ? (snap.vramTotalBytes - snap.vramUsedBytes) : 0;
+        const uint64_t sysUsed = snap.gttUsedBytes + snap.hostUsedBytes;
+        const uint64_t gartFree = snap.gttTotalBytes > snap.gttUsedBytes
+                                      ? (snap.gttTotalBytes - snap.gttUsedBytes) : 0;
+        setU32("Device Utilization %", snap.gpuUtilPct);
+        setU32("GPU Activity(%)", snap.gpuUtilPct);
+        setU64("vramUsedBytes", snap.vramUsedBytes);
+        setU64("vramFreeBytes", vramFree);
+        setU64("inUseVidMemoryBytes", snap.vramUsedBytes);
+        setU64("inUseSysMemoryBytes", sysUsed);
+        setU64("gartUsedBytes", snap.gttUsedBytes);
+        setU64("gartFreeBytes", gartFree);
+        setU64("gartSizeBytes", snap.gttTotalBytes);
+    }
+    void writePerformanceStats(OSDictionary *dict, bool reset) APPLE_KEXT_OVERRIDE {
+        IOAccelStatistics2::writePerformanceStats(dict, reset);
+        writeTelemetryDict(dict);
+    }
+    void writeInternalStats(OSDictionary *dict, bool reset) APPLE_KEXT_OVERRIDE {
+        IOAccelStatistics2::writeInternalStats(dict, reset);
+        // serialize_performance_stats calls writePerformanceStats then writeInternalStats;
+        // re-apply telemetry keys so family defaults do not overwrite inUseVid/SysMemoryBytes
+        // or gartFree/SizeBytes.
+        writeTelemetryDict(dict);
+    }
+};
+OSDefineMetaClassAndStructors(NVStatistics, IOAccelStatistics2)
 #endif
 
 class NVAccel : public IOGraphicsAccelerator2 {
@@ -276,6 +377,28 @@ public:
     OSObject *newVidMemory() APPLE_KEXT_OVERRIDE { NVVidMemory *m = OSTypeAlloc(NVVidMemory); ALOG("newVidMemory -> %p", m); return m; }
     OSObject *newResource() APPLE_KEXT_OVERRIDE { NVResource *r = OSTypeAlloc(NVResource); OSAddAtomic64(1, &gCntResNew); ALOG("newResource -> %p", r); return r; }
     OSObject *newMemoryMap() APPLE_KEXT_OVERRIDE { NVMemoryMap *m = OSTypeAlloc(NVMemoryMap); ALOG("newMemoryMap -> %p", m); return m; }
+#ifdef NMX_ACCEL
+    OSObject *newStatistics() APPLE_KEXT_OVERRIDE {
+        NVStatistics *s = OSTypeAlloc(NVStatistics);
+        ALOG("newStatistics -> %p", s);
+        return s;
+    }
+    void describeDriverAllocations(IOAccelAllocationInfo *info) APPLE_KEXT_OVERRIDE {
+        IOGraphicsAccelerator2::describeDriverAllocations(info);
+        if (!info) return;
+        PhxGpuTelemetrySnapshot snap;
+        if (!queryPhxTelemetry(&snap)) return;
+        for (uint32_t i = 0; i < snap.pidCount && i < PHX_TELEMETRY_MAX_PIDS; i++) {
+            const PhxPidTelemetry &entry = snap.pids[i];
+            if (entry.pid <= 0) continue;
+            if (entry.vramBytes > 0)
+                info->declareAdditionalSystemMemory(entry.vramBytes, entry.pid, "PhxVRAM");
+            const uint64_t gttTotal = entry.gttBytes + entry.hostBytes;
+            if (gttTotal > 0)
+                info->declareAdditionalSystemMemory(gttTotal, entry.pid, "PhxGTT");
+        }
+    }
+#endif
 
     NVDisplayMachine *fDM = nullptr;
     IOPCIDevice *fPCI = nullptr;
@@ -510,6 +633,145 @@ public:
     IOService *fNVRM = nullptr;
 #ifdef NMX_ACCEL
     IOService *fNative = nullptr;
+    const OSSymbol *fSymTelemetry = nullptr;
+    IOLock *fTelLock = nullptr;
+    struct thread_call *fTelCall = nullptr;
+    volatile bool fTelStop = false;
+    volatile SInt32 fTelRunning = 0;
+    NMXTelemetrySubmitter *fSubmitters[PHX_TELEMETRY_MAX_PIDS] = {};
+    bool ensureNativeService() {
+        if (fNative) return true;
+        OSDictionary *m = serviceMatching("PhxBringup");
+        if (!m) return false;
+        IOService *svc = waitForMatchingService(m, 0);
+        if (!svc) return false;
+        if (!OSCompareAndSwapPtr(nullptr, svc, (void *volatile *)&fNative))
+            svc->release();
+        return fNative != nullptr;
+    }
+    bool queryPhxTelemetry(PhxGpuTelemetrySnapshot *out) {
+        if (!out || !ensureNativeService()) return false;
+        if (!fSymTelemetry) {
+            const OSSymbol *sym = OSSymbol::withCStringNoCopy(PHX_TELEMETRY_FN);
+            if (!sym) return false;
+            if (!OSCompareAndSwapPtr(nullptr, (void *)sym, (void *volatile *)&fSymTelemetry))
+                sym->release();
+        }
+        if (!fSymTelemetry) return false;
+        bzero(out, sizeof(*out));
+        IOReturn r = fNative->callPlatformFunction(fSymTelemetry, false, out, nullptr, nullptr, nullptr);
+        return r == kIOReturnSuccess && out->version == PHX_TELEMETRY_ABI_VERSION;
+    }
+    void syncTelemetrySubmitters() {
+        if (fTelStop || !fTelLock) return;
+        PhxGpuTelemetrySnapshot snap;
+        if (!queryPhxTelemetry(&snap)) return;
+        IOLockLock(fTelLock);
+        if (fTelStop) {
+            IOLockUnlock(fTelLock);
+            return;
+        }
+        bool seen[PHX_TELEMETRY_MAX_PIDS] = {};
+        for (uint32_t i = 0; i < snap.pidCount && i < PHX_TELEMETRY_MAX_PIDS; i++) {
+            const PhxPidTelemetry &entry = snap.pids[i];
+            if (entry.pid <= 0) continue;
+            int match = -1, freeSlot = -1;
+            for (uint32_t s = 0; s < PHX_TELEMETRY_MAX_PIDS; s++) {
+                if (fSubmitters[s]) {
+                    if (fSubmitters[s]->fPid == entry.pid) {
+                        match = (int)s;
+                        break;
+                    }
+                } else if (freeSlot < 0) {
+                    freeSlot = (int)s;
+                }
+            }
+            if (match >= 0) {
+                seen[match] = true;
+                fSubmitters[match]->updateTelemetry(entry);
+            } else if (freeSlot >= 0) {
+                NMXTelemetrySubmitter *sub = OSTypeAlloc(NMXTelemetrySubmitter);
+                if (sub && sub->initForPid(entry.pid, entry.procName)) {
+                    if (sub->attach(this)) {
+                        if (sub->start(this)) {
+                            sub->updateTelemetry(entry);
+                            fSubmitters[freeSlot] = sub;
+                            seen[freeSlot] = true;
+                        } else {
+                            sub->detach(this);
+                            sub->release();
+                        }
+                    } else {
+                        sub->release();
+                    }
+                } else if (sub) {
+                    sub->release();
+                }
+            }
+        }
+        for (uint32_t s = 0; s < PHX_TELEMETRY_MAX_PIDS; s++) {
+            if (fSubmitters[s] && !seen[s]) {
+                NMXTelemetrySubmitter *old = fSubmitters[s];
+                fSubmitters[s] = nullptr;
+                old->stop(this);
+                old->detach(this);
+                old->release();
+            }
+        }
+        IOLockUnlock(fTelLock);
+    }
+    static void telemetryTick(void *p0, void *) {
+        NVAccel *me = (NVAccel *)p0;
+        if (!me || me->fTelStop) return;
+        OSIncrementAtomic(&me->fTelRunning);
+        if (!me->fTelStop)
+            me->syncTelemetrySubmitters();
+        if (!me->fTelStop && me->fTelCall) {
+            uint64_t when = 0;
+            clock_interval_to_deadline(500, kMillisecondScale, &when);
+            thread_call_enter_delayed(me->fTelCall, when);
+        }
+        OSDecrementAtomic(&me->fTelRunning);
+    }
+    void startTelemetrySync() {
+        fTelStop = false;
+        if (!fTelLock) fTelLock = IOLockAlloc();
+        if (!fTelCall) fTelCall = thread_call_allocate(&NVAccel::telemetryTick, this);
+        if (fTelCall) {
+            uint64_t when = 0;
+            clock_interval_to_deadline(500, kMillisecondScale, &when);
+            thread_call_enter_delayed(fTelCall, when);
+        }
+    }
+    void stopTelemetrySync() {
+        fTelStop = true;
+        if (fTelCall) {
+            thread_call_cancel(fTelCall);
+            for (int i = 0; i < 200 && fTelRunning > 0; i++)
+                IOSleep(10);
+            thread_call_free(fTelCall);
+            fTelCall = nullptr;
+        }
+        if (fTelLock) {
+            IOLockLock(fTelLock);
+            for (uint32_t s = 0; s < PHX_TELEMETRY_MAX_PIDS; s++) {
+                if (fSubmitters[s]) {
+                    NMXTelemetrySubmitter *old = fSubmitters[s];
+                    fSubmitters[s] = nullptr;
+                    old->stop(this);
+                    old->detach(this);
+                    old->release();
+                }
+            }
+            IOLockUnlock(fTelLock);
+            IOLockFree(fTelLock);
+            fTelLock = nullptr;
+        }
+        if (fSymTelemetry) {
+            fSymTelemetry->release();
+            fSymTelemetry = nullptr;
+        }
+    }
     IOReturn newNativeProxy(task_t owningTask, void *securityID, UInt32 type, IOUserClient **handler) {
         if (!fNative) {
             OSDictionary *m = serviceMatching("PhxBringup");
@@ -730,14 +992,28 @@ public:
                     armHeadlessCheck();
                 }
             } else ALOG("serviceMatching(NVRMFramebuffer) returned NULL -- cannot watch for the framebuffer");
+#ifdef NMX_ACCEL
+            startTelemetrySync();
+#endif
         }
         return r;
     }
-    virtual void stop(IOService *provider) APPLE_KEXT_OVERRIDE { ALOG("stop"); IOGraphicsAccelerator2::stop(provider); }
+    virtual void stop(IOService *provider) APPLE_KEXT_OVERRIDE {
+        ALOG("stop");
+#ifdef NMX_ACCEL
+        stopTelemetrySync();
+#endif
+        IOGraphicsAccelerator2::stop(provider);
+    }
     virtual IOReturn callPlatformFunction(const OSSymbol *fn, bool wait, void *p1, void *p2, void *p3, void *p4) APPLE_KEXT_OVERRIDE;
 };
 OSDefineMetaClassAndStructors(NVAccel, IOGraphicsAccelerator2)
 NVAccel *NVAccel::gAccel = nullptr;
+#ifdef NMX_ACCEL
+static bool nmxQueryTelemetry(NVAccel *accel, PhxGpuTelemetrySnapshot *out) {
+    return accel && accel->queryPhxTelemetry(out);
+}
+#endif
 
 IOAccelMemory *NVDisplayPipe::initFramebufferResource(unsigned int index, IOAccelResource2 *res)
 {

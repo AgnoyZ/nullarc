@@ -68,6 +68,15 @@ class Build34UmaStageTests(unittest.TestCase):
         self.assertIn('PE_parse_boot_argn("phx_uma_vram"', staged)
         self.assertIn('kMaxAllocs = 2048u;', header_text)
 
+        # GPU telemetry staging: HW timestamps, per-PID accounting, platform function
+        self.assertIn('#include "PhxTelemetry.h"', staged)
+        self.assertIn('SYSCTL_INT(_debug, OID_AUTO, phx_gpu_ts,', staged)
+        self.assertIn('functionName->isEqualTo(PHX_TELEMETRY_FN)', staged)
+        self.assertIn('retireQueueLocked(q);', staged)
+        self.assertIn('owner->telemetryClientOpen(clientPid, clientProcName);', staged)
+        self.assertIn('owner->telemetryClientClose(clientPid);', staged)
+        self.assertIn('owner->gpuSubmit(vmid, ib0.ip_type == PHX_AMDGPU_HW_IP_GFX, va, dw, h.num_ibs, &seq, clientPid);', staged)
+
         # License hygiene: MIT/GPL-2.0 header, no PolyForm header or NullMoth code copy
         self.assertIn('SPDX-License-Identifier: MIT OR GPL-2.0-only', header_text)
         self.assertNotIn('PolyForm', header_text)

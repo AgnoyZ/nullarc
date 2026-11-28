@@ -15,6 +15,7 @@ TESTS = $(TEST_BIN_DIR)/test_rdna3_discovery_uma \
         $(TEST_BIN_DIR)/test_phx_dcn_zerocopy \
         $(TEST_BIN_DIR)/test_phx_dcn_cursor \
         $(TEST_BIN_DIR)/test_phx_uma_pool \
+        $(TEST_BIN_DIR)/test_phx_telemetry \
         $(TEST_BIN_DIR)/test_build34_dcn_page_layout \
         $(TEST_BIN_DIR)/test_build34_dcn_flip_readback \
         $(TEST_BIN_DIR)/test_nmplugin_video_decode_gate
@@ -36,6 +37,9 @@ $(TEST_BIN_DIR)/test_phx_dcn_cursor: tests/test_phx_dcn_cursor.cpp src/phxaccel/
 	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all $< -o $@
 
 $(TEST_BIN_DIR)/test_phx_uma_pool: tests/test_phx_uma_pool.cpp src/phxbringup/PhxUmaPool.h | $(TEST_BIN_DIR)
+	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc/phxbringup $< -o $@
+
+$(TEST_BIN_DIR)/test_phx_telemetry: tests/test_phx_telemetry.cpp src/phxbringup/PhxTelemetry.h | $(TEST_BIN_DIR)
 	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc/phxbringup $< -o $@
 
 $(TEST_BIN_DIR)/test_rdna3_discovery_uma: src/amd/rdna3_ip_discovery.cpp src/amd/rdna3_rebar_uma.cpp src/amd/rdna3_chip_profile.cpp tests/test_rdna3_discovery_uma.cpp | $(TEST_BIN_DIR)

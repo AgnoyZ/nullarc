@@ -17,3 +17,4 @@
 #define NV2DContext        NMX2DContext
 #define NVCLContext        NMXCLContext
 #define NVVideoContext     NMXVideoContext
+#define NVStatistics       NMXStatistics

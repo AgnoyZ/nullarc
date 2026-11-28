@@ -4,7 +4,7 @@ import hashlib
 
 
 ACCEL = "src/phxaccel/accel/nvrm-accel.cpp"
-ACCEL_SHA256 = "31bf8e83cbf6e99cc3f131b55095da4757477d99f1ff42f065047096882edf3a"
+ACCEL_SHA256 = "fd026f6effcf42a957c28582510c52f12107efefcd3d94af545451a52d739ffc"
 
 
 def stage(accelerator):

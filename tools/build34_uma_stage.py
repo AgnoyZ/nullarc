@@ -33,7 +33,11 @@ DRIVER_REL = 'src/phxbringup/PhxBringup.cpp'
 DRIVER_SHA256 = '81f45aa2e8166bc6ebed4106129bebebfd70f9b4bbea6dbe389be46263e3c699'
 
 ANCHOR_INCLUDES = '#include "PhxNativeABI.h"\n'
-INSERT_INCLUDES = '#include "PhxNativeABI.h"\n#include "PhxUmaPool.h"\n'
+INSERT_INCLUDES = '''#include <sys/proc.h>
+#include "PhxNativeABI.h"
+#include "PhxUmaPool.h"
+#include "PhxTelemetry.h"
+'''
 
 ANCHOR_SYSCTL = 'static volatile UInt32 gSysctlUp;\n'
 INSERT_SYSCTL = '''static volatile UInt32 gSysctlUp;
@@ -46,6 +50,9 @@ static volatile SInt64 gUmaVramFrees;
 static volatile SInt64 gUmaVramFallbacks;
 static volatile SInt64 gUmaVramBytesLive;
 static volatile SInt32 gUmaVramFaults;
+static int gGpuTsEnable = 1;
+static volatile SInt32 gGpuUtilPct;
+static volatile SInt64 gVramUsedBytes;
 SYSCTL_INT(_debug, OID_AUTO, phx_uma_vram, CTLFLAG_RW | CTLFLAG_LOCKED, &gUmaVramMode, 0,
            "UMA carve-out high-VRAM mode: 0 off, 1 pilot 64 MiB, 2 full verified window");
 SYSCTL_QUAD(_debug, OID_AUTO, phx_uma_vram_allocs, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gUmaVramAllocs,
@@ -58,6 +65,12 @@ SYSCTL_QUAD(_debug, OID_AUTO, phx_uma_vram_bytes, CTLFLAG_RD | CTLFLAG_LOCKED, (
             "bytes currently allocated in the UMA high-VRAM pool");
 SYSCTL_INT(_debug, OID_AUTO, phx_uma_vram_faults, CTLFLAG_RD | CTLFLAG_LOCKED, (int *)&gUmaVramFaults, 0,
            "UMA pool fault or quarantine events");
+SYSCTL_INT(_debug, OID_AUTO, phx_gpu_ts, CTLFLAG_RW | CTLFLAG_LOCKED, &gGpuTsEnable, 0,
+           "emit GFX11 RELEASE_MEM hardware timestamps around GPU submissions: 0 off, 1 on");
+SYSCTL_INT(_debug, OID_AUTO, phx_gpu_util, CTLFLAG_RD | CTLFLAG_LOCKED, (int *)&gGpuUtilPct, 0,
+           "last sampled GPU utilization percentage (0..100)");
+SYSCTL_QUAD(_debug, OID_AUTO, phx_vram_used_bytes, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gVramUsedBytes,
+            "total live VRAM bytes tracked across all GPU clients");
 '''
 
 ANCHOR_PUBLIC_METHODS = '    IOReturn vmUnmap(uint32_t vmid, uint64_t va, uint64_t size);\n'
@@ -68,6 +81,41 @@ INSERT_PUBLIC_METHODS = '''    IOReturn vmUnmap(uint32_t vmid, uint64_t va, uint
     void umaFree(uint64_t ownerId, uint32_t slot, uint64_t serial, uint64_t lastSeq);
     void umaQuarantine(uint64_t ownerId, uint32_t slot, uint64_t serial);
     bool umaQueryHiPool(uint64_t &totalOut, uint64_t &freeOut, int *activeModeOut = nullptr);
+    void telemetryClientOpen(int32_t pid, const char *procName);
+    void telemetryClientClose(int32_t pid);
+    void telemetryAddMemory(int32_t pid, int64_t vramDelta, int64_t gttDelta, int64_t hostDelta);
+    void telemetryNoteSubmit(int32_t pid, uint64_t submitAbs);
+    IOReturn callPlatformFunction(const OSSymbol *functionName, bool waitForFunction,
+                                  void *param1, void *param2, void *param3, void *param4) override;
+'''
+
+ANCHOR_GPUSUBMIT_DECL = '    IOReturn gpuSubmit(uint32_t vmid, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seq);\n'
+INSERT_GPUSUBMIT_DECL = '    IOReturn gpuSubmit(uint32_t vmid, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seq, int32_t pid = 0);\n'
+
+ANCHOR_GPUQUEUE_STRUCT = '''    struct GpuQueue {
+        bool ready, gfx;
+        uint32_t ringOff, ringDw, wbOff, fenceOff;
+        uint64_t dbByte, wptr, doneEnd;
+        uint64_t fseq[64], fend[64];
+        uint32_t fvmid[64];                     // the hardware VMID each outstanding submission runs under
+        volatile uint32_t head, tail;
+        uint64_t lastDone, lastProgress;        // the hang watchdog's view: fence seen last, and when it last moved
+        uint64_t killedSeq; bool killedAll;
+    };
+'''
+INSERT_GPUQUEUE_STRUCT = '''    struct GpuQueue {
+        bool ready, gfx;
+        uint32_t ringOff, ringDw, wbOff, fenceOff, tsOff;
+        uint64_t dbByte, wptr, doneEnd;
+        uint64_t fseq[64], fend[64];
+        uint32_t fvmid[64];                     // the hardware VMID each outstanding submission runs under
+        int32_t fpid[64];
+        uint64_t fSubmitNs[64];
+        bool fHasTs[64];
+        volatile uint32_t head, tail;
+        uint64_t lastDone, lastProgress;        // the hang watchdog's view: fence seen last, and when it last moved
+        uint64_t killedSeq; bool killedAll;
+    };
 '''
 
 ANCHOR_PT_CHUNKS = '    static constexpr uint32_t kPtChunkBytes = 64u << 10, kPtChunkPages = kPtChunkBytes / 4096, kPtChunks = 64;\n'
@@ -88,7 +136,11 @@ INSERT_PRIVATE_MEMBERS = '''    volatile SInt32 sessionOpen{0};
     bool ensureUmaAdmittedLocked(int requestedMode);
     uint32_t vramReadMmIndex(uint64_t pos) const;
     bool zeroUmaRange(uint64_t physBase, uint64_t bytes) const;
+    void retireQueueLocked(GpuQueue &q);
+    void snapshotTelemetry(PhxGpuTelemetrySnapshot &out);
     IOLock *umaLock{nullptr};
+    IOLock *telemetryLock{nullptr};
+    phx::telemetry::PhxTelemetryTracker telemetry{};
     phx::uma::Geometry umaGeom{};
     phx::uma::DiscoveryProbe umaDisc{};
     phx::uma::WindowPlan umaPlan{};
@@ -125,10 +177,14 @@ INSERT_BO_STRUCT = '''    struct Bo {
 ANCHOR_CLIENT_MEMBERS = '    uint64_t emitted{0};\n'
 INSERT_CLIENT_MEMBERS = '''    uint64_t emitted{0};
     uint64_t umaOwnerId{0};
+    int32_t clientPid{0};
+    char clientProcName[PHX_TELEMETRY_NAME_LEN]{};
+    bool telemetryOpen{false};
+    uint64_t umaUsed{0};
 '''
 
 ANCHOR_START_LOCK = '    gpuLock = IOLockAlloc();\n'
-INSERT_START_LOCK = '    gpuLock = IOLockAlloc();\n    umaLock = IOLockAlloc();\n'
+INSERT_START_LOCK = '    gpuLock = IOLockAlloc();\n    umaLock = IOLockAlloc();\n    telemetryLock = IOLockAlloc();\n'
 
 ANCHOR_START_PROBE = '    setProperty("phx-fb-aper-len", fbAperLen, 64);\n'
 INSERT_START_PROBE = '''    setProperty("phx-fb-aper-len", fbAperLen, 64);
@@ -158,6 +214,9 @@ INSERT_STOP_SYSCTL = '''        sysctl_unregister_oid(&sysctl__debug_phx_hang_ki
         sysctl_unregister_oid(&sysctl__debug_phx_uma_vram_fallbacks);
         sysctl_unregister_oid(&sysctl__debug_phx_uma_vram_bytes);
         sysctl_unregister_oid(&sysctl__debug_phx_uma_vram_faults);
+        sysctl_unregister_oid(&sysctl__debug_phx_gpu_ts);
+        sysctl_unregister_oid(&sysctl__debug_phx_gpu_util);
+        sysctl_unregister_oid(&sysctl__debug_phx_vram_used_bytes);
         gSysctlUp = 0;
     }
     if (umaLock) {
@@ -167,6 +226,13 @@ INSERT_STOP_SYSCTL = '''        sysctl_unregister_oid(&sysctl__debug_phx_hang_ki
         IOLockUnlock(umaLock);
         IOLockFree(umaLock);
         umaLock = nullptr;
+    }
+    if (telemetryLock) {
+        IOLockLock(telemetryLock);
+        telemetry.reset();
+        IOLockUnlock(telemetryLock);
+        IOLockFree(telemetryLock);
+        telemetryLock = nullptr;
     }
 '''
 
@@ -514,13 +580,416 @@ INSERT_SYSCTL_REG = '''        sysctl_register_oid(&sysctl__debug_phx_hang_kills
         sysctl_register_oid(&sysctl__debug_phx_uma_vram_fallbacks);
         sysctl_register_oid(&sysctl__debug_phx_uma_vram_bytes);
         sysctl_register_oid(&sysctl__debug_phx_uma_vram_faults);
+        sysctl_register_oid(&sysctl__debug_phx_gpu_ts);
+        sysctl_register_oid(&sysctl__debug_phx_gpu_util);
+        sysctl_register_oid(&sysctl__debug_phx_vram_used_bytes);
     }
+'''
+
+ANCHOR_ADOPT_QUEUE = '''    q.fenceOff = static_cast<uint32_t>(fenceOff);
+    q.dbByte = dbByte;
+    q.wptr = q.doneEnd = wptr;
+    volatile uint32_t *fence = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + fenceOff);
+    fence[0] = static_cast<uint32_t>(gSeq);
+    fence[1] = static_cast<uint32_t>(gSeq >> 32);
+    hdpFlush();
+    q.ready = true;
+'''
+INSERT_ADOPT_QUEUE = '''    q.fenceOff = static_cast<uint32_t>(fenceOff);
+    q.tsOff = 0;
+    if ((fenceOff & 0xFFFull) == 0 && fenceOff + 0x500ull <= fbAperLen) {
+        const uint64_t tsStart = fenceOff + 0x100ull;
+        const uint64_t tsEnd = tsStart + 0x400ull;
+        const uint64_t ringEnd = ringOff + ringDw * 4ull;
+        const uint64_t wbEnd = wbOff + 32ull;
+        bool overlap = (tsStart < ringEnd && ringOff < tsEnd) || (tsStart < wbEnd && wbOff < tsEnd);
+        const GpuQueue &peer = gq[qi ^ 1];
+        if (peer.ready) {
+            const uint64_t pRingEnd = static_cast<uint64_t>(peer.ringOff) + static_cast<uint64_t>(peer.ringDw) * 4ull;
+            const uint64_t pWbEnd = static_cast<uint64_t>(peer.wbOff) + 32ull;
+            const uint64_t pFenceEnd = static_cast<uint64_t>(peer.fenceOff) + 8ull;
+            if ((tsStart < pRingEnd && peer.ringOff < tsEnd) ||
+                (tsStart < pWbEnd && peer.wbOff < tsEnd) ||
+                (tsStart < pFenceEnd && peer.fenceOff < tsEnd))
+                overlap = true;
+            if (peer.tsOff) {
+                const uint64_t pTsEnd = static_cast<uint64_t>(peer.tsOff) + 0x400ull;
+                if (tsStart < pTsEnd && peer.tsOff < tsEnd)
+                    overlap = true;
+            }
+        }
+        if (!overlap) {
+            q.tsOff = static_cast<uint32_t>(tsStart);
+            volatile uint64_t *tsBuf = reinterpret_cast<volatile uint64_t *>(fbAper->getVirtualAddress() + q.tsOff);
+            for (uint32_t ti = 0; ti < 128; ti++)
+                tsBuf[ti] = 0;
+        }
+    }
+    q.dbByte = dbByte;
+    q.wptr = q.doneEnd = wptr;
+    volatile uint32_t *fence = reinterpret_cast<volatile uint32_t *>(fbAper->getVirtualAddress() + fenceOff);
+    fence[0] = static_cast<uint32_t>(gSeq);
+    fence[1] = static_cast<uint32_t>(gSeq >> 32);
+    hdpFlush();
+    q.ready = true;
+'''
+
+ANCHOR_GPUSUBMIT_BODY = '''IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seqOut) {
+    // doSubmit retains the client lock/BO ownership throughout this call.
+    // Do not reserve ring or history space while waiting with gpuLock released.
+    const uint64_t start = mach_absolute_time();
+    GpuQueue *qp = nullptr;
+    for (bool retried = false;; retried = true) {
+        IOLockLock(gpuLock);
+        // Re-select and validate under the lock after every sleep: adoption,
+        // queue geometry, retirement and other submitters may have changed.
+        qp = gfx ? (gq[1].ready ? &gq[1] : &gq[0]) : (gq[0].ready ? &gq[0] : &gq[1]);
+        if (!qp->ready || !vmCtx(handle)) {
+            IOLockUnlock(gpuLock);
+            return kIOReturnNotReady;
+        }
+        GpuQueue &q = *qp;
+        const uint32_t need = n * 4 + 8 + (q.gfx ? 0u : 8u);
+        if (need + 16 > q.ringDw) {
+            IOLockUnlock(gpuLock);
+            return kIOReturnBadArgument;
+        }
+        const uint64_t done = queueFence(q);
+        while (q.head != q.tail && q.fseq[q.head & 63] <= done) {
+            q.doneEnd = q.fend[q.head & 63];
+            q.head++;
+        }
+        const bool hasSpace = q.tail - q.head < 63 && q.wptr + need - q.doneEnd <= q.ringDw - 16;
+        if (retried || !hasSpace) {
+            uint64_t elapsed = 0;
+            absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsed);
+            if (elapsed >= 2000000000ull) {
+                IOLockUnlock(gpuLock);
+                return kIOReturnBusy;
+            }
+        }
+        if (hasSpace)
+            break;  // Keep the lock through VM binding, packet emission and doorbell.
+        IOLockUnlock(gpuLock);
+        IOSleep(1);
+    }
+    GpuQueue &q = *qp;
+    const uint32_t vmid = vmBind(handle);
+    if (!vmid) {
+        IOLockUnlock(gpuLock);
+        return kIOReturnBusy;
+    }
+    uint32_t k = 0;
+    if (!q.gfx) {
+        ringPut(q, k++, 0xc0065800u);
+        ringPut(q, k++, 0x00000000u);
+        ringPut(q, k++, 0xffffffffu);
+        ringPut(q, k++, 0x00ffffffu);
+        ringPut(q, k++, 0x00000000u);
+        ringPut(q, k++, 0x00000000u);
+        ringPut(q, k++, 0x0000000au);
+        ringPut(q, k++, 0x0000c3b1u);
+    }
+    for (uint32_t i = 0; i < n; i++) {
+        ringPut(q, k++, 0xC0023F00);                               // INDIRECT_BUFFER
+        // the CP wants the canonical (sign-extended) address: an upper-half IB (bit 47, where RADV puts them) with a
+        // bare 16-bit high word silently wedges the queue
+        const uint64_t cva = (ibVa[i] & (1ull << 47)) ? (ibVa[i] | 0xFFFF000000000000ull) : ibVa[i];
+        ringPut(q, k++, static_cast<uint32_t>(cva) & ~3u);
+        ringPut(q, k++, static_cast<uint32_t>(cva >> 32));
+        // size | VMID, plus VALID on compute (gfx_v11_0_ring_emit_ib_compute; the gfx variant has no VALID bit)
+        ringPut(q, k++, ibDw[i] | (q.gfx ? 0u : (1u << 23)) | (vmid << 24));
+    }
+    const uint64_t seq = ++gSeq;
+    hwv[vmid - kFirstUserVmid].lastSeq = seq;
+    const uint64_t fenceMc = fbMcBase + q.fenceOff;
+    ringPut(q, k++, 0xC0064900);                                   // RELEASE_MEM, as gfx_v11_0_ring_emit_fence
+    ringPut(q, k++, 0x06603514);                                   // GCR SEQ|GL2_WB|GLM_INV|GLM_WB, CP 3, CACHE_FLUSH_AND_INV_TS, idx 5
+    ringPut(q, k++, 0x40000000);                                   // DATA_SEL 2 (64-bit), no interrupt
+    ringPut(q, k++, static_cast<uint32_t>(fenceMc));
+    ringPut(q, k++, static_cast<uint32_t>(fenceMc >> 32));
+    ringPut(q, k++, static_cast<uint32_t>(seq));
+    ringPut(q, k++, static_cast<uint32_t>(seq >> 32));
+    ringPut(q, k++, 0);
+    q.wptr += k;
+    q.fseq[q.tail & 63] = seq;
+    q.fend[q.tail & 63] = q.wptr;
+    q.fvmid[q.tail & 63] = vmid;
+    __asm__ __volatile__("" ::: "memory");
+    q.tail = q.tail + 1;
+'''
+INSERT_GPUSUBMIT_BODY = '''void PhxBringup::retireQueueLocked(GpuQueue &q) {
+    if (!q.ready)
+        return;
+    const uint64_t done = queueFence(q);
+    if (q.head == q.tail || q.fseq[q.head & 63] > done)
+        return;
+    uint64_t nowNs = 0;
+    absolutetime_to_nanoseconds(mach_absolute_time(), &nowNs);
+    const uintptr_t aperBase = fbAper ? fbAper->getVirtualAddress() : 0;
+    while (q.head != q.tail && q.fseq[q.head & 63] <= done) {
+        const uint32_t idx = q.head & 63;
+        uint64_t gpuNs = 0;
+        bool fromHw = false;
+        if (q.fHasTs[idx] && q.tsOff && aperBase) {
+            const volatile uint32_t *tp = reinterpret_cast<const volatile uint32_t *>(aperBase + q.tsOff + idx * 16u);
+            const uint64_t tsStart = static_cast<uint64_t>(tp[0]) | (static_cast<uint64_t>(tp[1]) << 32);
+            const uint64_t tsEnd = static_cast<uint64_t>(tp[2]) | (static_cast<uint64_t>(tp[3]) << 32);
+            gpuNs = phx::telemetry::ticksToNs(tsStart, tsEnd);
+            if (gpuNs > 0)
+                fromHw = true;
+        }
+        if (gpuNs == 0 && q.fSubmitNs[idx] > 0)
+            gpuNs = phx::telemetry::clampFallbackNs(q.fSubmitNs[idx], nowNs);
+        if (gpuNs > 0 && telemetryLock) {
+            IOLockLock(telemetryLock);
+            telemetry.addGpuTime(q.fpid[idx], gpuNs, fromHw);
+            IOLockUnlock(telemetryLock);
+        }
+        q.doneEnd = q.fend[idx];
+        q.head++;
+    }
+}
+
+void PhxBringup::telemetryClientOpen(int32_t pid, const char *procName) {
+    if (!telemetryLock || pid <= 0)
+        return;
+    IOLockLock(telemetryLock);
+    telemetry.clientOpen(pid, procName);
+    IOLockUnlock(telemetryLock);
+}
+
+void PhxBringup::telemetryClientClose(int32_t pid) {
+    if (!telemetryLock || pid <= 0)
+        return;
+    IOLockLock(telemetryLock);
+    telemetry.clientClose(pid);
+    IOLockUnlock(telemetryLock);
+}
+
+void PhxBringup::telemetryAddMemory(int32_t pid, int64_t vramDelta, int64_t gttDelta, int64_t hostDelta) {
+    if (!telemetryLock)
+        return;
+    IOLockLock(telemetryLock);
+    telemetry.addMemory(pid, vramDelta, gttDelta, hostDelta);
+    gVramUsedBytes = static_cast<SInt64>(telemetry.vramUsedBytes());
+    IOLockUnlock(telemetryLock);
+}
+
+void PhxBringup::telemetryNoteSubmit(int32_t pid, uint64_t submitAbs) {
+    if (!telemetryLock || pid <= 0)
+        return;
+    IOLockLock(telemetryLock);
+    telemetry.noteSubmit(pid, submitAbs);
+    IOLockUnlock(telemetryLock);
+}
+
+void PhxBringup::snapshotTelemetry(PhxGpuTelemetrySnapshot &out) {
+    if (gpuLock) {
+        IOLockLock(gpuLock);
+        for (GpuQueue &q : gq)
+            retireQueueLocked(q);
+        IOLockUnlock(gpuLock);
+    }
+    uint64_t vramTotal = fbSize;
+    uint64_t gttTotal = kGttCap;
+    uint64_t umaHiTotal = 0, umaHiFree = 0;
+    int umaMode = 0;
+    if (umaQueryHiPool(umaHiTotal, umaHiFree, &umaMode) && umaMode >= 2) {
+        if (vramTotal == 0)
+            vramTotal = kVisTotal + umaHiTotal;
+        gttTotal = kUmaFullGttCap;
+    } else if (vramTotal == 0) {
+        vramTotal = kVisTotal + kHiTotal;
+    }
+    uint64_t nowNs = 0;
+    absolutetime_to_nanoseconds(mach_absolute_time(), &nowNs);
+    if (telemetryLock) {
+        IOLockLock(telemetryLock);
+        telemetry.snapshot(out, nowNs, vramTotal, gttTotal);
+        gGpuUtilPct = static_cast<SInt32>(out.gpuUtilPct);
+        gVramUsedBytes = static_cast<SInt64>(out.vramUsedBytes);
+        IOLockUnlock(telemetryLock);
+    } else {
+        bzero(&out, sizeof(out));
+        out.version = PHX_TELEMETRY_ABI_VERSION;
+        out.vramTotalBytes = vramTotal;
+        out.gttTotalBytes = gttTotal;
+    }
+}
+
+IOReturn PhxBringup::callPlatformFunction(const OSSymbol *functionName, bool waitForFunction,
+                                          void *param1, void *param2, void *param3, void *param4) {
+    if (functionName && functionName->isEqualTo(PHX_TELEMETRY_FN)) {
+        if (!param1)
+            return kIOReturnBadArgument;
+        PhxGpuTelemetrySnapshot *snap = static_cast<PhxGpuTelemetrySnapshot *>(param1);
+        snapshotTelemetry(*snap);
+        return kIOReturnSuccess;
+    }
+    return IOService::callPlatformFunction(functionName, waitForFunction, param1, param2, param3, param4);
+}
+
+IOReturn PhxBringup::gpuSubmit(uint32_t handle, bool gfx, const uint64_t *ibVa, const uint32_t *ibDw, uint32_t n, uint64_t *seqOut, int32_t pid) {
+    // doSubmit retains the client lock/BO ownership throughout this call.
+    // Do not reserve ring or history space while waiting with gpuLock released.
+    const uint64_t start = mach_absolute_time();
+    GpuQueue *qp = nullptr;
+    bool emitTs = false;
+    for (bool retried = false;; retried = true) {
+        IOLockLock(gpuLock);
+        // Re-select and validate under the lock after every sleep: adoption,
+        // queue geometry, retirement and other submitters may have changed.
+        qp = gfx ? (gq[1].ready ? &gq[1] : &gq[0]) : (gq[0].ready ? &gq[0] : &gq[1]);
+        if (!qp->ready || !vmCtx(handle)) {
+            IOLockUnlock(gpuLock);
+            return kIOReturnNotReady;
+        }
+        GpuQueue &q = *qp;
+        emitTs = (gGpuTsEnable != 0) && (q.tsOff != 0);
+        const uint32_t need = n * 4 + 8 + (q.gfx ? 0u : 8u) + (emitTs ? 16u : 0u);
+        if (need + 16 > q.ringDw) {
+            IOLockUnlock(gpuLock);
+            return kIOReturnBadArgument;
+        }
+        retireQueueLocked(q);
+        const bool hasSpace = q.tail - q.head < 63 && q.wptr + need - q.doneEnd <= q.ringDw - 16;
+        if (retried || !hasSpace) {
+            uint64_t elapsed = 0;
+            absolutetime_to_nanoseconds(mach_absolute_time() - start, &elapsed);
+            if (elapsed >= 2000000000ull) {
+                IOLockUnlock(gpuLock);
+                return kIOReturnBusy;
+            }
+        }
+        if (hasSpace)
+            break;  // Keep the lock through VM binding, packet emission and doorbell.
+        IOLockUnlock(gpuLock);
+        IOSleep(1);
+    }
+    GpuQueue &q = *qp;
+    const uint32_t vmid = vmBind(handle);
+    if (!vmid) {
+        IOLockUnlock(gpuLock);
+        return kIOReturnBusy;
+    }
+    const uint32_t slot = q.tail & 63;
+    const uint64_t tsStartMc = emitTs ? (fbMcBase + q.tsOff + slot * 16ull) : 0;
+    const uint64_t tsEndMc = emitTs ? (tsStartMc + 8ull) : 0;
+    if (emitTs) {
+        volatile uint64_t *tp = reinterpret_cast<volatile uint64_t *>(fbAper->getVirtualAddress() + q.tsOff + slot * 16u);
+        tp[0] = 0;
+        tp[1] = 0;
+    }
+    uint32_t k = 0;
+    if (!q.gfx) {
+        ringPut(q, k++, 0xc0065800u);
+        ringPut(q, k++, 0x00000000u);
+        ringPut(q, k++, 0xffffffffu);
+        ringPut(q, k++, 0x00ffffffu);
+        ringPut(q, k++, 0x00000000u);
+        ringPut(q, k++, 0x00000000u);
+        ringPut(q, k++, 0x0000000au);
+        ringPut(q, k++, 0x0000c3b1u);
+    }
+    if (emitTs) {
+        // GFX11 RELEASE_MEM: CACHE_FLUSH_AND_INV_TS (event 0x14, idx 5), DATA_SEL=3 (64-bit GPU clock)
+        ringPut(q, k++, 0xC0064900u);
+        ringPut(q, k++, 0x00000514u);
+        ringPut(q, k++, 0x60000000u);
+        ringPut(q, k++, static_cast<uint32_t>(tsStartMc));
+        ringPut(q, k++, static_cast<uint32_t>(tsStartMc >> 32));
+        ringPut(q, k++, 0u);
+        ringPut(q, k++, 0u);
+        ringPut(q, k++, 0u);
+    }
+    for (uint32_t i = 0; i < n; i++) {
+        ringPut(q, k++, 0xC0023F00);                               // INDIRECT_BUFFER
+        // the CP wants the canonical (sign-extended) address: an upper-half IB (bit 47, where RADV puts them) with a
+        // bare 16-bit high word silently wedges the queue
+        const uint64_t cva = (ibVa[i] & (1ull << 47)) ? (ibVa[i] | 0xFFFF000000000000ull) : ibVa[i];
+        ringPut(q, k++, static_cast<uint32_t>(cva) & ~3u);
+        ringPut(q, k++, static_cast<uint32_t>(cva >> 32));
+        // size | VMID, plus VALID on compute (gfx_v11_0_ring_emit_ib_compute; the gfx variant has no VALID bit)
+        ringPut(q, k++, ibDw[i] | (q.gfx ? 0u : (1u << 23)) | (vmid << 24));
+    }
+    if (emitTs) {
+        ringPut(q, k++, 0xC0064900u);
+        ringPut(q, k++, 0x00000514u);
+        ringPut(q, k++, 0x60000000u);
+        ringPut(q, k++, static_cast<uint32_t>(tsEndMc));
+        ringPut(q, k++, static_cast<uint32_t>(tsEndMc >> 32));
+        ringPut(q, k++, 0u);
+        ringPut(q, k++, 0u);
+        ringPut(q, k++, 0u);
+    }
+    const uint64_t seq = ++gSeq;
+    hwv[vmid - kFirstUserVmid].lastSeq = seq;
+    const uint64_t fenceMc = fbMcBase + q.fenceOff;
+    ringPut(q, k++, 0xC0064900);                                   // RELEASE_MEM, as gfx_v11_0_ring_emit_fence
+    ringPut(q, k++, 0x06603514);                                   // GCR SEQ|GL2_WB|GLM_INV|GLM_WB, CP 3, CACHE_FLUSH_AND_INV_TS, idx 5
+    ringPut(q, k++, 0x40000000);                                   // DATA_SEL 2 (64-bit), no interrupt
+    ringPut(q, k++, static_cast<uint32_t>(fenceMc));
+    ringPut(q, k++, static_cast<uint32_t>(fenceMc >> 32));
+    ringPut(q, k++, static_cast<uint32_t>(seq));
+    ringPut(q, k++, static_cast<uint32_t>(seq >> 32));
+    ringPut(q, k++, 0);
+    q.wptr += k;
+    const uint64_t submitAbs = mach_absolute_time();
+    uint64_t submitNs = 0;
+    absolutetime_to_nanoseconds(submitAbs, &submitNs);
+    q.fseq[slot] = seq;
+    q.fend[slot] = q.wptr;
+    q.fvmid[slot] = vmid;
+    q.fpid[slot] = pid;
+    q.fSubmitNs[slot] = submitNs;
+    q.fHasTs[slot] = emitTs;
+    __asm__ __volatile__("" ::: "memory");
+    q.tail = q.tail + 1;
+    telemetryNoteSubmit(pid, submitAbs);
+'''
+
+ANCHOR_HANG_CHECK = '''void PhxBringup::hangCheck() {
+    const int limitMs = gHangMs;
+    if (limitMs <= 0 || !mmio)
+        return;
+'''
+INSERT_HANG_CHECK = '''void PhxBringup::hangCheck() {
+    if (gpuLock) {
+        IOLockLock(gpuLock);
+        for (GpuQueue &q : gq)
+            retireQueueLocked(q);
+        IOLockUnlock(gpuLock);
+    }
+    const int limitMs = gHangMs;
+    if (limitMs <= 0 || !mmio)
+        return;
 '''
 
 ANCHOR_INIT_CLIENT = '    maps = static_cast<Map *>(IOMallocZero(sizeof(Map) * kMaxMaps));\n'
 INSERT_INIT_CLIENT = '''    maps = static_cast<Map *>(IOMallocZero(sizeof(Map) * kMaxMaps));
     static volatile SInt64 nextUmaOwner;
     umaOwnerId = static_cast<uint64_t>(OSAddAtomic64(1, &nextUmaOwner) + 1);
+    clientPid = proc_selfpid();
+    if (clientPid > 0)
+        proc_name(clientPid, clientProcName, sizeof(clientProcName));
+    else
+        clientProcName[0] = '\\0';
+'''
+
+ANCHOR_CLIENT_START = '''    if (owner->claimSession())
+        sessionClaimed = true;
+    return IOUserClient::start(provider);
+'''
+INSERT_CLIENT_START = '''    if (owner->claimSession())
+        sessionClaimed = true;
+    if (!IOUserClient::start(provider))
+        return false;
+    if (clientPid > 0 && !telemetryOpen) {
+        owner->telemetryClientOpen(clientPid, clientProcName);
+        telemetryOpen = true;
+    }
+    return true;
 '''
 
 ANCHOR_FREE_ALL = '''    for (uint32_t h = 1; h < PHXN_MAX_BOS; h++)
@@ -530,6 +999,14 @@ ANCHOR_FREE_ALL = '''    for (uint32_t h = 1; h < PHXN_MAX_BOS; h++)
 INSERT_FREE_ALL = '''    for (uint32_t h = 1; h < PHXN_MAX_BOS; h++)
         if (bos[h].md || bos[h].uma)
             boRelease(bos[h]);
+    if (owner && (visUsed || hiUsed || umaUsed || gttUsed || hostUsed)) {
+        const uint64_t vramRem = visUsed + hiUsed + umaUsed;
+        owner->telemetryAddMemory(clientPid,
+                                  -static_cast<int64_t>(vramRem),
+                                  -static_cast<int64_t>(gttUsed),
+                                  -static_cast<int64_t>(hostUsed));
+    }
+    visUsed = hiUsed = umaUsed = gttUsed = hostUsed = 0;
 '''
 
 ANCHOR_CLIENT_CLOSE = '''IOReturn IOAccelPhxNativeClient::clientClose() {
@@ -562,6 +1039,23 @@ INSERT_CLIENT_CLOSE = '''IOReturn IOAccelPhxNativeClient::clientClose() {
     freeAll();
     if (lock)
         IOLockUnlock(lock);
+    if (telemetryOpen && owner) {
+        owner->telemetryClientClose(clientPid);
+        telemetryOpen = false;
+    }
+'''
+
+ANCHOR_CLIENT_FREE = '''    if (sessionClaimed && owner)
+        owner->releaseSession();
+    if (bos)
+'''
+INSERT_CLIENT_FREE = '''    if (telemetryOpen && owner) {
+        owner->telemetryClientClose(clientPid);
+        telemetryOpen = false;
+    }
+    if (sessionClaimed && owner)
+        owner->releaseSession();
+    if (bos)
 '''
 
 ANCHOR_FIND_BO = '''IOAccelPhxNativeClient::Bo *IOAccelPhxNativeClient::findBo(uint32_t h) {
@@ -701,6 +1195,8 @@ INSERT_BOCREATE_POOL = '''    uint32_t domain, bits;
         if (owner->umaAlloc(umaOwnerId, size, align, umaAlloc)) {
             bos[h] = Bo{nullptr, umaAlloc.bytes, 4, PHXN_PLACED_HI_POOL | PHXN_PLACED_ZEROED, nullptr, false,
                         true, umaAlloc.slot, umaAlloc.serial, umaAlloc.vramOffset};
+            umaUsed += umaAlloc.bytes;
+            owner->telemetryAddMemory(clientPid, static_cast<int64_t>(umaAlloc.bytes), 0, 0);
             a->scalarOutput[0] = h;
             a->scalarOutput[1] = umaAlloc.bytes;
             a->scalarOutput[2] = 4;
@@ -746,6 +1242,10 @@ INSERT_BOCREATE_POOL = '''    uint32_t domain, bits;
     bzero(md->getBytesNoCopy(), size);
     *pool += size;
     bos[h] = Bo{md, size, domain, bits, static_cast<uint8_t *>(md->getBytesNoCopy()), false, false, 0, 0, 0};
+    if (domain == 4)
+        owner->telemetryAddMemory(clientPid, static_cast<int64_t>(size), 0, 0);
+    else
+        owner->telemetryAddMemory(clientPid, 0, static_cast<int64_t>(size), 0);
 '''
 
 ANCHOR_BOFREE_BODY = '''    for (int i = 0; i < kMaxMaps; i++)
@@ -773,22 +1273,30 @@ INSERT_BOFREE_BODY = '''    for (int i = 0; i < kMaxMaps; i++) {
         const uint32_t slot = b->umaSlot;
         const uint64_t serial = b->umaSerial;
         const uint64_t seq = lastSeq;
+        const uint64_t freedBytes = b->size;
+        umaUsed = umaUsed >= freedBytes ? umaUsed - freedBytes : 0;
         *b = Bo{};
         if (owner) {
+            owner->telemetryAddMemory(clientPid, -static_cast<int64_t>(freedBytes), 0, 0);
             IOLockUnlock(lock);
             owner->umaFree(umaOwnerId, slot, serial, seq);
             IOLockLock(lock);
         }
         return kIOReturnSuccess;
     }
-    if (b->host)
+    if (b->host) {
         hostUsed -= b->size;
-    else if (b->domain == 2)
+        if (owner) owner->telemetryAddMemory(clientPid, 0, 0, -static_cast<int64_t>(b->size));
+    } else if (b->domain == 2) {
         gttUsed -= b->size;
-    else if (b->bits & PHXN_PLACED_HI_POOL)
+        if (owner) owner->telemetryAddMemory(clientPid, 0, -static_cast<int64_t>(b->size), 0);
+    } else if (b->bits & PHXN_PLACED_HI_POOL) {
         hiUsed -= b->size;
-    else
+        if (owner) owner->telemetryAddMemory(clientPid, -static_cast<int64_t>(b->size), 0, 0);
+    } else {
         visUsed -= b->size;
+        if (owner) owner->telemetryAddMemory(clientPid, -static_cast<int64_t>(b->size), 0, 0);
+    }
     boRelease(*b);
     return kIOReturnSuccess;
 '''
@@ -825,7 +1333,13 @@ INSERT_IMPORT_HOST_LOOP = '''    uint32_t h = 1;
 '''
 
 ANCHOR_IMPORT_HOST_SET = '    bos[h] = Bo{md, size, 2, 0, nullptr, true};\n'
-INSERT_IMPORT_HOST_SET = '    bos[h] = Bo{md, size, 2, 0, nullptr, true, false, 0, 0, 0};\n'
+INSERT_IMPORT_HOST_SET = '''    bos[h] = Bo{md, size, 2, 0, nullptr, true, false, 0, 0, 0};
+    if (owner)
+        owner->telemetryAddMemory(clientPid, 0, 0, static_cast<int64_t>(size));
+'''
+
+ANCHOR_DOSUBMIT_CALL = '        const IOReturn r = owner->gpuSubmit(vmid, ib0.ip_type == PHX_AMDGPU_HW_IP_GFX, va, dw, h.num_ibs, &seq);\n'
+INSERT_DOSUBMIT_CALL = '        const IOReturn r = owner->gpuSubmit(vmid, ib0.ip_type == PHX_AMDGPU_HW_IP_GFX, va, dw, h.num_ibs, &seq, clientPid);\n'
 
 ANCHOR_GEMVA_MAP = '''        maps[freei] = Map{true, v->handle, va, v->map_size, v->offset_in_bo, v->flags};
         if (owner->gpuReady()) {
@@ -888,6 +1402,8 @@ REPLACEMENTS = [
     (ANCHOR_SYSCTL, INSERT_SYSCTL),
     (ANCHOR_GTT_CAP, INSERT_GTT_CAP),
     (ANCHOR_PUBLIC_METHODS, INSERT_PUBLIC_METHODS),
+    (ANCHOR_GPUSUBMIT_DECL, INSERT_GPUSUBMIT_DECL),
+    (ANCHOR_GPUQUEUE_STRUCT, INSERT_GPUQUEUE_STRUCT),
     (ANCHOR_PT_CHUNKS, INSERT_PT_CHUNKS),
     (ANCHOR_PRIVATE_MEMBERS, INSERT_PRIVATE_MEMBERS),
     (ANCHOR_BO_STRUCT, INSERT_BO_STRUCT),
@@ -897,11 +1413,16 @@ REPLACEMENTS = [
     (ANCHOR_STOP_SYSCTL, INSERT_STOP_SYSCTL),
     (ANCHOR_SLEEP, INSERT_SLEEP),
     (ANCHOR_READ_FB_END, INSERT_UMA_HELPERS),
+    (ANCHOR_ADOPT_QUEUE, INSERT_ADOPT_QUEUE),
     (ANCHOR_VMUNMAP, INSERT_VMMAP_UMA),
+    (ANCHOR_GPUSUBMIT_BODY, INSERT_GPUSUBMIT_BODY),
+    (ANCHOR_HANG_CHECK, INSERT_HANG_CHECK),
     (ANCHOR_SYSCTL_REG, INSERT_SYSCTL_REG),
     (ANCHOR_INIT_CLIENT, INSERT_INIT_CLIENT),
+    (ANCHOR_CLIENT_START, INSERT_CLIENT_START),
     (ANCHOR_FREE_ALL, INSERT_FREE_ALL),
     (ANCHOR_CLIENT_CLOSE, INSERT_CLIENT_CLOSE),
+    (ANCHOR_CLIENT_FREE, INSERT_CLIENT_FREE),
     (ANCHOR_FIND_BO, INSERT_FIND_BO),
     (ANCHOR_CLIENT_MEM, INSERT_CLIENT_MEM),
     (ANCHOR_QUERY_INFO, INSERT_QUERY_INFO),
@@ -912,6 +1433,7 @@ REPLACEMENTS = [
     (ANCHOR_IMPORT_HOST_SET, INSERT_IMPORT_HOST_SET),
     (ANCHOR_GEMVA_MAP, INSERT_GEMVA_MAP),
     (ANCHOR_IB_COVERED, INSERT_IB_COVERED),
+    (ANCHOR_DOSUBMIT_CALL, INSERT_DOSUBMIT_CALL),
 ]
 
 
@@ -948,7 +1470,7 @@ def build_candidate(sdk_path: Path, out_dir: Path) -> Path:
     amd_dir.mkdir(parents=True, mode=0o700)
     shutil.copy2(ROOT / 'src/amd/phx_topology.h', amd_dir / 'phx_topology.h')
     phx_dir = ROOT / 'src/phxbringup'
-    for name in ('Info.plist', 'PhxNativeABI.h', 'PhxUmaPool.h', 'kmod_info.c', 'build.sh'):
+    for name in ('Info.plist', 'PhxNativeABI.h', 'PhxUmaPool.h', 'PhxTelemetry.h', 'kmod_info.c', 'build.sh'):
         shutil.copy2(phx_dir / name, src_dir / name)
     staged = stage_driver((phx_dir / 'PhxBringup.cpp').read_bytes())
     (src_dir / 'PhxBringup.cpp').write_bytes(staged)

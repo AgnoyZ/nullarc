@@ -8,7 +8,7 @@ OUT="$HERE/build/PhxAccel.kext"
 rm -rf "$HERE/build"
 mkdir -p "$OUT/Contents/MacOS"
 clang++ -arch x86_64 -mmacosx-version-min=11.0 -fapple-kext -mkernel -nostdinc -I"$MKSDK/Headers" -I"$HERE" \
-  -I"$HERE/accel" -I"$HERE/accel/iofam" -I"$HERE/accel/re" \
+  -I"$HERE/accel" -I"$HERE/accel/iofam" -I"$HERE/accel/re" -I"$HERE/../phxbringup" \
   -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT -DNMX_ACCEL -DNM_TAHOE -DPHX_FB \
   -std=c++17 -fno-rtti -fno-exceptions -fno-builtin -fno-common -O2 \
   -Wall -Wno-unused-parameter -Wno-inconsistent-missing-override -Wno-unused-function -Wno-unused-variable \
