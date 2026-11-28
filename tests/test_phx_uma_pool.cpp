@@ -158,7 +158,10 @@ static void testAllocatorLifecycleAndStress() {
     check(pool.encodePagePte(10, alloc.slot, alloc.serial, 4096, true, pteRw), "encode RW local PTE");
     check(pteRo == ((alloc.physBase & kPtAddrMask) | kPteLocalReadFlags), "RO local PTE value");
     check(pteRw == (((alloc.physBase + 4096) & kPtAddrMask) | kPteLocalRwFlags), "RW local PTE value");
-    check((pteRw & 0x16ull) == 0, "local PTE clears SYSTEM, SNOOPED, and EXEC bits");
+    // amdgpu_vm.h: VALID=0x1 SYSTEM=0x2 SNOOPED=0x4 EXECUTABLE=0x10 READABLE=0x20 WRITEABLE=0x40
+    check((pteRw & 0x6ull) == 0, "local PTE clears SYSTEM and SNOOPED bits");
+    check((pteRo & 0x31ull) == 0x31ull && (pteRw & 0x31ull) == 0x31ull, "local PTE keeps VALID, EXEC and READ bits");
+    check((pteRw & 0x40ull) != 0 && (pteRo & 0x40ull) == 0, "WRITE only on the writable encoding");
     check(!pool.encodePagePte(11, alloc.slot, alloc.serial, 0, true, pteRw), "wrong owner refused");
     check(!pool.encodePagePte(10, alloc.slot, alloc.serial, 8192, true, pteRw), "out of range offset refused");
     check(!pool.release(11, alloc.slot, alloc.serial), "wrong owner release refused");

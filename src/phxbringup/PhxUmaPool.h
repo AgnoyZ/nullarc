@@ -32,11 +32,13 @@ static constexpr uint32_t kDiscoveryTmrSize = 10u << 10;
 static constexpr uint32_t kDiscoveryMaxSize = 64u << 10;
 static constexpr uint32_t kDiscoverySignature = 0x28211407u;
 
-// GPUVM leaf PTE flags for local UMA VRAM (mesboot.c vm8_test):
-// VALID(0x1) | READ(0x20) | WRITE(0x40), SYSTEM=0, SNOOPED=0, EXEC=0, MTYPE=4.
+// GPUVM leaf PTE flags for local UMA VRAM (mesboot.c gart()/vm8_test): the
+// GART identity table maps local FB pages with 0x71 (VALID|EXEC|READ|WRITE)
+// and MTYPE 4, and RADV maps every VRAM BO with EXECUTABLE set, so local
+// VRAM keeps EXEC on: SYSTEM=0, SNOOPED=0, MTYPE=4.
 static constexpr uint64_t kPtAddrMask = 0x0000FFFFFFFFF000ull;
-static constexpr uint64_t kPteLocalReadFlags = 0x21ull | (4ull << 48);
-static constexpr uint64_t kPteLocalRwFlags = 0x61ull | (4ull << 48);
+static constexpr uint64_t kPteLocalReadFlags = 0x31ull | (4ull << 48);   // VALID | EXEC | READ
+static constexpr uint64_t kPteLocalRwFlags = 0x71ull | (4ull << 48);     // VALID | EXEC | READ | WRITE
 
 // Minimum valid alias sample counts when verifying phx-fb-phys against BAR0.
 static constexpr uint32_t kAliasMinSamples = 64u;
@@ -284,7 +286,7 @@ static inline uint64_t encodeLocalVramPte(uint64_t physBase, uint64_t vramOffset
 // Callers serialize all methods under a lock (e.g. PhxBringup::umaLock).
 class HighUmaAllocator {
 public:
-    static constexpr uint32_t kMaxAllocs = 512u;
+    static constexpr uint32_t kMaxAllocs = 2048u;
 
     struct Allocation {
         uint64_t serial{0};

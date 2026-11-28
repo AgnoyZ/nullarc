@@ -39,11 +39,19 @@ class Build34UmaStageTests(unittest.TestCase):
         self.assertIn('setProperty("phx-uma-full-host-status"', staged)
         self.assertIn('phx::uma::classifyBootMap(', staged)
 
-        # Phase 2 safety: no CPU mmap and no EXECUTABLE IB mapping on UMA BOs
+        # Phase 2 safety: no CPU mmap on UMA BOs; EXECUTABLE is accepted (RADV maps
+        # every VRAM BO EXECUTABLE) and the local VRAM PTE keeps EXEC set.
         self.assertIn('if (b->uma || !b->md)', staged)
-        self.assertIn('if (b->uma && (v->flags & PHX_AMDGPU_VM_PAGE_EXECUTABLE))', staged)
+        self.assertNotIn('return kIOReturnUnsupported;\n        maps[freei] = Map{true, v->handle', staged)
+        header_text = UMA_HEADER.read_text(encoding='utf-8')
+        self.assertIn('kPteLocalRwFlags = 0x71ull | (4ull << 48)', header_text)
+        self.assertIn('kPteLocalReadFlags = 0x31ull | (4ull << 48)', header_text)
         # Correct AMDGPU_VM_PAGE_WRITEABLE bit (1 << 2)
         self.assertIn('(v->flags & (1u << 2)) != 0', staged)
+        # CP instruction fetch from the high UMA carve-out faults on Phoenix: an IB
+        # whose VA lands on a UMA BO mapping must be refused before submission.
+        self.assertIn('const Bo *mapped = findBo(mp.handle);', staged)
+        self.assertIn('if (mapped && mapped->uma)\n                    return false;', staged)
 
         # Client close tears down VMID before releasing UMA BOs
         vmid_free_idx = staged.index('owner->vmidFree(closingVmid, closingSeq);')
@@ -53,8 +61,14 @@ class Build34UmaStageTests(unittest.TestCase):
         # Sleep trips fault latch on active UMA pool
         self.assertIn('umaPool.tripFault();', staged)
 
+        # Full-mode Vulkan/Metal 4 GiB reporting + large-BO page-table capacity + boot-arg opt-in
+        self.assertIn('kPtChunks = 192;', staged)
+        self.assertIn('kUmaFullGttCap = 2048ull << 20;', staged)
+        self.assertIn('inf.vram_vis_total = kVisTotal + umaHiTotal;', staged)
+        self.assertIn('PE_parse_boot_argn("phx_uma_vram"', staged)
+        self.assertIn('kMaxAllocs = 2048u;', header_text)
+
         # License hygiene: MIT/GPL-2.0 header, no PolyForm header or NullMoth code copy
-        header_text = UMA_HEADER.read_text(encoding='utf-8')
         self.assertIn('SPDX-License-Identifier: MIT OR GPL-2.0-only', header_text)
         self.assertNotIn('PolyForm', header_text)
         self.assertNotIn('PolyForm', staged)

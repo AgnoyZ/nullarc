@@ -16,9 +16,10 @@ Phase 2 (opt-in via sysctl debug.phx_uma_vram):
   proved geometry, discovery signature, alias match, and EFI ReservedTypeOnly coverage.
 - Mode 2 (full): admits [256 MiB, fbSize - topReserve) only when Phase 1 proved full
   window coverage; reports real pool capacity/free bytes in vram_hi_total/vram_hi_free.
-- High-UMA BOs are data-only (no CPU mmap via clientMemoryForType, no EXECUTABLE IB
-  mapping), zeroed before use via write-combining alias mapping, mapped with local
-  VRAM PTEs (0x21 / 0x61 | MTYPE 4), and unmapped + retirement-drained before release.
+- High-UMA BOs refuse CPU mmap via clientMemoryForType, are zeroed before use via
+  write-combining alias mapping, and are mapped with local VRAM PTEs (0x31 / 0x71 |
+  MTYPE 4, EXEC kept: RADV maps every VRAM BO EXECUTABLE) and unmapped +
+  retirement-drained before release.
 """
 import argparse
 import hashlib
@@ -66,12 +67,24 @@ INSERT_PUBLIC_METHODS = '''    IOReturn vmUnmap(uint32_t vmid, uint64_t va, uint
     bool umaAlloc(uint64_t ownerId, uint64_t size, uint64_t align, phx::uma::HighUmaAllocator::Allocation &out);
     void umaFree(uint64_t ownerId, uint32_t slot, uint64_t serial, uint64_t lastSeq);
     void umaQuarantine(uint64_t ownerId, uint32_t slot, uint64_t serial);
-    bool umaQueryHiPool(uint64_t &totalOut, uint64_t &freeOut);
+    bool umaQueryHiPool(uint64_t &totalOut, uint64_t &freeOut, int *activeModeOut = nullptr);
+'''
+
+ANCHOR_PT_CHUNKS = '    static constexpr uint32_t kPtChunkBytes = 64u << 10, kPtChunkPages = kPtChunkBytes / 4096, kPtChunks = 64;\n'
+INSERT_PT_CHUNKS = '    static constexpr uint32_t kPtChunkBytes = 64u << 10, kPtChunkPages = kPtChunkBytes / 4096, kPtChunks = 192;\n'
+
+ANCHOR_GTT_CAP = '''static constexpr uint64_t kGttCap = 512ull << 20;
+static constexpr uint64_t kGttMaxBo = 256ull << 20;
+'''
+INSERT_GTT_CAP = '''static constexpr uint64_t kGttCap = 512ull << 20;
+static constexpr uint64_t kGttMaxBo = 256ull << 20;
+static constexpr uint64_t kUmaFullGttCap = 2048ull << 20;
 '''
 
 ANCHOR_PRIVATE_MEMBERS = '    volatile SInt32 sessionOpen{0};\n'
 INSERT_PRIVATE_MEMBERS = '''    volatile SInt32 sessionOpen{0};
     void probeUmaReadOnly();
+    bool verifyUmaAliasReadOnly(bool publishProps);
     bool ensureUmaAdmittedLocked(int requestedMode);
     uint32_t vramReadMmIndex(uint64_t pos) const;
     bool zeroUmaRange(uint64_t physBase, uint64_t bytes) const;
@@ -120,6 +133,18 @@ INSERT_START_LOCK = '    gpuLock = IOLockAlloc();\n    umaLock = IOLockAlloc();\
 ANCHOR_START_PROBE = '    setProperty("phx-fb-aper-len", fbAperLen, 64);\n'
 INSERT_START_PROBE = '''    setProperty("phx-fb-aper-len", fbAperLen, 64);
     probeUmaReadOnly();
+    {
+        int bootUmaMode = 0;
+        if (PE_parse_boot_argn("phx_uma_vram", &bootUmaMode, sizeof(bootUmaMode)) &&
+            (bootUmaMode == 1 || bootUmaMode == 2)) {
+            gUmaVramMode = bootUmaMode;
+            if (umaLock) {
+                IOLockLock(umaLock);
+                ensureUmaAdmittedLocked(gUmaVramMode);
+                IOLockUnlock(umaLock);
+            }
+        }
+    }
 '''
 
 ANCHOR_STOP_SYSCTL = '''        sysctl_unregister_oid(&sysctl__debug_phx_hang_kills);
@@ -176,6 +201,42 @@ uint32_t PhxBringup::vramReadMmIndex(uint64_t pos) const {
     return rreg(phx::uma::kRegMmData);
 }
 
+bool PhxBringup::verifyUmaAliasReadOnly(bool publishProps) {
+    if (!fbAper || fbAperLen < (16ull << 20) || !fbPhys)
+        return false;
+    // Read-only alias check: sample across the first 16 MiB of phx-fb-phys
+    // against BAR0 (4096 stride-spaced dwords so even a mostly-black boot
+    // screen hits non-zero pixels, and re-callable once desktop scanout is up).
+    const uint64_t probeBytes = 16ull << 20;
+    IODeviceMemory *dm = IODeviceMemory::withRange(fbPhys, probeBytes);
+    if (!dm)
+        return false;
+    IOMemoryMap *alias = dm->map(kIOMapWriteCombineCache);
+    dm->release();
+    if (!alias)
+        return false;
+    const volatile uint32_t *a = reinterpret_cast<const volatile uint32_t *>(alias->getVirtualAddress());
+    const volatile uint32_t *b = reinterpret_cast<const volatile uint32_t *>(fbAper->getVirtualAddress());
+    const uint64_t words = probeBytes / 4;
+    const uint64_t step = words / 4096u;
+    uint32_t same = 0, total = 0, nonZero = 0;
+    for (uint64_t w = 0; w < words && total < 4096u; w += step, ++total) {
+        const uint32_t va = a[w], vb = b[w];
+        same += (va == vb) ? 1u : 0u;
+        nonZero += (vb != 0) ? 1u : 0u;
+    }
+    alias->release();
+    const bool matched = phx::uma::aliasVerificationMatches(same, total, nonZero);
+    umaAliasMatched = matched;
+    if (publishProps) {
+        setProperty("phx-uma-alias-matched", umaAliasMatched);
+        setProperty("phx-uma-alias-same", same, 32);
+        setProperty("phx-uma-alias-total", total, 32);
+        setProperty("phx-uma-alias-nonzero", nonZero, 32);
+    }
+    return matched;
+}
+
 void PhxBringup::probeUmaReadOnly() {
     umaGeom = phx::uma::Geometry{fbMcBase, fbPhys, fbSize, fbAperLen};
     umaDisc = phx::uma::DiscoveryProbe{};
@@ -207,33 +268,7 @@ void PhxBringup::probeUmaReadOnly() {
         }
         umaDisc = phx::uma::classifyDiscoveryProbe(fbSize, memsizeMb, ipVer, discOff, discBytes, discSig);
         umaPlan = phx::uma::planHighUmaWindows(umaGeom, umaDisc);
-
-        if (fbAper && fbAperLen >= (16ull << 20)) {
-            // Read-only alias check: compare 128 sampled dwords across the first 16 MiB
-            // of phx-fb-phys against BAR0, matching PhxAMDFB's concept without writing anything.
-            const uint64_t probeBytes = 16ull << 20;
-            if (IODeviceMemory *dm = IODeviceMemory::withRange(fbPhys, probeBytes)) {
-                if (IOMemoryMap *alias = dm->map(kIOMapWriteCombineCache)) {
-                    const volatile uint32_t *a = reinterpret_cast<const volatile uint32_t *>(alias->getVirtualAddress());
-                    const volatile uint32_t *b = reinterpret_cast<const volatile uint32_t *>(fbAper->getVirtualAddress());
-                    const uint64_t words = probeBytes / 4;
-                    const uint64_t step = words / 128u;
-                    uint32_t same = 0, total = 0, nonZero = 0;
-                    for (uint64_t w = 0; w < words && total < 128u; w += step, ++total) {
-                        const uint32_t va = a[w], vb = b[w];
-                        same += (va == vb) ? 1u : 0u;
-                        nonZero += (vb != 0) ? 1u : 0u;
-                    }
-                    umaAliasMatched = phx::uma::aliasVerificationMatches(same, total, nonZero);
-                    setProperty("phx-uma-alias-matched", umaAliasMatched);
-                    setProperty("phx-uma-alias-same", same, 32);
-                    setProperty("phx-uma-alias-total", total, 32);
-                    setProperty("phx-uma-alias-nonzero", nonZero, 32);
-                    alias->release();
-                }
-                dm->release();
-            }
-        }
+        verifyUmaAliasReadOnly(true);
 
         if (umaPlan.valid) {
             const uint8_t *bootArgsBytes = reinterpret_cast<const uint8_t *>(PE_state.bootArgs);
@@ -303,18 +338,30 @@ bool PhxBringup::zeroUmaRange(uint64_t physBase, uint64_t bytes) const {
 }
 
 bool PhxBringup::ensureUmaAdmittedLocked(int requestedMode) {
-    if (requestedMode <= 0 || isSleeping || !umaPlan.valid || !umaAliasMatched)
+    if (requestedMode <= 0 || isSleeping || !umaPlan.valid)
         return false;
     if (umaPool.stats().faulted)
         return false;
-    if (umaActiveMode != 0)
-        return true;
-    const phx::uma::Range target = (requestedMode >= 2) ? umaPlan.fullHighWindow : umaPlan.pilotWindow;
+    const int targetMode = (requestedMode >= 2) ? 2 : 1;
+    if (umaActiveMode != 0) {
+        if (umaActiveMode == targetMode)
+            return true;
+        const auto st = umaPool.stats();
+        if (st.liveCount == 0 && st.quarantinedCount == 0 && !st.faulted) {
+            umaPool.reset();
+            umaActiveMode = 0;
+        } else {
+            return true;
+        }
+    }
+    if (!umaAliasMatched && !verifyUmaAliasReadOnly(false))
+        return false;
+    const phx::uma::Range target = (targetMode == 2) ? umaPlan.fullHighWindow : umaPlan.pilotWindow;
     const phx::uma::HostExclusionStatus hostStatus =
-        (requestedMode >= 2) ? umaFullHostStatus : umaPilotHostStatus;
+        (targetMode == 2) ? umaFullHostStatus : umaPilotHostStatus;
     if (!umaPool.admit(umaGeom, target, umaPlan.discoveryRange, hostStatus, umaAliasMatched))
         return false;
-    umaActiveMode = (requestedMode >= 2) ? 2 : 1;
+    umaActiveMode = targetMode;
     IOLog("PhxBringup: UMA high-VRAM pool admitted (mode=%d, offset=0x%llx, size=%llu MiB)\\n",
           umaActiveMode, static_cast<unsigned long long>(target.offset),
           static_cast<unsigned long long>(target.bytes >> 20));
@@ -382,7 +429,9 @@ void PhxBringup::umaQuarantine(uint64_t ownerId, uint32_t slot, uint64_t serial)
     OSAddAtomic(1, &gUmaVramFaults);
 }
 
-bool PhxBringup::umaQueryHiPool(uint64_t &totalOut, uint64_t &freeOut) {
+bool PhxBringup::umaQueryHiPool(uint64_t &totalOut, uint64_t &freeOut, int *activeModeOut) {
+    if (activeModeOut)
+        *activeModeOut = 0;
     const int mode = gUmaVramMode;
     if (mode <= 0 || !umaLock)
         return false;
@@ -392,11 +441,14 @@ bool PhxBringup::umaQueryHiPool(uint64_t &totalOut, uint64_t &freeOut) {
         return false;
     }
     const auto st = umaPool.stats();
+    const int activeMode = umaActiveMode;
     IOLockUnlock(umaLock);
     if (!st.admitted || st.faulted || !st.capacityBytes)
         return false;
     totalOut = st.capacityBytes;
     freeOut = st.capacityBytes > st.usedBytes ? st.capacityBytes - st.usedBytes : 0;
+    if (activeModeOut)
+        *activeModeOut = activeMode;
     return true;
 }
 '''
@@ -544,16 +596,49 @@ INSERT_CLIENT_MEM = '''    Bo *b = findBo(type);
     b->md->retain();
 '''
 
-ANCHOR_QUERY_INFO = '''    inf.vram_hi_total = kHiTotal;
+ANCHOR_QUERY_INFO = '''    inf.vram_vis_total = kVisTotal;
+    inf.vram_vis_free = kVisTotal - visUsed;
+    inf.vram_hi_total = kHiTotal;
     inf.vram_hi_free = kHiTotal - hiUsed;
+    inf.gtt_cap = kGttCap;
+    inf.gtt_used = gttUsed;
+    inf.gtt_max_bo = kGttMaxBo;
 '''
 INSERT_QUERY_INFO = '''    uint64_t umaHiTotal = 0, umaHiFree = 0;
-    if (owner->umaQueryHiPool(umaHiTotal, umaHiFree)) {
-        inf.vram_hi_total = umaHiTotal;
-        inf.vram_hi_free = umaHiFree;
+    int umaMode = 0;
+    const uint64_t visFree = kVisTotal > visUsed ? kVisTotal - visUsed : 0;
+    if (owner->umaQueryHiPool(umaHiTotal, umaHiFree, &umaMode)) {
+        if (umaMode >= 2) {
+            // On Phoenix APU (has_dedicated_vram == 0), RADV discards vram_hi_total
+            // and computes DEVICE_LOCAL = 2/3 * (vram_vis_total + gtt_cap) and
+            // GTT = 1/3 * (vram_vis_total + gtt_cap). Report the combined visible +
+            // verified high-UMA pool in vram_vis_* with a 2 GiB GTT cap so RADV and
+            // NVMTL see the real ~4 GiB VRAM heap while doBoCreate keeps CPU-mappable
+            // allocations bounded to kVisTotal and backs NO_CPU_ACCESS VRAM BOs in UMA.
+            inf.vram_vis_total = kVisTotal + umaHiTotal;
+            inf.vram_vis_free = visFree + umaHiFree;
+            inf.vram_hi_total = 0;
+            inf.vram_hi_free = 0;
+            inf.gtt_cap = kUmaFullGttCap;
+            inf.gtt_used = gttUsed;
+            inf.gtt_max_bo = kGttMaxBo;
+        } else {
+            inf.vram_vis_total = kVisTotal;
+            inf.vram_vis_free = visFree;
+            inf.vram_hi_total = umaHiTotal;
+            inf.vram_hi_free = umaHiFree;
+            inf.gtt_cap = kGttCap;
+            inf.gtt_used = gttUsed;
+            inf.gtt_max_bo = kGttMaxBo;
+        }
     } else {
+        inf.vram_vis_total = kVisTotal;
+        inf.vram_vis_free = visFree;
         inf.vram_hi_total = kHiTotal;
         inf.vram_hi_free = kHiTotal > hiUsed ? kHiTotal - hiUsed : 0;
+        inf.gtt_cap = kGttCap;
+        inf.gtt_used = gttUsed;
+        inf.gtt_max_bo = kGttMaxBo;
     }
 '''
 
@@ -637,7 +722,12 @@ INSERT_BOCREATE_POOL = '''    uint32_t domain, bits;
             return kIOReturnNoMemory;
         }
     } else {
-        if (size > kGttMaxBo || gttUsed + size > kGttCap)
+        uint64_t umaHiTotal = 0, umaHiFree = 0;
+        int umaMode = 0;
+        const uint64_t effectiveGttCap =
+            (owner->umaQueryHiPool(umaHiTotal, umaHiFree, &umaMode) && umaMode >= 2)
+                ? kUmaFullGttCap : kGttCap;
+        if (size > kGttMaxBo || gttUsed + size > effectiveGttCap)
             return kIOReturnNoMemory;
         domain = 2;
         bits = PHXN_PLACED_ZEROED;
@@ -748,7 +838,7 @@ ANCHOR_GEMVA_MAP = '''        maps[freei] = Map{true, v->handle, va, v->map_size
         return kIOReturnSuccess;
 '''
 INSERT_GEMVA_MAP = '''        if (b->uma && (v->flags & PHX_AMDGPU_VM_PAGE_EXECUTABLE))
-            return kIOReturnUnsupported;
+            (void)0;   // local VRAM PTE keeps EXEC (0x71 | MTYPE 4): RADV maps every VRAM BO EXECUTABLE
         maps[freei] = Map{true, v->handle, va, v->map_size, v->offset_in_bo, v->flags};
         if (owner->gpuReady()) {
             IOReturn r = kIOReturnNoResources;
@@ -767,10 +857,38 @@ INSERT_GEMVA_MAP = '''        if (b->uma && (v->flags & PHX_AMDGPU_VM_PAGE_EXECU
         return kIOReturnSuccess;
 '''
 
+ANCHOR_IB_COVERED = '''        for (int i = 0; i < kMaxMaps; i++) {
+            const Map &mp = maps[i];
+            if (mp.used && (mp.flags & PHX_AMDGPU_VM_PAGE_EXECUTABLE) && cur >= mp.va && cur < mp.va + mp.size) {
+                cur = mp.va + mp.size < end ? mp.va + mp.size : end;
+                ok = true;
+                break;
+            }
+        }
+'''
+INSERT_IB_COVERED = '''        for (int i = 0; i < kMaxMaps; i++) {
+            const Map &mp = maps[i];
+            if (mp.used && (mp.flags & PHX_AMDGPU_VM_PAGE_EXECUTABLE) && cur >= mp.va && cur < mp.va + mp.size) {
+                // CP instruction fetch from the high UMA carve-out faults on Phoenix (live
+                // 2026-11-28: data reads/writes/copies all pass, an IB placed there GPUVM-faults
+                // and hangs the queue). RADV keeps every IB in GTT; refuse it here so a client
+                // can never trip the fault.
+                const Bo *mapped = findBo(mp.handle);
+                if (mapped && mapped->uma)
+                    return false;
+                cur = mp.va + mp.size < end ? mp.va + mp.size : end;
+                ok = true;
+                break;
+            }
+        }
+'''
+
 REPLACEMENTS = [
     (ANCHOR_INCLUDES, INSERT_INCLUDES),
     (ANCHOR_SYSCTL, INSERT_SYSCTL),
+    (ANCHOR_GTT_CAP, INSERT_GTT_CAP),
     (ANCHOR_PUBLIC_METHODS, INSERT_PUBLIC_METHODS),
+    (ANCHOR_PT_CHUNKS, INSERT_PT_CHUNKS),
     (ANCHOR_PRIVATE_MEMBERS, INSERT_PRIVATE_MEMBERS),
     (ANCHOR_BO_STRUCT, INSERT_BO_STRUCT),
     (ANCHOR_CLIENT_MEMBERS, INSERT_CLIENT_MEMBERS),
@@ -793,6 +911,7 @@ REPLACEMENTS = [
     (ANCHOR_IMPORT_HOST_LOOP, INSERT_IMPORT_HOST_LOOP),
     (ANCHOR_IMPORT_HOST_SET, INSERT_IMPORT_HOST_SET),
     (ANCHOR_GEMVA_MAP, INSERT_GEMVA_MAP),
+    (ANCHOR_IB_COVERED, INSERT_IB_COVERED),
 ]
 
 

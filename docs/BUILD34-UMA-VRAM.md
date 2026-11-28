@@ -213,14 +213,15 @@ clean-room MIT/GPL-2.0 allocator and staging pipeline live in:
   `[256 MiB, 320 MiB)` and `fullHighWindow` `[256 MiB, fbSize - 64 MiB)`
   clamped below IP Discovery), read-only BAR0-vs-`phx-fb-phys` alias matcher,
   x86_64 `boot_args` EFI memory-map classifier, local VRAM PTE encoder
-  (`0x21`/`0x61 | (4 << 48)` — `VALID|READ(|WRITE)`, `SYSTEM=0`, `SNOOPED=0`,
-  `EXEC=0`, `MTYPE=4`), and fixed-capacity `HighUmaAllocator` with quarantine
+  (`0x31`/`0x71 | (4 << 48)` — `VALID|EXEC|READ(|WRITE)`, `SYSTEM=0`, `SNOOPED=0`,
+  `MTYPE=4`, the same local-FB leaf flags as `mesboot.c`'s GART table), and
+  fixed-capacity `HighUmaAllocator` with quarantine
   and fault latch.
 - `tools/build34_uma_stage.py`: stages Phase 1 + Phase 2 onto exact build34
   `PhxBringup.cpp` and builds a signed `PhxBringup.kext` in a fresh
   `build/*-private` directory using `MacKernelSDK`.
 - `tests/test_phx_uma_pool.cpp` and `tests/test_build34_uma_stage.py`: ASan/UBSan
-  unit tests (`7560` checks) and staging invariant tests, wired into `make test`
+  unit tests (`7562` checks) and staging invariant tests, wired into `make test`
   and `make test-build34-uma-vram`.
 
 ### Phase 1 (Read-Only Probe on Start)
@@ -230,7 +231,7 @@ and publishes `phx-uma-*` properties on the `PhxBringup` IORegistry entry:
 
 1. Reads `RCC_CONFIG_MEMSIZE`, `IP_DISCOVERY_VERSION`, `DRIVER_SCRATCH_0..2`,
    and verifies the IP Discovery signature (`0x282114`) via `MM_INDEX`/`MM_DATA`.
-2. Samples 128 dwords across the first 16 MiB of `phx-fb-phys` vs BAR0
+2. Samples 4096 stride-spaced dwords across the first 16 MiB of `phx-fb-phys` vs BAR0
    (`kIOMapWriteCombineCache`, read-only) to confirm `phx-fb-phys` aliases VRAM.
 3. Maps the EFI memory map pointed to by `PE_state.bootArgs` read-only and
    classifies both the 64 MiB pilot window and the full high-UMA window with
@@ -240,7 +241,8 @@ Default runtime behavior is completely unchanged (`debug.phx_uma_vram = 0`).
 
 ### Phase 2 (Opt-In `debug.phx_uma_vram` High-VRAM Pool)
 
-Controlled at runtime via `sysctl debug.phx_uma_vram`:
+Controlled at runtime via `sysctl debug.phx_uma_vram` (or at boot via optional
+boot-arg `phx_uma_vram=1` or `phx_uma_vram=2`; default remains `0`):
 
 - `0` (default): off; stock build34 system-memory BO path unchanged.
 - `1`: admits the 64 MiB pilot window `[256 MiB, 320 MiB)` only if Phase 1
@@ -248,16 +250,34 @@ Controlled at runtime via `sysctl debug.phx_uma_vram`:
   host exclusion.
 - `2`: admits the full verified high-UMA window `[256 MiB, fbSize - 64 MiB)`
   (~3776 MiB on a 4 GiB carve-out, yielding ~4032 MiB total VRAM when combined
-  with 256 MiB visible VRAM) only if Phase 1 proved full-window coverage.
+  with 256 MiB visible VRAM) only if Phase 1 proved full-window coverage. Because
+  RADV on Phoenix APU (`has_dedicated_vram == 0`) discards `vram_hi_total` and
+  computes `DEVICE_LOCAL = 2/3 * (vram_vis_total + gtt_cap)` and
+  `GTT = 1/3 * (vram_vis_total + gtt_cap)`, mode `2` reports the combined
+  visible + verified high-UMA pool (`4032 MiB`) in `vram_vis_*` together with a
+  `2048 MiB` `gtt_cap` so Vulkan/Metal see a `~4053 MiB` `DEVICE_LOCAL` heap
+  and `~2026 MiB` GTT heap, while `doBoCreate()` keeps CPU-mappable VRAM BOs
+  strictly bounded to `kVisTotal` (`256 MiB`) and places `NO_CPU_ACCESS` VRAM
+  BOs in the real high-UMA pool (`kMaxAllocs = 2048`, `kPtChunks = 192` for
+  ~6 GiB mappable GPU VA per VMID).
 
 Safety invariants enforced by the staged kext:
 
 - High-UMA BOs are admitted only for `VRAM | NO_CPU_ACCESS` requests without
   `CPU_ACCESS_REQUIRED`.
 - `clientMemoryForType()` refuses CPU mmap (`kIOReturnUnsupported`) on UMA BOs.
-- `doGemVa()` refuses `PHX_AMDGPU_VM_PAGE_EXECUTABLE` mappings on UMA BOs and
-  decodes `AMDGPU_VM_PAGE_WRITEABLE` (`1u << 2`) for read-only vs read-write
-  local PTEs.
+- `doGemVa()` accepts `PHX_AMDGPU_VM_PAGE_EXECUTABLE` on UMA BOs (RADV maps
+  every VRAM BO EXECUTABLE; refusing it made `vkQueueSubmit` fail with
+  `VK_ERROR_OUT_OF_DEVICE_MEMORY` in the first live run) and decodes
+  `AMDGPU_VM_PAGE_WRITEABLE` (`1u << 2`) for read-only vs read-write local
+  PTEs.
+- `doSubmit()` refuses an IB whose VA lands on a UMA BO mapping (`ibCovered`
+  treats UMA-backed EXEC maps as non-covering). Live bisect on 2026-11-28:
+  GPU `WRITE_DATA`/`COPY_DATA` to, from and within the high UMA window all
+  pass, an IB copied into the window reads back verbatim, but the CP faulting
+  on instruction fetch from it trips a GPUVM fault that hangs the queue until
+  the hang killer recovers it. RADV keeps every IB in GTT, so this is a
+  safety net, not a restriction.
 - Each UMA allocation is zeroed via write-combining alias mapping + `sfence` +
   `hdpFlush()` before handoff; zeroing failure quarantines the slot.
 - `doBoFree()` unmaps PTEs and waits for GPU retirement outside `lock` before
@@ -289,11 +309,40 @@ No EFI/kext installation or reboot is performed automatically. When approved:
    candidate; reboot with default `debug.phx_uma_vram = 0`.
 2. Verify Phase 1 read-only evidence via `ioreg -rn PhxBringup`: confirm
    `phx-uma-discovery-valid = Yes`, `phx-uma-alias-matched = Yes`,
-   `phx-uma-pilot-host-status = 1` (`ReservedTypeOnly`), and
-   `phx-uma-full-host-status = 1`.
+   `phx-uma-pilot-host-status = 7` (`ReservedTypeOnly`), and
+   `phx-uma-full-host-status = 7`.
 3. Only if Phase 1 checks pass, opt in to the 64 MiB pilot:
    `sudo sysctl -w debug.phx_uma_vram=1`, run a Vulkan/Metal client, and check
    `sysctl debug.phx_uma_vram_allocs debug.phx_uma_vram_frees debug.phx_uma_vram_bytes debug.phx_uma_vram_faults`.
 4. If the 64 MiB pilot succeeds with zero faults/artifacts, reboot or test
    mode `2` (`sudo sysctl -w debug.phx_uma_vram=2`) to expose the full verified
    high-UMA heap to RADV/Metal.
+
+### Live Hardware Verification (2026-11-28, Radeon 780M / macOS 26.7.2 25G332)
+
+Candidate v5 (`PhxBringup.kext`, UUID `FDB05A5C-EFBF-3341-887C-550F27B7F8AC`,
+SHA-256 `9beca4446c8c010643598e7b464d884ba7c554e295d0cfc82ed0fb917b49b58f`) was
+installed to EFI and verified on real hardware:
+
+- **Phase 1 read-only probe**: `phx-fb-size = 4 GiB`, `phx-fb-aper-len = 256 MiB`,
+  `phx-uma-rcc-memsize-mb = 4096`, `phx-uma-discovery-valid = Yes` (`0x28211407`),
+  `phx-uma-alias-matched = Yes` (`4096/4096`, `73` non-zero samples),
+  `phx-uma-pilot-host-status = 7` (`ReservedTypeOnly`),
+  `phx-uma-full-host-status = 7` (`ReservedTypeOnly`),
+  `phx-uma-full-bytes = 3776 MiB`.
+- **Vulkan (`debug.phx_uma_vram = 2`)**: RADV reports
+  `VRAM 4032 MiB visible + 0 MiB hi, GTT cap 2048 MiB`, exposing
+  `heap[1]` (`VK_MEMORY_HEAP_DEVICE_LOCAL_BIT`): **4053 MiB** (budget **4053 MiB**)
+  and `heap[0]` (GTT): **2026 MiB** (budget **2026 MiB**).
+- **Large BO + IB-in-UMA guard**: `BOCREATE` + `GEMVA` of a single `2048 MiB`
+  high-UMA BO succeeds (`kPtChunks = 192`); CPU mmap is refused (`0xe00002c2`);
+  submitting an IB whose VA lands in high UMA is cleanly refused (`0xe00002c2`)
+  with zero GPUVM faults and zero hangs; GPU `WRITE_DATA` and `COPY_DATA`
+  readbacks pass verbatim.
+- **Metal end-to-end stress**: `128 MiB` Private buffer blit roundtrip passes
+  directly on UMA (`allocs=2, frees=2, fallbacks=0, faults=0`);
+  `10 × 256 MiB` (`2561 MiB` peak, default NVMTL headroom) and
+  `14 × 256 MiB` (`3585 MiB` peak with `NVMTL_VRAM_HEADROOM_MB=128`) live
+  `MTLResourceStorageModePrivate` buffers all allocate in real UMA VRAM, pass
+  GPU blit readback, and release cleanly on exit with `fallbacks = 0`,
+  `faults = 0`, and `debug.phx_hang_kills = 0`.
